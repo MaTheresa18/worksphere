@@ -1030,4 +1030,16 @@ class TeamController extends Controller
 
         return response()->json($team->fresh());
     }
+
+    /**
+     * Remove the team avatar.
+     */
+    public function deleteAvatar(Team $team): JsonResponse
+    {
+        $this->authorize('update', $team);
+
+        $team->clearMediaCollection('avatars');
+
+        return response()->json($team->fresh());
+    }
 }

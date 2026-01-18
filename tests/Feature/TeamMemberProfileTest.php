@@ -142,4 +142,30 @@ class TeamMemberProfileTest extends TestCase
         $this->assertNotNull($media);
         $this->assertEquals('public', $media->disk);
     }
+
+    public function test_team_owner_can_remove_avatar()
+    {
+        $owner = User::factory()->create();
+        $team = Team::factory()->create(['owner_id' => $owner->id]);
+
+        $team->members()->syncWithoutDetaching([
+            $owner->id => ['role' => 'owner'],
+        ]);
+
+        // Upload first
+        $file = UploadedFile::fake()->image('avatar.jpg');
+        $this->actingAs($owner)
+            ->postJson("/api/teams/{$team->public_id}/avatar", [
+                'avatar' => $file,
+            ]);
+
+        $this->assertCount(1, $team->fresh()->getMedia('avatars'));
+
+        // Delete
+        $response = $this->actingAs($owner)
+            ->deleteJson("/api/teams/{$team->public_id}/avatar");
+
+        $response->assertStatus(200);
+        $this->assertCount(0, $team->fresh()->getMedia('avatars'));
+    }
 }

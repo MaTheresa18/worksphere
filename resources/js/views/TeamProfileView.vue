@@ -126,67 +126,6 @@ function handleEventClick(info) {
     const props = info.event.extendedProps;
     if (props.type === "event" && props.can_edit) {
         selectedEvent.value = {
-            id: info.event.id,
-            title: info.event.title,
-            start_time: info.event.startStr,
-            end_time: info.event.endStr,
-            is_all_day: info.event.allDay,
-            color: info.event.backgroundColor,
-            location: props.location,
-            description: props.description,
-        };
-        showEventModal.value = true;
-    } else if (props.type === "project") {
-        router.push({
-            name: "admin-project-detail",
-            params: { id: props.project_id },
-        });
-    }
-}
-
-const avatarInput = ref(null);
-const isUploadingAvatar = ref(false);
-
-function triggerAvatarUpload() {
-    avatarInput.value.click();
-}
-
-async function handleAvatarUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    if (file.size > 2 * 1024 * 1024) {
-        toast.error("Avatar must be less than 2MB");
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append("avatar", file);
-
-    isUploadingAvatar.value = true;
-    try {
-        await axios.post(
-            `/api/teams/${team.value.public_id}/avatar`,
-            formData,
-            {
-                headers: { "Content-Type": "multipart/form-data" },
-            },
-        );
-        toast.success("Team avatar updated");
-        await fetchTeam(); // Refresh team data to show new avatar
-    } catch (error) {
-        toast.error("Failed to update avatar");
-    } finally {
-        isUploadingAvatar.value = false;
-        event.target.value = ""; // Reset input
-    }
-}
-
-function handleExportEvents(range) {
-    if (!range?.start || !range?.end) {
-        toast.error("Please select a date range first");
-        return;
-    }
 
     const params = new URLSearchParams({
         start: format(range.start, "yyyy-MM-dd"),
@@ -893,14 +832,26 @@ const canRemoveMember = (member) => {
                                 />
                                 <div
                                     v-if="isOwner"
-                                    class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white"
-                                    @click="triggerAvatarUpload"
+                                    class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white gap-3"
                                 >
                                     <div
-                                        v-if="isUploadingAvatar"
-                                        class="animate-spin rounded-full h-6 w-6 border-b-2 border-white"
-                                    ></div>
-                                    <Upload v-else class="h-6 w-6" />
+                                        class="p-2 hover:bg-white/20 rounded-full cursor-pointer transition-colors"
+                                        @click="triggerAvatarUpload"
+                                        title="Upload new avatar"
+                                    >
+                                        <div
+                                            v-if="isUploadingAvatar"
+                                            class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"
+                                        ></div>
+                                        <Upload v-else class="h-5 w-5" />
+                                    </div>
+                                    <div
+                                        class="p-2 hover:bg-red-500/80 rounded-full cursor-pointer transition-colors text-red-200 hover:text-white"
+                                        @click.stop="removeAvatar"
+                                        title="Remove avatar"
+                                    >
+                                        <Trash2 class="h-5 w-5" />
+                                    </div>
                                 </div>
                                 <input
                                     type="file"
