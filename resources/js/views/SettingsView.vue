@@ -34,6 +34,7 @@ import {
     Camera,
     Plus,
     FileText,
+    Move,
 } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 
@@ -257,13 +258,13 @@ const isDisablingEmail = ref(false);
 
 // Computed safe accessors for 2FA methods
 const isTotpEnabled = computed(
-    () => twoFactorStatus.value.enabledMethods?.includes("totp") ?? false
+    () => twoFactorStatus.value.enabledMethods?.includes("totp") ?? false,
 );
 const isSmsEnabled = computed(
-    () => twoFactorStatus.value.enabledMethods?.includes("sms") ?? false
+    () => twoFactorStatus.value.enabledMethods?.includes("sms") ?? false,
 );
 const isEmailEnabled = computed(
-    () => twoFactorStatus.value.enabledMethods?.includes("email") ?? false
+    () => twoFactorStatus.value.enabledMethods?.includes("email") ?? false,
 );
 
 // File Upload Refs
@@ -274,6 +275,158 @@ const selectedAvatar = ref(null);
 const avatarPreview = ref(null);
 const selectedCover = ref(null);
 const coverPreview = ref(null);
+
+// Cover Photo Repositioning
+const isCoverLoaded = ref(false);
+const onCoverLoad = () => {
+    isCoverLoaded.value = true;
+};
+
+// Reset loaded state when preview changes
+watch(coverPreview, () => {
+    isCoverLoaded.value = false;
+});
+
+const togglePush = async (value) => {
+    if (value) {
+        if (!("Notification" in window)) {
+            toast.error("This browser does not support desktop notifications");
+            return;
+        }
+
+        if (Notification.permission === "granted") {
+            notifications.value.push = true;
+        } else if (Notification.permission !== "denied") {
+            const permission = await Notification.requestPermission();
+            if (permission === "granted") {
+                notifications.value.push = true;
+                toast.success("Notifications enabled!");
+            } else {
+                notifications.value.push = false;
+                toast.error("Permission denied. Check browser settings.");
+            }
+        } else {
+            // value is true (user tried to turn on), but permission denied
+            notifications.value.push = false;
+            toast.error(
+                "Notifications are blocked. Please enable them in your browser settings.",
+            );
+        }
+    } else {
+        notifications.value.push = false;
+    }
+};
+
+const isRepositioning = ref(false);
+const coverOffsetY = ref(50); // Default to center (50%)
+const isDraggingCover = ref(false);
+const dragStartY = ref(0);
+const startOffsetY = ref(0);
+
+const startReposition = () => {
+    isRepositioning.value = true;
+    // Load existing preference or default to 50
+    const existing = appearance.value.cover_offset;
+    coverOffsetY.value = existing !== undefined ? existing : 50;
+};
+
+const cancelReposition = () => {
+    isRepositioning.value = false;
+    isDraggingCover.value = false;
+    // Reset to saved value
+    const existing = appearance.value.cover_offset;
+    coverOffsetY.value = existing !== undefined ? existing : 50;
+};
+
+const saveReposition = async () => {
+    try {
+        await api.put("/api/user/preferences", {
+            appearance: {
+                ...appearance.value,
+                cover_offset: Math.round(coverOffsetY.value),
+            },
+        });
+
+        // Update local state
+        appearance.value.cover_offset = Math.round(coverOffsetY.value);
+        if (authStore.user.preferences) {
+            if (!authStore.user.preferences.appearance)
+                authStore.user.preferences.appearance = {};
+            authStore.user.preferences.appearance.cover_offset = Math.round(
+                coverOffsetY.value,
+            );
+        }
+
+        isRepositioning.value = false;
+        toast.success("Cover position saved");
+    } catch (error) {
+        toast.error("Failed to save position");
+    }
+};
+
+const onCoverMouseDown = (e) => {
+    if (!isRepositioning.value) return;
+    e.preventDefault(); // Prevent image drag behavior
+    isDraggingCover.value = true;
+    dragStartY.value = e.clientY || e.touches?.[0].clientY;
+    startOffsetY.value = coverOffsetY.value;
+
+    // Add global listeners to handle drag outside container
+    document.addEventListener("mousemove", onCoverMouseMove);
+    document.addEventListener("mouseup", onCoverMouseUp);
+    document.addEventListener("touchmove", onCoverMouseMove, {
+        passive: false,
+    });
+    document.addEventListener("touchend", onCoverMouseUp);
+};
+
+const onCoverMouseMove = (e) => {
+    if (!isDraggingCover.value) return;
+
+    // For touch events
+    if (e.type === "touchmove") {
+        e.preventDefault();
+    }
+
+    const clientY = e.clientY || e.touches?.[0].clientY;
+    const deltaY = clientY - dragStartY.value;
+
+    // Sensitivity factor: how many pixels of drag = 1% of offset
+    // This depends on image height vs container height, but let's estimate
+    // If container is 128px (h-32), and image is larger.
+    // Moving 1px should change percentage slightly.
+    // Let's say moving full height (128px) should cover 0 to 100? No, that's too fast.
+    const sensitivity = 0.5;
+
+    let newOffset = startOffsetY.value - deltaY * sensitivity;
+
+    // Clamp between 0 and 100
+    newOffset = Math.max(0, Math.min(100, newOffset));
+
+    coverOffsetY.value = newOffset;
+};
+
+const onCoverMouseUp = () => {
+    isDraggingCover.value = false;
+    document.removeEventListener("mousemove", onCoverMouseMove);
+    document.removeEventListener("mouseup", onCoverMouseUp);
+    document.removeEventListener("touchmove", onCoverMouseMove);
+    document.removeEventListener("touchend", onCoverMouseUp);
+};
+
+const coverStyle = computed(() => {
+    return {
+        objectPosition: `center ${coverOffsetY.value}%`,
+        cursor: isRepositioning.value
+            ? isDraggingCover.value
+                ? "grabbing"
+                : "grab"
+            : "default",
+        transition: isDraggingCover.value
+            ? "none"
+            : "object-position 0.2s ease-out",
+    };
+});
 
 // Initialize profile from auth store
 const initProfile = () => {
@@ -299,14 +452,19 @@ const initProfile = () => {
                     ...appearance.value,
                     ...authStore.user.preferences.appearance,
                 };
+                if (
+                    authStore.user.preferences.appearance.cover_offset !==
+                    undefined
+                ) {
+                    coverOffsetY.value =
+                        authStore.user.preferences.appearance.cover_offset;
+                }
             }
         }
     }
 };
 
 // ...
-
-
 
 // Save profile
 const saveProfile = async () => {
@@ -326,7 +484,7 @@ const saveProfile = async () => {
             const formData = new FormData();
             formData.append("avatar", selectedAvatar.value);
             await api.post("/api/user/avatar", formData, {
-                headers: { "Content-Type": "multipart/form-data" },
+                headers: { "Content-Type": null },
             });
         }
 
@@ -335,7 +493,7 @@ const saveProfile = async () => {
             const formData = new FormData();
             formData.append("cover", selectedCover.value);
             await api.post("/api/user/cover", formData, {
-                headers: { "Content-Type": "multipart/form-data" },
+                headers: { "Content-Type": null },
             });
         }
 
@@ -367,7 +525,7 @@ const saveProfile = async () => {
         toast.success("Profile updated successfully");
     } catch (error) {
         toast.error(
-            error.response?.data?.message || "Failed to update profile"
+            error.response?.data?.message || "Failed to update profile",
         );
     } finally {
         isSaving.value = false;
@@ -430,7 +588,7 @@ const handleDocumentUpload = async (event) => {
     isUploadingDocument.value = true;
     try {
         await api.post("/api/user/documents", formData, {
-            headers: { "Content-Type": "multipart/form-data" },
+            headers: { "Content-Type": null },
         });
         await authStore.fetchUser();
         // We also need to re-fetch details if we want the files list to update immediately if it relies on a separate endpoint?
@@ -580,7 +738,7 @@ const revokeSession = async (sessionId) => {
         toast.success("Session revoked");
     } catch (error) {
         toast.error(
-            error.response?.data?.message || "Failed to revoke session"
+            error.response?.data?.message || "Failed to revoke session",
         );
     } finally {
         isRevokingSession.value = null;
@@ -618,7 +776,7 @@ const fetchSocialAccounts = async () => {
 const disconnectSocial = async (provider) => {
     if (
         !confirm(
-            `Disconnect ${provider}? You'll need to use your password to login.`
+            `Disconnect ${provider}? You'll need to use your password to login.`,
         )
     )
         return;
@@ -626,7 +784,7 @@ const disconnectSocial = async (provider) => {
     try {
         await api.delete(`/api/user/social-accounts/${provider}`);
         socialAccounts.value = socialAccounts.value.filter(
-            (a) => a.provider !== provider
+            (a) => a.provider !== provider,
         );
         toast.success(`${provider} disconnected`);
     } catch (error) {
@@ -683,7 +841,7 @@ const confirm2FA = async () => {
         });
         // Fetch recovery codes
         const codesResponse = await api.get(
-            "/api/user/two-factor-recovery-codes"
+            "/api/user/two-factor-recovery-codes",
         );
         twoFactorRecoveryCodes.value = codesResponse.data || [];
         twoFAStep.value = "recovery";
@@ -691,7 +849,7 @@ const confirm2FA = async () => {
         toast.success("Two-factor authentication enabled");
     } catch (error) {
         toast.error(
-            error.response?.data?.message || "Invalid verification code"
+            error.response?.data?.message || "Invalid verification code",
         );
     } finally {
         isConfirming2FA.value = false;
@@ -731,7 +889,7 @@ const disable2FA = async () => {
         toast.error(
             error.response?.data?.errors?.password?.[0] ||
                 error.response?.data?.message ||
-                "Failed to disable 2FA"
+                "Failed to disable 2FA",
         );
     } finally {
         isDisabling2FA.value = false;
@@ -751,7 +909,7 @@ const regenerateRecoveryCodes = async () => {
         toast.success("New recovery codes generated");
     } catch (error) {
         toast.error(
-            error.response?.data?.message || "Failed to regenerate codes"
+            error.response?.data?.message || "Failed to regenerate codes",
         );
     } finally {
         isRegeneratingCodes.value = false;
@@ -832,7 +990,7 @@ const enableSms2FA = async () => {
 
 const resendSmsCode = async () => {
     if (smsResendCountdown.value > 0) return;
-    
+
     isSendingSmsCode.value = true;
     try {
         await api.post("/api/user/two-factor-sms/verify/send");
@@ -844,7 +1002,9 @@ const resendSmsCode = async () => {
             const retryAfter = error.response?.data?.retry_after || 60;
             smsResendCountdown.value = retryAfter;
             startSmsCountdown();
-            toast.error(`Please wait ${retryAfter} seconds before requesting another code`);
+            toast.error(
+                `Please wait ${retryAfter} seconds before requesting another code`,
+            );
         } else {
             toast.error(error.response?.data?.message || "Failed to send code");
         }
@@ -885,7 +1045,7 @@ const verifySmsCode = async () => {
         await fetch2FAStatus();
     } catch (error) {
         toast.error(
-            error.response?.data?.message || "Invalid verification code"
+            error.response?.data?.message || "Invalid verification code",
         );
     } finally {
         isVerifyingSmsCode.value = false;
@@ -900,7 +1060,7 @@ const disableSms2FA = async () => {
         await fetch2FAStatus();
     } catch (error) {
         toast.error(
-            error.response?.data?.message || "Failed to disable SMS 2FA"
+            error.response?.data?.message || "Failed to disable SMS 2FA",
         );
     } finally {
         isDisablingSms.value = false;
@@ -916,7 +1076,7 @@ const enableEmail2FA = async () => {
         await fetch2FAStatus();
     } catch (error) {
         toast.error(
-            error.response?.data?.message || "Failed to enable Email 2FA"
+            error.response?.data?.message || "Failed to enable Email 2FA",
         );
     } finally {
         isEnablingEmail.value = false;
@@ -931,7 +1091,7 @@ const disableEmail2FA = async () => {
         await fetch2FAStatus();
     } catch (error) {
         toast.error(
-            error.response?.data?.message || "Failed to disable Email 2FA"
+            error.response?.data?.message || "Failed to disable Email 2FA",
         );
     } finally {
         isDisablingEmail.value = false;
@@ -1016,7 +1176,9 @@ onMounted(() => {
                         >
 
                         <div
-                            class="relative group h-32 w-full rounded-xl overflow-hidden bg-[var(--surface-secondary)] border border-[var(--border-default)]"
+                            class="relative group h-32 w-full rounded-xl overflow-hidden bg-[var(--surface-secondary)] border border-[var(--border-default)] select-none"
+                            @mousedown="onCoverMouseDown"
+                            @touchstart="onCoverMouseDown"
                         >
                             <img
                                 v-if="
@@ -1027,23 +1189,80 @@ onMounted(() => {
                                     coverPreview ||
                                     authStore.user.cover_photo_url
                                 "
-                                class="w-full h-full object-cover"
+                                class="w-full h-full object-cover pointer-events-none transition-opacity duration-500"
+                                :class="{
+                                    'opacity-0': !isCoverLoaded,
+                                    'opacity-100': isCoverLoaded,
+                                }"
+                                :style="coverStyle"
                                 alt="Cover Photo"
+                                @load="onCoverLoad"
                             />
                             <div
                                 v-else
                                 class="w-full h-full bg-gradient-to-r from-[var(--color-primary-500)] to-[var(--color-primary-700)]"
                             ></div>
 
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                class="absolute top-4 right-4 bg-black/20 text-white hover:bg-black/30 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                                @click="triggerCoverUpload"
+                            <!-- Reposition Overlay -->
+                            <div
+                                v-if="isRepositioning"
+                                class="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[2px]"
+                                :class="{ 'opacity-0': isDraggingCover }"
                             >
-                                <Camera class="h-4 w-4 mr-2" />
-                                Change cover
-                            </Button>
+                                <p
+                                    class="text-white font-medium drop-shadow-md"
+                                >
+                                    Drag to Reposition
+                                </p>
+                            </div>
+
+                            <!-- Reposition Controls -->
+                            <div
+                                v-if="isRepositioning"
+                                class="absolute bottom-4 right-4 flex gap-2 z-20"
+                                @mousedown.stop
+                                @touchstart.stop
+                            >
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    @click.stop="cancelReposition"
+                                >
+                                    Cancel
+                                </Button>
+                                <Button size="sm" @click.stop="saveReposition">
+                                    Save
+                                </Button>
+                            </div>
+
+                            <!-- Initial Actions -->
+                            <div
+                                v-else
+                                class="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <Button
+                                    v-if="
+                                        !coverPreview &&
+                                        authStore.user?.cover_photo_url
+                                    "
+                                    variant="ghost"
+                                    size="sm"
+                                    class="bg-black/20 text-white hover:bg-black/30 backdrop-blur-sm"
+                                    @click="startReposition"
+                                >
+                                    <Move class="h-4 w-4 mr-2" />
+                                    Reposition
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    class="bg-black/20 text-white hover:bg-black/30 backdrop-blur-sm"
+                                    @click="triggerCoverUpload"
+                                >
+                                    <Camera class="h-4 w-4 mr-2" />
+                                    Change cover
+                                </Button>
+                            </div>
                         </div>
 
                         <div
@@ -1192,7 +1411,7 @@ onMounted(() => {
                                         newSkill === '' &&
                                         profile.skills.length > 0
                                             ? removeSkill(
-                                                  profile.skills.length - 1
+                                                  profile.skills.length - 1,
                                               )
                                             : null
                                     "
@@ -1528,7 +1747,7 @@ onMounted(() => {
                                         Added
                                         {{
                                             new Date(
-                                                passkey.created_at
+                                                passkey.created_at,
                                             ).toLocaleDateString()
                                         }}
                                     </p>
@@ -1870,7 +2089,8 @@ onMounted(() => {
                             description="Receive notifications via email"
                         />
                         <Switch
-                            v-model="notifications.push"
+                            :model-value="notifications.push"
+                            @update:model-value="togglePush"
                             label="Push notifications"
                             description="Receive push notifications in your browser"
                         />
@@ -2077,10 +2297,10 @@ onMounted(() => {
                                         account.provider === 'google'
                                             ? 'bg-red-500/10'
                                             : account.provider === 'github'
-                                            ? 'bg-gray-500/10'
-                                            : account.provider === 'facebook'
-                                            ? 'bg-blue-500/10'
-                                            : 'bg-[var(--surface-secondary)]',
+                                              ? 'bg-gray-500/10'
+                                              : account.provider === 'facebook'
+                                                ? 'bg-blue-500/10'
+                                                : 'bg-[var(--surface-secondary)]',
                                     ]"
                                 >
                                     <!-- Google Icon -->
@@ -2161,7 +2381,7 @@ onMounted(() => {
                                         {{
                                             account.connected_at
                                                 ? new Date(
-                                                      account.connected_at
+                                                      account.connected_at,
                                                   ).toLocaleDateString()
                                                 : ""
                                         }}
@@ -2190,7 +2410,7 @@ onMounted(() => {
                             <Button
                                 v-if="
                                     !socialAccounts.some(
-                                        (a) => a.provider === 'google'
+                                        (a) => a.provider === 'google',
                                     )
                                 "
                                 variant="outline"
@@ -2222,7 +2442,7 @@ onMounted(() => {
                             <Button
                                 v-if="
                                     !socialAccounts.some(
-                                        (a) => a.provider === 'github'
+                                        (a) => a.provider === 'github',
                                     )
                                 "
                                 variant="outline"
@@ -2418,8 +2638,8 @@ onMounted(() => {
                                         @click="
                                             navigator.clipboard.writeText(
                                                 twoFactorRecoveryCodes.join(
-                                                    '\n'
-                                                )
+                                                    '\n',
+                                                ),
                                             );
                                             toast.success('Codes copied!');
                                         "
@@ -2440,10 +2660,10 @@ onMounted(() => {
                                             const file = new Blob(
                                                 [
                                                     twoFactorRecoveryCodes.join(
-                                                        '\n'
+                                                        '\n',
                                                     ),
                                                 ],
-                                                { type: 'text/plain' }
+                                                { type: 'text/plain' },
                                             );
                                             element.href =
                                                 URL.createObjectURL(file);
@@ -2669,13 +2889,26 @@ onMounted(() => {
                             <button
                                 type="button"
                                 class="text-sm transition-colors"
-                                :class="smsResendCountdown > 0 || isSendingSmsCode ? 'text-[var(--text-muted)] cursor-not-allowed' : 'text-[var(--interactive-primary)] hover:underline'"
-                                :disabled="isSendingSmsCode || smsResendCountdown > 0"
+                                :class="
+                                    smsResendCountdown > 0 || isSendingSmsCode
+                                        ? 'text-[var(--text-muted)] cursor-not-allowed'
+                                        : 'text-[var(--interactive-primary)] hover:underline'
+                                "
+                                :disabled="
+                                    isSendingSmsCode || smsResendCountdown > 0
+                                "
                                 @click="resendSmsCode"
                             >
-                                <template v-if="isSendingSmsCode">Sending...</template>
-                                <template v-else-if="smsResendCountdown > 0">Resend code in {{ smsResendCountdown }}s</template>
-                                <template v-else>Didn't receive code? Resend</template>
+                                <template v-if="isSendingSmsCode"
+                                    >Sending...</template
+                                >
+                                <template v-else-if="smsResendCountdown > 0"
+                                    >Resend code in
+                                    {{ smsResendCountdown }}s</template
+                                >
+                                <template v-else
+                                    >Didn't receive code? Resend</template
+                                >
                             </button>
                             <div class="flex gap-3 pt-2">
                                 <Button

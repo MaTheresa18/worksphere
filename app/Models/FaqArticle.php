@@ -100,7 +100,7 @@ class FaqArticle extends Model implements HasMedia
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('images')
-            ->useDisk('faq_media')
+            ->useDisk('private')
             ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']);
 
         $this->addMediaCollection('attachments')

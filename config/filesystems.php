@@ -70,7 +70,7 @@ return [
             'visibility' => 'private',
         ],
 
-        'faq_media' => [
+        'faq_media' => $cloudDisks['private'] ?? [
             'driver' => 'local',
             'root' => storage_path('app/private/faq_media'),
             'serve' => false,

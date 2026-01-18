@@ -209,12 +209,7 @@ function getTrendIcon(trend: string) {
                             :class="{ 'animate-spin': isRefreshing }"
                         />
                     </Button>
-                    <Button
-                        class="shadow-lg shadow-[var(--color-primary-500)]/25"
-                    >
-                        <Plus class="h-4 w-4" />
-                        New Project
-                    </Button>
+    
                 </div>
             </div>
 

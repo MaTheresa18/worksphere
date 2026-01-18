@@ -139,7 +139,7 @@ class ChatMessage extends Model implements HasMedia
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('chat_attachments')
-            ->useDisk('public')
+            ->useDisk('private')
             ->acceptsMimeTypes([
                 // Images
                 'image/jpeg',

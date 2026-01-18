@@ -7,7 +7,9 @@
         </div>
 
         <div v-else-if="error" class="text-center py-12">
-            <div class="bg-red-50 text-red-600 p-4 rounded-lg inline-block">
+            <div
+                class="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-lg inline-block"
+            >
                 {{ error }}
             </div>
         </div>
@@ -18,8 +20,27 @@
                 class="bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 overflow-hidden"
             >
                 <div
-                    class="h-32 bg-gradient-to-r from-brand-500 to-indigo-600 relative"
+                    class="h-32 bg-[var(--surface-secondary)] relative overflow-hidden"
                 >
+                    <img
+                        v-if="user.cover_photo_url"
+                        :src="user.cover_photo_url"
+                        :alt="user.name + ' Cover'"
+                        class="w-full h-full object-cover transition-opacity duration-500"
+                        :class="{
+                            'opacity-0': !isCoverLoaded,
+                            'opacity-100': isCoverLoaded,
+                        }"
+                        :style="{
+                            objectPosition: `center ${user.cover_photo_offset ?? 50}%`,
+                        }"
+                        @load="onCoverLoad"
+                    />
+                    <div
+                        v-else
+                        class="w-full h-full bg-gradient-to-r from-brand-500 to-indigo-600"
+                    ></div>
+
                     <div class="absolute -bottom-12 left-8">
                         <img
                             :src="user.avatar_url"
@@ -188,21 +209,40 @@ interface UserProfile {
     joined_at: string;
     role_level: number;
     email?: string;
+    cover_photo_url?: string | null;
+    cover_photo_offset?: number;
 }
 
 const user = ref<UserProfile | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
+const isCoverLoaded = ref(false);
+const onCoverLoad = () => {
+    isCoverLoaded.value = true;
+};
+
+watch(
+    () => user.value?.cover_photo_url,
+    () => {
+        isCoverLoaded.value = false;
+    },
+);
 
 const fetchProfile = async () => {
     loading.value = true;
     error.value = null;
     const publicId = route.params.public_id as string;
 
+    if (!publicId) {
+        error.value = "No user ID provided.";
+        loading.value = false;
+        return;
+    }
+
     try {
-        // Updated backend route is /users/{user}/profile, assuming {user} matches route key 'public_id'
-        const response = await api.get(`/users/${publicId}/profile`);
-        user.value = response.data.data;
+        // API endpoint includes /api prefix via the api client
+        const response = await api.get(`/api/users/${publicId}/profile`);
+        user.value = response.data.data || response.data;
     } catch (err: any) {
         console.error("Failed to load profile", err);
         if (err.response?.status === 403) {

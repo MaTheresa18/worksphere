@@ -555,6 +555,17 @@ const routes: RouteRecordRaw[] = [
                 meta: {
                     title: 'Settings',
                     breadcrumb: 'Settings',
+                    breadcrumbParent: { name: 'profile', label: 'Profile' },
+                    transition: 'slide-fade',
+                },
+            },
+            {
+                path: 'profile',
+                name: 'profile',
+                component: ProfileView,
+                meta: {
+                    title: 'My Profile',
+                    breadcrumb: 'Profile',
                     transition: 'slide-fade',
                 },
             },
@@ -872,16 +883,6 @@ const routes: RouteRecordRaw[] = [
                 meta: {
                     title: 'User Profile',
                     breadcrumb: 'Profile',
-                    transition: 'slide-fade',
-                },
-            },
-            {
-                path: 'teams/:id',
-                name: 'team-profile',
-                component: () => import('@/views/TeamProfileView.vue'), // Assuming TeamProfileView is imported directly or this is a typo and should be () => import(...)
-                meta: {
-                    title: 'Team Profile',
-                    breadcrumb: 'Team',
                     transition: 'slide-fade',
                 },
             },

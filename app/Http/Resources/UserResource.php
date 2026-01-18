@@ -29,6 +29,7 @@ class UserResource extends JsonResource
             'avatar_url' => $this->avatar_url,
             'avatar_thumb_url' => $this->avatar_thumb_url,
             'cover_photo_url' => $this->cover_photo_url,
+            'cover_photo_offset' => $this->preferences['appearance']['cover_offset'] ?? 50,
             'title' => $this->title,
             'bio' => $this->bio,
             'location' => $this->location,

@@ -35,7 +35,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, WebAuth
             ->useDisk('public');
 
         $this->addMediaCollection('documents')
-            ->useDisk('local'); // Private disk for documents
+            ->useDisk('private'); // Private disk for documents (persists on cloud)
     }
 
     public function registerMediaConversions(?\Spatie\MediaLibrary\MediaCollections\Models\Media $media = null): void

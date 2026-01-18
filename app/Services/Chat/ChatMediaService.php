@@ -306,29 +306,31 @@ class ChatMediaService
 
     /**
      * Get the URL for a media file.
+     * Uses temporary signed URLs since chat attachments are on private disk.
      */
-    public function getMediaUrl(Media $media, ?string $conversion = null): string
+    public function getMediaUrl(Media $media, ?string $conversion = null, int $expiryMinutes = 60): string
     {
         if ($conversion && $media->hasGeneratedConversion($conversion)) {
-            return $media->getUrl($conversion);
+            return $media->getTemporaryUrl(now()->addMinutes($expiryMinutes), $conversion);
         }
 
-        return $media->getUrl();
+        return $media->getTemporaryUrl(now()->addMinutes($expiryMinutes));
     }
 
     /**
      * Get the thumbnail URL for a media file (for images).
+     * Uses temporary signed URLs since chat attachments are on private disk.
      */
-    public function getThumbUrl(Media $media): ?string
+    public function getThumbUrl(Media $media, int $expiryMinutes = 60): ?string
     {
         if (! str_starts_with($media->mime_type, 'image/')) {
             return null;
         }
 
         if ($media->hasGeneratedConversion('thumb')) {
-            return $media->getUrl('thumb');
+            return $media->getTemporaryUrl(now()->addMinutes($expiryMinutes), 'thumb');
         }
 
-        return $media->getUrl();
+        return $media->getTemporaryUrl(now()->addMinutes($expiryMinutes));
     }
 }

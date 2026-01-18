@@ -501,7 +501,28 @@ class TicketController extends Controller
     {
         $this->authorize('update', $ticket);
 
+        // First, look in direct ticket attachments
         $media = $ticket->getMedia('attachments')->firstWhere('uuid', $mediaId);
+
+        // If not found, search in comment attachments
+        if (! $media) {
+            $commentIds = $ticket->comments()->pluck('id');
+            $media = \Spatie\MediaLibrary\MediaCollections\Models\Media::where('collection_name', 'attachments')
+                ->where('model_type', \App\Models\TicketComment::class)
+                ->whereIn('model_id', $commentIds)
+                ->where('uuid', $mediaId)
+                ->first();
+        }
+
+        // If still not found, search in internal note attachments
+        if (! $media) {
+            $noteIds = $ticket->internalNotes()->pluck('id');
+            $media = \Spatie\MediaLibrary\MediaCollections\Models\Media::where('collection_name', 'attachments')
+                ->where('model_type', \App\Models\TicketInternalNote::class)
+                ->whereIn('model_id', $noteIds)
+                ->where('uuid', $mediaId)
+                ->first();
+        }
 
         if (! $media) {
             return response()->json(['message' => 'Attachment not found.'], 404);

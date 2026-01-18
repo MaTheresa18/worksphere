@@ -36,8 +36,6 @@ import {
     ArrowUpRight,
     ArrowDownRight,
     Minus,
-    // FileText removed
-    // Image, File removed
     Plus,
     UserPlus,
     X,
@@ -51,6 +49,20 @@ import {
     Link as LinkIcon,
     Unlink as UnlinkIcon,
     Archive as ArchiveIcon,
+    // Activity timeline icons
+    PlusCircle,
+    Edit,
+    UserMinus,
+    Upload,
+    FileX,
+    RefreshCw,
+    Key,
+    Shield,
+    Settings,
+    Eye,
+    LogOut,
+    LogIn,
+    MailCheck,
 } from "lucide-vue-next";
 import MediaManager from "@/components/tools/MediaManager.vue";
 import MediaViewer from "@/components/tools/MediaViewer.vue";
@@ -200,6 +212,11 @@ const isLoadingAttachments = ref(false);
 const isUploadingFile = ref(false);
 const uploadQueue = ref<any[]>([]);
 
+// Delete attachment modal state
+const showDeleteAttachmentModal = ref(false);
+const attachmentToDelete = ref<string | null>(null);
+const isDeletingAttachment = ref(false);
+
 onMounted(() => {
     fetchTicket();
 });
@@ -320,7 +337,7 @@ const allComments = computed(() => {
 
     return [...comments, ...notes].sort(
         (a, b) =>
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
 });
 
@@ -430,6 +447,145 @@ function formatRelativeTime(dateString: string) {
     return formatDate(dateString);
 }
 
+// Activity timeline helper functions
+const activityIconMap: Record<string, any> = {
+    "plus-circle": PlusCircle,
+    edit: Edit,
+    trash: Trash2,
+    "trash-2": Trash2,
+    "user-plus": UserPlus,
+    "user-minus": UserMinus,
+    upload: Upload,
+    "file-x": FileX,
+    "message-square": MessageSquare,
+    paperclip: Paperclip,
+    "refresh-cw": RefreshCw,
+    archive: ArchiveIcon,
+    key: Key,
+    shield: Shield,
+    lock: Lock,
+    settings: Settings,
+    eye: Eye,
+    "log-out": LogOut,
+    login: LogIn,
+    logout: LogOut,
+    "mail-check": MailCheck,
+    "alert-triangle": AlertTriangle,
+    "alert-circle": AlertCircle,
+    "check-circle": CheckCircle2,
+    ticket: Paperclip,
+};
+
+function getActivityIcon(iconName: string) {
+    if (!iconName) return Edit;
+    return activityIconMap[iconName] || Edit;
+}
+
+function getActivityIconStyle(action: string) {
+    const styleMap: Record<string, string> = {
+        created:
+            "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
+        ticket_created:
+            "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
+        updated:
+            "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
+        ticket_updated:
+            "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
+        deleted: "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400",
+        force_deleted:
+            "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400",
+        archived:
+            "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
+        ticket_status_changed:
+            "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400",
+        ticket_assigned:
+            "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400",
+        ticket_comment_added:
+            "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400",
+        ticket_attachment_added:
+            "bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400",
+        ticket_attachment_removed:
+            "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400",
+        file_uploaded:
+            "bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400",
+        file_deleted:
+            "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400",
+    };
+    return (
+        styleMap[action] ||
+        "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"
+    );
+}
+
+function getActivityActionText(activity: any) {
+    // Use action_label from API if available, otherwise generate from action
+    if (activity.action_label) {
+        return activity.action_label.toLowerCase();
+    }
+
+    const actionTextMap: Record<string, string> = {
+        created: "created this ticket",
+        updated: "updated this ticket",
+        deleted: "deleted this ticket",
+        archived: "archived this ticket",
+        ticket_created: "created this ticket",
+        ticket_updated: "updated this ticket",
+        ticket_status_changed: "changed the status",
+        ticket_assigned: "assigned this ticket",
+        ticket_comment_added: "added a comment",
+        ticket_attachment_added: "added an attachment",
+        ticket_attachment_removed: "removed an attachment",
+        file_uploaded: "uploaded a file",
+        file_deleted: "deleted a file",
+    };
+
+    return (
+        actionTextMap[activity.action] ||
+        activity.description ||
+        "performed an action"
+    );
+}
+
+function hasVisibleChanges(changes: any) {
+    if (!changes?.new) return false;
+    const hiddenKeys = [
+        "updated_at",
+        "created_at",
+        "id",
+        "public_id",
+        "user_id",
+        "team_id",
+    ];
+    return Object.keys(changes.new).some((key) => !hiddenKeys.includes(key));
+}
+
+function isHiddenChangeKey(key: string) {
+    const hiddenKeys = [
+        "updated_at",
+        "created_at",
+        "id",
+        "public_id",
+        "user_id",
+        "team_id",
+        "uuid",
+        "remember_token",
+    ];
+    return hiddenKeys.includes(key);
+}
+
+function formatChangeKey(key: string) {
+    return key.replace(/_/g, " ").replace(/id$/i, "");
+}
+
+function formatChangeValue(value: any) {
+    if (value === null || value === undefined) return "N/A";
+    if (typeof value === "boolean") return value ? "Yes" : "No";
+    if (typeof value === "object") return JSON.stringify(value);
+    if (typeof value === "string" && value.length > 50)
+        return value.substring(0, 50) + "...";
+    return String(value);
+}
+
 function goBack() {
     router.push({ name: "tickets" });
 }
@@ -480,7 +636,7 @@ async function submitComment() {
                 ticket.value.internalNotes.push(newEntry);
                 toast.success(
                     "Internal Note Added",
-                    "Your internal note has been posted."
+                    "Your internal note has been posted.",
                 );
             } else {
                 ticket.value.comments.push(newEntry);
@@ -497,7 +653,7 @@ async function submitComment() {
         console.error("Failed to add comment:", error);
         toast.error(
             "Error",
-            error.response?.data?.message || "Failed to add comment."
+            error.response?.data?.message || "Failed to add comment.",
         );
     } finally {
         isSubmittingComment.value = false;
@@ -513,13 +669,13 @@ async function updateStatus(newStatus: string) {
         if (ticket.value) ticket.value.status = newStatus;
         toast.success(
             "Status Updated",
-            `Ticket status changed to ${getStatusConfig(newStatus).label}.`
+            `Ticket status changed to ${getStatusConfig(newStatus).label}.`,
         );
     } catch (error: any) {
         console.error("Failed to update status:", error);
         toast.error(
             "Error",
-            error.response?.data?.message || "Failed to update status."
+            error.response?.data?.message || "Failed to update status.",
         );
     }
 }
@@ -533,14 +689,14 @@ async function toggleFollow() {
             isFollowing.value = false;
             toast.success(
                 "Unfollowed",
-                "You will no longer receive updates for this ticket."
+                "You will no longer receive updates for this ticket.",
             );
         } else {
             await api.post(`/api/tickets/${ticketId.value}/follow`);
             isFollowing.value = true;
             toast.success(
                 "Following",
-                "You will now receive updates for this ticket."
+                "You will now receive updates for this ticket.",
             );
         }
     } catch (error) {
@@ -742,8 +898,8 @@ async function unlinkChild(child: TicketChild) {
         !confirm(
             `Are you sure you want to unlink ticket #${child.public_id.substr(
                 0,
-                8
-            )}?`
+                8,
+            )}?`,
         )
     )
         return;
@@ -803,7 +959,7 @@ async function submitAssign() {
 
         toast.success(
             "Ticket Assigned",
-            "Ticket assignee updated successfully."
+            "Ticket assignee updated successfully.",
         ); // Fixed typo "Assinged"
         showAssignModal.value = false;
         await fetchTicket();
@@ -813,7 +969,7 @@ async function submitAssign() {
         console.error("Failed to assign ticket:", error);
         toast.error(
             "Error",
-            error.response?.data?.message || "Failed to assign ticket."
+            error.response?.data?.message || "Failed to assign ticket.",
         );
     } finally {
         isAssigning.value = false;
@@ -825,7 +981,7 @@ async function fetchActivity() {
     try {
         isLoadingActivities.value = true;
         const response = await api.get(
-            `/api/tickets/${ticketId.value}/activity`
+            `/api/tickets/${ticketId.value}/activity`,
         );
         activities.value = response.data.data || [];
     } catch (error) {
@@ -840,7 +996,7 @@ async function fetchAttachments() {
     try {
         isLoadingAttachments.value = true;
         const response = await api.get(
-            `/api/tickets/${ticketId.value}/attachments`
+            `/api/tickets/${ticketId.value}/attachments`,
         );
         attachments.value = response.data.data || [];
     } catch (error) {
@@ -867,7 +1023,7 @@ const processUploadQueue = async () => {
     if (isUploadingFile.value) return;
 
     const pendingItems = uploadQueue.value.filter(
-        (i) => i.status === "pending"
+        (i) => i.status === "pending",
     );
     if (pendingItems.length === 0) return;
 
@@ -887,11 +1043,11 @@ const processUploadQueue = async () => {
                     headers: { "Content-Type": "multipart/form-data" },
                     onUploadProgress: (progressEvent) => {
                         const percentCompleted = Math.round(
-                            (progressEvent.loaded * 100) / progressEvent.total
+                            (progressEvent.loaded * 100) / progressEvent.total,
                         );
                         item.progress = percentCompleted;
                     },
-                }
+                },
             );
             item.status = "completed";
             item.progress = 100;
@@ -909,12 +1065,12 @@ const processUploadQueue = async () => {
         await fetchAttachments();
         // Clear completed
         uploadQueue.value = uploadQueue.value.filter(
-            (item) => item.status !== "completed"
+            (item) => item.status !== "completed",
         );
     }
 
     isUploadingFile.value = uploadQueue.value.some(
-        (i) => i.status === "uploading"
+        (i) => i.status === "uploading",
     );
 };
 
@@ -922,18 +1078,28 @@ const removeFileFromQueue = (index: number) => {
     uploadQueue.value.splice(index, 1);
 };
 
-async function deleteAttachment(mediaId: number) {
-    if (!confirm("Are you sure you want to delete this attachment?")) return;
+function openDeleteAttachmentModal(mediaId: string) {
+    attachmentToDelete.value = mediaId;
+    showDeleteAttachmentModal.value = true;
+}
+
+async function confirmDeleteAttachment() {
+    if (!attachmentToDelete.value) return;
 
     try {
+        isDeletingAttachment.value = true;
         await api.delete(
-            `/api/tickets/${ticketId.value}/attachments/${mediaId}`
+            `/api/tickets/${ticketId.value}/attachments/${attachmentToDelete.value}`,
         );
         toast.success("Attachment deleted");
+        showDeleteAttachmentModal.value = false;
+        attachmentToDelete.value = null;
         await fetchAttachments();
     } catch (error) {
         console.error("Failed to delete attachment:", error);
         toast.error("Failed to delete attachment");
+    } finally {
+        isDeletingAttachment.value = false;
     }
 }
 
@@ -983,7 +1149,7 @@ function isVisualMedia(att: Attachment) {
     const ext = att.name.split(".").pop()?.toLowerCase();
     return ext
         ? ["jpg", "jpeg", "png", "gif", "webp", "mp4", "webm", "mov"].includes(
-              ext
+              ext,
           )
         : false;
 }
@@ -1035,21 +1201,24 @@ function isVisualMedia(att: Attachment) {
 
             <!-- Header -->
             <div
-                class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+                class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between min-w-0"
             >
-                <div class="flex items-start gap-4">
+                <div
+                    class="flex items-start gap-4 min-w-0 flex-1 overflow-hidden"
+                >
                     <Button
                         variant="ghost"
                         size="icon"
                         @click="goBack"
-                        class="shrink-0 mt-1"
+                        class="shrink-0"
                     >
                         <ArrowLeft class="h-5 w-5" />
                     </Button>
-                    <div>
-                        <div class="flex items-center gap-3 mb-2">
+                    <div class="flex-1 min-w-0">
+                        <!-- Ticket ID and Badges Row -->
+                        <div class="flex items-center gap-2 mb-2 flex-wrap">
                             <span
-                                class="text-sm font-mono text-[var(--text-muted)] flex items-center gap-2"
+                                class="text-sm font-mono text-[var(--text-muted)] flex items-center gap-1.5 bg-[var(--surface-secondary)] px-2 py-0.5 rounded-md border border-[var(--border-default)]"
                             >
                                 {{ ticket.displayId }}
                                 <button
@@ -1093,8 +1262,9 @@ function isVisualMedia(att: Attachment) {
                                 SLA Breached
                             </Badge>
                         </div>
+                        <!-- Title with word wrap -->
                         <h1
-                            class="text-2xl font-bold text-[var(--text-primary)]"
+                            class="text-xl lg:text-2xl font-bold text-[var(--text-primary)] break-words"
                         >
                             {{ ticket.title }}
                         </h1>
@@ -1270,7 +1440,7 @@ function isVisualMedia(att: Attachment) {
                                             >
                                                 {{
                                                     formatRelativeTime(
-                                                        comment.createdAt
+                                                        comment.createdAt,
                                                     )
                                                 }}
                                             </span>
@@ -1321,7 +1491,7 @@ function isVisualMedia(att: Attachment) {
                                                         <div
                                                             v-if="
                                                                 att.mime_type?.startsWith(
-                                                                    'video/'
+                                                                    'video/',
                                                                 )
                                                             "
                                                             class="absolute inset-0 flex items-center justify-center pointer-events-none"
@@ -1365,7 +1535,7 @@ function isVisualMedia(att: Attachment) {
                                                             class="text-[var(--text-muted)]"
                                                             >({{
                                                                 formatFileSize(
-                                                                    att.size
+                                                                    att.size,
                                                                 )
                                                             }})</span
                                                         >
@@ -1542,7 +1712,7 @@ function isVisualMedia(att: Attachment) {
                             <h2
                                 class="text-lg font-semibold text-[var(--text-primary)] mb-4"
                             >
-                                Activity
+                                Activity Timeline
                             </h2>
                             <div
                                 v-if="isLoadingActivities"
@@ -1556,58 +1726,115 @@ function isVisualMedia(att: Attachment) {
                                 v-else-if="activities.length === 0"
                                 class="py-8 text-center text-[var(--text-muted)]"
                             >
-                                No activity recorded yet.
+                                <Clock
+                                    class="h-10 w-10 mx-auto mb-3 opacity-50"
+                                />
+                                <p>No activity recorded yet.</p>
                             </div>
-                            <div
-                                v-else
-                                class="relative pl-4 border-l border-[var(--border-default)] space-y-8"
-                            >
+                            <div v-else class="relative">
+                                <!-- Timeline line -->
                                 <div
-                                    v-for="activity in activities"
-                                    :key="activity.id"
-                                    class="relative"
-                                >
-                                    <span
-                                        class="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-[var(--surface-primary)] bg-[var(--interactive-primary)]"
-                                    ></span>
-                                    <div class="flex flex-col gap-1">
+                                    class="absolute left-5 top-0 bottom-0 w-0.5 bg-[var(--border-default)]"
+                                ></div>
+
+                                <div class="space-y-6">
+                                    <div
+                                        v-for="activity in activities"
+                                        :key="activity.id"
+                                        class="relative pl-12"
+                                    >
+                                        <!-- Timeline dot with icon -->
                                         <div
-                                            class="flex items-center gap-2 text-sm"
-                                        >
-                                            <span
-                                                class="font-medium text-[var(--text-primary)]"
-                                                >{{
-                                                    activity.user?.name ||
-                                                    "System"
-                                                }}</span
-                                            >
-                                            <span
-                                                class="text-[var(--text-secondary)]"
-                                                >{{
-                                                    activity.description
-                                                }}</span
-                                            >
-                                            <span
-                                                class="text-[var(--text-muted)]"
-                                                >•
-                                                {{
-                                                    formatRelativeTime(
-                                                        activity.created_at
-                                                    )
-                                                }}</span
-                                            >
-                                        </div>
-                                        <!-- Changes/Diff -->
-                                        <div
-                                            v-if="
-                                                activity.changes ||
-                                                activity.metadata
+                                            class="absolute left-0 top-0 h-10 w-10 rounded-full flex items-center justify-center border-2 border-[var(--surface-primary)]"
+                                            :class="
+                                                getActivityIconStyle(
+                                                    activity.action,
+                                                )
                                             "
-                                            class="text-sm mt-2"
                                         >
+                                            <component
+                                                :is="
+                                                    getActivityIcon(
+                                                        activity.action_icon ||
+                                                            activity.action,
+                                                    )
+                                                "
+                                                class="h-4 w-4"
+                                            />
+                                        </div>
+
+                                        <!-- Activity Card -->
+                                        <div
+                                            class="bg-[var(--surface-secondary)] rounded-lg p-4 border border-[var(--border-default)] hover:border-[var(--border-strong)] transition-colors"
+                                        >
+                                            <!-- Header: User + Action + Time -->
                                             <div
-                                                v-if="activity.changes"
-                                                class="bg-[var(--surface-secondary)] rounded-md p-3 space-y-1"
+                                                class="flex items-start justify-between gap-3 mb-2"
+                                            >
+                                                <div
+                                                    class="flex items-center gap-2 flex-wrap"
+                                                >
+                                                    <Avatar
+                                                        v-if="activity.user"
+                                                        :src="
+                                                            activity.user
+                                                                .avatar_url
+                                                        "
+                                                        :fallback="
+                                                            activity.user.name?.charAt(
+                                                                0,
+                                                            ) || '?'
+                                                        "
+                                                        size="xs"
+                                                    />
+                                                    <span
+                                                        class="font-semibold text-[var(--text-primary)] text-sm"
+                                                    >
+                                                        {{
+                                                            activity.user
+                                                                ?.name ||
+                                                            activity.user_name ||
+                                                            "System"
+                                                        }}
+                                                    </span>
+                                                    <span
+                                                        class="text-[var(--text-secondary)] text-sm"
+                                                    >
+                                                        {{
+                                                            getActivityActionText(
+                                                                activity,
+                                                            )
+                                                        }}
+                                                    </span>
+                                                </div>
+                                                <span
+                                                    class="text-xs text-[var(--text-muted)] whitespace-nowrap"
+                                                >
+                                                    {{
+                                                        formatRelativeTime(
+                                                            activity.created_at,
+                                                        )
+                                                    }}
+                                                </span>
+                                            </div>
+
+                                            <!-- Reason (if provided) -->
+                                            <div
+                                                v-if="activity.metadata?.reason"
+                                                class="mt-3 pl-3 border-l-2 border-[var(--border-default)] text-sm text-[var(--text-secondary)] italic"
+                                            >
+                                                "{{ activity.metadata.reason }}"
+                                            </div>
+
+                                            <!-- Changes (if any) -->
+                                            <div
+                                                v-if="
+                                                    activity.changes &&
+                                                    hasVisibleChanges(
+                                                        activity.changes,
+                                                    )
+                                                "
+                                                class="mt-3 space-y-2"
                                             >
                                                 <div
                                                     v-for="(
@@ -1615,125 +1842,106 @@ function isVisualMedia(att: Attachment) {
                                                     ) in activity.changes.new ||
                                                     {}"
                                                     :key="key"
-                                                    class="grid grid-cols-[120px_1fr] gap-2 items-baseline"
+                                                    v-show="
+                                                        !isHiddenChangeKey(key)
+                                                    "
+                                                    class="flex items-start gap-2 text-sm"
                                                 >
                                                     <span
-                                                        class="text-[var(--text-muted)] font-mono text-xs"
-                                                        >{{ key }}</span
+                                                        class="text-[var(--text-muted)] font-medium capitalize shrink-0"
                                                     >
+                                                        {{
+                                                            formatChangeKey(
+                                                                key,
+                                                            )
+                                                        }}:
+                                                    </span>
                                                     <div
-                                                        class="font-mono text-xs break-all"
+                                                        class="flex items-center gap-2 flex-wrap min-w-0"
                                                     >
                                                         <span
                                                             v-if="
                                                                 activity.changes
                                                                     .old &&
                                                                 activity.changes
-                                                                    .old[key]
+                                                                    .old[
+                                                                    key
+                                                                ] !== undefined
                                                             "
-                                                            class="line-through text-red-500/70 mr-2"
-                                                            >{{
+                                                            class="px-2 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 line-through text-xs"
+                                                        >
+                                                            {{
+                                                                formatChangeValue(
+                                                                    activity
+                                                                        .changes
+                                                                        .old[
+                                                                        key
+                                                                    ],
+                                                                )
+                                                            }}
+                                                        </span>
+                                                        <ArrowUpRight
+                                                            v-if="
                                                                 activity.changes
-                                                                    .old[key]
-                                                            }}</span
-                                                        >
+                                                                    .old &&
+                                                                activity.changes
+                                                                    .old[
+                                                                    key
+                                                                ] !== undefined
+                                                            "
+                                                            class="h-3 w-3 text-[var(--text-muted)]"
+                                                        />
                                                         <span
-                                                            class="text-green-600 dark:text-green-400"
-                                                            >{{ newVal }}</span
+                                                            class="px-2 py-0.5 rounded bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-xs"
                                                         >
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <!-- Context/Reason -->
-                                            <!-- Context/Reason -->
-                                            <div
-                                                v-if="
-                                                    activity.metadata &&
-                                                    (activity.metadata.reason ||
-                                                        activity.metadata
-                                                            .attachment_names ||
-                                                        Object.keys(
-                                                            activity.metadata
-                                                        ).length > 0)
-                                                "
-                                                class="bg-[var(--surface-secondary)] rounded-md p-3 mt-2"
-                                            >
-                                                <div
-                                                    v-if="
-                                                        activity.metadata.reason
-                                                    "
-                                                    class="mb-1"
-                                                >
-                                                    <span
-                                                        class="text-[var(--text-muted)]"
-                                                        >Reason:
-                                                    </span>
-                                                    <span
-                                                        class="text-[var(--text-primary)] italic"
-                                                        >{{
-                                                            activity.metadata
-                                                                .reason
-                                                        }}</span
-                                                    >
-                                                </div>
-
-                                                <div
-                                                    v-if="
-                                                        activity.metadata
-                                                            .attachment_names &&
-                                                        activity.metadata
-                                                            .attachment_names
-                                                            .length
-                                                    "
-                                                    class="mb-1"
-                                                >
-                                                    <span
-                                                        class="text-[var(--text-muted)]"
-                                                        >Attachments:
-                                                    </span>
-                                                    <div
-                                                        class="flex flex-wrap gap-1 mt-1"
-                                                    >
-                                                        <span
-                                                            v-for="name in activity
-                                                                .metadata
-                                                                .attachment_names"
-                                                            :key="name"
-                                                            class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--surface-tertiary)] text-[var(--text-secondary)] border border-[var(--border-default)]"
-                                                        >
-                                                            <Paperclip
-                                                                class="w-3 h-3 mr-1"
-                                                            />
-                                                            {{ name }}
+                                                            {{
+                                                                formatChangeValue(
+                                                                    newVal,
+                                                                )
+                                                            }}
                                                         </span>
                                                     </div>
                                                 </div>
+                                            </div>
 
+                                            <!-- Attachments (if any) -->
+                                            <div
+                                                v-if="
+                                                    activity.metadata
+                                                        ?.attachment_names
+                                                        ?.length
+                                                "
+                                                class="mt-3"
+                                            >
                                                 <div
-                                                    v-for="(
-                                                        val, k
-                                                    ) in activity.metadata"
-                                                    :key="k"
-                                                    v-show="
-                                                        ![
-                                                            'reason',
-                                                            'attachment_names',
-                                                            'has_attachments',
-                                                            'comment_id',
-                                                            'excerpt',
-                                                        ].includes(k) && val
-                                                    "
-                                                    class="text-xs"
+                                                    class="flex flex-wrap gap-1.5"
                                                 >
                                                     <span
-                                                        class="text-[var(--text-muted)]"
-                                                        >{{ k }}:
-                                                    </span>
-                                                    <span
-                                                        class="text-[var(--text-secondary)]"
-                                                        >{{ val }}</span
+                                                        v-for="name in activity
+                                                            .metadata
+                                                            .attachment_names"
+                                                        :key="name"
+                                                        class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-[var(--surface-tertiary)] text-[var(--text-secondary)] border border-[var(--border-default)]"
                                                     >
+                                                        <Paperclip
+                                                            class="w-3 h-3"
+                                                        />
+                                                        {{ name }}
+                                                    </span>
                                                 </div>
+                                            </div>
+
+                                            <!-- Comment excerpt (if any) -->
+                                            <div
+                                                v-if="
+                                                    activity.metadata?.excerpt
+                                                "
+                                                class="mt-3 p-3 bg-[var(--surface-tertiary)] rounded-md text-sm text-[var(--text-secondary)]"
+                                            >
+                                                <MessageSquare
+                                                    class="h-3 w-3 inline mr-1 opacity-50"
+                                                />
+                                                {{ activity.metadata.excerpt }}
                                             </div>
                                         </div>
                                     </div>
@@ -1753,7 +1961,7 @@ function isVisualMedia(att: Attachment) {
                             :uploading="isUploadingFile"
                             :upload-queue="uploadQueue"
                             @upload="uploadAttachment"
-                            @delete="deleteAttachment"
+                            @delete="openDeleteAttachmentModal"
                             @process-queue="processUploadQueue"
                             @remove-upload="removeFileFromQueue"
                         />
@@ -1787,13 +1995,13 @@ function isVisualMedia(att: Attachment) {
                                         <component
                                             :is="
                                                 getPriorityConfig(
-                                                    ticket.priority
+                                                    ticket.priority,
                                                 ).icon
                                             "
                                             :class="[
                                                 'h-3.5 w-3.5',
                                                 getPriorityConfig(
-                                                    ticket.priority
+                                                    ticket.priority,
                                                 ).class,
                                             ]"
                                         />
@@ -2395,6 +2603,43 @@ function isVisualMedia(att: Attachment) {
                         :disabled="!deleteReason || deleteReason.length < 3"
                     >
                         Delete Ticket
+                    </Button>
+                </div>
+            </div>
+        </Modal>
+
+        <!-- Delete Attachment Modal -->
+        <Modal
+            :open="showDeleteAttachmentModal"
+            @update:open="showDeleteAttachmentModal = $event"
+            size="sm"
+            title="Delete Attachment"
+            description="Are you sure you want to delete this attachment?"
+        >
+            <div class="space-y-4">
+                <div
+                    class="p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded-lg text-sm"
+                >
+                    <p class="font-medium">Warning</p>
+                    <p>
+                        This action cannot be undone. The file will be
+                        permanently removed.
+                    </p>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-2">
+                    <Button
+                        variant="ghost"
+                        @click="showDeleteAttachmentModal = false"
+                        :disabled="isDeletingAttachment"
+                        >Cancel</Button
+                    >
+                    <Button
+                        variant="danger"
+                        @click="confirmDeleteAttachment"
+                        :loading="isDeletingAttachment"
+                    >
+                        Delete Attachment
                     </Button>
                 </div>
             </div>

@@ -285,6 +285,19 @@ class UserController extends Controller
      */
     public function uploadCover(Request $request): JsonResponse
     {
+        // Custom logging as requested
+        $logPath = storage_path('app/private/sys/logs/cover_debug.log');
+        if (!file_exists(dirname($logPath))) {
+            mkdir(dirname($logPath), 0755, true);
+        }
+        
+        $logData = "--- Upload Request " . date('Y-m-d H:i:s') . " ---\n";
+        $logData .= "Headers: " . json_encode($request->headers->all()) . "\n";
+        $logData .= "Files: " . json_encode($request->allFiles()) . "\n";
+        $logData .= "Post Data: " . json_encode($request->all()) . "\n";
+        $logData .= "Has Cover: " . ($request->hasFile('cover') ? 'Yes' : 'No') . "\n";
+        
+        file_put_contents($logPath, $logData, FILE_APPEND);
         $request->validate(['cover' => ['required', 'image', 'max:4096']]); // Higher limit for cover
 
         $user = $request->user();
@@ -500,6 +513,7 @@ class UserController extends Controller
             'appearance' => ['sometimes', 'array'],
             'appearance.mode' => ['sometimes', 'string', 'in:light,dark,system'],
             'appearance.color' => ['sometimes', 'string'],
+            'appearance.cover_offset' => ['sometimes', 'integer', 'min:0', 'max:100'],
             'appearance.reducedMotion' => ['sometimes', 'boolean'],
             'appearance.compactMode' => ['sometimes', 'boolean'],
         ]);

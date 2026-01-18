@@ -1,7 +1,7 @@
 <script setup>
-import { computed } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { ChevronRight, Home } from 'lucide-vue-next';
+import { computed } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { ChevronRight, Home } from "lucide-vue-next";
 
 const route = useRoute();
 const router = useRouter();
@@ -11,49 +11,49 @@ const breadcrumbs = computed(() => {
 
     // Always start with home/dashboard
     crumbs.push({
-        label: 'Home',
-        path: '/dashboard',
+        label: "Home",
+        path: "/dashboard",
         icon: Home,
     });
 
     // Build parent chain from route meta
     const buildParentCrumbs = (routeMeta, params) => {
         const parentCrumbs = [];
-        
+
         if (routeMeta?.breadcrumbParent) {
             const parent = routeMeta.breadcrumbParent;
-            
+
             // Resolve parent path
-            let parentPath = '';
+            let parentPath = "";
             if (parent.name) {
-                // Map param keys if needed (e.g., 'team' -> 'public_id', 'projectId' -> 'id')
-                const mappedParams = { ...params };
+                // Only pass params that the parent route needs
+                // Don't pass all params to avoid "Discarded invalid param" warnings
+                const parentParams = {};
                 if (parent.paramKey) {
-                    // Support sourceParam for different param names (e.g., projectId -> id)
-                    const sourceKey = parent.sourceParam || 'team';
+                    const sourceKey = parent.sourceParam || "team";
                     if (params[sourceKey]) {
-                        mappedParams[parent.paramKey] = params[sourceKey];
+                        parentParams[parent.paramKey] = params[sourceKey];
                     }
                 }
-                
-                // Named route - resolve it
-                const resolved = router.resolve({ 
-                    name: parent.name, 
-                    params: mappedParams 
+
+                // Named route - resolve it with only relevant params
+                const resolved = router.resolve({
+                    name: parent.name,
+                    params: parentParams,
                 });
                 parentPath = resolved.path;
-            } else if (typeof parent.path === 'function') {
+            } else if (typeof parent.path === "function") {
                 parentPath = parent.path(params);
             } else {
                 parentPath = parent.path;
             }
-            
+
             parentCrumbs.push({
                 label: parent.label || parent.name,
                 path: parentPath,
             });
         }
-        
+
         return parentCrumbs;
     };
 
@@ -62,7 +62,7 @@ const breadcrumbs = computed(() => {
     crumbs.push(...parentCrumbs);
 
     // Get current route breadcrumb
-    if (route.meta.breadcrumb && route.path !== '/dashboard') {
+    if (route.meta.breadcrumb && route.path !== "/dashboard") {
         crumbs.push({
             label: route.meta.breadcrumb,
             path: route.path,
@@ -121,4 +121,3 @@ function navigate(path) {
         </ol>
     </nav>
 </template>
-

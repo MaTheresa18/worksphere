@@ -171,7 +171,8 @@ class Ticket extends Model implements HasMedia
      */
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('attachments');
+        $this->addMediaCollection('attachments')
+            ->useDisk('private');
     }
 
     /**

@@ -78,32 +78,6 @@ return [
             'pinnable' => true,
             'pinned_default' => true,
             'badge_key' => 'open_tickets_count',
-            'children' => [
-                [
-                    'id' => 'tickets-all',
-                    'label' => 'All Tickets',
-                    'route' => '/tickets',
-                    'permission' => 'tickets.view',
-                ],
-                [
-                    'id' => 'tickets-my',
-                    'label' => 'My Tickets', // Created by me
-                    'route' => '/tickets?reporter_id=me',
-                    'permission' => 'tickets.view',
-                ],
-                [
-                    'id' => 'tickets-assigned',
-                    'label' => 'Assigned to Me',
-                    'route' => '/tickets?assigned_to=me',
-                    'permission' => 'tickets.view',
-                ],
-                [
-                    'id' => 'tickets-unassigned',
-                    'label' => 'Unassigned',
-                    'route' => '/tickets?assigned_to=unassigned',
-                    'permission' => 'tickets.assign',
-                ],
-            ],
         ],
         [
             'id' => 'calendar',
