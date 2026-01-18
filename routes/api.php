@@ -215,6 +215,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
         Route::post('/events', [\App\Http\Controllers\Api\TeamController::class, 'storeEvent']);
         Route::post('/events/{event}/invite', [\App\Http\Controllers\Api\TeamController::class, 'inviteEvent']);
         Route::post('/avatar', [\App\Http\Controllers\Api\TeamController::class, 'uploadAvatar']);
+        Route::delete('/avatar', [\App\Http\Controllers\Api\TeamController::class, 'deleteAvatar']);
         Route::get('/events/{event}/ics', [\App\Http\Controllers\Api\TeamController::class, 'downloadEventIcs']);
         Route::put('/events/{event}', [\App\Http\Controllers\Api\TeamController::class, 'updateEvent']);
         Route::delete('/events/{event}', [\App\Http\Controllers\Api\TeamController::class, 'destroyEvent']);
