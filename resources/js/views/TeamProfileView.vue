@@ -126,6 +126,29 @@ function handleEventClick(info) {
     const props = info.event.extendedProps;
     if (props.type === "event" && props.can_edit) {
         selectedEvent.value = {
+            id: info.event.id,
+            title: info.event.title,
+            start_time: info.event.startStr,
+            end_time: info.event.endStr,
+            is_all_day: info.event.allDay,
+            color: info.event.backgroundColor,
+            location: props.location,
+            description: props.description,
+        };
+        showEventModal.value = true;
+    } else if (props.type === "project") {
+        router.push({
+            name: "admin-project-detail",
+            params: { id: props.project_id },
+        });
+    }
+}
+
+function handleExportEvents(range) {
+    if (!range?.start || !range?.end) {
+        toast.error("Please select a date range first");
+        return;
+    }
 
     const params = new URLSearchParams({
         start: format(range.start, "yyyy-MM-dd"),
