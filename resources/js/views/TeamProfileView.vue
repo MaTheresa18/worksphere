@@ -186,24 +186,8 @@ async function handleAvatarUpload(event) {
 async function removeAvatar() {
     if (!team.value) return;
 
-    if (
-        !confirm(
-            "Are you sure you want to remove the team avatar? This cannot be undone.",
-        )
-    ) {
-        return;
-    }
-
-    try {
-        const response = await axios.delete(
-            `/api/teams/${team.value.public_id}/avatar`,
-        );
-        team.value = response.data;
-        toast.success("Team avatar removed");
-    } catch (error) {
-        console.error("Failed to remove avatar:", error);
-        toast.error("Failed to remove avatar");
-    }
+    deleteTarget.value = { type: "avatar" };
+    deleteModalOpen.value = true;
 }
 
 function handleExportEvents(range) {
@@ -796,6 +780,17 @@ const confirmDelete = async () => {
         }
     } else if (deleteTarget.value.type === "bulk") {
         await processBulkDelete(deleteTarget.value.ids);
+    } else if (deleteTarget.value.type === "avatar") {
+        try {
+            const response = await axios.delete(
+                `/api/teams/${team.value.public_id}/avatar`,
+            );
+            team.value = response.data;
+            toast.success("Team avatar removed");
+        } catch (error) {
+            console.error("Failed to remove avatar:", error);
+            toast.error("Failed to remove avatar");
+        }
     }
 };
 
@@ -1908,12 +1903,18 @@ const canRemoveMember = (member) => {
         <Modal
             v-model:open="deleteModalOpen"
             :title="
-                deleteTarget.type === 'bulk' ? 'Delete Files' : 'Delete File'
+                deleteTarget.type === 'bulk'
+                    ? 'Delete Files'
+                    : deleteTarget.type === 'avatar'
+                      ? 'Remove Avatar'
+                      : 'Delete File'
             "
             :description="
                 deleteTarget.type === 'bulk'
                     ? `Are you sure you want to delete ${deleteTarget.ids.length} files? This action cannot be undone.`
-                    : 'Are you sure you want to delete this file? This action cannot be undone.'
+                    : deleteTarget.type === 'avatar'
+                      ? 'Are you sure you want to remove the team avatar? This cannot be undone.'
+                      : 'Are you sure you want to delete this file? This action cannot be undone.'
             "
             size="sm"
         >
