@@ -885,7 +885,7 @@ const canRemoveMember = (member) => {
                         <div class="flex items-center gap-6">
                             <div class="relative group">
                                 <Avatar
-                                    :src="team.avatar"
+                                    :src="team.avatar_url"
                                     :alt="team.name"
                                     :fallback="team.initials"
                                     size="5xl"
