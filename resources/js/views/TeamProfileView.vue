@@ -1,3 +1,4 @@
+<script setup>
 import { ref, onMounted, computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
@@ -157,7 +158,11 @@ const isUploadingAvatar = ref(false);
 const confirm = useConfirm();
 
 const isOwner = computed(() => {
-    return team.value && authStore.user && team.value.owner_id === authStore.user.id;
+    return (
+        team.value &&
+        authStore.user &&
+        team.value.owner_id === authStore.user.id
+    );
 });
 
 function triggerAvatarUpload() {
@@ -188,7 +193,7 @@ async function handleAvatarUpload(event) {
         team.value = response.data;
         toast.success("Team avatar updated");
     } catch (error) {
-        console.error('Failed to upload avatar:', error);
+        console.error("Failed to upload avatar:", error);
         toast.error("Failed to update avatar");
     } finally {
         isUploadingAvatar.value = false;
@@ -200,20 +205,23 @@ async function removeAvatar() {
     if (!team.value) return;
 
     const confirmed = await confirm.open({
-        title: 'Remove Team Avatar',
-        message: 'Are you sure you want to remove the team avatar? This cannot be undone.',
-        confirmText: 'Remove',
-        type: 'danger',
+        title: "Remove Team Avatar",
+        message:
+            "Are you sure you want to remove the team avatar? This cannot be undone.",
+        confirmText: "Remove",
+        type: "danger",
     });
 
     if (confirmed) {
         try {
-            const response = await axios.delete(`/api/teams/${team.value.public_id}/avatar`);
+            const response = await axios.delete(
+                `/api/teams/${team.value.public_id}/avatar`,
+            );
             team.value = response.data;
-            toast.success('Team avatar removed');
+            toast.success("Team avatar removed");
         } catch (error) {
-            console.error('Failed to remove avatar:', error);
-            toast.error('Failed to remove avatar');
+            console.error("Failed to remove avatar:", error);
+            toast.error("Failed to remove avatar");
         }
     }
 }
