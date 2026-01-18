@@ -827,7 +827,7 @@ onMounted(() => {
 watch(team, (newTeam) => {
     if (
         newTeam &&
-        (authStore.user?.public_id === newTeam.owner.public_id ||
+        (authStore.user?.public_id === newTeam.owner?.public_id ||
             members.value.find((m) => m.public_id === authStore.user?.public_id)
                 ?.pivot?.role === "admin")
     ) {
