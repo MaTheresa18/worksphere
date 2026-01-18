@@ -157,14 +157,6 @@ const avatarInput = ref(null);
 const isUploadingAvatar = ref(false);
 const confirm = useConfirm();
 
-const isOwner = computed(() => {
-    return (
-        team.value &&
-        authStore.user &&
-        team.value.owner_id === authStore.user.id
-    );
-});
-
 function triggerAvatarUpload() {
     avatarInput.value.click();
 }
