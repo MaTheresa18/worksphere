@@ -1,9 +1,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { storeToRefs } from "pinia";
 import axios from "axios";
-import { useTeamStore } from "@/stores/team";
 import { useConfirm } from "@/composables/useConfirm";
 import {
     Users,
@@ -146,12 +144,6 @@ function handleEventClick(info) {
         });
     }
 }
-
-const teamStore = useTeamStore();
-// Note: team is already defined locally as a ref (line 51) and populated via fetchTeam.
-// But useTeamStore might be better source of truth if available.
-// However, the existing code uses a local `team` ref.
-// Let's stick to the local `team` ref but add the missing variables.
 
 const avatarInput = ref(null);
 const isUploadingAvatar = ref(false);
