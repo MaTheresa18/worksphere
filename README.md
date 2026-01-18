@@ -1,12 +1,17 @@
-# Coresync V2
+# WorkSphere
 
 <p align="center">
 <a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a>
 </p>
 
+> [!WARNING]
+> **BETA RELEASE NOTICE**
+> WorkSphere is currently in active **BETA** development. Features are subject to change, and you may encounter bugs or instability.
+> NOT RECOMMENDED FOR PRODUCTION USE without extensive testing.
+
 ## Overview
 
-Coresync V2 is a comprehensive enterprise **Single Page Application (SPA)** built on **Laravel 12** and **Vue 3**. It functions as a "Super App," integrating multiple core business modules into a unified, real-time interface.
+WorkSphere is a comprehensive enterprise **Single Page Application (SPA)** built on **Laravel 12** and **Vue 3**. It functions as a "Super App," integrating multiple core business modules into a unified, real-time interface.
 
 ## Technology Stack
 
@@ -80,8 +85,8 @@ _System health monitoring, queue management, and backups._
 1. **Clone the repository**
 
     ```bash
-    git clone git@github.com:SummerRijndael/coresync_v2.git
-    cd coresync_v2
+    git clone git@github.com:SummerRijndael/worksphere.git
+    cd worksphere
     ```
 
 2. **Install Dependencies**
@@ -106,7 +111,7 @@ _System health monitoring, queue management, and backups._
 
     ### Real-time (Laravel Reverb)
 
-    CoreSync V2 uses Laravel Reverb for real-time WebSocket communication (chat, notifications, presence).
+    WorkSphere uses Laravel Reverb for real-time WebSocket communication (chat, notifications, presence).
 
     ```ini
     REVERB_APP_ID=my-app-id
@@ -184,7 +189,7 @@ _System health monitoring, queue management, and backups._
 
 ## Documentation
 
-For detailed internal documentation, open `coresync_v2_doc.html` in your browser.
+For detailed internal documentation, open `worksphere_doc.html` in your browser.
 
 ## License
 
@@ -204,4 +209,4 @@ limitations under the License.
 
 ---
 
-&copy; 2026 Coresync V2. Internal Development.
+&copy; 2026 WorkSphere. Internal Development.
