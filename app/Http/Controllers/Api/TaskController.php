@@ -148,6 +148,14 @@ class TaskController extends Controller
             }
         }
 
+        // Handle QA user
+        if (! empty($validated['qa_user_id'])) {
+            $qaUser = User::where('public_id', $validated['qa_user_id'])->first();
+            if ($qaUser && $project->hasMember($qaUser)) {
+                $taskData['qa_user_id'] = $qaUser->id;
+            }
+        }
+
         $task = Task::create($taskData);
 
         // Process checklist items to create interactive rows
@@ -210,6 +218,7 @@ class TaskController extends Controller
             'parent',
             'template',
             'assignee',
+            'qaUser',
             'assigner',
             'creator',
             'archiver',
@@ -264,6 +273,18 @@ class TaskController extends Controller
             if ($assignee && $project->hasMember($assignee)) {
                 $this->workflowService->assignTask($task, $assignee, $request->user());
             }
+        }
+
+        // Handle QA user change
+        if (array_key_exists('qa_user_id', $validated)) {
+             if (empty($validated['qa_user_id'])) {
+                 $updateData['qa_user_id'] = null;
+             } else {
+                $qaUser = User::where('public_id', $validated['qa_user_id'])->first();
+                if ($qaUser && $project->hasMember($qaUser)) {
+                    $updateData['qa_user_id'] = $qaUser->id;
+                }
+             }
         }
 
         $task->update($updateData);

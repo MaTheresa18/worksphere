@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch } from "vue";
 import { useAuthStore } from "@/stores/auth";
 import { Card, Button, Badge, Avatar, Input } from "@/components/ui";
 import MiniCalendar from "@/components/ui/MiniCalendar.vue";
+import PersonalTaskWidget from "@/components/tasks/PersonalTaskWidget.vue";
 import {
     Mail,
     MapPin,
@@ -38,14 +39,6 @@ const userDetails = ref(null);
 // Mock Data for Calendar
 const currentMonth = ref(new Date());
 const weekDays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-
-// To-Do List State
-const newTodo = ref("");
-const todos = ref([
-    { id: 1, text: "Review quarter reports", completed: false },
-    { id: 2, text: "Update user documentation", completed: true },
-    { id: 3, text: "Team sync meeting", completed: false },
-]);
 
 const stats = ref([
     {
@@ -85,17 +78,6 @@ const fetchUserDetails = async () => {
     }
 };
 
-const addTodo = () => {
-    if (!newTodo.value.trim()) return;
-    todos.value.unshift({
-        id: Date.now(),
-        text: newTodo.value,
-        completed: false,
-    });
-    newTodo.value = "";
-    newTodo.value = "";
-};
-
 const isPublic = ref(false);
 const isUpdatingVisibility = ref(false);
 
@@ -133,15 +115,6 @@ const copyPublicUrl = () => {
     if (!publicProfileUrl.value) return;
     navigator.clipboard.writeText(publicProfileUrl.value);
     toast.success("Link copied to clipboard");
-};
-
-const toggleTodo = (id) => {
-    const todo = todos.value.find((t) => t.id === id);
-    if (todo) todo.completed = !todo.completed;
-};
-
-const removeTodo = (id) => {
-    todos.value = todos.value.filter((t) => t.id !== id);
 };
 
 const calendarDays = computed(() => {
@@ -666,99 +639,8 @@ onMounted(() => {
                     <MiniCalendar :show-holidays="true" country-code="US" />
                 </Card>
 
-                <!-- To-Do List -->
-                <Card padding="lg" class="flex flex-col h-auto max-h-[400px]">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2
-                            class="font-semibold text-[var(--text-primary)] flex items-center gap-2"
-                        >
-                            <CheckSquare
-                                class="h-4 w-4 text-[var(--text-secondary)]"
-                            />
-                            My Tasks
-                        </h2>
-                        <Badge variant="neutral"
-                            >{{
-                                todos.filter((t) => !t.completed).length
-                            }}
-                            pending</Badge
-                        >
-                    </div>
-
-                    <div class="flex gap-2 mb-4">
-                        <Input
-                            v-model="newTodo"
-                            placeholder="Add a new task..."
-                            class="h-9 text-sm flex-1"
-                            @keyup.enter="addTodo"
-                        />
-                        <Button
-                            size="icon-sm"
-                            @click="addTodo"
-                            :disabled="!newTodo.trim()"
-                        >
-                            <Plus class="h-4 w-4" />
-                        </Button>
-                    </div>
-
-                    <div
-                        class="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar"
-                    >
-                        <div
-                            v-for="todo in todos"
-                            :key="todo.id"
-                            class="group flex items-center gap-3 p-2 rounded-md hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
-                            @click="toggleTodo(todo.id)"
-                        >
-                            <div
-                                class="h-5 w-5 rounded border flex items-center justify-center transition-colors"
-                                :class="
-                                    todo.completed
-                                        ? 'bg-green-500 border-green-500 text-white'
-                                        : 'border-[var(--border-default)] bg-[var(--surface-primary)]'
-                                "
-                            >
-                                <svg
-                                    v-if="todo.completed"
-                                    class="h-3.5 w-3.5"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    stroke-width="3"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        d="M5 13l4 4L19 7"
-                                    />
-                                </svg>
-                            </div>
-                            <span
-                                class="text-sm flex-1 transition-all"
-                                :class="
-                                    todo.completed
-                                        ? 'text-[var(--text-muted)] line-through'
-                                        : 'text-[var(--text-primary)]'
-                                "
-                            >
-                                {{ todo.text }}
-                            </span>
-                            <button
-                                class="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 transition-all p-1"
-                                @click.stop="removeTodo(todo.id)"
-                            >
-                                <Trash2 class="h-4 w-4" />
-                            </button>
-                        </div>
-
-                        <div
-                            v-if="todos.length === 0"
-                            class="text-center py-8 text-[var(--text-muted)]"
-                        >
-                            <p class="text-sm">No tasks yet. Enjoy your day!</p>
-                        </div>
-                    </div>
-                </Card>
+                <!-- To-Do List (Now Personal Tasks) -->
+                <PersonalTaskWidget />
             </div>
         </div>
     </div>

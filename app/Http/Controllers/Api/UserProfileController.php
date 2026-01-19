@@ -34,4 +34,34 @@ class UserProfileController extends Controller
             ],
         ]);
     }
+    /**
+     * Get tasks assigned to the user (Team Work).
+     */
+    public function assignedTasks(Request $request, User $user)
+    {
+        // 1. Authorization: Can auth user view profile?
+        $this->authorize('viewProfile', $user);
+
+        // 2. Query Tasks
+        // - Assigned to target user
+        // - Created by SOMEONE ELSE (not self-assigned)
+        // - Visible to AUTH user (via project membership)
+        $query = \App\Models\Task::query()
+            ->with(['project', 'creator', 'status'])
+            ->where('assigned_to', $user->id)
+            ->where('created_by', '!=', $user->id) // Filter out self-assigned
+            ->whereHas('project', function ($q) use ($request) {
+                // Ensure AUTH user is a member of the project
+                $q->whereHas('members', function ($m) use ($request) {
+                    $m->where('user_id', $request->user()->id);
+                });
+            })
+            ->orderBy('due_date', 'asc')
+            ->orderBy('priority', 'asc');
+
+        $tasks = $query->paginate(20);
+
+        // Use TaskResource if it exists, or simple mapping
+        return \App\Http\Resources\TaskResource::collection($tasks);
+    }
 }

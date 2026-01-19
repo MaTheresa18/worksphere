@@ -425,11 +425,27 @@ export const useEmailStore = defineStore('email', () => {
         }
 
         if (newId) {
-            subscribeToAccount(newId);
-            // Fetch initial status
-            const account = await emailService.getAccount(newId);
-            if (account) {
-                updateAccountStatusFromModel(account);
+            try {
+                // Fetch initial status first to verify existence
+                const account = await emailService.getAccount(newId);
+                
+                if (account) {
+                    updateAccountStatusFromModel(account);
+                    // Only subscribe if account exists and we have access
+                    subscribeToAccount(newId);
+                } else {
+                     // Should be caught by catch block if 404, but just in case
+                     selectedAccountId.value = null;
+                }
+            } catch (error: any) {
+                console.warn('Failed to load selected email account, resetting selection:', error);
+                
+                // If 404 Not Found or 403 Forbidden, clear the stale ID
+                if (error.response && (error.response.status === 404 || error.response.status === 403)) {
+                    selectedAccountId.value = null;
+                }
+                
+                accountStatus.value = null;
             }
         }
     }, { immediate: true });

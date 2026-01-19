@@ -138,6 +138,25 @@
 
                 <!-- Right Main: Bio & Skills -->
                 <div class="md:col-span-2 space-y-6">
+                    <!-- Personal Tasks Widget (Only visible to owner) -->
+                    <div v-if="isOwnProfile">
+                        <PersonalTaskWidget />
+                    </div>
+
+                    <!-- Assigned Tasks (Visible to team members) -->
+                    <div v-if="assignedTasks.length > 0 || isOwnProfile" class="space-y-4">
+                        <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                            Assigned Tasks
+                        </h3>
+                        <TaskList :tasks="assignedTasks" :show-project="true" />
+                        <div v-if="loadingTasks" class="flex justify-center py-4">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+                        </div>
+                        <div v-if="!loadingTasks && assignedTasks.length === 0" class="text-center py-8 text-zinc-500 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                            No assigned tasks found.
+                        </div>
+                    </div>
+
                     <!-- Bio -->
                     <div
                         class="bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 p-6"
@@ -181,12 +200,18 @@
     </div>
 </template>
 
+
+
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import api from "@/lib/api";
+import { useAuthStore } from "@/stores/auth";
+import PersonalTaskWidget from "@/components/tasks/PersonalTaskWidget.vue";
+import TaskList from "@/components/tasks/TaskList.vue";
 
 const route = useRoute();
+const authStore = useAuthStore();
 
 const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString(undefined, {
@@ -217,6 +242,14 @@ const user = ref<UserProfile | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
 const isCoverLoaded = ref(false);
+const assignedTasks = ref([]);
+const loadingTasks = ref(false);
+
+// Computed property to check if the viewed profile is the current user's own profile
+const isOwnProfile = computed(() => {
+    return authStore.user && user.value && authStore.user.public_id === user.value.public_id;
+});
+
 const onCoverLoad = () => {
     isCoverLoaded.value = true;
 };
@@ -227,6 +260,18 @@ watch(
         isCoverLoaded.value = false;
     },
 );
+
+const fetchAssignedTasks = async (publicId: string) => {
+    loadingTasks.value = true;
+    try {
+        const response = await api.get(`/api/users/${publicId}/assigned-tasks`);
+        assignedTasks.value = response.data.data;
+    } catch (err) {
+        console.error("Failed to fetch assigned tasks", err);
+    } finally {
+        loadingTasks.value = false;
+    }
+};
 
 const fetchProfile = async () => {
     loading.value = true;
@@ -243,6 +288,9 @@ const fetchProfile = async () => {
         // API endpoint includes /api prefix via the api client
         const response = await api.get(`/api/users/${publicId}/profile`);
         user.value = response.data.data || response.data;
+        
+        // Fetch assigned tasks after profile is loaded
+        fetchAssignedTasks(publicId);
     } catch (err: any) {
         console.error("Failed to load profile", err);
         if (err.response?.status === 403) {

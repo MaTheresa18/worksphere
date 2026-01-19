@@ -42,6 +42,7 @@ class Task extends Model implements HasMedia
         'estimated_hours',
         'actual_hours',
         'assigned_to',
+        'qa_user_id',
         'assigned_by',
         'assigned_at',
         'sort_order',
@@ -173,14 +174,19 @@ class Task extends Model implements HasMedia
         return $this->belongsTo(TaskTemplate::class, 'task_template_id');
     }
 
-    /**
-     * Get the assigned user.
-     *
-     * @return BelongsTo<User, Task>
-     */
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    /**
+     * Get the QA user.
+     *
+     * @return BelongsTo<User, Task>
+     */
+    public function qaUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'qa_user_id');
     }
 
     /**

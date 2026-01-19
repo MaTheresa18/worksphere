@@ -75,6 +75,18 @@ class TaskResource extends JsonResource
                     'avatar_url' => $this->assignee->avatar_url,
                 ];
             }),
+            'qa_user' => $this->whenLoaded('qaUser', function () {
+                if (! $this->qaUser) {
+                    return null;
+                }
+
+                return [
+                    'id' => $this->qaUser->public_id,
+                    'name' => $this->qaUser->name,
+                    'email' => $this->qaUser->email,
+                    'avatar_url' => $this->qaUser->avatar_url,
+                ];
+            }),
             'assigner' => $this->whenLoaded('assigner', function () {
                 if (! $this->assigner) {
                     return null;

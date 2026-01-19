@@ -18,12 +18,13 @@ class TeamMemberProfileTest extends TestCase
     {
         parent::setUp();
         cache()->flush();
+        config(['audit.async' => false]);
 
         // Seed necessary permissions
         app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
-        \Spatie\Permission\Models\Permission::create(['name' => 'user_manage', 'guard_name' => 'web']);
-        \Spatie\Permission\Models\Permission::create(['name' => 'team_roles.assign', 'guard_name' => 'web']);
-        \Spatie\Permission\Models\Permission::create(['name' => 'teams.update', 'guard_name' => 'web']);
+        \Spatie\Permission\Models\Permission::firstOrCreate(['name' => 'user_manage', 'guard_name' => 'web']);
+        \Spatie\Permission\Models\Permission::firstOrCreate(['name' => 'team_roles.assign', 'guard_name' => 'web']);
+        \Spatie\Permission\Models\Permission::firstOrCreate(['name' => 'teams.update', 'guard_name' => 'web']);
     }
 
     public function test_user_can_view_teammate_profile()
@@ -33,8 +34,8 @@ class TeamMemberProfileTest extends TestCase
         $user2 = User::factory()->create();
 
         $team->members()->syncWithoutDetaching([
-            $user1->id => ['role' => 'member'],
-            $user2->id => ['role' => 'member'],
+            $user1->id => ['role' => \App\Enums\TeamRole::Operator->value],
+            $user2->id => ['role' => \App\Enums\TeamRole::Operator->value],
         ]);
 
         $response = $this->actingAs($user1)
@@ -51,8 +52,8 @@ class TeamMemberProfileTest extends TestCase
         $user1 = User::factory()->create();
         $user2 = User::factory()->create();
 
-        $team1->members()->syncWithoutDetaching([$user1->id => ['role' => 'member']]);
-        $team2->members()->syncWithoutDetaching([$user2->id => ['role' => 'member']]);
+        $team1->members()->syncWithoutDetaching([$user1->id => ['role' => \App\Enums\TeamRole::Operator->value]]);
+        $team2->members()->syncWithoutDetaching([$user2->id => ['role' => \App\Enums\TeamRole::Operator->value]]);
 
         $response = $this->actingAs($user1)
             ->getJson("/api/users/{$user2->public_id}/profile");
@@ -67,13 +68,13 @@ class TeamMemberProfileTest extends TestCase
         $member = User::factory()->create();
 
         $team->members()->syncWithoutDetaching([
-            $admin->id => ['role' => 'admin'],
-            $member->id => ['role' => 'member'],
+            $admin->id => ['role' => \App\Enums\TeamRole::SubjectMatterExpert->value],
+            $member->id => ['role' => \App\Enums\TeamRole::Operator->value],
         ]);
 
         $response = $this->actingAs($admin)
             ->putJson("/api/teams/{$team->public_id}/members/{$member->public_id}/role", [
-                'role' => 'admin',
+                'role' => \App\Enums\TeamRole::SubjectMatterExpert->value,
             ]);
 
         $response->assertStatus(200);
@@ -81,7 +82,7 @@ class TeamMemberProfileTest extends TestCase
         $this->assertDatabaseHas('team_user', [
             'team_id' => $team->id,
             'user_id' => $member->id,
-            'role' => 'admin',
+            'role' => \App\Enums\TeamRole::SubjectMatterExpert->value,
         ]);
     }
 
@@ -92,13 +93,13 @@ class TeamMemberProfileTest extends TestCase
         $member2 = User::factory()->create();
 
         $team->members()->syncWithoutDetaching([
-            $member1->id => ['role' => 'member'],
-            $member2->id => ['role' => 'member'],
+            $member1->id => ['role' => \App\Enums\TeamRole::Operator->value],
+            $member2->id => ['role' => \App\Enums\TeamRole::Operator->value],
         ]);
 
         $response = $this->actingAs($member1)
             ->putJson("/api/teams/{$team->public_id}/members/{$member2->public_id}/role", [
-                'role' => 'admin',
+                'role' => \App\Enums\TeamRole::SubjectMatterExpert->value,
             ]);
 
         $response->assertStatus(403);
@@ -111,13 +112,13 @@ class TeamMemberProfileTest extends TestCase
         $admin = User::factory()->create();
 
         $team->members()->syncWithoutDetaching([
-            $owner->id => ['role' => 'owner'],
-            $admin->id => ['role' => 'admin'],
+            $owner->id => ['role' => \App\Enums\TeamRole::TeamLead->value],
+            $admin->id => ['role' => \App\Enums\TeamRole::SubjectMatterExpert->value],
         ]);
 
         $response = $this->actingAs($admin)
             ->putJson("/api/teams/{$team->public_id}/members/{$owner->public_id}/role", [
-                'role' => 'member',
+                'role' => \App\Enums\TeamRole::Operator->value,
             ]);
 
         $response->assertStatus(403);
@@ -128,7 +129,7 @@ class TeamMemberProfileTest extends TestCase
         $team = Team::factory()->create(['owner_id' => $owner->id]);
         
         $team->members()->syncWithoutDetaching([
-            $owner->id => ['role' => 'owner'],
+            $owner->id => ['role' => \App\Enums\TeamRole::TeamLead->value],
         ]);
 
         $file = \Illuminate\Http\UploadedFile::fake()->image('avatar.jpg');
@@ -152,7 +153,7 @@ class TeamMemberProfileTest extends TestCase
         $team = Team::factory()->create(['owner_id' => $owner->id]);
 
         $team->members()->syncWithoutDetaching([
-            $owner->id => ['role' => 'owner'],
+            $owner->id => ['role' => \App\Enums\TeamRole::TeamLead->value],
         ]);
 
         // Upload first

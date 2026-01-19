@@ -47,6 +47,10 @@ import {
 } from 'lucide-vue-next';
 import { toast } from 'vue-sonner';
 
+import { usePresence, getStatusColor, getStatusLabel } from '@/composables/usePresence';
+
+const { presenceUsers, fetchUsersPresence } = usePresence({ manageLifecycle: false });
+
 const route = useRoute();
 const router = useRouter();
 const userId = route.params.public_id;
@@ -57,6 +61,16 @@ const activeSessions = ref([]);
 const selectedSessions = ref([]);
 const isLoading = ref(true);
 const isLogsLoading = ref(true);
+
+// Computed Presence
+const presenceStatus = computed(() => {
+    if (!user.value) return 'offline';
+    // Check real-time map first
+    const realTimeUser = presenceUsers.value.get(user.value.public_id || userId);
+    if (realTimeUser) return realTimeUser.status;
+    
+    return user.value.presence || 'offline';
+});
 
 // Audit logs pagination
 const logsPerPage = ref(10);
@@ -195,6 +209,11 @@ const fetchUser = async () => {
     try {
         const response = await api.get(`/api/users/${userId}`);
         user.value = response.data;
+        
+        // Fetch real-time presence once we have the user
+        if (user.value?.public_id) {
+            fetchUsersPresence([user.value.public_id]);
+        }
     } catch (error) {
         console.error('Failed to fetch user:', error);
         toast.error('Failed to load user details');
@@ -489,8 +508,8 @@ onMounted(async () => {
                         </div>
                         <div 
                             class="absolute bottom-0 right-0 w-5 h-5 rounded-full border-2 border-[var(--surface-primary)]"
-                            :class="user.presence === 'online' ? 'bg-green-500' : 'bg-gray-400'"
-                            :title="user.presence === 'online' ? 'Online' : 'Offline'"
+                            :class="getStatusColor(presenceStatus)"
+                            :title="getStatusLabel(presenceStatus)"
                         ></div>
                     </div>
 

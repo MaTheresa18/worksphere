@@ -70,8 +70,8 @@ class TeamController extends Controller
             'status' => $validated['status'],
         ]);
 
-        // Add owner as a member with 'owner' role
-        $team->members()->attach($owner->id, ['role' => 'owner']);
+        // Add owner as a member with 'team_lead' role
+        $team->members()->attach($owner->id, ['role' => \App\Enums\TeamRole::TeamLead->value]);
 
         return response()->json($team, 201);
     }
@@ -126,9 +126,9 @@ class TeamController extends Controller
 
                 // Ensure new owner is member
                 if (! $team->members()->where('user_id', $newOwner->id)->exists()) {
-                    $team->members()->attach($newOwner->id, ['role' => 'owner']);
+                    $team->members()->attach($newOwner->id, ['role' => \App\Enums\TeamRole::TeamLead->value]);
                 } else {
-                    $team->members()->updateExistingPivot($newOwner->id, ['role' => 'owner']);
+                    $team->members()->updateExistingPivot($newOwner->id, ['role' => \App\Enums\TeamRole::TeamLead->value]);
                 }
             }
         }
@@ -260,7 +260,7 @@ class TeamController extends Controller
 
         $validated = $request->validate([
             'email' => ['required', 'email', 'exists:users,email'],
-            'role' => ['required', 'in:admin,member'],
+            'role' => ['required', 'in:subject_matter_expert,quality_assessor,operator'],
         ]);
 
         $user = User::where('email', $validated['email'])->first();
@@ -591,7 +591,7 @@ class TeamController extends Controller
                     'email' => $user ? $user->email : 'Unknown',
                     'name' => $user ? $user->name : 'Unknown',
                     'avatar_url' => $user ? $user->avatar_url : null,
-                    'role' => $notification->data['role'] ?? 'member',
+                    'role' => $notification->data['role'] ?? 'operator',
                     'sent_at' => $notification->created_at,
                     'inviter_name' => $notification->data['inviter_name'] ?? 'Unknown',
                 ];
@@ -751,7 +751,7 @@ class TeamController extends Controller
                 // Determine if user can edit: owner, event creator, or team admin
                 $canEdit = auth()->id() === $event->user_id ||
                            auth()->id() === $team->owner_id ||
-                           $team->members()->where('user_id', auth()->id())->wherePivot('role', 'admin')->exists();
+                           $team->members()->where('user_id', auth()->id())->whereIn('role', [\App\Enums\TeamRole::TeamLead->value, \App\Enums\TeamRole::SubjectMatterExpert->value])->exists();
 
                 return [
                     'id' => $event->public_id,
@@ -790,7 +790,7 @@ class TeamController extends Controller
     {
         // Permission check: Owner or Admin
         if (auth()->id() !== $team->owner_id &&
-            ! $team->members()->where('user_id', auth()->id())->wherePivot('role', 'admin')->exists()) {
+            ! $team->members()->where('user_id', auth()->id())->whereIn('role', [\App\Enums\TeamRole::TeamLead->value, \App\Enums\TeamRole::SubjectMatterExpert->value])->exists()) {
             abort(403, 'Only team admins can create events.');
         }
 

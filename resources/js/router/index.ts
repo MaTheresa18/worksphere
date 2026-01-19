@@ -134,15 +134,6 @@ const routes: RouteRecordRaw[] = [
         },
     },
     {
-        path: '/support',
-        name: 'public.support',
-        component: () => import('@/views/public/SupportView.vue'),
-        meta: {
-            title: 'Contact Support',
-            transition: 'fade',
-        },
-    },
-    {
         path: '/auth',
         component: AuthLayout,
         meta: { requiresGuest: true },
@@ -446,6 +437,16 @@ const routes: RouteRecordRaw[] = [
                 meta: {
                     title: 'Tickets',
                     breadcrumb: 'Tickets',
+                    transition: 'slide-fade',
+                },
+            },
+            {
+                path: 'support',
+                name: 'support',
+                component: () => import('@/views/SupportView.vue'),
+                meta: {
+                    title: 'Help Desk',
+                    breadcrumb: 'Help Desk',
                     transition: 'slide-fade',
                 },
             },

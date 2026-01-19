@@ -1286,7 +1286,7 @@ function isVisualMedia(att: Attachment) {
                         {{ isFollowing ? "Following" : "Follow" }}
                     </Button>
 
-                    <Dropdown align="end">
+                    <Dropdown align="end" v-if="can('tickets.update')">
                         <template #trigger>
                             <Button variant="outline" size="sm">
                                 Status
@@ -1310,22 +1310,23 @@ function isVisualMedia(att: Attachment) {
                         >
                     </Dropdown>
 
-                    <Dropdown align="end">
+                    <Dropdown align="end" v-if="can('tickets.update') || can('tickets.assign') || can('tickets.delete')">
                         <template #trigger>
                             <Button variant="ghost" size="icon">
                                 <MoreVertical class="h-5 w-5" />
                             </Button>
                         </template>
-                        <DropdownItem @select="openEditModal">
+                        <DropdownItem @select="openEditModal" v-if="can('tickets.update')">
                             <Edit3 class="h-4 w-4" />
                             Edit Ticket
                         </DropdownItem>
-                        <DropdownItem @select="openAssignModal">
+                        <DropdownItem @select="openAssignModal" v-if="can('tickets.assign')">
                             <UserPlus class="h-4 w-4" />
                             Assign to...
                         </DropdownItem>
-                        <DropdownSeparator />
+                        <DropdownSeparator v-if="(can('tickets.update') || can('tickets.assign')) && can('tickets.delete')" />
                         <DropdownItem
+                            v-if="can('tickets.delete')"
                             @click="
                                 showDeleteModal = true;
                                 deleteReason = '';
@@ -1334,7 +1335,7 @@ function isVisualMedia(att: Attachment) {
                             <Trash2 class="mr-2 h-4 w-4 text-red-500" />
                             <span class="text-red-500">Delete Ticket</span>
                         </DropdownItem>
-                        <DropdownItem @click="openArchiveModal">
+                        <DropdownItem @click="openArchiveModal" v-if="can('tickets.delete')">
                             <ArchiveIcon class="mr-2 h-4 w-4" />
                             <span>Archive Ticket</span>
                         </DropdownItem>

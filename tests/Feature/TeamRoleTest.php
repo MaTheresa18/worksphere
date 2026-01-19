@@ -62,9 +62,9 @@ class TeamRoleTest extends TestCase
         ]);
 
         // Add members
-        $this->team->addMember($this->owner, 'owner');
-        $this->team->addMember($this->admin, 'admin');
-        $this->team->addMember($this->member, 'member');
+        $this->team->addMember($this->owner, \App\Enums\TeamRole::TeamLead->value);
+        $this->team->addMember($this->admin, \App\Enums\TeamRole::SubjectMatterExpert->value);
+        $this->team->addMember($this->member, \App\Enums\TeamRole::Operator->value);
 
         // Create default roles
         $this->team->createDefaultRoles($this->owner);
@@ -92,7 +92,7 @@ class TeamRoleTest extends TestCase
                 ],
             ]);
 
-        // Should have 4 default roles: Owner, Admin, Member, Viewer
+        // Should have 4 default roles: Team Lead, SME, QA, Operator
         $this->assertCount(4, $response->json('data'));
     }
 
@@ -216,7 +216,7 @@ class TeamRoleTest extends TestCase
 
     public function test_can_assign_role_to_member(): void
     {
-        $role = $this->team->roles()->where('slug', 'admin')->first();
+        $role = $this->team->roles()->where('slug', \App\Enums\TeamRole::SubjectMatterExpert->value)->first();
 
         $response = $this->actingAs($this->owner)
             ->postJson("/api/teams/{$this->team->public_id}/roles/{$role->public_id}/assign/{$this->member->public_id}");
@@ -234,7 +234,7 @@ class TeamRoleTest extends TestCase
     public function test_cannot_assign_role_to_non_member(): void
     {
         $nonMember = User::factory()->create();
-        $role = $this->team->roles()->where('slug', 'member')->first();
+        $role = $this->team->roles()->where('slug', \App\Enums\TeamRole::Operator->value)->first();
 
         $response = $this->actingAs($this->owner)
             ->postJson("/api/teams/{$this->team->public_id}/roles/{$role->public_id}/assign/{$nonMember->public_id}");
@@ -261,7 +261,7 @@ class TeamRoleTest extends TestCase
 
     public function test_can_get_role_members(): void
     {
-        $role = $this->team->roles()->where('slug', 'member')->first();
+        $role = $this->team->roles()->where('slug', \App\Enums\TeamRole::Operator->value)->first();
         $this->team->members()->updateExistingPivot($this->member->id, [
             'team_role_id' => $role->id,
         ]);
@@ -288,7 +288,7 @@ class TeamRoleTest extends TestCase
             'owner_id' => $this->admin->id,
         ]);
 
-        $role = $this->team->roles()->where('slug', 'member')->first();
+        $role = $this->team->roles()->where('slug', \App\Enums\TeamRole::Operator->value)->first();
 
         $response = $this->actingAs($this->owner)
             ->getJson("/api/teams/{$otherTeam->public_id}/roles/{$role->public_id}");
@@ -414,8 +414,8 @@ class TeamRoleTest extends TestCase
 
     public function test_role_level_hierarchy(): void
     {
-        $highRole = $this->team->roles()->where('slug', 'owner')->first();
-        $lowRole = $this->team->roles()->where('slug', 'member')->first();
+        $highRole = $this->team->roles()->where('slug', \App\Enums\TeamRole::TeamLead->value)->first();
+        $lowRole = $this->team->roles()->where('slug', \App\Enums\TeamRole::Operator->value)->first();
 
         $this->assertTrue($highRole->hasHigherLevelThan($lowRole));
         $this->assertFalse($lowRole->hasHigherLevelThan($highRole));

@@ -37,9 +37,8 @@ const disabledUsers = computed(() => props.stats.status_counts['disabled'] || 0)
 const problemUsers = computed(() => suspendedUsers.value + blockedUsers.value + disabledUsers.value);
 
 const administrators = computed(() => props.stats.role_counts['administrator'] || 0);
-const projectManagers = computed(() => props.stats.role_counts['project_manager'] || props.stats.role_counts['pm'] || 0); // Handle 'pm' or 'project_manager'
-const operators = computed(() => props.stats.role_counts['operator'] || 0);
-const members = computed(() => props.stats.role_counts['member'] || props.stats.role_counts['user'] || 0); // Handle default role name
+const itSupport = computed(() => props.stats.role_counts['it_support'] || 0);
+const users = computed(() => props.stats.role_counts['user'] || props.stats.role_counts['member'] || 0);
 </script>
 
 <template>
@@ -122,24 +121,17 @@ const members = computed(() => props.stats.role_counts['member'] || props.stats.
                     </div>
                     <div class="flex items-center justify-between p-1.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-default)]">
                         <div class="flex items-center gap-1.5">
-                            <Briefcase class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                            <span class="text-[var(--text-secondary)]">PM</span>
-                        </div>
-                        <span class="font-bold text-[var(--text-primary)]">{{ projectManagers }}</span>
-                    </div>
-                    <div class="flex items-center justify-between p-1.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-default)]">
-                        <div class="flex items-center gap-1.5">
                             <Headset class="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
-                            <span class="text-[var(--text-secondary)]">Ops</span>
+                            <span class="text-[var(--text-secondary)]">IT Support</span>
                         </div>
-                        <span class="font-bold text-[var(--text-primary)]">{{ operators }}</span>
+                        <span class="font-bold text-[var(--text-primary)]">{{ itSupport }}</span>
                     </div>
-                     <div class="flex items-center justify-between p-1.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-default)]">
+                     <div class="col-span-2 flex items-center justify-between p-1.5 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-default)]">
                         <div class="flex items-center gap-1.5">
-                            <Users class="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
+                            <Users class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                             <span class="text-[var(--text-secondary)]">Users</span>
                         </div>
-                        <span class="font-bold text-[var(--text-primary)]">{{ members }}</span>
+                        <span class="font-bold text-[var(--text-primary)]">{{ users }}</span>
                     </div>
                 </div>
             </div>

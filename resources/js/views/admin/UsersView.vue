@@ -20,7 +20,6 @@ import {
 } from 'lucide-vue-next';
 
 // State
-// State
 const users = ref([]);
 const isLoading = ref(false);
 const searchQuery = ref('');
@@ -72,11 +71,27 @@ const formData = ref({
 });
 
 const errors = ref({});
+import { usePresence } from '@/composables/usePresence';
+
+const { presenceUsers, fetchUsersPresence } = usePresence({ manageLifecycle: false });
+
+const getPresenceBorder = (user) => {
+    const status = presenceUsers.value.get(user.public_id)?.status || 'offline';
+    switch (status) {
+        case 'online': return 'border-green-500';
+        case 'away': return 'border-yellow-500';
+        case 'busy': return 'border-red-500';
+        default: return 'border-gray-200 dark:border-gray-700';
+    }
+};
+
+// ... existing code ...
 
 // Fetch users
 const fetchUsers = debounce(async (page = 1) => {
     isLoading.value = true;
     try {
+        // ... (existing params logic) ...
         const params = {
             page,
             search: searchQuery.value,
@@ -94,7 +109,14 @@ const fetchUsers = debounce(async (page = 1) => {
 
         const response = await api.get('/api/users', { params: cleanParams });
         users.value = response.data.data;
+
+        // Fetch presence for visible users
+        const publicIds = users.value.map(u => u.public_id);
+        if (publicIds.length > 0) {
+            fetchUsersPresence(publicIds);
+        }
         
+        // ... (existing pagination logic) ...
         const meta = response.data.meta || response.data;
         pagination.value = {
             current_page: meta.current_page,
@@ -110,6 +132,16 @@ const fetchUsers = debounce(async (page = 1) => {
         isLoading.value = false;
     }
 }, 300);
+
+// ... existing code ...
+
+// In template (List View)
+// <img v-if="user.avatar_thumb_url" :src="user.avatar_thumb_url" alt="" class="w-8 h-8 rounded-full object-cover border-2" :class="getPresenceBorder(user)">
+// <div v-else class="w-8 h-8 rounded-full ... border-2" :class="getPresenceBorder(user)"> ... </div>
+
+// In template (Grid View)
+// <img v-if="user.avatar_url" :src="user.avatar_url" alt="" class="w-16 h-16 rounded-full object-cover border-2 mb-3" :class="getPresenceBorder(user)">
+// <div v-else class="w-16 h-16 rounded-full ... border-2 mb-3" :class="getPresenceBorder(user)"> ... </div>
 
 // Selection Logic
 const toggleSelectAll = () => {
@@ -243,6 +275,7 @@ onMounted(() => {
                             v-model="roleFilter"
                             :options="[
                                 { value: 'administrator', label: 'Administrator' },
+                                { value: 'it_support', label: 'IT Support' },
                                 { value: 'user', label: 'User' }
                             ]"
                             placeholder="All Roles"
@@ -276,180 +309,196 @@ onMounted(() => {
             </div>
         </div>
 
-        <!-- Table -->
-        <div class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] overflow-hidden flex flex-col h-[calc(100vh-18rem)]">
-            <Transition name="fade" mode="out-in">
-                <div v-if="viewMode === 'list'" key="list" class="overflow-auto flex-1">
-                <table class="w-full text-left text-sm relative border-collapse">
-                    <thead class="bg-[var(--surface-secondary)] text-[var(--text-secondary)] font-medium sticky top-0 z-10 border-b border-[var(--border-default)]">
-                        <tr>
-                            <th class="w-12 px-6 py-3 border border-[var(--border-default)] bg-[var(--surface-secondary)]">
-                                <input type="checkbox" v-model="selectAll" @change="toggleSelectAll" class="rounded border-[var(--border-strong)] text-[var(--interactive-primary)] focus:ring-[var(--interactive-primary)] bg-[var(--surface-elevated)]">
-                            </th>
-                            <th class="px-6 py-3 border border-[var(--border-default)] bg-[var(--surface-secondary)]">User</th>
-                            <th class="px-6 py-3 border border-[var(--border-default)] bg-[var(--surface-secondary)]">Role</th>
-                            <th class="px-6 py-3 border border-[var(--border-default)] bg-[var(--surface-secondary)]">Status</th>
-                            <th class="px-6 py-3 border border-[var(--border-default)] bg-[var(--surface-secondary)]">Joined</th>
-                            <th class="px-6 py-3 border border-[var(--border-default)] bg-[var(--surface-secondary)] text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <Transition name="fade" mode="out-in">
-                    <tbody v-if="isLoading" key="loading">
-                        <tr>
-                            <td colspan="6" class="px-6 py-12 text-center text-[var(--text-muted)] border border-[var(--border-default)]">
-                                <div class="flex flex-col items-center gap-2">
-                                    <Loader2 class="w-6 h-6 animate-spin" />
-                                    <span>Loading users...</span>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                    <tbody v-else-if="users.length === 0" key="empty">
-                         <tr>
-                            <td colspan="6" class="px-6 py-12 text-center text-[var(--text-muted)] border border-[var(--border-default)]">
-                                <div class="flex flex-col items-center gap-2">
-                                    <UsersIcon class="w-8 h-8 text-[var(--text-muted)] opacity-50" />
-                                    <span>No users found.</span>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                    <TransitionGroup v-else tag="tbody" name="list" appear class="divide-y divide-[var(--border-default)]">
-                        <tr v-for="user in users" :key="user.public_id" class="group hover:bg-[var(--surface-secondary)] transition-colors">
-                            <td class="px-6 py-3 border border-[var(--border-default)]">
-                                <input type="checkbox" :value="user.public_id" v-model="selectedUsers" @change="toggleSelection" class="rounded border-[var(--border-strong)] text-[var(--interactive-primary)] focus:ring-[var(--interactive-primary)] bg-[var(--surface-elevated)]">
-                            </td>
-                            <td class="px-6 py-3 border border-[var(--border-default)]">
-                                <div class="flex items-center gap-3">
-                                    <img v-if="user.avatar_thumb_url" :src="user.avatar_thumb_url" alt="" class="w-8 h-8 rounded-full object-cover border border-[var(--border-default)]">
-                                    <div v-else class="w-8 h-8 rounded-full bg-[var(--surface-tertiary)] flex items-center justify-center text-[var(--interactive-primary)] text-xs font-bold border border-[var(--border-default)]">
-                                        {{ user.initials }}
-                                    </div>
-                                    <div>
-                                        <div class="font-medium text-[var(--text-primary)] leading-tight">{{ user.name }}</div>
-                                        <div class="text-xs text-[var(--text-secondary)]">{{ user.email }}</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-6 py-3 border border-[var(--border-default)]">
-                                <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] text-[var(--text-secondary)] capitalize">
-                                    {{ user.roles[0]?.label || 'Member' }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-3 border border-[var(--border-default)]">
-                                <span :class="{
-                                    'bg-green-500/10 text-green-900 border-green-200 dark:border-green-800 dark:text-green-400': user.status === 'active',
-                                    'bg-red-500/10 text-red-700 border-red-200 dark:border-red-800 dark:text-red-400': user.status === 'suspended',
-                                    'bg-[var(--surface-tertiary)] text-[var(--text-secondary)] border-[var(--border-default)]': user.status === 'inactive'
-                                }" class="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-full border capitalize">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
-                                    {{ user.status }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-3 text-xs text-[var(--text-tertiary)] font-mono border border-[var(--border-default)]">
-                                {{ new Date(user.created_at).toLocaleDateString() }}
-                            </td>
-                            <td class="px-6 py-3 text-right border border-[var(--border-default)]">
-                                <div class="flex items-center justify-end gap-1">
-                                    <button 
-                                        type="button"
-                                        @click="router.push(`/admin/users/${user.public_id}`)"
-                                        class="flex items-center justify-center p-1.5 h-8 w-8 rounded-lg hover:bg-[var(--surface-tertiary)] text-[var(--text-secondary)] transition-colors" 
-                                        title="View Details"
-                                    >
-                                        <Eye class="w-4 h-4" />
-                                    </button>
-                                    <button 
-                                        type="button"
-                                        @click="openEditModal(user)" 
-                                        class="flex items-center justify-center p-1.5 h-8 w-8 rounded-lg hover:bg-[var(--surface-tertiary)] text-[var(--text-secondary)] transition-colors" 
-                                        aria-label="Edit User"
-                                    >
-                                        <Edit2 class="w-4 h-4" />
-                                    </button>
-                                    <button 
-                                        type="button"
-                                        @click="deleteUser(user)" 
-                                        class="flex items-center justify-center p-1.5 h-8 w-8 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-[var(--color-error)] transition-colors" 
-                                        aria-label="Delete User"
-                                    >
-                                        <Trash2 class="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    </TransitionGroup>
-                    </Transition>
-                </table>
-            </div>
-
-
-
-            <!-- Grid View -->
-            <div v-else key="grid" class="overflow-auto flex-1 p-6 bg-[var(--surface-secondary)]/30">
+            <!-- Table (List View) -->
+            <div class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] overflow-hidden flex flex-col flex-1" style="min-height: 500px">
                 <Transition name="fade" mode="out-in">
-                    <div v-if="isLoading" key="loading" class="flex flex-col items-center justify-center p-12 text-[var(--text-muted)] h-full">
-                        <Loader2 class="w-8 h-8 animate-spin mb-4" />
-                        <span>Loading users...</span>
-                    </div>
-                    <div v-else-if="users.length === 0" key="empty" class="flex flex-col items-center justify-center p-12 text-[var(--text-muted)] h-full">
-                        <UsersIcon class="w-12 h-12 mb-4 opacity-50" />
-                        <span>No users found.</span>
-                    </div>
-                    <div v-else key="content">
-                         <TransitionGroup tag="div" name="list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    <div v-for="user in users" :key="user.public_id" class="group bg-[var(--surface-elevated)] border border-[var(--border-default)] rounded-xl p-4 hover:border-[var(--interactive-primary)] hover:shadow-md transition-all relative">
-                        <!-- Checkbox -->
-                        <div class="absolute top-4 left-4 z-10">
-                            <input type="checkbox" :value="user.public_id" v-model="selectedUsers" @change="toggleSelection" class="rounded border-[var(--border-strong)] text-[var(--interactive-primary)] focus:ring-[var(--interactive-primary)] bg-[var(--surface-elevated)]">
-                        </div>
-                        
-                        <!-- Actions -->
-                        <div class="absolute top-2 right-2 flex gap-1 z-20">
-                            <button @click="router.push(`/admin/users/${user.public_id}`)" class="flex items-center justify-center p-1 h-7 w-7 rounded-lg hover:bg-[var(--surface-tertiary)] text-[var(--text-secondary)] transition-colors" title="View Details">
-                                <Eye class="w-4 h-4" />
-                            </button>
-                            <button @click="openEditModal(user)" class="flex items-center justify-center p-1 h-7 w-7 rounded-lg hover:bg-[var(--surface-tertiary)] text-[var(--text-secondary)] transition-colors" title="Edit User">
-                                <Edit2 class="w-4 h-4" />
-                            </button>
-                            <button @click="deleteUser(user)" class="flex items-center justify-center p-1 h-7 w-7 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-[var(--color-error)] transition-colors" title="Delete User">
-                                <Trash2 class="w-4 h-4" />
-                            </button>
-                        </div>
-                        
-                        <div class="flex flex-col items-center text-center mt-2">
-                            <img v-if="user.avatar_url" :src="user.avatar_url" alt="" class="w-16 h-16 rounded-full object-cover border-2 border-[var(--surface-secondary)] mb-3">
-                            <div v-else class="w-16 h-16 rounded-full bg-[var(--surface-tertiary)] flex items-center justify-center text-[var(--interactive-primary)] text-xl font-bold border-2 border-[var(--surface-secondary)] mb-3">
-                                {{ user.initials }}
-                            </div>
-                            <h3 class="font-bold text-[var(--text-primary)] truncate max-w-full px-2">{{ user.name }}</h3>
-                            <p class="text-xs text-[var(--text-secondary)] truncate max-w-full px-2 mb-3">{{ user.email }}</p>
-                            
-                            <div class="flex items-center gap-2 mb-4">
-                                <span class="inline-flex px-2 py-0.5 text-[10px] font-medium rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] text-[var(--text-secondary)] capitalize">
-                                    {{ user.roles[0]?.label || 'Member' }}
-                                </span>
-                                <span :class="{
-                                    'bg-green-500/10 text-green-700 border-green-200 dark:border-green-800 dark:text-green-400': user.status === 'active',
-                                    'bg-red-500/10 text-red-700 border-red-200 dark:border-red-800 dark:text-red-400': user.status === 'suspended',
-                                    'bg-[var(--surface-tertiary)] text-[var(--text-secondary)] border-[var(--border-default)]': user.status === 'inactive'
-                                }" class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full border capitalize">
-                                    <span class="w-1 h-1 rounded-full bg-current"></span>
-                                    {{ user.status }}
-                                </span>
-                            </div>
-                            
-                            <div class="w-full pt-3 border-t border-[var(--border-default)] flex justify-between items-center text-xs text-[var(--text-tertiary)]">
-                                <span>Joined</span>
-                                <span class="font-mono">{{ new Date(user.created_at).toLocaleDateString() }}</span>
-                            </div>
-                        </div>
-                    </div>
+                <div v-if="viewMode === 'list'" key="list" class="overflow-auto flex-1">
+                    <table class="w-full text-left text-sm relative border-collapse">
+                        <thead class="bg-[var(--surface-secondary)]/50 backdrop-blur-sm sticky top-0 z-10 border-b border-[var(--border-default)]">
+                            <tr>
+                                <th class="w-12 px-6 py-4 font-semibold text-xs tracking-wider text-[var(--text-secondary)] uppercase">
+                                    <input type="checkbox" v-model="selectAll" @change="toggleSelectAll" class="rounded border-[var(--border-strong)] text-[var(--interactive-primary)] focus:ring-[var(--interactive-primary)] bg-[var(--surface-elevated)]">
+                                </th>
+                                <th class="px-6 py-4 font-semibold text-xs tracking-wider text-[var(--text-secondary)] uppercase">User</th>
+                                <th class="px-6 py-4 font-semibold text-xs tracking-wider text-[var(--text-secondary)] uppercase">Role</th>
+                                <th class="px-6 py-4 font-semibold text-xs tracking-wider text-[var(--text-secondary)] uppercase">Status</th>
+                                <th class="px-6 py-4 font-semibold text-xs tracking-wider text-[var(--text-secondary)] uppercase">2FA</th>
+                                <th class="px-6 py-4 font-semibold text-xs tracking-wider text-[var(--text-secondary)] uppercase">Joined</th>
+                                <th class="px-6 py-4 font-semibold text-xs tracking-wider text-[var(--text-secondary)] uppercase text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <Transition name="fade" mode="out-in">
+                        <tbody v-if="isLoading" key="loading">
+                             <tr>
+                                <td colspan="7" class="px-6 py-24 text-center text-[var(--text-muted)]">
+                                    <div class="flex flex-col items-center gap-3">
+                                        <Loader2 class="w-8 h-8 animate-spin text-[var(--interactive-primary)]" />
+                                        <span class="text-sm font-medium">Loading users...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tbody v-else-if="users.length === 0" key="empty">
+                             <tr>
+                                <td colspan="7" class="px-6 py-24 text-center text-[var(--text-muted)]">
+                                    <div class="flex flex-col items-center gap-3">
+                                        <UsersIcon class="w-10 h-10 opacity-30" />
+                                        <span class="text-sm font-medium">No users found</span>
+                                        <p class="text-xs max-w-xs mx-auto">Try adjusting your filters or search query.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <TransitionGroup v-else tag="tbody" name="list" appear class="divide-y divide-[var(--border-default)]">
+                            <tr v-for="user in users" :key="user.public_id" class="group hover:bg-[var(--surface-secondary)]/50 transition-colors">
+                                <td class="px-6 py-4">
+                                    <input type="checkbox" :value="user.public_id" v-model="selectedUsers" @change="toggleSelection" class="rounded border-[var(--border-strong)] text-[var(--interactive-primary)] focus:ring-[var(--interactive-primary)] bg-[var(--surface-elevated)]">
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <img v-if="user.avatar_thumb_url" :src="user.avatar_thumb_url" alt="" class="w-10 h-10 rounded-full object-cover border-2 shadow-sm transition-transform hover:scale-105" :class="getPresenceBorder(user)">
+                                        <div v-else class="w-10 h-10 rounded-full bg-[var(--surface-tertiary)] flex items-center justify-center text-[var(--interactive-primary)] text-sm font-bold border-2 shadow-sm transition-transform hover:scale-105" :class="getPresenceBorder(user)">
+                                            {{ user.initials }}
+                                        </div>
+                                        <div>
+                                            <div class="font-semibold text-[var(--text-primary)]">{{ user.name }}</div>
+                                            <div class="text-xs text-[var(--text-secondary)]">{{ user.email }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)] capitalize">
+                                        {{ user.roles[0]?.label || 'No Role' }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span :class="{
+                                        'bg-green-500/10 text-green-700 border-green-200 dark:border-green-800 dark:text-green-400': user.status === 'active',
+                                        'bg-red-500/10 text-red-700 border-red-200 dark:border-red-800 dark:text-red-400': user.status === 'suspended',
+                                        'bg-[var(--surface-tertiary)] text-[var(--text-secondary)] border-[var(--border-default)]': user.status === 'inactive'
+                                    }" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border capitalize shadow-sm">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-current animate-pulse" v-if="user.status === 'active'"></span>
+                                        <span class="w-1.5 h-1.5 rounded-full bg-current" v-else></span>
+                                        {{ user.status }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">
+                                      <span :class="{
+                                        'bg-green-500/10 text-green-700 border-green-200 dark:border-green-800 dark:text-green-400': user.has_2fa_enabled,
+                                        'bg-[var(--surface-tertiary)] text-[var(--text-tertiary)] border-[var(--border-default)]': !user.has_2fa_enabled
+                                    }" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border capitalize shadow-sm">
+                                        <span v-if="user.has_2fa_enabled" class="w-1.5 h-1.5 rounded-full bg-current"></span>
+                                        {{ user.has_2fa_enabled ? 'Active' : 'Disabled' }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-xs text-[var(--text-secondary)] font-mono">
+                                    {{ new Date(user.created_at).toLocaleDateString() }}
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <button 
+                                            type="button"
+                                            @click="router.push(`/admin/users/${user.public_id}`)"
+                                            class="p-2 rounded-lg hover:bg-[var(--surface-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors" 
+                                            title="View Details"
+                                        >
+                                            <Eye class="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            @click="openEditModal(user)" 
+                                            class="p-2 rounded-lg hover:bg-[var(--surface-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors" 
+                                            title="Edit User"
+                                        >
+                                            <Edit2 class="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            @click="deleteUser(user)" 
+                                            class="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-[var(--color-error)] transition-colors" 
+                                            title="Delete User"
+                                        >
+                                            <Trash2 class="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
                         </TransitionGroup>
-                    </div>
+                        </Transition>
+                    </table>
+                </div>
+
+                <!-- Grid View -->
+                <div v-else key="grid" class="flex-1 p-6 overflow-auto bg-[var(--surface-secondary)]/30">
+                    <Transition name="fade" mode="out-in">
+                        <div v-if="isLoading" key="loading" class="flex flex-col items-center justify-center p-24 text-[var(--text-muted)] h-full">
+                            <Loader2 class="w-8 h-8 animate-spin mb-4 text-[var(--interactive-primary)]" />
+                            <span>Loading users...</span>
+                        </div>
+                        <div v-else-if="users.length === 0" key="empty" class="flex flex-col items-center justify-center p-24 text-[var(--text-muted)] h-full">
+                            <UsersIcon class="w-12 h-12 mb-4 opacity-50" />
+                            <span>No users found.</span>
+                        </div>
+                        <div v-else key="content">
+                            <TransitionGroup tag="div" name="list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                <div v-for="user in users" :key="user.public_id" class="group bg-[var(--surface-elevated)] border border-[var(--border-default)] rounded-xl p-5 hover:border-[var(--interactive-primary)] hover:shadow-lg transition-all relative">
+                                    <!-- Checkbox -->
+                                    <div class="absolute top-4 left-4 z-10">
+                                        <input type="checkbox" :value="user.public_id" v-model="selectedUsers" @change="toggleSelection" class="rounded border-[var(--border-strong)] text-[var(--interactive-primary)] focus:ring-[var(--interactive-primary)] bg-[var(--surface-elevated)]">
+                                    </div>
+                                    
+                                    <!-- Actions -->
+                                    <div class="absolute top-3 right-3 flex gap-1 z-20 bg-[var(--surface-elevated)]/80 backdrop-blur-sm rounded-lg p-1 border border-[var(--border-default)] shadow-sm">
+                                        <button @click="router.push(`/admin/users/${user.public_id}`)" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] text-[var(--text-secondary)] transition-colors" title="View Details">
+                                            <Eye class="w-3.5 h-3.5" />
+                                        </button>
+                                        <button @click="openEditModal(user)" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] text-[var(--text-secondary)] transition-colors" title="Edit User">
+                                            <Edit2 class="w-3.5 h-3.5" />
+                                        </button>
+                                        <button @click="deleteUser(user)" class="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-[var(--color-error)] transition-colors" title="Delete User">
+                                            <Trash2 class="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                    
+                                    <div class="flex flex-col items-center text-center mt-2">
+                                        <img v-if="user.avatar_url" :src="user.avatar_url" alt="" class="w-20 h-20 rounded-full object-cover border-4 mb-4 shadow-sm" :class="getPresenceBorder(user)">
+                                        <div v-else class="w-20 h-20 rounded-full bg-[var(--surface-tertiary)] flex items-center justify-center text-[var(--interactive-primary)] text-2xl font-bold border-4 mb-4 shadow-sm" :class="getPresenceBorder(user)">
+                                            {{ user.initials }}
+                                        </div>
+                                        <h3 class="font-bold text-[var(--text-primary)] text-lg truncate max-w-full px-2">{{ user.name }}</h3>
+                                        <p class="text-xs text-[var(--text-secondary)] truncate max-w-full px-2 mb-4">{{ user.email }}</p>
+                                        
+                                        <div class="flex flex-wrap justify-center gap-2 mb-6">
+                                            <span class="inline-flex px-2.5 py-0.5 text-[10px] font-medium rounded-full border border-[var(--border-default)] bg-[var(--surface-secondary)] text-[var(--text-secondary)] capitalize">
+                                                {{ user.roles[0]?.label || 'No Role' }}
+                                            </span>
+                                            <span :class="{
+                                                'bg-green-500/10 text-green-700 border-green-200 dark:border-green-800 dark:text-green-400': user.status === 'active',
+                                                'bg-red-500/10 text-red-700 border-red-200 dark:border-red-800 dark:text-red-400': user.status === 'suspended',
+                                                'bg-[var(--surface-tertiary)] text-[var(--text-secondary)] border-[var(--border-default)]': user.status === 'inactive'
+                                            }" class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border capitalize">
+                                                <span class="w-1 h-1 rounded-full bg-current"></span>
+                                                {{ user.status }}
+                                            </span>
+                                             <span :class="{
+                                                'bg-green-500/10 text-green-700 border-green-200 dark:border-green-800 dark:text-green-400': user.has_2fa_enabled,
+                                                'bg-[var(--surface-tertiary)] text-[var(--text-tertiary)] border-[var(--border-default)]': !user.has_2fa_enabled
+                                            }" class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border capitalize">
+                                                {{ user.has_2fa_enabled ? '2FA On' : '2FA Off' }}
+                                            </span>
+                                        </div>
+                                        
+                                        <div class="w-full pt-4 border-t border-[var(--border-default)] flex justify-between items-center text-xs text-[var(--text-tertiary)]">
+                                            <span>Joined</span>
+                                            <span class="font-mono">{{ new Date(user.created_at).toLocaleDateString() }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </TransitionGroup>
+                        </div>
+                    </Transition>
+                </div>
                 </Transition>
-            </div>
-            </Transition>
 
             <!-- Pagination -->
             <div class="px-4 py-3 border-t border-[var(--border-default)] bg-[var(--surface-elevated)] flex items-center justify-between">

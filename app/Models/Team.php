@@ -138,7 +138,7 @@ class Team extends Model implements HasMedia
         $slug = $baseSlug;
         $counter = 1;
 
-        while (self::where('slug', '=', $slug)->exists()) {
+        while (self::where('slug', $slug)->exists()) {
             $slug = $baseSlug.'-'.$counter;
             $counter++;
         }
@@ -223,41 +223,41 @@ class Team extends Model implements HasMedia
     {
         $defaultRoles = [
             [
-                'name' => 'Owner',
-                'slug' => 'owner',
+                'name' => 'Team Lead',
+                'slug' => 'team_lead',
                 'description' => 'Full team control and management',
-                'color' => 'error',
+                'color' => 'purple',
                 'level' => 100,
                 'is_system' => true,
-                'permissions' => config('roles.team_role_permissions.owner', []),
+                'permissions' => config('roles.team_role_permissions.team_lead', []),
             ],
             [
-                'name' => 'Admin',
-                'slug' => 'admin',
-                'description' => 'Team administration with limited ownership rights',
-                'color' => 'warning',
+                'name' => 'Subject Matter Expert',
+                'slug' => 'subject_matter_expert',
+                'description' => 'Team administration and expert guidance',
+                'color' => 'blue',
                 'level' => 75,
                 'is_system' => true,
-                'permissions' => config('roles.team_role_permissions.admin', []),
+                'permissions' => config('roles.team_role_permissions.subject_matter_expert', []),
             ],
             [
-                'name' => 'Member',
-                'slug' => 'member',
-                'description' => 'Standard team member access',
-                'color' => 'primary',
+                'name' => 'Quality Assessor',
+                'slug' => 'quality_assessor',
+                'description' => 'Quality assurance and review',
+                'color' => 'orange',
                 'level' => 50,
+                'is_system' => true,
+                'permissions' => config('roles.team_role_permissions.quality_assessor', []),
+            ],
+            [
+                'name' => 'Operator',
+                'slug' => 'operator',
+                'description' => 'Standard operator access',
+                'color' => 'green',
+                'level' => 25,
                 'is_default' => true,
                 'is_system' => true,
-                'permissions' => config('roles.team_role_permissions.member', []),
-            ],
-            [
-                'name' => 'Viewer',
-                'slug' => 'viewer',
-                'description' => 'Read-only access to team resources',
-                'color' => 'secondary',
-                'level' => 25,
-                'is_system' => true,
-                'permissions' => config('roles.team_role_permissions.viewer', []),
+                'permissions' => config('roles.team_role_permissions.operator', []),
             ],
         ];
 
@@ -334,7 +334,7 @@ class Team extends Model implements HasMedia
     {
         return $this->members()
             ->where('user_id', $user->id)
-            ->whereIn('role', ['owner', 'admin'])
+            ->whereIn('role', ['team_lead', 'subject_matter_expert'])
             ->exists();
     }
 
@@ -349,11 +349,14 @@ class Team extends Model implements HasMedia
     /**
      * Add a member to the team.
      */
-    public function addMember(User $user, string $role = 'member'): void
+    public function addMember(User $user, string $role = 'operator'): void
     {
         if (! $this->hasMember($user)) {
+            $teamRole = $this->roles()->where('slug', $role)->first();
+            
             $this->members()->attach($user->id, [
                 'role' => $role,
+                'team_role_id' => $teamRole ? $teamRole->id : null,
                 'joined_at' => now(),
             ]);
         }

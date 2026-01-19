@@ -221,7 +221,7 @@ class TicketService implements TicketServiceContract
                 'title' => $data['title'],
                 'description' => $data['description'] ?? null,
                 'status' => $data['status'] ?? TicketStatus::Open,
-                'priority' => $data['priority'] ?? 'medium',
+                'priority' => $data['priority'] ?? $this->inferPriority($data['type'] ?? 'task'),
                 'type' => $data['type'] ?? 'task',
                 'tags' => $data['tags'] ?? [],
                 'assigned_to' => $data['assigned_to'] ?? null,
@@ -664,5 +664,18 @@ class TicketService implements TicketServiceContract
         }
 
         return $count;
+    }
+    /**
+     * Infer priority based on ticket type.
+     */
+    protected function inferPriority(string $type): string
+    {
+        return match ($type) {
+            'incident', 'critical' => 'critical',
+            'bug' => 'high',
+            'feature', 'task' => 'medium',
+            'question', 'improvement', 'accounting' => 'low',
+            default => 'medium',
+        };
     }
 }

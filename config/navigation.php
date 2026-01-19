@@ -74,10 +74,19 @@ return [
             'label' => 'Tickets',
             'icon' => 'ticket',
             'route' => '/tickets',
-            'permission' => ['tickets.view', 'tickets.view_own'],
+            'permission' => 'tickets.view',
             'pinnable' => true,
             'pinned_default' => true,
             'badge_key' => 'open_tickets_count',
+        ],
+        [
+            'id' => 'support',
+            'label' => 'Help Desk',
+            'icon' => 'life-buoy',
+            'route' => '/support',
+            'permission' => 'tickets.view_own',
+            'pinnable' => true,
+            'pinned_default' => true,
         ],
         [
             'id' => 'calendar',
@@ -103,26 +112,6 @@ return [
             'permission' => ['tasks.view', 'tasks.view_assigned'],
             'pinnable' => true,
             'pinned_default' => false,
-            'children' => [
-                [
-                    'id' => 'tasks-all',
-                    'label' => 'All Tasks',
-                    'route' => '/tasks',
-                    'permission' => 'tasks.view',
-                ],
-                [
-                    'id' => 'tasks-my',
-                    'label' => 'My Tasks',
-                    'route' => '/tasks/my',
-                    'permission' => 'tasks.view_assigned',
-                ],
-                [
-                    'id' => 'tasks-board',
-                    'label' => 'Kanban Board',
-                    'route' => '/tasks/board',
-                    'permission' => 'tasks.view',
-                ],
-            ],
         ],
         [
             'id' => 'teams',

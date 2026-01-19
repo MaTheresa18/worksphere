@@ -30,6 +30,7 @@ class StoreTaskRequest extends FormRequest
             'parent_id' => ['nullable', 'string', 'exists:tasks,public_id'],
             'task_template_id' => ['nullable', 'string', 'exists:task_templates,public_id'],
             'assigned_to' => ['nullable', 'string', 'exists:users,public_id'],
+            'qa_user_id' => ['nullable', 'string', 'exists:users,public_id'],
             'priority' => ['sometimes', 'integer', 'min:1', 'max:5'],
             'due_date' => ['nullable', 'date'],
             'estimated_hours' => ['nullable', 'numeric', 'min:0', 'max:9999.99'],

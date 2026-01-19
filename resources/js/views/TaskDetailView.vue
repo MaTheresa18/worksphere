@@ -1356,7 +1356,7 @@ watch(
                                 <dt
                                     class="text-xs font-medium text-[var(--text-secondary)] mb-1.5"
                                 >
-                                    Assignee
+                                    Operator
                                 </dt>
                                 <dd class="flex items-center gap-2">
                                     <Avatar
@@ -1384,6 +1384,41 @@ watch(
                                         {{
                                             task.assignee?.name || "Unassigned"
                                         }}
+                                    </span>
+                                </dd>
+                            </div>
+
+                            <!-- QA -->
+                            <div>
+                                <dt
+                                    class="text-xs font-medium text-[var(--text-secondary)] mb-1.5"
+                                >
+                                    QA
+                                </dt>
+                                <dd class="flex items-center gap-2">
+                                    <Avatar
+                                        v-if="task.qa_user"
+                                        :name="task.qa_user.name"
+                                        :src="task.qa_user.avatar_url"
+                                        size="sm"
+                                    />
+                                    <div
+                                        v-else
+                                        class="w-8 h-8 rounded-full bg-[var(--surface-tertiary)] flex items-center justify-center border border-[var(--border-subtle)]"
+                                    >
+                                        <UserPlus
+                                            class="w-3.5 h-3.5 text-[var(--text-muted)]"
+                                        />
+                                    </div>
+                                    <span
+                                        class="text-sm font-medium"
+                                        :class="
+                                            task.qa_user
+                                                ? 'text-[var(--text-primary)]'
+                                                : 'text-[var(--text-muted)] italic'
+                                        "
+                                    >
+                                        {{ task.qa_user?.name || "Unassigned" }}
                                     </span>
                                 </dd>
                             </div>
@@ -1421,7 +1456,7 @@ watch(
                                 <dt
                                     class="text-xs font-medium text-[var(--text-secondary)] mb-1.5"
                                 >
-                                    Reporter
+                                    Created By
                                 </dt>
                                 <dd class="flex items-center gap-2">
                                     <Avatar

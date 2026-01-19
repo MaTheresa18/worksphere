@@ -23,7 +23,7 @@ class UpdateTeamMemberRoleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'role' => ['required', 'string', Rule::in(['admin', 'member'])],
+            'role' => ['required', 'string', Rule::in(['subject_matter_expert', 'quality_assessor', 'operator'])],
         ];
     }
 }

@@ -58,130 +58,42 @@ return [
             'level' => 100,
             'permissions' => ['*'], // All permissions
         ],
-        'project_manager' => [
-            'label' => 'Project Manager',
-            'description' => 'Manage projects, teams, and resources',
-            'color' => 'primary',
-            'level' => 75,
-            'permissions' => [
-                // Dashboard
-                'dashboard.view',
-                'dashboard.analytics',
-
-                // Users (limited)
-                'users.view',
-                'users.create',
-                'users.update',
-
-                // Projects (full)
-                'projects.view',
-                'projects.create',
-                'projects.update',
-                'projects.delete',
-                'projects.archive',
-                'projects.assign',
-
-                // Tasks (full)
-                'tasks.view',
-                'tasks.create',
-                'tasks.update',
-                'tasks.delete',
-                'tasks.assign',
-
-                // Tickets (full)
-                'tickets.view',
-                'tickets.create',
-                'tickets.update',
-                'tickets.delete',
-                'tickets.assign',
-                'tickets.close',
-
-                // Reports
-                'reports.view',
-                'reports.export',
-
-                // Teams
-                'teams.view',
-                'teams.create',
-                'teams.update',
-                'teams.manage_members',
-            ],
-        ],
-        'operator' => [
-            'label' => 'Operator',
-            'description' => 'Handle tickets and daily operations',
+        'it_support' => [
+            'label' => 'IT Support',
+            'description' => 'Support related permissions (tickets, user management)',
             'color' => 'warning',
             'level' => 50,
             'permissions' => [
-                // Dashboard
                 'dashboard.view',
-
-                // Tickets (manage assigned)
+                'users.view',
+                'users.update', // Reset password/MFA often falls under update
+                'users.manage_status',
                 'tickets.view',
                 'tickets.create',
                 'tickets.update',
                 'tickets.assign',
                 'tickets.close',
-
-                // Tasks (manage assigned)
-                'tasks.view',
-                'tasks.create',
-                'tasks.update',
-
-                // Projects (view only)
-                'projects.view',
-
-                // Reports (view only)
+                'tickets.internal_notes',
                 'reports.view',
             ],
         ],
         'user' => [
             'label' => 'User',
-            'description' => 'Basic user access',
+            'description' => 'Regular user permissions for self-service actions',
             'color' => 'secondary',
             'level' => 10,
             'permissions' => [
-                // Dashboard
                 'dashboard.view',
-
-                // Tickets (own only)
                 'tickets.view_own',
                 'tickets.create',
                 'tickets.update_own',
-
-                // Projects (view assigned)
                 'projects.view_assigned',
-
-                // Tasks (view assigned)
                 'tasks.view_assigned',
                 'tasks.update_assigned',
-
-                // Personal Notes
                 'notes.view',
                 'notes.create',
                 'notes.update',
                 'notes.delete',
-            ],
-        ],
-        'client' => [
-            'label' => 'Client',
-            'description' => 'Client access to portal',
-            'color' => 'success',
-            'level' => 1,
-            'permissions' => [
-                // Dashboard
-                'dashboard.view',
-
-                // Tickets
-                'tickets.view_own',
-                'tickets.create',
-                'tickets.update_own',
-
-                // Projects
-                'projects.view_assigned',
-
-                // Invoices
-                'invoices.view',
             ],
         ],
     ],
@@ -214,7 +126,7 @@ return [
             'users.manage_roles' => 'Manage user roles',
             'users.manage_status' => 'Manage user status',
             'users.manage_permissions' => 'Manage user permission overrides',
-            'user_manage' => 'Manage all user settings', // New broad permission
+            'user_manage' => 'Manage all user settings',
         ],
 
         // Role Management
@@ -248,6 +160,12 @@ return [
             'tasks.update_assigned' => 'Update assigned tasks',
             'tasks.delete' => 'Delete tasks',
             'tasks.assign' => 'Assign tasks to users',
+            'tasks.submit' => 'Submit tasks',
+            'tasks.qa_review' => 'Review tasks (QA)',
+            'tasks.approve' => 'Approve tasks',
+            'tasks.reject' => 'Reject tasks',
+            'tasks.send_to_client' => 'Send tasks to client',
+            'tasks.archive' => 'Archive tasks',
         ],
 
         // Ticket Management
@@ -299,14 +217,6 @@ return [
             'system.logs' => 'View system logs',
             'system.manage_blocklist' => 'Manage blocked URLs',
             'system.manage_email' => 'Manage system email accounts',
-        ],
-
-        // Announcements
-        'announcements' => [
-            'announcements.view' => 'View announcement management',
-            'announcements.create' => 'Create announcements',
-            'announcements.update' => 'Edit announcements',
-            'announcements.delete' => 'Delete announcements',
         ],
 
         // Team Roles
@@ -421,7 +331,7 @@ return [
     */
 
     'team_role_permissions' => [
-        'owner' => [
+        'team_lead' => [
             // Full team management
             'teams.view',
             'teams.update',
@@ -505,16 +415,14 @@ return [
             'reports.create',
             'reports.export',
         ],
-        'admin' => [
+        'subject_matter_expert' => [
             // Team management (limited)
             'teams.view',
             'teams.update',
             'teams.manage_members',
 
-            // Team roles (limited)
+            // Team roles (limited - cannot delete or manage lead)
             'team_roles.view',
-            'team_roles.create',
-            'team_roles.update',
             'team_roles.assign',
 
             // Projects within team
@@ -576,55 +484,31 @@ return [
             'reports.view',
             'reports.export',
         ],
-        'member' => [
-            // Team view only
+        'quality_assessor' => [
+            // Limited view
             'teams.view',
-
-            // Team roles (view only)
-            'team_roles.view',
-
-            // Projects (view + update assigned)
             'projects.view',
-            'projects.update',
-            'projects.manage_files',
-
-            // Tasks (full for assigned)
-            'tasks.view',
-            'tasks.create',
-            'tasks.update',
-            'tasks.submit',
-
-            // Task templates (view only)
-            'task_templates.view',
-
-            // QA checks (view only)
-            'qa_checks.view',
-
-            // Clients (view only)
             'clients.view',
 
-            // Invoices (view only)
-            'invoices.view',
-
-            // Tickets (manage own + view all)
-            'tickets.view',
-            'tickets.create',
-            'tickets.update',
-
-            // Reports (view only)
-            'reports.view',
+            // Tasks - QA focus
+            'tasks.view',
+            'tasks.qa_review', // Can review
+            'tasks.approve',   // Can approve
+            'tasks.reject',    // Can reject
+            
+            // Cannot create/delete tasks, but can see them
         ],
-        'viewer' => [
-            // Read-only access
+        'operator' => [
+            // Assigned work only
             'teams.view',
-            'team_roles.view',
             'projects.view_assigned',
             'tasks.view_assigned',
-            'task_templates.view',
-            'clients.view',
-            'invoices.view',
-            'tickets.view_own',
-            'reports.view',
+            
+            // CANNOT update task details, add/remove checklist (controlled by policies/UI)
+            // But can likely "complete" subtasks if assigned? Instructions said "cannot update task details"
+            
+            'tickets.view_own', // Or assigned
+            'reports.view', // Maybe?
         ],
     ],
 

@@ -127,6 +127,15 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
     // Global Task List
     Route::get('/user/tasks', [\App\Http\Controllers\Api\UserTaskController::class, 'index']);
 
+    // Personal Tasks
+    Route::apiResource('personal-tasks', \App\Http\Controllers\Api\PersonalTaskController::class);
+
+    // User Profile related
+    Route::prefix('users/{user}')->group(function () {
+        Route::get('profile', [\App\Http\Controllers\Api\UserProfileController::class, 'show']);
+        Route::get('assigned-tasks', [\App\Http\Controllers\Api\UserProfileController::class, 'assignedTasks']);
+    });
+
     // Dashboard
     Route::prefix('dashboard')->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\DashboardController::class, 'index']);

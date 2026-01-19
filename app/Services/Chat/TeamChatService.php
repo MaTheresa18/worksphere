@@ -176,9 +176,10 @@ class TeamChatService
         $role = strtolower($role ?? 'member');
 
         return match ($role) {
-            'owner' => 'owner',
-            'admin' => 'admin',
-            'viewer' => 'viewer',
+            'team_lead' => 'owner',
+            'subject_matter_expert' => 'admin',
+            'quality_assessor' => 'member',
+            'operator' => 'member',
             default => 'member',
         };
     }

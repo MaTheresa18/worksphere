@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { Badge, Avatar } from "@/components/ui";
-import { Calendar } from "lucide-vue-next";
+import { Calendar, User } from "lucide-vue-next";
 
 interface Task {
     public_id: string;
@@ -18,7 +18,15 @@ interface Task {
         name: string;
         avatar_url: string;
     };
+    qa_user?: {
+        name: string;
+        avatar_url: string;
+    };
+    project?: {
+        name: string;
+    };
     created_at: string;
+    public_id: string; // Ensure this is consistently present
 }
 
 interface Props {
@@ -34,7 +42,10 @@ const props = withDefaults(defineProps<Props>(), {
     statuses: () => [
         { value: "open", label: "Open", color: "blue" },
         { value: "in_progress", label: "In Progress", color: "indigo" },
+        { value: "submitted", label: "Submitted", color: "purple" },
         { value: "in_qa", label: "In QA", color: "amber" },
+        { value: "approved", label: "Approved", color: "teal" },
+        { value: "sent_to_client", label: "Client Review", color: "rose" },
         { value: "completed", label: "Done", color: "emerald" },
     ],
 });
@@ -105,116 +116,148 @@ const onDragOver = (event: DragEvent) => {
 </script>
 
 <template>
-    <div class="flex overflow-x-auto pb-4 gap-4 h-full min-h-[500px]">
-        <div
-            v-for="status in statuses"
-            :key="status.value"
-            class="flex-shrink-0 w-80 flex flex-col bg-[var(--surface-secondary)] rounded-xl"
-            @dragover="onDragOver"
-            @drop="onDrop($event, status.value)"
-        >
-            <!-- Column Header -->
+    <div class="h-full overflow-x-auto overflow-y-hidden">
+        <div class="flex h-full gap-6 pb-4 min-w-full w-max px-1">
             <div
-                class="p-3 font-semibold text-sm flex items-center justify-between sticky top-0 bg-[var(--surface-secondary)] z-10 rounded-t-xl"
+                v-for="status in statuses"
+                :key="status.value"
+                class="flex flex-col w-[320px] flex-shrink-0 max-h-full rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)]"
+                @dragover="onDragOver"
+                @drop="onDrop($event, status.value)"
             >
-                <div class="flex items-center gap-2">
-                    <div
-                        class="w-2 h-2 rounded-full"
-                        :class="`bg-${status.color}-500`"
-                    ></div>
-                    <span class="text-[var(--text-secondary)]">{{
-                        status.label
-                    }}</span>
-                    <span
-                        class="px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-xs text-[var(--text-muted)]"
-                    >
-                        {{ getTasksByStatus(status.value).length }}
-                    </span>
-                </div>
-            </div>
-
-            <!-- Task List -->
-            <div
-                class="p-3 pt-0 flex-1 overflow-y-auto space-y-3 custom-scrollbar"
-            >
+                <!-- Column Header -->
                 <div
-                    v-for="task in getTasksByStatus(status.value)"
-                    :key="task.public_id"
-                    :draggable="!readOnly"
-                    @dragstart="!readOnly && onDragStart($event, task)"
-                    @click="emit('task-click', task)"
-                    class="bg-[var(--surface-primary)] p-4 rounded-lg shadow-sm border border-[var(--border-subtle)] hover:shadow-md hover:border-[var(--border-default)] transition-all cursor-pointer group"
-                    :class="{
-                        'opacity-50 ring-2 ring-[var(--color-primary-500)]':
-                            draggingTask?.public_id === task.public_id,
-                    }"
+                    class="p-4 flex items-center justify-between flex-shrink-0 border-b border-[var(--border-subtle)] bg-[var(--surface-secondary)] rounded-t-xl"
                 >
-                    <div class="flex items-start justify-between mb-2">
-                        <span
-                            class="px-2 py-0.5 rounded text-[10px] font-medium border"
-                            :class="getPriorityColor(task.priority)"
-                        >
-                            {{ getPriorityLabel(task.priority) }}
-                        </span>
-
+                    <div class="flex items-center gap-2.5">
                         <div
-                            v-if="task.due_date"
-                            class="flex items-center text-[10px] text-[var(--text-muted)] gap-1"
-                        >
-                            <Calendar class="w-3 h-3" />
-                            {{ formatDate(task.due_date) }}
-                        </div>
-                    </div>
-
-                    <h4
-                        class="text-sm font-medium text-[var(--text-primary)] mb-1 line-clamp-2 leading-relaxed"
-                    >
-                        {{ task.title }}
-                    </h4>
-
-                    <div
-                        v-if="showProject && (task as any).project"
-                        class="mb-2"
-                    >
-                        <Badge
-                            variant="outline"
-                            size="sm"
-                            class="text-[10px] h-5 px-1.5 max-w-full truncate"
-                        >
-                            {{ (task as any).project.name }}
+                            class="w-2.5 h-2.5 rounded-full ring-2 ring-offset-2 ring-offset-[var(--surface-secondary)]"
+                            :class="`bg-${status.color}-500 ring-${status.color}-500/30`"
+                        ></div>
+                        <h3 class="font-semibold text-sm text-[var(--text-primary)]">
+                            {{ status.label }}
+                        </h3>
+                        <Badge variant="secondary" size="sm" class="ml-1 px-1.5 min-w-[20px] justify-center">
+                            {{ getTasksByStatus(status.value).length }}
                         </Badge>
                     </div>
-
-                    <div class="flex items-center justify-between mt-3">
-                        <div class="flex items-center gap-1.5">
-                            <Avatar
-                                v-if="task.assignee"
-                                :name="task.assignee.name"
-                                :src="task.assignee.avatar_url"
-                                size="xs"
-                                class="ring-1 ring-[var(--surface-primary)]"
-                            />
-                            <div
-                                v-else
-                                class="w-5 h-5 rounded-full bg-[var(--surface-tertiary)] flex items-center justify-center text-[10px] text-[var(--text-muted)]"
-                            >
-                                ?
-                            </div>
-                        </div>
-                        <div class="text-[10px] text-[var(--text-muted)]">
-                            #{{ task.public_id.substring(0, 4) }}
-                        </div>
-                    </div>
                 </div>
 
-                <!-- Empty State -->
+                <!-- Task List -->
                 <div
-                    v-if="getTasksByStatus(status.value).length === 0"
-                    class="flex items-center justify-center h-24 border-2 border-dashed border-[var(--border-subtle)] rounded-lg"
+                    class="p-3 flex-1 overflow-y-auto space-y-3 custom-scrollbar scroll-smooth"
                 >
-                    <span class="text-xs text-[var(--text-muted)]"
-                        >No tasks</span
+                    <div
+                        v-for="task in getTasksByStatus(status.value)"
+                        :key="task.public_id"
+                        :draggable="!readOnly"
+                        @dragstart="!readOnly && onDragStart($event, task)"
+                        @click="emit('task-click', task)"
+                        class="group relative bg-[var(--surface-primary)] p-4 rounded-xl shadow-sm border border-[var(--border-subtle)] hover:shadow-md hover:border-[var(--brand-primary)]/50 transition-all duration-200 cursor-pointer select-none"
+                        :class="{
+                            'opacity-50 rotate-2 scale-95 ring-2 ring-[var(--brand-primary)]':
+                                draggingTask?.public_id === task.public_id,
+                        }"
                     >
+                        <!-- Card Header -->
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-mono text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors">
+                                    #{{ task.public_id.substring(0, 4) }}
+                                </span>
+                                <Badge
+                                    v-if="showProject && task.project"
+                                    variant="outline"
+                                    size="sm"
+                                    class="text-[10px] h-5 px-1.5 max-w-[100px] truncate"
+                                >
+                                    {{ task.project.name }}
+                                </Badge>
+                            </div>
+                            
+                            <div 
+                                class="w-1.5 h-1.5 rounded-full"
+                                :class="getPriorityColor(task.priority).replace('bg-', 'bg-').replace('text-', 'bg-')"
+                            ></div>
+                        </div>
+
+                        <!-- Title -->
+                        <h4
+                            class="text-sm font-semibold text-[var(--text-primary)] mb-3 leading-snug line-clamp-3 group-hover:text-[var(--brand-primary)] transition-colors"
+                        >
+                            {{ task.title }}
+                        </h4>
+
+                        <!-- Footer -->
+                        <div class="flex items-center justify-between mt-auto pt-3 border-t border-[var(--border-subtle)]/50">
+                            <!-- People -->
+                            <div class="flex items-center -space-x-2">
+                                <!-- Operator -->
+                                <Avatar
+                                    v-if="task.assignee"
+                                    :name="task.assignee.name"
+                                    :src="task.assignee.avatar_url"
+                                    size="xs"
+                                    class="ring-2 ring-[var(--surface-primary)] w-6 h-6"
+                                    title="Operator"
+                                />
+                                <div
+                                    v-else
+                                    class="w-6 h-6 rounded-full bg-[var(--surface-tertiary)] flex items-center justify-center text-[10px] text-[var(--text-muted)] ring-2 ring-[var(--surface-primary)]"
+                                    title="No Operator"
+                                >
+                                    <User class="w-3 h-3" />
+                                </div>
+
+                                <!-- QA -->
+                                <Avatar
+                                    v-if="task.qa_user"
+                                    :name="task.qa_user.name"
+                                    :src="task.qa_user.avatar_url"
+                                    size="xs"
+                                    class="ring-2 ring-[var(--surface-primary)] w-6 h-6"
+                                    title="QA"
+                                />
+                            </div>
+
+                            <!-- Meta -->
+                            <div class="flex items-center gap-3">
+                                <!-- Priority Label -->
+                                <span 
+                                    class="text-[10px] font-medium px-1.5 py-0.5 rounded"
+                                    :class="getPriorityColor(task.priority)"
+                                >
+                                    {{ getPriorityLabel(task.priority) }}
+                                </span>
+
+                                <!-- Date -->
+                                <div
+                                    v-if="task.due_date"
+                                    class="flex items-center text-[10px] gap-1"
+                                    :class="{
+                                        'text-red-500 font-medium': new Date(task.due_date) < new Date(),
+                                        'text-[var(--text-muted)]': new Date(task.due_date) >= new Date()
+                                    }"
+                                >
+                                    <Calendar class="w-3 h-3" />
+                                    {{ formatDate(task.due_date) }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div
+                        v-if="getTasksByStatus(status.value).length === 0"
+                        class="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-[var(--border-subtle)] rounded-xl bg-[var(--surface-primary)]/30"
+                    >
+                        <div class="w-10 h-10 rounded-full bg-[var(--surface-tertiary)] flex items-center justify-center mb-2">
+                            <span class="text-xl opacity-20">📋</span>
+                        </div>
+                        <span class="text-xs font-medium text-[var(--text-muted)]"
+                            >No tasks in {{ status.label }}</span
+                        >
+                    </div>
                 </div>
             </div>
         </div>

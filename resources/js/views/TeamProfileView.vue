@@ -83,7 +83,9 @@ const isTeamAdmin = computed(() => {
     const membership = members.value.find(
         (m) => m.public_id === authStore.user?.public_id,
     );
-    return membership?.pivot?.role === "admin";
+    return ["team_lead", "subject_matter_expert"].includes(
+        membership?.role,
+    );
 });
 
 async function fetchCalendarEvents(start, end) {
@@ -311,14 +313,14 @@ const isOwner = computed(() => {
     return (
         authStore.user?.public_id === team.value?.owner?.public_id ||
         members.value.find((m) => m.public_id === authStore.user?.public_id)
-            ?.pivot?.role === "owner"
+            ?.role === "team_lead"
     );
 });
 
 // Invite
 const showInviteModal = ref(false);
 const inviteEmail = ref("");
-const inviteRole = ref("member");
+const inviteRole = ref("operator");
 const inviteLoading = ref(false);
 
 const inviteError = ref("");
@@ -538,9 +540,9 @@ const handleUpdateRole = async (member, newRole) => {
         const mIndex = members.value.findIndex(
             (m) => m.public_id === member.public_id,
         );
-        if (mIndex !== -1 && members.value[mIndex].pivot) {
+        if (mIndex !== -1) {
             // Create a deep copy to avoid reactivity issues if needed, or just assign
-            members.value[mIndex].pivot.role = newRole;
+            members.value[mIndex].role = newRole;
         }
     } catch (error) {
         console.error("Error updating role:", error);
@@ -829,7 +831,7 @@ watch(team, (newTeam) => {
         newTeam &&
         (authStore.user?.public_id === newTeam.owner?.public_id ||
             members.value.find((m) => m.public_id === authStore.user?.public_id)
-                ?.pivot?.role === "admin")
+                ?.pivot?.role === "subject_matter_expert" || members.value.find((m) => m.public_id === authStore.user?.public_id)?.pivot?.role === "team_lead")
     ) {
         fetchPendingInvites();
     }
@@ -869,13 +871,16 @@ const canRemoveMember = (member) => {
     const currentUserMemberObj = members.value.find(
         (m) => m.public_id === authStore.user?.public_id,
     );
-    const isCurrentUserAdmin = currentUserMemberObj?.pivot?.role === "admin";
+    const isCurrentUserAdmin = ["team_lead", "subject_matter_expert"].includes(
+        currentUserMemberObj?.pivot?.role,
+    );
 
     // Admin can remove members, but not other admins or owner
     if (
         isCurrentUserAdmin &&
-        member.pivot?.role !== "admin" &&
-        member.pivot?.role !== "owner"
+        !["team_lead", "subject_matter_expert"].includes(
+            member.pivot?.role,
+        )
     ) {
         return true;
     }
@@ -1327,9 +1332,12 @@ const canRemoveMember = (member) => {
                                 class="h-10 rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] text-sm px-3 focus:outline-none focus:ring-2 focus:ring-[var(--interactive-primary)]"
                             >
                                 <option value="">All Roles</option>
-                                <option value="owner">Owner</option>
-                                <option value="admin">Admin</option>
-                                <option value="member">Member</option>
+                                <option value="team_lead">Team Lead</option>
+                                <option value="subject_matter_expert">
+                                    SME
+                                </option>
+                                <option value="quality_assessor">QA</option>
+                                <option value="operator">Operator</option>
                             </select>
                             <select
                                 v-model="perPage"
@@ -1517,8 +1525,8 @@ const canRemoveMember = (member) => {
                                         <div
                                             v-if="
                                                 isTeamAdmin &&
-                                                member.pivot?.role !==
-                                                    'owner' &&
+                                                member.role !==
+                                                    'team_lead' &&
                                                 member.public_id !==
                                                     authStore.user?.public_id
                                             "
@@ -1533,13 +1541,19 @@ const canRemoveMember = (member) => {
                                                             e.target.value,
                                                         )
                                                 "
-                                                :value="member.pivot?.role"
+                                                :value="member.role"
                                             >
-                                                <option value="member">
-                                                    Member
+                                                <option value="operator">
+                                                    Operator
                                                 </option>
-                                                <option value="admin">
-                                                    Admin
+                                                <option value="quality_assessor">
+                                                    QA
+                                                </option>
+                                                <option value="subject_matter_expert">
+                                                    SME
+                                                </option>
+                                                <option value="team_lead">
+                                                    Team Lead
                                                 </option>
                                             </select>
                                         </div>
@@ -1547,21 +1561,21 @@ const canRemoveMember = (member) => {
                                             v-else
                                             class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize"
                                             :class="
-                                                member.pivot?.role === 'owner'
+                                                member.role === 'team_lead'
                                                     ? 'bg-purple-100 text-purple-800'
                                                     : 'bg-gray-100 text-gray-800'
                                             "
                                         >
-                                            {{ member.pivot?.role || "member" }}
+                                            {{ member.role?.replace('_', ' ') || "operator" }}
                                         </span>
                                     </td>
                                     <td
                                         class="py-4 px-6 text-sm text-[var(--text-secondary)]"
                                     >
                                         {{
-                                            member.pivot?.joined_at
+                                            member.joined_at
                                                 ? formatDate(
-                                                      member.pivot.joined_at,
+                                                      member.joined_at,
                                                   )
                                                 : "N/A"
                                         }}
@@ -1883,8 +1897,14 @@ const canRemoveMember = (member) => {
                         v-model="inviteRole"
                         class="w-full h-10 px-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--interactive-primary)]"
                     >
-                        <option value="member">Member</option>
-                        <option value="admin">Admin</option>
+                        <option value="operator">Operator</option>
+                        <option value="quality_assessor">
+                            Quality Assessor
+                        </option>
+                        <option value="subject_matter_expert">
+                            Subject Matter Expert
+                        </option>
+                        <option value="team_lead">Team Lead</option>
                     </select>
                 </div>
             </div>

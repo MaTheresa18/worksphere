@@ -4,10 +4,10 @@ namespace App\Enums;
 
 enum TeamRole: string
 {
-    case Owner = 'owner';
-    case Admin = 'admin';
-    case Member = 'member';
-    case Viewer = 'viewer';
+    case TeamLead = 'team_lead';
+    case SubjectMatterExpert = 'subject_matter_expert';
+    case QualityAssessor = 'quality_assessor';
+    case Operator = 'operator';
 
     /**
      * Get the human-readable label for the role.
@@ -15,10 +15,10 @@ enum TeamRole: string
     public function label(): string
     {
         return match ($this) {
-            self::Owner => 'Owner',
-            self::Admin => 'Administrator',
-            self::Member => 'Member',
-            self::Viewer => 'Viewer',
+            self::TeamLead => 'Team Lead',
+            self::SubjectMatterExpert => 'Subject Matter Expert',
+            self::QualityAssessor => 'Quality Assessor',
+            self::Operator => 'Operator',
         };
     }
 
@@ -28,10 +28,10 @@ enum TeamRole: string
     public function level(): int
     {
         return match ($this) {
-            self::Owner => 100,
-            self::Admin => 75,
-            self::Member => 50,
-            self::Viewer => 25,
+            self::TeamLead => 100,
+            self::SubjectMatterExpert => 75,
+            self::QualityAssessor => 50,
+            self::Operator => 25,
         };
     }
 
@@ -41,10 +41,10 @@ enum TeamRole: string
     public function color(): string
     {
         return match ($this) {
-            self::Owner => 'purple',
-            self::Admin => 'blue',
-            self::Member => 'green',
-            self::Viewer => 'gray',
+            self::TeamLead => 'purple',
+            self::SubjectMatterExpert => 'blue',
+            self::QualityAssessor => 'orange',
+            self::Operator => 'green',
         };
     }
 
@@ -53,7 +53,7 @@ enum TeamRole: string
      */
     public function canManageMembers(): bool
     {
-        return in_array($this, [self::Owner, self::Admin]);
+        return in_array($this, [self::TeamLead, self::SubjectMatterExpert]);
     }
 
     /**
@@ -61,7 +61,7 @@ enum TeamRole: string
      */
     public function canManageSettings(): bool
     {
-        return in_array($this, [self::Owner, self::Admin]);
+        return in_array($this, [self::TeamLead, self::SubjectMatterExpert]);
     }
 
     /**
@@ -69,7 +69,7 @@ enum TeamRole: string
      */
     public function canDeleteTeam(): bool
     {
-        return $this === self::Owner;
+        return $this === self::TeamLead;
     }
 
     /**
@@ -96,8 +96,8 @@ enum TeamRole: string
     public function assignableRoles(): array
     {
         return match ($this) {
-            self::Owner => [self::Admin, self::Member, self::Viewer],
-            self::Admin => [self::Member, self::Viewer],
+            self::TeamLead => [self::SubjectMatterExpert, self::QualityAssessor, self::Operator],
+            self::SubjectMatterExpert => [self::QualityAssessor, self::Operator],
             default => [],
         };
     }
