@@ -29,7 +29,7 @@ class TicketInternalNoteResource extends JsonResource
                 'name' => $media->file_name,
                 // USE SIGNED URL
                 'url' => \Illuminate\Support\Facades\URL::temporarySignedRoute(
-                    'media.show',
+                    'api.media.show',
                     now()->addMinutes(60),
                     ['media' => $media->id]
                 ),
@@ -37,7 +37,7 @@ class TicketInternalNoteResource extends JsonResource
                 'mime_type' => $media->mime_type,
                 'thumb_url' => $media->hasGeneratedConversion('thumb')
                     ? \Illuminate\Support\Facades\URL::temporarySignedRoute(
-                        'media.show',
+                        'api.media.show',
                         now()->addMinutes(60),
                         ['media' => $media->id, 'conversion' => 'thumb']
                     )

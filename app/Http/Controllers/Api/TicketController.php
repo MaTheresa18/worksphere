@@ -15,12 +15,17 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use App\Services\AuditService;
+use App\Enums\AuditAction;
+use App\Enums\AuditCategory;
+use Illuminate\Support\Facades\Cache;
 
 class TicketController extends Controller
 {
     public function __construct(
         protected TicketServiceContract $ticketService,
-        protected \App\Services\MediaService $mediaService
+        protected \App\Services\MediaService $mediaService,
+        protected AuditService $auditService
     ) {}
 
     /**
@@ -165,11 +170,39 @@ class TicketController extends Controller
     {
         $this->authorize('view', $ticket);
 
-        $ticket->load(['reporter', 'assignee', 'team', 'comments.author', 'followers', 'parent', 'children']);
+        // Track view (Debounced)
+        $user = $request->user();
+        $cacheKey = "ticket_viewed:{$ticket->id}:{$user->id}";
+
+        if (! Cache::has($cacheKey)) {
+             try {
+                $this->auditService->log(
+                    AuditAction::TicketViewed,
+                    AuditCategory::DataModification, 
+                    $ticket,
+                    $user,
+                    null,
+                    null,
+                    ['source' => 'api']
+                );
+                // Cache for 1 hour to prevent flooding
+                Cache::put($cacheKey, true, now()->addHour());
+             } catch (\Exception $e) {
+                 // Silently fail logging to not disrupt the user experience
+             }
+        }
+
+        $ticket->load(['reporter', 'assignee', 'team', 'comments.author', 'parent', 'children']);
+        
+        if ($request->user()->can('viewFollowers', $ticket)) {
+            $ticket->load('followers');
+        }
 
         // Load internal notes if user has permission
         if ($request->user()->can('viewInternalNotes', $ticket)) {
-            $ticket->load('internalNotes.author');
+            $ticket->load(['internalNotes' => function ($query) {
+                $query->with(['author', 'media']);
+            }]);
         }
 
         return new TicketResource($ticket);
@@ -199,6 +232,20 @@ class TicketController extends Controller
 
         $reason = $validated['reason'];
         unset($validated['reason']);
+
+        // Sanitize 'assigned_to' if user doesn't have permission to assign
+        if (isset($validated['assigned_to']) && ! $request->user()->can('assign', $ticket)) {
+            unset($validated['assigned_to']);
+        }
+
+        // Sanitize 'tags' if user doesn't have permission to update (edit tags)
+        // Actually 'update' policy is for the whole ticket. 
+        // If user has 'tickets.update', they can edit everything. 
+        // If user is Owner (view_own/update_own) but NOT 'tickets.update' (staff), they shouldn't edit tags.
+        // We'll check for the specific permission 'tickets.update' or admin.
+        if (isset($validated['tags']) && ! ($request->user()->hasPermissionTo('tickets.update') || $request->user()->hasRole('administrator'))) {
+            unset($validated['tags']);
+        }
 
         // Convert public_id to internal id for assignee
         if (isset($validated['assigned_to'])) {
@@ -391,7 +438,7 @@ class TicketController extends Controller
      */
     public function activity(Ticket $ticket): AnonymousResourceCollection
     {
-        $this->authorize('view', $ticket);
+        $this->authorize('viewActivity', $ticket);
 
         $activities = AuditLog::where('auditable_type', Ticket::class)
             ->where('auditable_id', $ticket->id)
@@ -423,13 +470,13 @@ class TicketController extends Controller
                 'size' => $media->size,
                 'mime_type' => $media->mime_type,
                 'url' => \Illuminate\Support\Facades\URL::temporarySignedRoute(
-                    'media.show',
+                    'api.media.show',
                     now()->addMinutes(60),
                     ['media' => $media->id]
                 ),
                 'thumb_url' => $media->hasGeneratedConversion('thumb')
                     ? \Illuminate\Support\Facades\URL::temporarySignedRoute(
-                        'media.show',
+                        'api.media.show',
                         now()->addMinutes(60),
                         ['media' => $media->id, 'conversion' => 'thumb']
                     )
@@ -443,7 +490,7 @@ class TicketController extends Controller
      */
     public function attachments(Ticket $ticket): JsonResponse
     {
-        $this->authorize('view', $ticket);
+        $this->authorize('viewAttachments', $ticket);
 
         $ticketMedia = $ticket->getMedia('attachments');
 
@@ -468,13 +515,13 @@ class TicketController extends Controller
             'size' => $m->size,
             'mime_type' => $m->mime_type,
             'url' => \Illuminate\Support\Facades\URL::temporarySignedRoute(
-                'media.show',
+                'api.media.show',
                 now()->addMinutes(60),
                 ['media' => $m->id]
             ),
             'thumb_url' => $m->hasGeneratedConversion('thumb')
                 ? \Illuminate\Support\Facades\URL::temporarySignedRoute(
-                    'media.show',
+                    'api.media.show',
                     now()->addMinutes(60),
                     ['media' => $m->id, 'conversion' => 'thumb']
                 )
@@ -545,7 +592,8 @@ class TicketController extends Controller
         $master = Ticket::where('public_id', $validated['parent_id'])->firstOrFail();
 
         // Policy check: user must be able to edit child?
-        // $this->authorize('update', $ticket); // Assuming update policy covers linking.
+        // Policy check: user must be able to update ticket to link it
+        $this->authorize('update', $ticket);
 
         try {
             $this->ticketService->linkChild($master, $ticket);
@@ -561,7 +609,7 @@ class TicketController extends Controller
      */
     public function unlink(Ticket $ticket): JsonResponse
     {
-        // $this->authorize('update', $ticket);
+        $this->authorize('update', $ticket);
 
         $this->ticketService->unlinkChild($ticket);
 

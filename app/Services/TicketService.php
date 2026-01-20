@@ -21,7 +21,8 @@ class TicketService implements TicketServiceContract
     public function __construct(
         protected AuditService $auditService,
         protected CacheService $cacheService
-    ) {}
+    ) {
+    }
 
     /**
      * List tickets with optional filters.
@@ -55,7 +56,7 @@ class TicketService implements TicketServiceContract
         }
 
         // Status filter (supports comma-separated values)
-        if (isset($filters['status']) && $filters['status'] !== 'all' && ! empty($filters['status'])) {
+        if (isset($filters['status']) && $filters['status'] !== 'all' && !empty($filters['status'])) {
             $statuses = is_array($filters['status']) ? $filters['status'] : explode(',', $filters['status']);
             $query->whereIn('status', $statuses);
         }
@@ -137,18 +138,20 @@ class TicketService implements TicketServiceContract
         $query = $this->getFilterQuery($filters);
 
         // Default to active tickets if no status filter provided
-        if (! isset($filters['status'])) {
+        if (!isset($filters['status'])) {
             $query->whereIn('status', [TicketStatus::Open, TicketStatus::InProgress]);
         }
 
         return $query->whereNotNull('assigned_to')
             ->select('assigned_to', DB::raw('count(*) as count'))
             ->groupBy('assigned_to')
-            ->with(['assignee' => function ($q) {
-                $q->select('id', 'name', 'avatar');
-            }])
+            ->with([
+                'assignee' => function ($q) {
+                    $q->select('id', 'name', 'avatar');
+                }
+            ])
             ->get()
-            ->map(fn ($row) => [
+            ->map(fn($row) => [
                 'user_id' => $row->assigned_to,
                 'name' => $row->assignee->name ?? 'Unknown',
                 'avatar_url' => $row->assignee->avatar_thumb_url ?? null,
@@ -318,7 +321,7 @@ class TicketService implements TicketServiceContract
         $ticket->assigned_to = $assignee?->id;
 
         // Record first response if this is the first assignment
-        if ($assignee && ! $ticket->first_response_at) {
+        if ($assignee && !$ticket->first_response_at) {
             $ticket->first_response_at = now();
         }
 
@@ -375,10 +378,10 @@ class TicketService implements TicketServiceContract
         $ticket->status = $status;
 
         // Set resolved/closed timestamps
-        if ($status === TicketStatus::Resolved && ! $ticket->resolved_at) {
+        if ($status === TicketStatus::Resolved && !$ticket->resolved_at) {
             $ticket->resolved_at = now();
         }
-        if ($status === TicketStatus::Closed && ! $ticket->closed_at) {
+        if ($status === TicketStatus::Closed && !$ticket->closed_at) {
             $ticket->closed_at = now();
         }
 
@@ -413,7 +416,7 @@ class TicketService implements TicketServiceContract
         ]);
 
         // Record first response if this is the first comment from non-reporter
-        if (! $ticket->first_response_at && $author->id !== $ticket->reporter_id) {
+        if (!$ticket->first_response_at && $author->id !== $ticket->reporter_id) {
             $ticket->first_response_at = now();
             $ticket->save();
         }
@@ -426,13 +429,13 @@ class TicketService implements TicketServiceContract
             context: [
                 'comment_id' => $comment->id,
                 'excerpt' => \Illuminate\Support\Str::limit(strip_tags($content), 100),
-                'has_attachments' => ! empty($attachments),
-                'attachment_names' => ! empty($attachments) ? collect($attachments)->map(fn ($f) => $f->getClientOriginalName())->toArray() : [],
+                'has_attachments' => !empty($attachments),
+                'attachment_names' => !empty($attachments) ? collect($attachments)->map(fn($f) => $f->getClientOriginalName())->toArray() : [],
             ]
         );
 
         // Handle Attachments
-        if (! empty($attachments)) {
+        if (!empty($attachments)) {
             foreach ($attachments as $file) {
                 $comment->addMedia($file)->toMediaCollection('attachments');
             }
@@ -440,7 +443,7 @@ class TicketService implements TicketServiceContract
 
         broadcast(new TicketCommentAdded($ticket, $comment))->toOthers();
 
-        return $comment->fresh(['author']);
+        return $comment->fresh(['author', 'media']);
     }
 
     /**
@@ -456,13 +459,13 @@ class TicketService implements TicketServiceContract
             'content' => $sanitizedContent,
         ]);
 
-        if (! empty($attachments)) {
+        if (!empty($attachments)) {
             foreach ($attachments as $file) {
                 $note->addMedia($file)->toMediaCollection('attachments');
             }
         }
 
-        return $note->fresh(['author']);
+        return $note->fresh(['author', 'media']);
     }
 
     /**
@@ -470,7 +473,7 @@ class TicketService implements TicketServiceContract
      */
     public function follow(Ticket $ticket, User $user): void
     {
-        if (! $ticket->isFollowedBy($user)) {
+        if (!$ticket->isFollowedBy($user)) {
             $ticket->followers()->attach($user->id);
         }
     }
@@ -605,7 +608,7 @@ class TicketService implements TicketServiceContract
     public function unlinkChild(Ticket $child): void
     {
         $oldParentId = $child->parent_id;
-        if (! $oldParentId) {
+        if (!$oldParentId) {
             return;
         }
 
@@ -629,7 +632,7 @@ class TicketService implements TicketServiceContract
             return;
         }
 
-        if (! $ticket->status->isTerminal() && empty($reason)) {
+        if (!$ticket->status->isTerminal() && empty($reason)) {
             throw new \Exception('Reason is required to archive an open ticket.');
         }
 

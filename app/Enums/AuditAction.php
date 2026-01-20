@@ -51,6 +51,7 @@ enum AuditAction: string
 
     // Ticket operations
     case TicketCreated = 'ticket_created';
+    case TicketViewed = 'ticket_viewed';
     case TicketUpdated = 'ticket_updated';
     case TicketAssigned = 'ticket_assigned';
     case TicketStatusChanged = 'ticket_status_changed';
@@ -151,6 +152,7 @@ enum AuditAction: string
             self::AccountBanned => 'Account Banned',
             self::SystemError => 'System Error',
             self::TicketCreated => 'Ticket Created',
+            self::TicketViewed => 'Ticket Viewed',
             self::TicketUpdated => 'Ticket Updated',
             self::TicketAssigned => 'Ticket Assigned',
             self::TicketStatusChanged => 'Ticket Status Changed',
@@ -211,6 +213,7 @@ enum AuditAction: string
             self::AccountBanned => 'slash',
             self::SystemError => 'alert-triangle',
             self::TicketCreated => 'ticket',
+            self::TicketViewed => 'eye',
             self::TicketUpdated => 'edit',
             self::TicketAssigned => 'user-plus',
             self::TicketStatusChanged => 'refresh-cw',

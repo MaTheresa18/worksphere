@@ -28,6 +28,10 @@ class TicketPolicy
         }
 
         // Can view own tickets (reporter or assignee)
+        if ($ticket->reporter_id === $user->id || $ticket->assigned_to === $user->id) {
+            return true;
+        }
+
         if ($user->hasPermissionTo('tickets.view_own')) {
             return $ticket->reporter_id === $user->id
                 || $ticket->assigned_to === $user->id;
@@ -49,10 +53,16 @@ class TicketPolicy
      */
     public function update(User $user, Ticket $ticket): bool
     {
-        // Admin or full update permission
-        if ($user->hasPermissionTo('tickets.update') || $user->hasRole('administrator')) {
+        // Admin always allowed
+        if ($user->hasRole('administrator')) {
             return true;
         }
+
+        // Support Staff: Must be the assignee (even if they have tickets.update)
+        // We defer to the assignee check below.
+        // The global 'tickets.update' permission is NO LONGER sufficient for updating specific tickets.
+        // It serves as a base capability, but 'Claim to Act' requires assignment.
+
 
         // Can update own tickets
         if ($user->hasPermissionTo('tickets.update_own')) {
@@ -88,7 +98,16 @@ class TicketPolicy
      */
     public function close(User $user, Ticket $ticket): bool
     {
-        return $user->hasPermissionTo('tickets.close') || $user->hasRole('administrator');
+        if ($user->hasRole('administrator')) {
+            return true;
+        }
+
+        // Support Staff: Must be assignee
+        if ($user->hasPermissionTo('tickets.close')) {
+            return $ticket->assigned_to === $user->id;
+        }
+
+        return false;
     }
 
     /**
@@ -133,5 +152,37 @@ class TicketPolicy
     {
         // Anyone who can view the ticket can follow it
         return $this->view($user, $ticket);
+    }
+
+    /**
+     * Determine whether the user can view the ticket activity log.
+     */
+    public function viewActivity(User $user, Ticket $ticket): bool
+    {
+        // Only staff/admins with full view/manage permissions can see activity
+        return $user->hasPermissionTo('tickets.view')
+            || $user->hasPermissionTo('tickets.manage')
+            || $user->hasRole('administrator');
+    }
+
+    /**
+     * Determine whether the user can view/manage attachments tab.
+     */
+    public function viewAttachments(User $user, Ticket $ticket): bool
+    {
+        // Only staff/admins with full view/manage permissions can see attachments tab
+        return $user->hasPermissionTo('tickets.view')
+            || $user->hasPermissionTo('tickets.update')
+            || $user->hasRole('administrator');
+    }
+
+    /**
+     * Determine whether the user can see followers.
+     */
+    public function viewFollowers(User $user, Ticket $ticket): bool
+    {
+        return $user->hasPermissionTo('tickets.view')
+            || $user->hasPermissionTo('tickets.update')
+            || $user->hasRole('administrator');
     }
 }

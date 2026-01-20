@@ -453,7 +453,7 @@ async function fetchAssignableUsers() {
         const response = await axios.get("/api/users?per_page=100");
         assignableUsers.value = response.data.data.map((u) => ({
             value: u.id,
-            label: u.name,
+            label: `${u.name} (${u.email})`,
             image: u.avatar_thumb_url,
         }));
     } catch (error) {
@@ -988,9 +988,33 @@ function viewTicket(ticketId) {
                                 </th>
                                 <th
                                     scope="col"
-                                    class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider"
+                                    class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider w-[40%]"
                                 >
                                     Ticket
+                                </th>
+                                <th
+                                    scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider"
+                                >
+                                    Status
+                                </th>
+                                <th
+                                    scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider"
+                                >
+                                    Assigned To
+                                </th>
+                                <th
+                                    scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider"
+                                >
+                                    Created
+                                </th>
+                                <th
+                                    scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider"
+                                >
+                                    Last Updated
                                 </th>
                                 <th scope="col" class="relative px-6 py-3">
                                     <span class="sr-only">Actions</span>
@@ -1028,14 +1052,14 @@ function viewTicket(ticketId) {
                                     </button>
                                 </td>
                                 <td
-                                    class="px-3 py-2.5"
+                                    class="px-6 py-4"
                                     @click="viewTicket(ticket.id)"
                                 >
-                                    <div class="flex items-center gap-3">
+                                    <div class="flex items-start gap-3">
                                         <!-- Priority Indicator -->
                                         <div
                                             :class="[
-                                                'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                                                'flex h-6 w-6 shrink-0 items-center justify-center rounded-lg mt-0.5',
                                                 getPriorityConfig(
                                                     ticket.priority,
                                                 ).bgClass,
@@ -1048,7 +1072,7 @@ function viewTicket(ticketId) {
                                                     ).icon
                                                 "
                                                 :class="[
-                                                    'h-4 w-4',
+                                                    'h-3.5 w-3.5',
                                                     getPriorityConfig(
                                                         ticket.priority,
                                                     ).class,
@@ -1057,18 +1081,11 @@ function viewTicket(ticketId) {
                                         </div>
 
                                         <!-- Ticket Info -->
-                                        <div
-                                            class="flex-1 min-w-0 flex items-center gap-3"
-                                        >
-                                            <!-- ID & Title -->
-                                            <div
-                                                class="flex items-center gap-2 min-w-0 flex-1"
-                                            >
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-2 mb-1">
                                                 <span
                                                     class="text-[11px] font-mono text-[var(--text-muted)] shrink-0"
-                                                    >{{
-                                                        ticket.displayId
-                                                    }}</span
+                                                    >{{ ticket.displayId }}</span
                                                 >
                                                 <Badge
                                                     :variant="
@@ -1085,116 +1102,95 @@ function viewTicket(ticketId) {
                                                         ).label
                                                     }}
                                                 </Badge>
-                                                <h3
-                                                    class="text-sm font-medium text-[var(--text-primary)] truncate max-w-[300px] lg:max-w-[400px] xl:max-w-[500px] group-hover:text-[var(--interactive-primary)] transition-colors"
-                                                    :title="ticket.title"
-                                                >
-                                                    {{ ticket.title }}
-                                                </h3>
-                                                <span
-                                                    v-if="ticket.description"
-                                                    class="text-xs text-[var(--text-muted)] truncate hidden lg:block max-w-[150px]"
-                                                >
-                                                    {{
-                                                        ticket.description
-                                                            .replace(
-                                                                /<[^>]*>/g,
-                                                                "",
-                                                            )
-                                                            .substring(0, 50)
-                                                    }}
-                                                </span>
                                             </div>
-                                        </div>
-
-                                        <!-- Right Side: Status, Assignee, Meta -->
-                                        <div
-                                            class="flex items-center gap-3 shrink-0"
-                                        >
+                                            <h3
+                                                class="text-sm font-medium text-[var(--text-primary)] hover:text-[var(--interactive-primary)] transition-colors line-clamp-2"
+                                                :title="ticket.title"
+                                            >
+                                                {{ ticket.title }}
+                                            </h3>
+                                            
                                             <!-- Overdue/SLA indicators -->
-                                            <Badge
-                                                v-if="ticket.isOverdue"
-                                                variant="danger"
-                                                size="xs"
-                                                >Overdue</Badge
-                                            >
-                                            <Badge
-                                                v-if="ticket.slaBreached"
-                                                variant="warning"
-                                                size="xs"
-                                                >SLA</Badge
-                                            >
-
-                                            <!-- Status -->
-                                            <Badge
-                                                :variant="
-                                                    getStatusConfig(
-                                                        ticket.status,
-                                                    ).variant
-                                                "
-                                                size="xs"
-                                            >
-                                                <component
-                                                    :is="
-                                                        getStatusConfig(
-                                                            ticket.status,
-                                                        ).icon
-                                                    "
-                                                    class="h-3 w-3 mr-0.5"
-                                                />
-                                                {{
-                                                    getStatusConfig(
-                                                        ticket.status,
-                                                    ).label
-                                                }}
-                                            </Badge>
-
-                                            <!-- Assignee -->
-                                            <div
-                                                class="flex items-center gap-1 text-xs text-[var(--text-muted)]"
-                                                :title="
-                                                    ticket.assignee?.name ||
-                                                    'Unassigned'
-                                                "
-                                            >
-                                                <Avatar
-                                                    v-if="ticket.assignee"
-                                                    :fallback="
-                                                        ticket.assignee.initials
-                                                    "
+                                            <div class="flex gap-2 mt-1">
+                                                <Badge
+                                                    v-if="ticket.isOverdue"
+                                                    variant="danger"
                                                     size="xs"
-                                                />
-                                                <User
-                                                    v-else
-                                                    class="h-3.5 w-3.5 opacity-50"
-                                                />
-                                            </div>
-
-                                            <!-- Comments -->
-                                            <div
-                                                class="flex items-center gap-0.5 text-xs text-[var(--text-muted)]"
-                                                title="Comments"
-                                            >
-                                                <MessageSquare
-                                                    class="h-3 w-3"
-                                                />
-                                                <span>{{
-                                                    ticket.comments
-                                                }}</span>
-                                            </div>
-
-                                            <!-- Time -->
-                                            <div
-                                                class="flex items-center gap-0.5 text-xs text-[var(--text-muted)]"
-                                                title="Last updated"
-                                            >
-                                                <Clock class="h-3 w-3" />
-                                                <span>{{
-                                                    ticket.updatedAt
-                                                }}</span>
+                                                    >Overdue</Badge
+                                                >
+                                                <Badge
+                                                    v-if="ticket.slaBreached"
+                                                    variant="warning"
+                                                    size="xs"
+                                                    >SLA</Badge
+                                                >
                                             </div>
                                         </div>
                                     </div>
+                                </td>
+
+                                <!-- Status -->
+                                <td class="px-6 py-4" @click="viewTicket(ticket.id)">
+                                    <Badge
+                                        :variant="
+                                            getStatusConfig(
+                                                ticket.status,
+                                            ).variant
+                                        "
+                                        size="xs"
+                                    >
+                                        <component
+                                            :is="
+                                                getStatusConfig(
+                                                    ticket.status,
+                                                ).icon
+                                            "
+                                            class="h-3 w-3 mr-0.5"
+                                        />
+                                        {{
+                                            getStatusConfig(
+                                                ticket.status,
+                                            ).label
+                                        }}
+                                    </Badge>
+                                </td>
+
+                                <!-- Assigned To -->
+                                <td class="px-6 py-4" @click="viewTicket(ticket.id)">
+                                    <div
+                                        class="flex items-center gap-2"
+                                        :title="
+                                            ticket.assignee?.name ||
+                                            'Unassigned'
+                                        "
+                                    >
+                                        <Avatar
+                                            v-if="ticket.assignee"
+                                            :fallback="
+                                                ticket.assignee.initials
+                                            "
+                                            :src="ticket.assignee?.avatar_url"
+                                            size="xs"
+                                        />
+                                        <User
+                                            v-else
+                                            class="h-6 w-6 p-1 rounded-full bg-[var(--surface-tertiary)] text-[var(--text-muted)]"
+                                        />
+                                        <span class="text-sm text-[var(--text-secondary)] truncate max-w-[120px]">{{
+                                            ticket.assignee?.name ||
+                                            "Unassigned"
+                                        }}</span>
+                                    </div>
+                                </td>
+
+                                <!-- Created -->
+                                <td class="px-6 py-4 text-sm text-[var(--text-secondary)] whitespace-nowrap" @click="viewTicket(ticket.id)">
+                                    {{ ticket.createdAt }}
+                                </td>
+
+                                <!-- Updated -->
+                                <td class="px-6 py-4 text-sm text-[var(--text-secondary)] whitespace-nowrap" @click="viewTicket(ticket.id)">
+                                    {{ ticket.updatedAt }}
                                 </td>
 
                                 <!-- Actions -->
@@ -1239,7 +1235,7 @@ function viewTicket(ticketId) {
                                 "
                             >
                                 <td
-                                    :colspan="activeView !== 'archived' ? 3 : 2"
+                                    :colspan="activeView !== 'archived' ? 7 : 6"
                                     class="py-12 text-center"
                                 >
                                     <MessageSquare
@@ -1773,8 +1769,9 @@ function viewTicket(ticketId) {
                     >
                     <ComboBox
                         v-model="selectedAssignee"
-                        :items="assignableUsers"
+                        :options="assignableUsers"
                         :loading="isLoadingUsers"
+                        :image-key="'image'"
                         placeholder="Select user..."
                         search-placeholder="Search users..."
                     />
