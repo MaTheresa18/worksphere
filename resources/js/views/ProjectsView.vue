@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { Card, Button, Badge, Avatar, Input, Modal, Dropdown, DropdownItem, DropdownSeparator } from '@/components/ui';
+import { Card, Button, Badge, Avatar, Input, Modal, Dropdown, DropdownItem, DropdownSeparator, Tooltip } from '@/components/ui';
 import {
     Plus,
     Search,
@@ -14,8 +14,13 @@ import {
     Trash2,
     Users,
     Calendar,
+    Info,
 } from 'lucide-vue-next';
 import DemoBanner from '@/components/common/DemoBanner.vue';
+import { useAuthStore } from '@/stores/auth';
+
+const authStore = useAuthStore();
+const hasTeams = computed(() => authStore.hasTeams);
 
 const viewMode = ref('grid');
 const searchQuery = ref('');
@@ -78,7 +83,19 @@ function getColorClass(color) {
                     Manage and track your team's projects.
                 </p>
             </div>
-            <Button @click="showNewProjectModal = true">
+            <Tooltip v-if="!hasTeams">
+                <template #trigger>
+                    <Button disabled class="opacity-60 cursor-not-allowed">
+                        <Plus class="h-4 w-4" />
+                        New Project
+                    </Button>
+                </template>
+                <div class="flex items-center gap-2">
+                    <Info class="h-4 w-4" />
+                    <span>Join a team to create projects</span>
+                </div>
+            </Tooltip>
+            <Button v-else @click="showNewProjectModal = true">
                 <Plus class="h-4 w-4" />
                 New Project
             </Button>

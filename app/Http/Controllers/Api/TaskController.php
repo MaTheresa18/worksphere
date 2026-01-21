@@ -101,6 +101,11 @@ class TaskController extends Controller
      */
     public function store(StoreTaskRequest $request, Team $team, Project $project): JsonResponse
     {
+        // Require team membership for task creation
+        if (! $this->permissionService->isTeamMember($request->user(), $team)) {
+            abort(403, 'You must be a member of this team to create tasks.');
+        }
+
         $this->authorizeTeamPermission($team, 'tasks.create');
         $this->ensureProjectBelongsToTeam($team, $project);
 
@@ -164,7 +169,7 @@ class TaskController extends Controller
                 // If item is string, use it as text. If object, look for text property.
                 $text = is_array($item) ? ($item['text'] ?? '') : $item;
                 $isCompleted = is_array($item) ? ($item['is_completed'] ?? false) : false;
-                
+
                 if (! empty($text)) {
                     $task->checklistItems()->create([
                         'text' => $text,
@@ -179,7 +184,7 @@ class TaskController extends Controller
         if ($request->boolean('save_as_template')) {
             TaskTemplate::create([
                 'team_id' => $team->id,
-                'name' => $task->title . ' (Template)',
+                'name' => $task->title.' (Template)',
                 'description' => $task->description,
                 'default_priority' => $task->priority ?? 2,
                 'default_estimated_hours' => $task->estimated_hours ?? 0,
@@ -277,18 +282,18 @@ class TaskController extends Controller
 
         // Handle QA user change
         if (array_key_exists('qa_user_id', $validated)) {
-             if (empty($validated['qa_user_id'])) {
-                 $updateData['qa_user_id'] = null;
-             } else {
+            if (empty($validated['qa_user_id'])) {
+                $updateData['qa_user_id'] = null;
+            } else {
                 $qaUser = User::where('public_id', $validated['qa_user_id'])->first();
                 if ($qaUser && $project->hasMember($qaUser)) {
                     $updateData['qa_user_id'] = $qaUser->id;
                 }
-             }
+            }
         }
 
         $task->update($updateData);
-        
+
         // Note: For update, we are NOT syncing the checklists automatically here to avoid overwriting progress
         // unless specifically requested. Usually the checklist items are managed via separate endpoints.
         // If the user adds items in the modal during edit, checking if we should append?

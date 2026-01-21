@@ -23,6 +23,7 @@ class EmailController extends Controller
     public function index(Request $request)
     {
         $query = Email::query()
+            ->forUser(auth()->id()) // CRITICAL: Scope to authenticated user's emails only
             ->with(['labels', 'emailAccount', 'media']) // Eager load relationships
             ->orderBy('received_at', 'desc');
 

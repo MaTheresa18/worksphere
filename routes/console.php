@@ -118,3 +118,10 @@ Schedule::command('monitor:external-services')
     ->everyTenMinutes()
     ->withoutOverlapping()
     ->onOneServer();
+
+// Check team health daily at 2 AM
+Schedule::command('teams:check-health')
+    ->dailyAt('02:00')
+    ->name('team-health-check')
+    ->withoutOverlapping()
+    ->onOneServer();

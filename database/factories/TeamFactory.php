@@ -21,6 +21,8 @@ class TeamFactory extends Factory
             'name' => fake()->company(),
             'description' => fake()->optional()->sentence(),
             'owner_id' => User::factory(),
+            'lifecycle_status' => 'active',
+            'last_activity_at' => now(),
         ];
     }
 

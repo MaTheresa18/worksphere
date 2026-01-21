@@ -158,15 +158,24 @@ class NavigationController extends Controller
     }
 
     /**
-     * Filter navigation items based on user permissions.
+     * Filter navigation items based on user permissions and team membership.
      *
      * @param  array<int, array<string, mixed>>  $items
      * @return array<int, array<string, mixed>>
      */
     protected function filterNavigationByPermissions(array $items, $user): array
     {
+        $hasTeams = $user->teams()->exists();
+
         return collect($items)
-            ->filter(function ($item) use ($user) {
+            ->filter(function ($item) use ($user, $hasTeams) {
+                // Check requires_team condition first
+                if (isset($item['requires_team']) && $item['requires_team'] === true) {
+                    if (! $hasTeams) {
+                        return false;
+                    }
+                }
+
                 // Always show items without permission requirements
                 if (! isset($item['permission'])) {
                     return true;

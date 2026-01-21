@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { Button, SelectFilter } from "@/components/ui";
-import { Plus, Search, Grid, List as ListIcon, User } from "lucide-vue-next";
+import { Button, SelectFilter, Tooltip } from "@/components/ui";
+import { Plus, Search, Grid, List as ListIcon, User, Info } from "lucide-vue-next";
 import TaskBoard from "@/components/tasks/TaskBoard.vue";
 import TaskList from "@/components/tasks/TaskList.vue";
 import TaskFormModal from "@/components/tasks/TaskFormModal.vue";
@@ -13,6 +13,7 @@ import axios from "axios";
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const hasTeams = computed(() => authStore.hasTeams);
 
 // State
 const tasks = ref<any[]>([]);
@@ -259,7 +260,19 @@ const onTaskMoved = async (taskId: string, newStatus: string) => {
                         placeholder="Select Team"
                     />
                 </div>
-                <Button @click="onCreateTask">
+                <Tooltip v-if="!hasTeams">
+                    <template #trigger>
+                        <Button disabled class="opacity-60 cursor-not-allowed">
+                            <Plus class="h-4 w-4" />
+                            New Task
+                        </Button>
+                    </template>
+                    <div class="flex items-center gap-2">
+                        <Info class="h-4 w-4" />
+                        <span>Join a team to create tasks</span>
+                    </div>
+                </Tooltip>
+                <Button v-else @click="onCreateTask">
                     <Plus class="h-4 w-4" />
                     New Task
                 </Button>
@@ -404,7 +417,19 @@ const onTaskMoved = async (taskId: string, newStatus: string) => {
                 No tasks match your current filters. Try adjusting them or
                 create a new task.
             </p>
-            <Button class="mt-4" @click="onCreateTask">
+            <Tooltip v-if="!hasTeams">
+                <template #trigger>
+                    <Button disabled class="mt-4 opacity-60 cursor-not-allowed">
+                        <Plus class="h-4 w-4" />
+                        Create Task
+                    </Button>
+                </template>
+                <div class="flex items-center gap-2">
+                    <Info class="h-4 w-4" />
+                    <span>Join a team to create tasks</span>
+                </div>
+            </Tooltip>
+            <Button v-else class="mt-4" @click="onCreateTask">
                 <Plus class="h-4 w-4" />
                 Create Task
             </Button>

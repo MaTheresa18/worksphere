@@ -112,6 +112,8 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
     Route::put('/user/profile', [UserController::class, 'updateProfile']);
     Route::put('/user/password', [UserController::class, 'updatePassword']);
     Route::put('/user/preferences', [UserController::class, 'updatePreferences']);
+    Route::put('/user/notification-preferences', [UserController::class, 'updateNotificationPreferences']);
+    Route::get('/user/notification-preferences', [UserController::class, 'getNotificationPreferences']);
     Route::put('/user/profile/visibility', [\App\Http\Controllers\Api\PublicProfileController::class, 'updateStatus']);
     Route::post('/user/avatar', [UserController::class, 'uploadAvatar']);
     Route::post('/user/cover', [UserController::class, 'uploadCover']);
@@ -201,6 +203,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
 
     // User Management
     Route::apiResource('teams', \App\Http\Controllers\Api\TeamController::class);
+    Route::get('teams-ownership-summary', [\App\Http\Controllers\Api\TeamController::class, 'ownershipSummary']);
     Route::prefix('teams/{team}')->group(function () {
         Route::get('/members', [\App\Http\Controllers\Api\TeamController::class, 'members']);
         Route::get('/participants', [\App\Http\Controllers\Api\TeamController::class, 'participants']);
@@ -228,6 +231,10 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
         Route::get('/events/{event}/ics', [\App\Http\Controllers\Api\TeamController::class, 'downloadEventIcs']);
         Route::put('/events/{event}', [\App\Http\Controllers\Api\TeamController::class, 'updateEvent']);
         Route::delete('/events/{event}', [\App\Http\Controllers\Api\TeamController::class, 'destroyEvent']);
+
+        // Lifecycle Management
+        Route::post('/keep-active', [\App\Http\Controllers\Api\TeamController::class, 'keepActive']);
+        Route::delete('/self-delete', [\App\Http\Controllers\Api\TeamController::class, 'selfDelete']);
 
         // Team Roles Management
         Route::prefix('roles')->group(function () {

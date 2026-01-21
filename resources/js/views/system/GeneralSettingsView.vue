@@ -67,6 +67,13 @@ const settings = ref({
     // Branding
     "app.logo": "",
     "app.favicon": "",
+    // Team Management
+    "teams.max_owned": 5,
+    "teams.max_joined": 20,
+    "teams.dormant_days": 90,
+    "teams.deletion_grace_days": 30,
+    "teams.auto_delete": false,
+    "teams.require_approval": false,
 });
 
 // Sensitive fields that should be masked
@@ -726,6 +733,131 @@ onMounted(async () => {
                         <p class="text-xs text-[var(--text-muted)]">
                             Maximum allowed storage per team in Megabytes.
                         </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Team Management Settings -->
+            <div
+                class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] overflow-hidden"
+            >
+                <div
+                    class="p-4 border-b border-[var(--border-default)] flex items-center gap-3"
+                >
+                    <div
+                        class="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            class="w-4 h-4 text-purple-600"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M18 21a8 8 0 0 0-16 0" />
+                            <circle cx="10" cy="8" r="5" />
+                            <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3" />
+                        </svg>
+                    </div>
+                    <h3 class="font-medium text-[var(--text-primary)]">
+                        Team Management
+                    </h3>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1.5">
+                            <label
+                                class="text-sm font-medium text-[var(--text-secondary)]"
+                                >Max Teams Owned</label
+                            >
+                            <Input
+                                v-model.number="settings['teams.max_owned']"
+                                type="number"
+                                min="1"
+                                placeholder="5"
+                            />
+                            <p class="text-xs text-[var(--text-muted)]">
+                                Maximum teams a user can own.
+                            </p>
+                        </div>
+                        <div class="space-y-1.5">
+                            <label
+                                class="text-sm font-medium text-[var(--text-secondary)]"
+                                >Max Teams Joined</label
+                            >
+                            <Input
+                                v-model.number="settings['teams.max_joined']"
+                                type="number"
+                                min="1"
+                                placeholder="20"
+                            />
+                            <p class="text-xs text-[var(--text-muted)]">
+                                Maximum teams a user can join.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1.5">
+                            <label
+                                class="text-sm font-medium text-[var(--text-secondary)]"
+                                >Days Until Dormant</label
+                            >
+                            <Input
+                                v-model.number="settings['teams.dormant_days']"
+                                type="number"
+                                min="1"
+                                placeholder="90"
+                            />
+                            <p class="text-xs text-[var(--text-muted)]">
+                                Days without activity before dormant.
+                            </p>
+                        </div>
+                        <div class="space-y-1.5">
+                            <label
+                                class="text-sm font-medium text-[var(--text-secondary)]"
+                                >Deletion Grace Period</label
+                            >
+                            <Input
+                                v-model.number="
+                                    settings['teams.deletion_grace_days']
+                                "
+                                type="number"
+                                min="1"
+                                placeholder="30"
+                            />
+                            <p class="text-xs text-[var(--text-muted)]">
+                                Days after dormant before deletion.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p
+                                class="text-sm font-medium text-[var(--text-primary)]"
+                            >
+                                Auto-Delete Teams
+                            </p>
+                            <p class="text-xs text-[var(--text-muted)]">
+                                Automatically delete after grace period
+                            </p>
+                        </div>
+                        <Switch v-model="settings['teams.auto_delete']" />
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p
+                                class="text-sm font-medium text-[var(--text-primary)]"
+                            >
+                                Require Team Creation Approval
+                            </p>
+                            <p class="text-xs text-[var(--text-muted)]">
+                                Require admin approval for new teams
+                            </p>
+                        </div>
+                        <Switch v-model="settings['teams.require_approval']" />
                     </div>
                 </div>
             </div>

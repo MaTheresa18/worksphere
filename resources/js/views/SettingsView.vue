@@ -131,6 +131,15 @@ const notifications = ref({
     tasks: true,
 });
 
+// Ticket email notification preferences
+const ticketNotifications = ref({
+    ticket_created: true,
+    ticket_assigned: true,
+    ticket_updated: true,
+    ticket_comment: true,
+    ticket_sla: true,
+});
+
 // Appearance settings
 const appearance = ref({
     mode: themeStore.currentMode, // Changed from theme to mode
@@ -702,6 +711,19 @@ const saveAppearance = debounce(async () => {
 
 // Watch notification changes and auto-save
 watch(notifications, saveNotifications, { deep: true });
+
+// Save ticket notification preferences
+const saveTicketNotifications = debounce(async () => {
+    try {
+        await api.put("/api/user/notification-preferences", ticketNotifications.value);
+        toast.success("Ticket notification preferences saved");
+    } catch (error) {
+        toast.error("Failed to save ticket notification preferences");
+    }
+}, 1000);
+
+// Watch ticket notification changes and auto-save
+watch(ticketNotifications, saveTicketNotifications, { deep: true });
 
 // Update theme
 const updateTheme = (mode) => {
@@ -2113,6 +2135,46 @@ onMounted(() => {
                             v-model="notifications.marketing"
                             label="Marketing emails"
                             description="Receive emails about new features and offers"
+                        />
+                    </div>
+                </Card>
+
+                <!-- Ticket Email Preferences -->
+                <Card padding="lg">
+                    <h3
+                        class="text-lg font-semibold text-[var(--text-primary)] mb-6"
+                    >
+                        Ticket Email Notifications
+                    </h3>
+                    <p class="text-sm text-[var(--text-secondary)] mb-4">
+                        Control which ticket events trigger email notifications.
+                    </p>
+
+                    <div class="space-y-6">
+                        <Switch
+                            v-model="ticketNotifications.ticket_created"
+                            label="New tickets"
+                            description="Email when new tickets are created in your queue"
+                        />
+                        <Switch
+                            v-model="ticketNotifications.ticket_assigned"
+                            label="Ticket assignments"
+                            description="Email when a ticket is assigned to you"
+                        />
+                        <Switch
+                            v-model="ticketNotifications.ticket_updated"
+                            label="Status updates"
+                            description="Email when ticket status changes"
+                        />
+                        <Switch
+                            v-model="ticketNotifications.ticket_comment"
+                            label="New comments"
+                            description="Email when someone comments on your tickets"
+                        />
+                        <Switch
+                            v-model="ticketNotifications.ticket_sla"
+                            label="SLA alerts"
+                            description="Email when SLA thresholds are breached"
                         />
                     </div>
                 </Card>

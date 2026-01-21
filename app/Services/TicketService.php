@@ -7,22 +7,25 @@ use App\Enums\AuditAction;
 use App\Enums\AuditCategory;
 use App\Enums\TicketStatus;
 use App\Events\TicketCommentAdded;
+use App\Events\TicketCreated;
+use App\Events\TicketSlaBreached;
 use App\Events\TicketUpdated;
 use App\Models\Ticket;
 use App\Models\TicketComment;
 use App\Models\TicketInternalNote;
 use App\Models\User;
 use App\Notifications\TicketDeadlineReminder;
+use App\Notifications\TicketNotification;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 
 class TicketService implements TicketServiceContract
 {
     public function __construct(
         protected AuditService $auditService,
         protected CacheService $cacheService
-    ) {
-    }
+    ) {}
 
     /**
      * List tickets with optional filters.
@@ -56,7 +59,7 @@ class TicketService implements TicketServiceContract
         }
 
         // Status filter (supports comma-separated values)
-        if (isset($filters['status']) && $filters['status'] !== 'all' && !empty($filters['status'])) {
+        if (isset($filters['status']) && $filters['status'] !== 'all' && ! empty($filters['status'])) {
             $statuses = is_array($filters['status']) ? $filters['status'] : explode(',', $filters['status']);
             $query->whereIn('status', $statuses);
         }
@@ -138,7 +141,7 @@ class TicketService implements TicketServiceContract
         $query = $this->getFilterQuery($filters);
 
         // Default to active tickets if no status filter provided
-        if (!isset($filters['status'])) {
+        if (! isset($filters['status'])) {
             $query->whereIn('status', [TicketStatus::Open, TicketStatus::InProgress]);
         }
 
@@ -148,10 +151,10 @@ class TicketService implements TicketServiceContract
             ->with([
                 'assignee' => function ($q) {
                     $q->select('id', 'name', 'avatar');
-                }
+                },
             ])
             ->get()
-            ->map(fn($row) => [
+            ->map(fn ($row) => [
                 'user_id' => $row->assigned_to,
                 'name' => $row->assignee->name ?? 'Unknown',
                 'avatar_url' => $row->assignee->avatar_thumb_url ?? null,
@@ -247,6 +250,18 @@ class TicketService implements TicketServiceContract
             $ticket
         );
 
+        // Broadcast for realtime list updates
+        broadcast(new TicketCreated($ticket));
+
+        // Notify assignee if assigned at creation
+        if ($ticket->assignee) {
+            $ticket->assignee->notify(new TicketNotification(
+                $ticket,
+                TicketNotification::TYPE_ASSIGNED,
+                $reporter
+            ));
+        }
+
         return $ticket->fresh(['reporter', 'assignee', 'team']);
     }
 
@@ -321,7 +336,7 @@ class TicketService implements TicketServiceContract
         $ticket->assigned_to = $assignee?->id;
 
         // Record first response if this is the first assignment
-        if ($assignee && !$ticket->first_response_at) {
+        if ($assignee && ! $ticket->first_response_at) {
             $ticket->first_response_at = now();
         }
 
@@ -339,6 +354,15 @@ class TicketService implements TicketServiceContract
         );
 
         broadcast(new TicketUpdated($ticket))->toOthers();
+
+        // Notify new assignee
+        if ($assignee && $assignee->id !== $oldAssignee) {
+            $assignee->notify(new TicketNotification(
+                $ticket,
+                TicketNotification::TYPE_ASSIGNED,
+                request()->user()
+            ));
+        }
 
         return $ticket->fresh(['reporter', 'assignee', 'team']);
     }
@@ -378,10 +402,10 @@ class TicketService implements TicketServiceContract
         $ticket->status = $status;
 
         // Set resolved/closed timestamps
-        if ($status === TicketStatus::Resolved && !$ticket->resolved_at) {
+        if ($status === TicketStatus::Resolved && ! $ticket->resolved_at) {
             $ticket->resolved_at = now();
         }
-        if ($status === TicketStatus::Closed && !$ticket->closed_at) {
+        if ($status === TicketStatus::Closed && ! $ticket->closed_at) {
             $ticket->closed_at = now();
         }
 
@@ -400,6 +424,35 @@ class TicketService implements TicketServiceContract
         );
 
         broadcast(new TicketUpdated($ticket))->toOthers();
+
+        // Notify stakeholders of status change (skip for system updates like cascade)
+        if (! $isSystem) {
+            $ticket->load(['reporter', 'assignee', 'followers']);
+            $recipients = collect();
+
+            // Add reporter
+            if ($ticket->reporter) {
+                $recipients->push($ticket->reporter);
+            }
+            // Add assignee
+            if ($ticket->assignee && $ticket->assignee->id !== $ticket->reporter?->id) {
+                $recipients->push($ticket->assignee);
+            }
+            // Add followers
+            foreach ($ticket->followers as $follower) {
+                if (! $recipients->contains('id', $follower->id)) {
+                    $recipients->push($follower);
+                }
+            }
+
+            $message = "Status changed from {$oldStatus->value} to {$status->value}";
+            Notification::send($recipients, new TicketNotification(
+                $ticket,
+                TicketNotification::TYPE_UPDATED,
+                request()->user(),
+                $message
+            ));
+        }
     }
 
     /**
@@ -416,7 +469,7 @@ class TicketService implements TicketServiceContract
         ]);
 
         // Record first response if this is the first comment from non-reporter
-        if (!$ticket->first_response_at && $author->id !== $ticket->reporter_id) {
+        if (! $ticket->first_response_at && $author->id !== $ticket->reporter_id) {
             $ticket->first_response_at = now();
             $ticket->save();
         }
@@ -429,19 +482,47 @@ class TicketService implements TicketServiceContract
             context: [
                 'comment_id' => $comment->id,
                 'excerpt' => \Illuminate\Support\Str::limit(strip_tags($content), 100),
-                'has_attachments' => !empty($attachments),
-                'attachment_names' => !empty($attachments) ? collect($attachments)->map(fn($f) => $f->getClientOriginalName())->toArray() : [],
+                'has_attachments' => ! empty($attachments),
+                'attachment_names' => ! empty($attachments) ? collect($attachments)->map(fn ($f) => $f->getClientOriginalName())->toArray() : [],
             ]
         );
 
         // Handle Attachments
-        if (!empty($attachments)) {
+        if (! empty($attachments)) {
             foreach ($attachments as $file) {
                 $comment->addMedia($file)->toMediaCollection('attachments');
             }
         }
 
         broadcast(new TicketCommentAdded($ticket, $comment))->toOthers();
+
+        // Notify stakeholders of new comment (except the author)
+        $ticket->load(['reporter', 'assignee', 'followers']);
+        $recipients = collect();
+
+        // Add reporter (if not the author)
+        if ($ticket->reporter && $ticket->reporter->id !== $author->id) {
+            $recipients->push($ticket->reporter);
+        }
+        // Add assignee (if not the author and not already added)
+        if ($ticket->assignee && $ticket->assignee->id !== $author->id && $ticket->assignee->id !== $ticket->reporter?->id) {
+            $recipients->push($ticket->assignee);
+        }
+        // Add followers (if not the author and not already added)
+        foreach ($ticket->followers as $follower) {
+            if ($follower->id !== $author->id && ! $recipients->contains('id', $follower->id)) {
+                $recipients->push($follower);
+            }
+        }
+
+        if ($recipients->isNotEmpty()) {
+            Notification::send($recipients, new TicketNotification(
+                $ticket,
+                TicketNotification::TYPE_COMMENT,
+                $author,
+                \Illuminate\Support\Str::limit(strip_tags($content), 100)
+            ));
+        }
 
         return $comment->fresh(['author', 'media']);
     }
@@ -459,7 +540,7 @@ class TicketService implements TicketServiceContract
             'content' => $sanitizedContent,
         ]);
 
-        if (!empty($attachments)) {
+        if (! empty($attachments)) {
             foreach ($attachments as $file) {
                 $note->addMedia($file)->toMediaCollection('attachments');
             }
@@ -473,7 +554,7 @@ class TicketService implements TicketServiceContract
      */
     public function follow(Ticket $ticket, User $user): void
     {
-        if (!$ticket->isFollowedBy($user)) {
+        if (! $ticket->isFollowedBy($user)) {
             $ticket->followers()->attach($user->id);
         }
     }
@@ -508,6 +589,26 @@ class TicketService implements TicketServiceContract
                 $ticket->sla_breached = true;
                 $ticket->save();
                 $breachedCount++;
+
+                // Broadcast SLA breach event
+                $breachType = $ticket->isResponseSlaBreached() ? 'response' : 'resolution';
+                broadcast(new TicketSlaBreached($ticket, $breachType));
+
+                // Notify assignee and reporter
+                $recipients = collect();
+                if ($ticket->assignee) {
+                    $recipients->push($ticket->assignee);
+                }
+                if ($ticket->reporter && $ticket->reporter->id !== $ticket->assignee?->id) {
+                    $recipients->push($ticket->reporter);
+                }
+
+                Notification::send($recipients, new TicketNotification(
+                    $ticket,
+                    TicketNotification::TYPE_SLA_BREACH,
+                    null,
+                    "SLA {$breachType} threshold exceeded"
+                ));
             }
         }
 
@@ -608,7 +709,7 @@ class TicketService implements TicketServiceContract
     public function unlinkChild(Ticket $child): void
     {
         $oldParentId = $child->parent_id;
-        if (!$oldParentId) {
+        if (! $oldParentId) {
             return;
         }
 
@@ -632,7 +733,7 @@ class TicketService implements TicketServiceContract
             return;
         }
 
-        if (!$ticket->status->isTerminal() && empty($reason)) {
+        if (! $ticket->status->isTerminal() && empty($reason)) {
             throw new \Exception('Reason is required to archive an open ticket.');
         }
 
@@ -668,6 +769,7 @@ class TicketService implements TicketServiceContract
 
         return $count;
     }
+
     /**
      * Infer priority based on ticket type.
      */

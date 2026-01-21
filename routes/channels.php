@@ -73,3 +73,8 @@ Broadcast::channel('email-account.{publicId}', function ($user, $publicId) {
 Broadcast::channel('personal-notes.{publicId}', function ($user, $publicId) {
     return $user->public_id === $publicId;
 });
+
+// Ticket queue channel - for support staff to receive new ticket notifications
+Broadcast::channel('tickets.queue', function ($user) {
+    return $user->hasPermissionTo('tickets.view');
+});

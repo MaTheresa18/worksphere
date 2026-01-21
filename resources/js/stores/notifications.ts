@@ -142,38 +142,92 @@ export const useNotificationsStore = defineStore('notifications', () => {
                     notifications.value.unshift(notification);
                     unreadCount.value++;
 
-                    // Show toast
-                    const title = notification.title || notification.data?.title || 'New Notification';
-                    const message = notification.message || notification.data?.message;
+                    // Show toast with appropriate routing
+                    showNotificationToast(notification);
+                }
+            });
 
-                    // Play sound
-                    try {
-                        const audio = new Audio('/static/sounds/notification.mp3');
-                        audio.play().catch(e => console.debug('Audio play blocked', e));
-                    } catch (e) {
-                        // ignore
-                    }
-
-                    toast(title, {
-                        description: message,
+        // Listen to ticket queue for support staff (if they have tickets.view permission)
+        if (authStore.user?.permissions?.includes('tickets.view')) {
+            echo.private('tickets.queue')
+                .listen('.ticket.created', (event: any) => {
+                    console.log('[Notifications] New ticket created:', event);
+                    toast('🎫 New Ticket', {
+                        description: `${event.ticket_number}: ${event.title}`,
                         action: {
                             label: 'View',
                             onClick: () => {
-                                // Dynamic import of router to avoid circular dependency
                                 import('@/router').then(({ default: router }) => {
-                                    if (notification.type === 'App\\Notifications\\EventReminder' || notification.data?.type === 'event_reminder') {
-                                        router.push('/calendar');
-                                    } else {
-                                        router.push('/notifications');
-                                    }
+                                    router.push(`/tickets/${event.public_id}`);
                                 });
                             }
                         }
                     });
-                }
-            });
+                })
+                .listen('.ticket.sla_breached', (event: any) => {
+                    console.log('[Notifications] SLA breached:', event);
+                    toast.warning('⚠️ SLA Breach Alert', {
+                        description: `${event.ticket_number}: ${event.title}`,
+                        action: {
+                            label: 'View',
+                            onClick: () => {
+                                import('@/router').then(({ default: router }) => {
+                                    router.push(`/tickets/${event.public_id}`);
+                                });
+                            }
+                        }
+                    });
+                });
+
+            console.debug('[Notifications] Listening on tickets.queue');
+        }
 
         console.debug(`[Notifications] Listening on ${channelName}`);
+    }
+
+    // Helper to show toast with appropriate routing based on notification type
+    function showNotificationToast(notification: Notification): void {
+        const title = notification.title || notification.data?.title || 'New Notification';
+        const message = notification.message || notification.data?.message;
+        const notificationType = notification.type || notification.data?.type || '';
+
+        // Play sound
+        try {
+            const audio = new Audio('/static/sounds/notification.mp3');
+            audio.play().catch(e => console.debug('Audio play blocked', e));
+        } catch (e) {
+            // ignore
+        }
+
+        // Determine route based on notification type
+        const getRoute = (): string => {
+            // Ticket notifications
+            if (notificationType.includes('TicketNotification') || notificationType.startsWith('ticket_')) {
+                const ticketId = notification.data?.metadata?.ticket_id || notification.data?.action_url?.split('/').pop();
+                return ticketId ? `/tickets/${ticketId}` : '/tickets';
+            }
+            // Event notifications
+            if (notificationType.includes('EventReminder') || notificationType === 'event_reminder') {
+                return '/calendar';
+            }
+            // Default
+            return '/notifications';
+        };
+
+        // Use warning toast for SLA breaches
+        const toastFn = notificationType.includes('sla') ? toast.warning : toast;
+
+        toastFn(title, {
+            description: message,
+            action: {
+                label: 'View',
+                onClick: () => {
+                    import('@/router').then(({ default: router }) => {
+                        router.push(getRoute());
+                    });
+                }
+            }
+        });
     }
 
     async function stopRealtimeListeners(): Promise<void> {
@@ -183,6 +237,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
 
          if (authStore.user?.public_id && isEchoAvailable()) {
              echo.leave(`App.Models.User.${authStore.user.public_id}`);
+             echo.leave('tickets.queue');
          }
     }
 

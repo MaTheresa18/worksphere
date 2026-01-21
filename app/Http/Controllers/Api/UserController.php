@@ -287,16 +287,16 @@ class UserController extends Controller
     {
         // Custom logging as requested
         $logPath = storage_path('app/private/sys/logs/cover_debug.log');
-        if (!file_exists(dirname($logPath))) {
+        if (! file_exists(dirname($logPath))) {
             mkdir(dirname($logPath), 0755, true);
         }
-        
-        $logData = "--- Upload Request " . date('Y-m-d H:i:s') . " ---\n";
-        $logData .= "Headers: " . json_encode($request->headers->all()) . "\n";
-        $logData .= "Files: " . json_encode($request->allFiles()) . "\n";
-        $logData .= "Post Data: " . json_encode($request->all()) . "\n";
-        $logData .= "Has Cover: " . ($request->hasFile('cover') ? 'Yes' : 'No') . "\n";
-        
+
+        $logData = '--- Upload Request '.date('Y-m-d H:i:s')." ---\n";
+        $logData .= 'Headers: '.json_encode($request->headers->all())."\n";
+        $logData .= 'Files: '.json_encode($request->allFiles())."\n";
+        $logData .= 'Post Data: '.json_encode($request->all())."\n";
+        $logData .= 'Has Cover: '.($request->hasFile('cover') ? 'Yes' : 'No')."\n";
+
         file_put_contents($logPath, $logData, FILE_APPEND);
         $request->validate(['cover' => ['required', 'image', 'max:4096']]); // Higher limit for cover
 
@@ -542,6 +542,48 @@ class UserController extends Controller
         return response()->json([
             'message' => 'Preferences updated successfully.',
             'preferences' => $user->fresh()->preferences,
+        ]);
+    }
+
+    /**
+     * Update the authenticated user's ticket notification preferences.
+     */
+    public function updateNotificationPreferences(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'ticket_created' => ['sometimes', 'boolean'],
+            'ticket_assigned' => ['sometimes', 'boolean'],
+            'ticket_updated' => ['sometimes', 'boolean'],
+            'ticket_comment' => ['sometimes', 'boolean'],
+            'ticket_sla' => ['sometimes', 'boolean'],
+        ]);
+
+        // Update each preference
+        foreach ($validated as $type => $enabled) {
+            $user->setNotificationPreference($type, $enabled);
+        }
+
+        return response()->json([
+            'message' => 'Ticket notification preferences updated.',
+            'preferences' => $user->notification_preferences,
+        ]);
+    }
+
+    /**
+     * Get the authenticated user's ticket notification preferences.
+     */
+    public function getNotificationPreferences(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        return response()->json([
+            'ticket_created' => $user->wantsEmailFor('ticket_created'),
+            'ticket_assigned' => $user->wantsEmailFor('ticket_assigned'),
+            'ticket_updated' => $user->wantsEmailFor('ticket_updated'),
+            'ticket_comment' => $user->wantsEmailFor('ticket_comment'),
+            'ticket_sla' => $user->wantsEmailFor('ticket_sla'),
         ]);
     }
 

@@ -46,6 +46,7 @@ return [
             'icon' => 'folder',
             'route' => '/projects',
             'permission' => ['projects.view', 'projects.view_assigned'],
+            'requires_team' => true,
             'pinnable' => true,
             'pinned_default' => true,
             'children' => [
@@ -110,6 +111,7 @@ return [
             'icon' => 'check-square',
             'route' => '/tasks',
             'permission' => ['tasks.view', 'tasks.view_assigned'],
+            'requires_team' => true,
             'pinnable' => true,
             'pinned_default' => false,
         ],

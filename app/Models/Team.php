@@ -33,6 +33,10 @@ class Team extends Model implements HasMedia
         'owner_id',
         'status',
         'settings',
+        'last_activity_at',
+        'lifecycle_status',
+        'dormant_notified_at',
+        'deletion_scheduled_at',
     ];
 
     /**
@@ -119,6 +123,9 @@ class Team extends Model implements HasMedia
     {
         return [
             'settings' => 'array',
+            'last_activity_at' => 'datetime',
+            'dormant_notified_at' => 'datetime',
+            'deletion_scheduled_at' => 'datetime',
         ];
     }
 
@@ -353,7 +360,7 @@ class Team extends Model implements HasMedia
     {
         if (! $this->hasMember($user)) {
             $teamRole = $this->roles()->where('slug', $role)->first();
-            
+
             $this->members()->attach($user->id, [
                 'role' => $role,
                 'team_role_id' => $teamRole ? $teamRole->id : null,
@@ -402,6 +409,100 @@ class Team extends Model implements HasMedia
         });
     }
 
+    /**
+     * Scope: Dormant teams.
+     *
+     * @param  Builder<Team>  $query
+     * @return Builder<Team>
+     */
+    public function scopeDormant(Builder $query): Builder
+    {
+        return $query->where('lifecycle_status', 'dormant');
+    }
+
+    /**
+     * Scope: Teams pending deletion.
+     *
+     * @param  Builder<Team>  $query
+     * @return Builder<Team>
+     */
+    public function scopePendingDeletion(Builder $query): Builder
+    {
+        return $query->where('lifecycle_status', 'pending_deletion');
+    }
+
+    /**
+     * Scope: Active lifecycle teams.
+     *
+     * @param  Builder<Team>  $query
+     * @return Builder<Team>
+     */
+    public function scopeLifecycleActive(Builder $query): Builder
+    {
+        return $query->where('lifecycle_status', 'active');
+    }
+
+    /**
+     * Touch the team's activity timestamp.
+     */
+    public function touchActivity(): void
+    {
+        $this->update([
+            'last_activity_at' => now(),
+            'lifecycle_status' => 'active',
+            'dormant_notified_at' => null,
+            'deletion_scheduled_at' => null,
+        ]);
+    }
+
+    /**
+     * Mark the team as dormant.
+     */
+    public function markDormant(): void
+    {
+        $this->update([
+            'lifecycle_status' => 'dormant',
+            'dormant_notified_at' => now(),
+        ]);
+    }
+
+    /**
+     * Mark the team as pending deletion.
+     */
+    public function markPendingDeletion(): void
+    {
+        $graceDays = config('teams.health.deletion_grace_days', 30);
+
+        $this->update([
+            'lifecycle_status' => 'pending_deletion',
+            'deletion_scheduled_at' => now()->addDays($graceDays),
+        ]);
+    }
+
+    /**
+     * Keep the team active (reset lifecycle status).
+     */
+    public function keepActive(): void
+    {
+        $this->touchActivity();
+    }
+
+    /**
+     * Check if team is dormant.
+     */
+    public function isDormant(): bool
+    {
+        return $this->lifecycle_status === 'dormant';
+    }
+
+    /**
+     * Check if team is pending deletion.
+     */
+    public function isPendingDeletion(): bool
+    {
+        return $this->lifecycle_status === 'pending_deletion';
+    }
+
     use \Laravel\Scout\Searchable;
 
     /**
@@ -418,6 +519,7 @@ class Team extends Model implements HasMedia
             'status' => $this->status,
         ];
     }
+
     /**
      * Register media collections.
      */

@@ -287,7 +287,15 @@ function finishSetup() {
     setupStep.value = 'complete';
 }
 
-function goToDashboard() {
+async function goToDashboard() {
+    // Refresh user data so requires2FASetup returns false
+    // This ensures the router guard allows navigation to dashboard
+    try {
+        await authStore.fetchUser();
+        authStore.clear2FAEnforcementState();
+    } catch (e) {
+        console.error('Failed to refresh user data:', e);
+    }
     router.push({ name: 'dashboard' });
 }
 

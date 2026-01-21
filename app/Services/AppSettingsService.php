@@ -59,6 +59,13 @@ class AppSettingsService
         'openai.organization' => ['env' => 'OPENAI_ORGANIZATION'],
         // Storage
         'storage.max_team_storage' => ['config' => 'storage.max_team_storage', 'default' => 1024], // MB
+        // Team Lifecycle
+        'teams.max_owned' => ['config' => 'teams.limits.max_teams_owned', 'default' => 5],
+        'teams.max_joined' => ['config' => 'teams.limits.max_teams_joined', 'default' => 20],
+        'teams.dormant_days' => ['config' => 'teams.health.dormant_after_days', 'default' => 90],
+        'teams.deletion_grace_days' => ['config' => 'teams.health.deletion_grace_days', 'default' => 30],
+        'teams.auto_delete' => ['config' => 'teams.health.auto_delete_enabled', 'default' => false],
+        'teams.require_approval' => ['config' => 'teams.limits.require_approval', 'default' => false],
     ];
 
     /**
@@ -376,6 +383,50 @@ class AppSettingsService
                     'type' => 'integer',
                     'value' => $this->get('storage.max_team_storage', 1024),
                     'description' => 'Maximum storage per team in Megabytes (MB)',
+                ],
+            ],
+            'teams' => [
+                [
+                    'key' => 'teams.max_owned',
+                    'label' => 'Max Teams Owned',
+                    'type' => 'integer',
+                    'value' => $this->get('teams.max_owned', 5),
+                    'description' => 'Maximum number of teams a user can own',
+                ],
+                [
+                    'key' => 'teams.max_joined',
+                    'label' => 'Max Teams Joined',
+                    'type' => 'integer',
+                    'value' => $this->get('teams.max_joined', 20),
+                    'description' => 'Maximum number of teams a user can join',
+                ],
+                [
+                    'key' => 'teams.dormant_days',
+                    'label' => 'Days Until Dormant',
+                    'type' => 'integer',
+                    'value' => $this->get('teams.dormant_days', 90),
+                    'description' => 'Days without activity before team is marked dormant',
+                ],
+                [
+                    'key' => 'teams.deletion_grace_days',
+                    'label' => 'Deletion Grace Period',
+                    'type' => 'integer',
+                    'value' => $this->get('teams.deletion_grace_days', 30),
+                    'description' => 'Days after dormant warning before deletion',
+                ],
+                [
+                    'key' => 'teams.auto_delete',
+                    'label' => 'Auto-Delete Teams',
+                    'type' => 'boolean',
+                    'value' => $this->get('teams.auto_delete', false),
+                    'description' => 'Automatically delete teams after grace period',
+                ],
+                [
+                    'key' => 'teams.require_approval',
+                    'label' => 'Require Team Creation Approval',
+                    'type' => 'boolean',
+                    'value' => $this->get('teams.require_approval', false),
+                    'description' => 'Require admin approval for new team creation requests',
                 ],
             ],
         ];

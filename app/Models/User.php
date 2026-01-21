@@ -176,6 +176,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, WebAuth
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'preferences' => 'array',
+            'notification_preferences' => 'array',
             'skills' => 'array',
             'last_login_at' => 'datetime',
             'phone_verified_at' => 'datetime',
@@ -305,6 +306,37 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, WebAuth
     public function isActive(): bool
     {
         return $this->status === 'active';
+    }
+
+    /**
+     * Check if user wants email notifications for a specific type.
+     *
+     * @param  string  $type  Notification type (e.g., 'ticket_created', 'ticket_updated')
+     */
+    public function wantsEmailFor(string $type): bool
+    {
+        $defaults = [
+            'ticket_created' => true,
+            'ticket_updated' => true,
+            'ticket_comment' => true,
+            'ticket_sla' => true,
+            'ticket_assigned' => true,
+        ];
+
+        $prefs = $this->notification_preferences ?? [];
+
+        return $prefs[$type] ?? ($defaults[$type] ?? true);
+    }
+
+    /**
+     * Update notification preference for a specific type.
+     */
+    public function setNotificationPreference(string $type, bool $enabled): void
+    {
+        $prefs = $this->notification_preferences ?? [];
+        $prefs[$type] = $enabled;
+        $this->notification_preferences = $prefs;
+        $this->save();
     }
 
     /**

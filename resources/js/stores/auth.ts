@@ -184,6 +184,11 @@ export const useAuthStore = defineStore('auth', () => {
     return null;
   });
 
+  // Computed: Check if user has any teams
+  const hasTeams: ComputedRef<boolean> = computed(() => {
+    return (user.value?.teams?.length ?? 0) > 0;
+  });
+
   // Actions
   function switchTeam(publicId: string): void {
     if (user.value?.teams?.some(t => t.public_id === publicId)) {
@@ -732,6 +737,7 @@ export const useAuthStore = defineStore('auth', () => {
     isPasswordSet,
     passwordLastUpdatedAt,
     currentTeam,
+    hasTeams,
     // Actions
     login,
     verify2FA,

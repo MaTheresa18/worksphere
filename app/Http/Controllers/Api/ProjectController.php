@@ -85,6 +85,11 @@ class ProjectController extends Controller
      */
     public function store(StoreProjectRequest $request, Team $team): JsonResponse
     {
+        // Require team membership for project creation
+        if (! $this->permissionService->isTeamMember($request->user(), $team)) {
+            abort(403, 'You must be a member of this team to create projects.');
+        }
+
         $this->authorizeTeamPermission($team, 'projects.create');
 
         $validated = $request->validated();

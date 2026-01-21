@@ -63,11 +63,23 @@ class TeamController extends Controller
 
         $owner = \App\Models\User::where('public_id', $validated['owner_id'])->first();
 
+        // Check team creation limit
+        $teamActivityService = app(\App\Services\TeamActivityService::class);
+        if (! $teamActivityService->canUserCreateTeam($owner)) {
+            $maxTeams = $teamActivityService->getMaxTeamsOwned();
+
+            return response()->json([
+                'message' => "Team creation limit reached. Maximum {$maxTeams} teams allowed per user.",
+                'errors' => ['owner_id' => ["User has reached the maximum of {$maxTeams} owned teams."]],
+            ], 403);
+        }
+
         $team = Team::create([
             'name' => $validated['name'],
             'description' => $validated['description'],
             'owner_id' => $owner->id,
             'status' => $validated['status'],
+            'last_activity_at' => now(),
         ]);
 
         // Add owner as a member with 'team_lead' role
@@ -1012,6 +1024,7 @@ class TeamController extends Controller
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
+
     /**
      * Upload a team avatar.
      */
@@ -1041,5 +1054,82 @@ class TeamController extends Controller
         $team->clearMediaCollection('avatars');
 
         return response()->json($team->fresh()->load('owner'));
+    }
+
+    /**
+     * Keep team active - reset dormancy status.
+     */
+    public function keepActive(Team $team): JsonResponse
+    {
+        // Only owner can keep team active
+        if (auth()->id() !== $team->owner_id) {
+            abort(403, 'Only the team owner can perform this action.');
+        }
+
+        $team->keepActive();
+
+        $this->auditService->log(
+            action: \App\Enums\AuditAction::Updated,
+            category: \App\Enums\AuditCategory::TeamManagement,
+            auditable: $team,
+            context: ['action' => 'keep_active', 'previous_status' => $team->getOriginal('lifecycle_status')]
+        );
+
+        return response()->json([
+            'message' => 'Team has been marked as active.',
+            'team' => $team->fresh(),
+        ]);
+    }
+
+    /**
+     * Owner self-delete team.
+     */
+    public function selfDelete(Team $team): JsonResponse
+    {
+        // Only owner can self-delete
+        if (auth()->id() !== $team->owner_id) {
+            abort(403, 'Only the team owner can delete their team.');
+        }
+
+        $this->auditService->log(
+            action: \App\Enums\AuditAction::Deleted,
+            category: \App\Enums\AuditCategory::TeamManagement,
+            auditable: $team,
+            context: ['reason' => 'owner_self_delete']
+        );
+
+        $team->delete();
+
+        return response()->json(['message' => 'Team deleted successfully.']);
+    }
+
+    /**
+     * Get ownership summary for current user.
+     */
+    public function ownershipSummary(): JsonResponse
+    {
+        $user = auth()->user();
+        $teamActivityService = app(\App\Services\TeamActivityService::class);
+
+        $ownedTeams = Team::where('owner_id', $user->id)->get();
+        $memberTeams = Team::forUser($user)->whereNot('owner_id', $user->id)->get();
+
+        return response()->json([
+            'owned_count' => $ownedTeams->count(),
+            'member_count' => $memberTeams->count(),
+            'max_owned' => $teamActivityService->getMaxTeamsOwned(),
+            'max_joined' => $teamActivityService->getMaxTeamsJoined(),
+            'remaining_slots' => $teamActivityService->getRemainingTeamSlots($user),
+            'owned_teams' => $ownedTeams->map(fn ($t) => [
+                'id' => $t->public_id,
+                'name' => $t->name,
+                'lifecycle_status' => $t->lifecycle_status,
+                'last_activity_at' => $t->last_activity_at?->toIso8601String(),
+            ]),
+            'member_teams' => $memberTeams->map(fn ($t) => [
+                'id' => $t->public_id,
+                'name' => $t->name,
+            ]),
+        ]);
     }
 }

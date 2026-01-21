@@ -1143,6 +1143,11 @@ class MaintenanceService
                 'description' => 'Prune Audit Logs (30 days)',
                 'schedule' => 'Daily',
             ],
+            [
+                'name' => 'teams:check-health',
+                'description' => 'Team Health Check (Dormant/Deletion)',
+                'schedule' => 'Daily at 2:00 AM',
+            ],
         ];
 
         return array_map(function ($task) {
@@ -1228,6 +1233,7 @@ class MaintenanceService
                 'tickets:reminders' => $this->runArtisanCommand('tickets:reminders'),
                 'server-monitor:run-checks' => $this->runArtisanCommand('server-monitor:run-checks'),
                 'email:sync-incremental' => $this->runArtisanCommand('email:sync-incremental'),
+                'teams:check-health' => $this->runArtisanCommand('teams:check-health'),
                 default => throw new \Exception("Unknown task: {$taskName}"),
             };
 
