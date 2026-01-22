@@ -83,6 +83,39 @@ class TicketController extends Controller
     }
 
     /**
+     * Get users who can be assigned tickets (support staff, admins).
+     */
+    public function assignableUsers(Request $request): JsonResponse
+    {
+        $this->authorize('assign', Ticket::class);
+
+        // Get users with support/admin roles or tickets.assign permission
+        $users = User::query()
+            ->where('status', 'active')
+            ->where(function ($query) {
+                $query->whereHas('roles', function ($q) {
+                    $q->whereIn('name', ['administrator', 'support_staff', 'support']);
+                })
+                ->orWhereHas('permissions', function ($q) {
+                    $q->where('name', 'tickets.assign');
+                });
+            })
+            ->select(['id', 'public_id', 'name', 'email'])
+            ->orderBy('name')
+            ->get()
+            ->map(function ($user) {
+                return [
+                    'id' => $user->public_id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'avatar_thumb_url' => $user->avatar_thumb_url,
+                ];
+            });
+
+        return response()->json(['data' => $users]);
+    }
+
+    /**
      * Search for linkable tickets (lightweight endpoint for Link to Master modal).
      * Returns only essential fields: id (public_id), ticket_number, title, status.
      */

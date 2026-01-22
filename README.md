@@ -42,17 +42,23 @@ _Central hub for personal stats, tasks, and system overview._
 ### Real-time Chat System
 
 _Full-featured messaging with groups, file sharing, and typing indicators._
+![Chat System](doc/screenshots/chat_mini.png)
 ![Chat System](doc/screenshots/chat_fullpage.png)
 
 ### Project Management & Calendar
 
 _Task tracking, Kanban boards, and integrated calendar scheduling._
 ![Calendar](doc/screenshots/calendar.png)
+![Team](doc/screenshots/team_details.png)
+![Project](doc/screenshots/projects_details.png)
+![Task](doc/screenshots/task_details.png)
+![Invoice](doc/screenshots/invoice_create.png)
 
 ### Ticket System
 
 _Internal support ticketing with automated workflows._
 ![Tickets](doc/screenshots/tickets.png)
+![Tickets](doc/screenshots/ticket_details.png)
 
 ### Unified Email Client
 
@@ -63,6 +69,13 @@ _IMAP/SMTP inbox with folder management and rich text composition._
 
 _Visual insights and reporting._
 ![Analytics](doc/screenshots/analytics.png)
+
+### Knowledge base
+
+_Knowledge base management._
+![Knowledge](doc/screenshots/kb_article_list.png)
+![Knowledge](doc/screenshots/kb_article.png)
+![Knowledge](doc/screenshots/public_article_read.png)
 
 ### Personal Notes
 
