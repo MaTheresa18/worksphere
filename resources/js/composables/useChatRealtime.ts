@@ -12,6 +12,7 @@ const subscribedChannels = ref<Set<string>>(new Set());
 const isConnected = ref(false);
 const connectionState = ref<'connected' | 'connecting' | 'disconnected'>('disconnected');
 const typingTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+const initializationPending = ref(false);
 
 /**
  * Composable for managing chat realtime subscriptions via Laravel Echo.
@@ -312,64 +313,78 @@ export function useChatRealtime() {
 
   /**
    * Initialize realtime subscriptions.
+   * Waits for Echo to be ready via echo:connected event if not yet available.
    */
   function initialize() {
+    const echo = (window as any).Echo as Echo<'reverb'>;
+    
+    // If Echo not ready, set up listener to retry when connected
+    if (!echo) {
+        if (!initializationPending.value) {
+            initializationPending.value = true;
+            const handler = () => {
+                console.log('[ChatRealtime] echo:connected event received, initializing...');
+                initializationPending.value = false;
+                window.removeEventListener('echo:connected', handler);
+                initialize();
+            };
+            window.addEventListener('echo:connected', handler);
+            console.log('[ChatRealtime] Echo not ready, waiting for echo:connected event');
+        }
+        return;
+    }
+    
+    // Echo is ready, proceed with subscriptions
     subscribeToUserChannel();
     subscribeToAllChats();
     
-    // Set initial state based on Echo
-    const echo = (window as any).Echo as Echo<'reverb'>;
-    if (echo) {
-        console.log('[ChatRealtime] Echo instance found, checking connector...');
-        // Assume connected initially if Echo exists, will be updated by events
-        connectionState.value = 'connected';
-        isConnected.value = true;
+    console.log('[ChatRealtime] Echo instance found, checking connector...');
+    // Assume connected initially if Echo exists, will be updated by events
+    connectionState.value = 'connected';
+    isConnected.value = true;
+    
+    // Access pusher instance safely
+    const connector = echo.connector as any;
+    if (connector && connector.pusher) {
+        console.log('[ChatRealtime] Pusher instance found, binding connection events');
         
-        // Access pusher instance safely
-        const connector = echo.connector as any;
-        if (connector && connector.pusher) {
-            console.log('[ChatRealtime] Pusher instance found, binding connection events');
-            
-            connector.pusher.connection.bind('connected', () => {
-                console.log('[ChatRealtime] Connection status: connected');
-                connectionState.value = 'connected';
-                isConnected.value = true;
-            });
-            
-            connector.pusher.connection.bind('unavailable', () => {
-                console.log('[ChatRealtime] Connection status: unavailable');
-                connectionState.value = 'disconnected';
-                isConnected.value = false;
-            });
-            
-            connector.pusher.connection.bind('failed', () => {
-                 console.log('[ChatRealtime] Connection status: failed');
-                 connectionState.value = 'disconnected';
-                 isConnected.value = false;
-            });
-            
-            connector.pusher.connection.bind('connecting', () => {
-                console.log('[ChatRealtime] Connection status: connecting');
-                connectionState.value = 'connecting';
-            });
-            
-            connector.pusher.connection.bind('disconnected', () => {
-                console.log('[ChatRealtime] Connection status: disconnected');
-                connectionState.value = 'disconnected';
-                isConnected.value = false;
-            });
-            
-            // Log current state
-            console.log('[ChatRealtime] Current Pusher state:', connector.pusher.connection.state);
-            if (connector.pusher.connection.state === 'connected') {
-                 connectionState.value = 'connected';
-                 isConnected.value = true;
-            }
-        } else {
-            console.warn('[ChatRealtime] Pusher instance NOT found on connector', connector);
+        connector.pusher.connection.bind('connected', () => {
+            console.log('[ChatRealtime] Connection status: connected');
+            connectionState.value = 'connected';
+            isConnected.value = true;
+        });
+        
+        connector.pusher.connection.bind('unavailable', () => {
+            console.log('[ChatRealtime] Connection status: unavailable');
+            connectionState.value = 'disconnected';
+            isConnected.value = false;
+        });
+        
+        connector.pusher.connection.bind('failed', () => {
+             console.log('[ChatRealtime] Connection status: failed');
+             connectionState.value = 'disconnected';
+             isConnected.value = false;
+        });
+        
+        connector.pusher.connection.bind('connecting', () => {
+            console.log('[ChatRealtime] Connection status: connecting');
+            connectionState.value = 'connecting';
+        });
+        
+        connector.pusher.connection.bind('disconnected', () => {
+            console.log('[ChatRealtime] Connection status: disconnected');
+            connectionState.value = 'disconnected';
+            isConnected.value = false;
+        });
+        
+        // Log current state
+        console.log('[ChatRealtime] Current Pusher state:', connector.pusher.connection.state);
+        if (connector.pusher.connection.state === 'connected') {
+             connectionState.value = 'connected';
+             isConnected.value = true;
         }
     } else {
-        console.warn('[ChatRealtime] Echo instance NOT found on window');
+        console.warn('[ChatRealtime] Pusher instance NOT found on connector', connector);
     }
   }
 

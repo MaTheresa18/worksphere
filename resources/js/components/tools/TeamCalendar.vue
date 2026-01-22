@@ -203,13 +203,9 @@ const today = () => calendarRef.value?.getApi()?.today();
     <div class="space-y-4">
         <!-- Toolbar -->
         <Card class="p-4">
-            <div
-                class="flex flex-col xl:flex-row items-center justify-between gap-4"
-            >
-                <!-- Navigation & Title -->
-                <div
-                    class="flex items-center gap-4 w-full xl:w-auto justify-between xl:justify-start"
-                >
+            <div class="flex flex-col gap-4">
+                <!-- Row 1: Navigation & Title -->
+                <div class="flex items-center gap-4 justify-between">
                     <div class="flex items-center gap-1">
                         <Button variant="ghost" size="sm" @click="prev">
                             <ChevronLeft class="h-4 w-4" />
@@ -222,21 +218,21 @@ const today = () => calendarRef.value?.getApi()?.today();
                         </Button>
                     </div>
                     <h2
-                        class="text-lg font-semibold whitespace-nowrap hidden sm:block"
+                        class="text-lg font-semibold whitespace-nowrap truncate"
                     >
                         {{ currentTitle }}
                     </h2>
                 </div>
 
-                <!-- Filters & Views & Actions -->
+                <!-- Row 2: Filters & Actions (scrollable on mobile) -->
                 <div
-                    class="flex flex-wrap items-center gap-3 w-full xl:w-auto justify-end"
+                    class="flex items-center gap-3 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 pb-2 sm:pb-0"
                 >
                     <!-- Holiday Toggle & Country Selector -->
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 shrink-0">
                         <button
                             @click="toggleHolidays"
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm font-medium"
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm font-medium whitespace-nowrap"
                             :class="
                                 showHolidays
                                     ? 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20'
@@ -306,7 +302,7 @@ const today = () => calendarRef.value?.getApi()?.today();
                                             :key="country.countryCode"
                                             @click="
                                                 selectCountry(
-                                                    country.countryCode
+                                                    country.countryCode,
                                                 )
                                             "
                                             class="w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-center justify-between"
@@ -335,7 +331,7 @@ const today = () => calendarRef.value?.getApi()?.today();
                     </div>
 
                     <!-- Event Type Filters -->
-                    <div class="flex items-center gap-2 mr-2">
+                    <div class="flex items-center gap-2 shrink-0">
                         <label
                             class="flex items-center gap-1.5 text-sm cursor-pointer select-none"
                         >
@@ -347,7 +343,6 @@ const today = () => calendarRef.value?.getApi()?.today();
                             <span
                                 class="w-2.5 h-2.5 rounded-full bg-blue-500"
                             ></span>
-                            <span class="hidden sm:inline">Projects</span>
                         </label>
                         <label
                             class="flex items-center gap-1.5 text-sm cursor-pointer select-none"
@@ -360,7 +355,6 @@ const today = () => calendarRef.value?.getApi()?.today();
                             <span
                                 class="w-2.5 h-2.5 rounded-full bg-emerald-500"
                             ></span>
-                            <span class="hidden sm:inline">Tasks</span>
                         </label>
                         <label
                             class="flex items-center gap-1.5 text-sm cursor-pointer select-none"
@@ -373,17 +367,16 @@ const today = () => calendarRef.value?.getApi()?.today();
                             <span
                                 class="w-2.5 h-2.5 rounded-full bg-purple-500"
                             ></span>
-                            <span class="hidden sm:inline">Events</span>
                         </label>
                     </div>
 
                     <div
-                        class="h-6 w-px bg-[var(--border-default)] hidden sm:block"
+                        class="h-6 w-px bg-[var(--border-default)] shrink-0"
                     ></div>
 
                     <!-- View Switcher -->
                     <div
-                        class="flex items-center bg-[var(--surface-secondary)] rounded-lg p-1"
+                        class="flex items-center bg-[var(--surface-secondary)] rounded-lg p-1 shrink-0"
                     >
                         <button
                             v-for="view in [
@@ -394,7 +387,7 @@ const today = () => calendarRef.value?.getApi()?.today();
                             ]"
                             :key="view"
                             @click="changeView(view)"
-                            class="px-3 py-1 text-xs font-medium rounded-md transition-all"
+                            class="px-3 py-1 text-xs font-medium rounded-md transition-all whitespace-nowrap"
                             :class="
                                 currentView === view
                                     ? 'bg-[var(--surface-elevated)] text-[var(--text-primary)] shadow-sm'
@@ -405,10 +398,10 @@ const today = () => calendarRef.value?.getApi()?.today();
                                 view === "dayGridMonth"
                                     ? "Month"
                                     : view === "timeGridWeek"
-                                    ? "Week"
-                                    : view === "timeGridDay"
-                                    ? "Day"
-                                    : "List"
+                                      ? "Week"
+                                      : view === "timeGridDay"
+                                        ? "Day"
+                                        : "List"
                             }}
                         </button>
                     </div>
@@ -416,6 +409,7 @@ const today = () => calendarRef.value?.getApi()?.today();
                     <Button
                         v-if="canCreate"
                         size="sm"
+                        class="shrink-0"
                         @click="$emit('create-click')"
                     >
                         <Plus class="h-4 w-4 mr-1" />
@@ -424,6 +418,7 @@ const today = () => calendarRef.value?.getApi()?.today();
                     <Button
                         variant="outline"
                         size="sm"
+                        class="shrink-0"
                         @click="$emit('export-click', currentRange)"
                         title="Export events as ICS file"
                     >
@@ -432,11 +427,6 @@ const today = () => calendarRef.value?.getApi()?.today();
                     </Button>
                 </div>
             </div>
-            <h2
-                class="text-lg font-semibold whitespace-nowrap sm:hidden mt-2 text-center"
-            >
-                {{ currentTitle }}
-            </h2>
         </Card>
 
         <!-- Calendar Area -->

@@ -34,6 +34,11 @@ WorkSphere is a comprehensive enterprise **Single Page Application (SPA)** built
 
 ## Core Features & Modules
 
+### Authentication
+
+_Secure login with social auth and multi-factor authentication support._
+![Login Page](doc/screenshots/login_page.png)
+
 ### Dashboard
 
 _Central hub for personal stats, tasks, and system overview._
@@ -42,23 +47,23 @@ _Central hub for personal stats, tasks, and system overview._
 ### Real-time Chat System
 
 _Full-featured messaging with groups, file sharing, and typing indicators._
-![Chat System](doc/screenshots/chat_mini.png)
-![Chat System](doc/screenshots/chat_fullpage.png)
+![Chat Mini](doc/screenshots/chat_mini.png)
+![Chat Full Page](doc/screenshots/chat_fullpage.png)
 
 ### Project Management & Calendar
 
 _Task tracking, Kanban boards, and integrated calendar scheduling._
 ![Calendar](doc/screenshots/calendar.png)
-![Team](doc/screenshots/team_details.png)
-![Project](doc/screenshots/projects_details.png)
-![Task](doc/screenshots/task_details.png)
-![Invoice](doc/screenshots/invoice_create.png)
+![Team Details](doc/screenshots/team_details.png)
+![Project Details](doc/screenshots/projects_details.png)
+![Task Details](doc/screenshots/task_details.png)
+![Invoice Create](doc/screenshots/invoice_create.png)
 
 ### Ticket System
 
 _Internal support ticketing with automated workflows._
-![Tickets](doc/screenshots/tickets.png)
-![Tickets](doc/screenshots/ticket_details.png)
+![Tickets List](doc/screenshots/tickets.png)
+![Ticket Details](doc/screenshots/ticket_details.png)
 
 ### Unified Email Client
 
@@ -70,12 +75,12 @@ _IMAP/SMTP inbox with folder management and rich text composition._
 _Visual insights and reporting._
 ![Analytics](doc/screenshots/analytics.png)
 
-### Knowledge base
+### Knowledge Base
 
-_Knowledge base management._
-![Knowledge](doc/screenshots/kb_article_list.png)
-![Knowledge](doc/screenshots/kb_article.png)
-![Knowledge](doc/screenshots/public_article_read.png)
+_Knowledge base management with public article publishing._
+![KB Article List](doc/screenshots/kb_article_list.png)
+![KB Article Editor](doc/screenshots/kb_article.png)
+![Public Article](doc/screenshots/public_article_read.png)
 
 ### Personal Notes
 
@@ -86,7 +91,9 @@ _Markdown-supported personal note-taking app._
 
 _Role-based access control (RBAC), team management, and user profiles._
 ![User Manager](doc/screenshots/user_manager.png)
+![User Details](doc/screenshots/user_details_manage.png)
 ![Roles & Permissions](doc/screenshots/roles_perms_manager.png)
+![Role Permission Details](doc/screenshots/role_perm_details_manage.png)
 
 ### System Maintenance
 
@@ -185,11 +192,12 @@ _System health monitoring, queue management, and backups._
     ```bash
     npm run start-all
     ```
-    _This command runs Laravel Serve, Reverb, Queue Worker, and Vite concurrently._
+    _This command runs Laravel Serve, Reverb, Queue Worker (Horizon), and Vite concurrently._
 
-Test users
-admin@example.com - Xachgamb@01
-test@example.com - Xachgamb@01
+**Test Users:**
+
+- `admin@example.com` / `Xachgamb@01`
+- `test@example.com` / `Xachgamb@01`
 
 ## Architecture
 
@@ -200,7 +208,7 @@ test@example.com - Xachgamb@01
 
 ## Security
 
-- **Authentication**: Supports Password, Social Login (Google/Microsoft), and 2FA (TOTP/SMS/WebAuthn).
+- **Authentication**: Supports Password, Social Login (Google/GitHub), and 2FA (TOTP/SMS/WebAuthn/Passkeys).
 - **Rate Limiting**: Strict throttling on auth endpoints and sensitive actions.
 - **Media**: Private uploads are securely served via signed URLs.
 

@@ -341,8 +341,23 @@
         <div
             class="px-3 py-2 border-t border-[var(--border-default)] bg-[var(--surface-secondary)] text-xs text-[var(--text-muted)] flex items-center justify-between shrink-0"
         >
-            <span>{{ filteredEmails.length }} emails</span>
-            <span v-if="unreadCount > 0">{{ unreadCount }} unread</span>
+            <span
+                >{{ filteredEmails.length }} of
+                {{
+                    store.$state.totalEmails || filteredEmails.length
+                }}
+                emails</span
+            >
+            <div class="flex items-center gap-3">
+                <span v-if="unreadCount > 0">{{ unreadCount }} unread</span>
+                <button
+                    @click="$emit('compose')"
+                    class="md:hidden flex items-center gap-1 px-2 py-1 bg-[var(--interactive-primary)] text-white rounded-md font-medium hover:bg-[var(--interactive-primary-hover)] transition-colors"
+                >
+                    <PlusIcon class="w-3 h-3" />
+                    Compose
+                </button>
+            </div>
         </div>
     </div>
 </template>
@@ -352,7 +367,7 @@ import {
     SearchIcon,
     TrashIcon,
     MailOpenIcon,
-    MailIcon, // Imported
+    MailIcon,
     MenuIcon,
     ArrowUpDownIcon,
     StarIcon,
@@ -360,6 +375,7 @@ import {
     PaperclipIcon,
     AlertOctagonIcon,
     LoaderIcon,
+    PlusIcon,
 } from "lucide-vue-next";
 import { useEmailStore } from "@/stores/emailStore";
 import { storeToRefs } from "pinia";
@@ -380,7 +396,7 @@ import { debounce } from "lodash";
 type SortField = "date" | "sender" | "subject";
 type SortOrder = "asc" | "desc";
 
-const emit = defineEmits(["toggle-sidebar", "select"]);
+const emit = defineEmits(["toggle-sidebar", "select", "compose"]);
 
 const store = useEmailStore();
 const {
@@ -396,6 +412,12 @@ const {
     newEmailCount,
     accountStatus,
 } = storeToRefs(store);
+
+// Track total email count from store
+const totalEmails = computed(() => store.emails.length);
+const totalEmailsServer = computed(
+    () => (store as any).$state?.totalEmails || 0,
+);
 
 const listRef = ref<HTMLElement | null>(null);
 let animation: any = null;
@@ -442,7 +464,7 @@ const sortLabel = computed(() => {
 });
 
 const unreadCount = computed(
-    () => filteredEmails.value.filter((e) => !e.is_read).length
+    () => filteredEmails.value.filter((e) => !e.is_read).length,
 );
 
 const sortItems = [
@@ -559,7 +581,7 @@ function setupObserver() {
             root: listRef.value,
             threshold: 0.1,
             rootMargin: "100px",
-        }
+        },
     );
 
     if (sentinel.value) {

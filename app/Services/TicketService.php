@@ -450,7 +450,7 @@ class TicketService implements TicketServiceContract
                 }
             }
 
-            $message = "Status changed from {$oldStatus->value} to {$status->value}";
+            $message = "Status changed from {$oldStatus->label()} to {$status->label()}";
             Notification::send($recipients, new TicketNotification(
                 $ticket,
                 TicketNotification::TYPE_UPDATED,

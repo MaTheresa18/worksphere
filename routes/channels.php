@@ -35,6 +35,12 @@ Broadcast::channel('online-users', function ($user) {
     ];
 });
 
+// Ticket queue channel - for support staff to receive new ticket notifications
+// IMPORTANT: This specific route MUST come before tickets.{ticketId} parameterized route
+Broadcast::channel('tickets.queue', function ($user) {
+    return $user->hasPermissionTo('tickets.view');
+});
+
 // Ticket channel - users can subscribe if they can view the ticket
 Broadcast::channel('tickets.{ticketId}', function ($user, $ticketId) {
     $ticket = \App\Models\Ticket::where('public_id', $ticketId)->first();
@@ -72,9 +78,4 @@ Broadcast::channel('email-account.{publicId}', function ($user, $publicId) {
 
 Broadcast::channel('personal-notes.{publicId}', function ($user, $publicId) {
     return $user->public_id === $publicId;
-});
-
-// Ticket queue channel - for support staff to receive new ticket notifications
-Broadcast::channel('tickets.queue', function ($user) {
-    return $user->hasPermissionTo('tickets.view');
 });

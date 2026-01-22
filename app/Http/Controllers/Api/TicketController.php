@@ -87,7 +87,10 @@ class TicketController extends Controller
      */
     public function assignableUsers(Request $request): JsonResponse
     {
-        $this->authorize('assign', Ticket::class);
+        // Check if user can assign tickets (doesn't require a specific ticket instance)
+        if (!$request->user()->hasPermissionTo('tickets.assign') && !$request->user()->hasRole('administrator')) {
+            abort(403, 'Unauthorized to assign tickets.');
+        }
 
         // Get users with support/admin roles or tickets.assign permission
         $users = User::query()

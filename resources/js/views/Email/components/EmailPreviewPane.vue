@@ -109,6 +109,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     compose: [];
+    "tab-closed": [tabId: string];
 }>();
 
 const activeTab = ref<string>("read");
@@ -123,25 +124,37 @@ watch(
         if (newEmail) {
             activeTab.value = "read";
         }
-    }
+    },
 );
 
 // Listen for postMessage from popup windows
 onMounted(() => {
-    window.addEventListener('message', handlePopupMessage);
+    window.addEventListener("message", handlePopupMessage);
 });
 
 onUnmounted(() => {
-    window.removeEventListener('message', handlePopupMessage);
+    window.removeEventListener("message", handlePopupMessage);
 });
 
 function handlePopupMessage(event: MessageEvent) {
-    if (event.data?.type && ['reply', 'reply-all', 'forward', 'forward-as-attachment'].includes(event.data.type)) {
+    if (
+        event.data?.type &&
+        ["reply", "reply-all", "forward", "forward-as-attachment"].includes(
+            event.data.type,
+        )
+    ) {
         openTab(event.data.type as any);
     }
 }
 
-function openTab(type: "reply" | "reply-all" | "forward" | "compose" | "forward-as-attachment") {
+function openTab(
+    type:
+        | "reply"
+        | "reply-all"
+        | "forward"
+        | "compose"
+        | "forward-as-attachment",
+) {
     const id = `${type}-${Date.now()}`;
     const labels = {
         reply: `Re: ${props.email?.subject || "Reply"}`,
@@ -176,6 +189,8 @@ function closeTab(id: string) {
         if (activeTab.value === id) {
             activeTab.value = "read";
         }
+        // Notify parent that a tab was closed
+        emit("tab-closed", id);
     }
 }
 

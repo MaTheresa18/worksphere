@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useToast } from "@/composables/useToast.ts";
 import axios from "axios";
@@ -541,7 +541,47 @@ onMounted(() => {
     if (route.query.search) searchQuery.value = route.query.search;
     fetchTickets();
     fetchStats();
+    subscribeToTicketUpdates();
 });
+
+onUnmounted(() => {
+    unsubscribeFromTicketUpdates();
+});
+
+// Ticket realtime subscriptions
+let ticketChannel = null;
+
+function subscribeToTicketUpdates() {
+    const echo = window.Echo;
+    if (!echo) {
+        // Retry when Echo connects
+        const handler = () => {
+            window.removeEventListener('echo:connected', handler);
+            subscribeToTicketUpdates();
+        };
+        window.addEventListener('echo:connected', handler);
+        return;
+    }
+    
+    ticketChannel = echo.private('tickets.queue')
+        .listen('.ticket.created', (event) => {
+            console.log('[TicketsView] New ticket created:', event);
+            toast.info(`New ticket: ${event.title}`);
+            fetchTickets();
+            fetchStats();
+        })
+        .listen('.ticket.updated', (event) => {
+            console.log('[TicketsView] Ticket updated:', event);
+            fetchTickets();
+        });
+}
+
+function unsubscribeFromTicketUpdates() {
+    if (ticketChannel && window.Echo) {
+        window.Echo.leave('tickets.queue');
+        ticketChannel = null;
+    }
+}
 
 function getStatusConfig(status) {
     const configs = {

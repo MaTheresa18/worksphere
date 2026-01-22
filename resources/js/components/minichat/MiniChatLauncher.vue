@@ -25,11 +25,8 @@ onMounted(async () => {
     await chatStore.fetchChats();
   }
   
-  // Background subscriptions for unread counts / badge glow
-  // Bubbles up to chatStore which handles de-duplication if window is also listening
+  // Initialize realtime subscriptions (handles Echo not ready via event listener)
   realtime.initialize();
-  realtime.subscribeToUserChannel();
-  realtime.subscribeToAllChats();
 });
 
 // Watch for unread count changes to trigger glow

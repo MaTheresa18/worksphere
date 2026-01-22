@@ -128,7 +128,14 @@ export const useNotificationsStore = defineStore('notifications', () => {
         const { default: echo, isEchoAvailable } = await import('@/echo');
 
         if (!isEchoAvailable()) {
-            console.debug('[Notifications] Echo not available, skipping realtime listeners');
+            console.debug('[Notifications] Echo not available, waiting for echo:connected event');
+            // Set up listener to retry when Echo becomes available
+            const handler = () => {
+                window.removeEventListener('echo:connected', handler);
+                console.debug('[Notifications] echo:connected received, initializing...');
+                startRealtimeListeners();
+            };
+            window.addEventListener('echo:connected', handler);
             return;
         }
 

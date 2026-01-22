@@ -210,7 +210,7 @@ const visibleTabs = computed(() => {
     const tabs = ["comments"];
     // Updated to match backend policy (tickets.update instead of tickets.manage)
     if (can("tickets.update")) {
-        tabs.push("activity", "attachments");
+        tabs.push("activity", "attachments", "user-tickets");
     }
     return tabs;
 });
@@ -246,27 +246,86 @@ const isSavingTag = ref(false);
 async function addTag() {
     if (!newTagValue.value.trim() || !ticket.value) return;
 
-    const tag = newTagValue.value.trim();
-    if (ticket.value.tags.includes(tag)) {
-        toast.error("Tag already exists");
+    // Split by comma and filter empty/duplicate tags
+    const inputTags = newTagValue.value
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t && !ticket.value!.tags.includes(t));
+
+    if (inputTags.length === 0) {
+        toast.error("No new tags to add");
         return;
     }
 
     isSavingTag.value = true;
     try {
-        const updatedTags = [...ticket.value.tags, tag];
+        const updatedTags = [...ticket.value.tags, ...inputTags];
         await api.put(`/api/tickets/${ticketId.value}`, {
             tags: updatedTags,
-            reason: `Added tag: ${tag}`,
+            reason: `Added tag${inputTags.length > 1 ? "s" : ""}: ${inputTags.join(", ")}`,
         });
         ticket.value.tags = updatedTags;
         newTagValue.value = "";
         showTagInput.value = false;
-        toast.success("Tag added");
+        toast.success(
+            `${inputTags.length} tag${inputTags.length > 1 ? "s" : ""} added`,
+        );
     } catch (error) {
         toast.error("Failed to add tag");
     } finally {
         isSavingTag.value = false;
+    }
+}
+
+// Handle input to detect comma and auto-add tags
+function handleTagInput(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const value = input.value;
+
+    // Check if comma was typed
+    if (value.includes(",")) {
+        // Extract tags before the last comma
+        const parts = value.split(",");
+        const tagsToAdd = parts
+            .slice(0, -1)
+            .map((t) => t.trim())
+            .filter((t) => t && !ticket.value?.tags.includes(t));
+
+        if (tagsToAdd.length > 0 && ticket.value) {
+            // Add tags immediately without full save
+            const updatedTags = [...ticket.value.tags, ...tagsToAdd];
+
+            // Optimistic update
+            ticket.value.tags = updatedTags;
+
+            // Save in background
+            api.put(`/api/tickets/${ticketId.value}`, {
+                tags: updatedTags,
+                reason: `Added tag${tagsToAdd.length > 1 ? "s" : ""}: ${tagsToAdd.join(", ")}`,
+            })
+                .then(() => {
+                    toast.success(
+                        `${tagsToAdd.length} tag${tagsToAdd.length > 1 ? "s" : ""} added`,
+                    );
+                })
+                .catch(() => {
+                    // Revert on error
+                    ticket.value!.tags = ticket.value!.tags.filter(
+                        (t) => !tagsToAdd.includes(t),
+                    );
+                    toast.error("Failed to add tag");
+                });
+        }
+
+        // Keep only text after last comma
+        newTagValue.value = parts[parts.length - 1];
+    }
+}
+
+// Handle blur to add any remaining tag text
+function handleTagBlur() {
+    if (newTagValue.value.trim() && ticket.value) {
+        addTag();
     }
 }
 
@@ -287,6 +346,45 @@ async function removeTag(tag: string) {
     } finally {
         isSavingTag.value = false;
     }
+}
+
+// Handle inline tag updates from TagInput component
+let tagUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
+
+async function handleInlineTagsUpdate(newTags: string[]) {
+    if (!ticket.value) return;
+    
+    // Get what was added/removed for the reason
+    const added = newTags.filter(t => !ticket.value!.tags.includes(t));
+    const removed = ticket.value.tags.filter(t => !newTags.includes(t));
+    
+    // Optimistic update
+    const oldTags = [...ticket.value.tags];
+    ticket.value.tags = newTags;
+    
+    // Debounce the API call
+    if (tagUpdateTimeout) clearTimeout(tagUpdateTimeout);
+    
+    tagUpdateTimeout = setTimeout(async () => {
+        isSavingTag.value = true;
+        try {
+            let reason = 'Updated tags';
+            if (added.length) reason = `Added tag${added.length > 1 ? 's' : ''}: ${added.join(', ')}`;
+            if (removed.length) reason = `Removed tag${removed.length > 1 ? 's' : ''}: ${removed.join(', ')}`;
+            
+            await api.put(`/api/tickets/${ticketId.value}`, {
+                tags: newTags,
+                reason,
+            });
+            toast.success('Tags updated');
+        } catch (error) {
+            // Revert on error
+            ticket.value!.tags = oldTags;
+            toast.error('Failed to update tags');
+        } finally {
+            isSavingTag.value = false;
+        }
+    }, 500);
 }
 
 onMounted(() => {
@@ -2094,6 +2192,97 @@ function isVisualMedia(att: Attachment) {
                             @remove-upload="removeFileFromQueue"
                         />
                     </div>
+
+                    <!-- User Tickets Tab -->
+                    <div
+                        v-show="activeTab === 'user-tickets'"
+                        class="space-y-4"
+                    >
+                        <Card padding="lg">
+                            <div class="flex items-center justify-between mb-4">
+                                <h2
+                                    class="text-lg font-semibold text-[var(--text-primary)]"
+                                >
+                                    Tickets by
+                                    {{
+                                        ticket.reporter?.name || "This User"
+                                    }}
+                                    ({{ reporterTickets.length }})
+                                </h2>
+                            </div>
+
+                            <div
+                                v-if="isLoadingReporterTickets"
+                                class="flex justify-center py-8"
+                            >
+                                <Loader2
+                                    class="w-6 h-6 animate-spin text-[var(--text-muted)]"
+                                />
+                            </div>
+
+                            <div
+                                v-else-if="reporterTickets.length"
+                                class="space-y-2"
+                            >
+                                <router-link
+                                    v-for="t in reporterTickets"
+                                    :key="t.id"
+                                    :to="`/tickets/${t.id}`"
+                                    class="flex items-center justify-between p-3 rounded-lg border border-[var(--border-default)] hover:bg-[var(--surface-secondary)] transition-colors group"
+                                >
+                                    <div class="flex-1 min-w-0">
+                                        <div
+                                            class="flex items-center gap-2 mb-1"
+                                        >
+                                            <span
+                                                class="text-xs font-mono text-[var(--text-muted)]"
+                                                >{{ t.displayId }}</span
+                                            >
+                                            <Badge
+                                                :variant="
+                                                    getStatusConfig(
+                                                        t.status.value,
+                                                    ).variant
+                                                "
+                                                size="sm"
+                                            >
+                                                {{ t.status.label }}
+                                            </Badge>
+                                        </div>
+                                        <p
+                                            class="text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--interactive-primary)]"
+                                        >
+                                            {{ t.title }}
+                                        </p>
+                                        <p
+                                            class="text-xs text-[var(--text-muted)] mt-1"
+                                        >
+                                            {{ formatDate(t.createdAt) }}
+                                        </p>
+                                    </div>
+                                    <div class="ml-4 shrink-0">
+                                        <Badge
+                                            :class="
+                                                getPriorityConfig(
+                                                    t.priority.value,
+                                                ).bgClass
+                                            "
+                                            size="sm"
+                                        >
+                                            {{ t.priority.label }}
+                                        </Badge>
+                                    </div>
+                                </router-link>
+                            </div>
+
+                            <div
+                                v-else
+                                class="text-center py-8 text-[var(--text-muted)]"
+                            >
+                                <p>No other tickets found from this user.</p>
+                            </div>
+                        </Card>
+                    </div>
                 </div>
 
                 <!-- Sidebar -->
@@ -2434,74 +2623,27 @@ function isVisualMedia(att: Attachment) {
 
                     <!-- Tags -->
                     <Card padding="lg" v-if="can('tickets.update')">
-                        <div class="flex items-center justify-between mb-4">
-                            <h2
-                                class="text-lg font-semibold text-[var(--text-primary)]"
-                            >
-                                Tags
-                            </h2>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                class="h-7 w-7"
-                                @click="showTagInput = !showTagInput"
-                                title="Add Tag"
-                                :disabled="isSavingTag"
-                            >
-                                <Plus class="h-4 w-4" />
-                            </Button>
-                        </div>
-
-                        <!-- Inline Tag Input -->
-                        <div v-if="showTagInput" class="mb-3">
-                            <div class="flex flex-col sm:flex-row gap-2">
-                                <input
-                                    v-model="newTagValue"
-                                    type="text"
-                                    class="w-full px-3 py-1.5 text-sm rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--interactive-primary)]/50"
-                                    placeholder="Enter tag..."
-                                    @keyup.enter="addTag"
-                                    @keyup.escape="
-                                        showTagInput = false;
-                                        newTagValue = '';
-                                    "
-                                />
-                                <Button
-                                    size="sm"
-                                    class="w-full sm:w-auto shrink-0"
-                                    @click="addTag"
-                                    :loading="isSavingTag"
-                                    :disabled="!newTagValue.trim()"
-                                >
-                                    Add
-                                </Button>
-                            </div>
-                        </div>
-
-                        <div
-                            v-if="ticket.tags.length"
-                            class="flex flex-wrap gap-2"
+                        <h2
+                            class="text-lg font-semibold text-[var(--text-primary)] mb-4"
                         >
-                            <span
-                                v-for="tag in ticket.tags"
-                                :key="tag"
-                                class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg bg-[var(--surface-tertiary)] text-[var(--text-secondary)] group"
-                            >
-                                {{ tag }}
-                                <button
-                                    @click="removeTag(tag)"
-                                    class="opacity-0 group-hover:opacity-100 hover:text-[var(--color-error)] transition-all"
-                                    :disabled="isSavingTag"
-                                >
-                                    <X class="h-3 w-3" />
-                                </button>
-                            </span>
+                            Tags
+                        </h2>
+
+                        <!-- Inline Tag Input using TagInput component -->
+                        <div class="mb-3">
+                            <TagInput
+                                :modelValue="ticket.tags"
+                                @update:modelValue="handleInlineTagsUpdate"
+                                placeholder="Add tags..."
+                                size="sm"
+                                :disabled="isSavingTag || ticket.isLocked"
+                            />
                         </div>
                         <p
-                            v-else-if="!showTagInput"
+                            v-if="!ticket.tags.length"
                             class="text-sm text-[var(--text-muted)]"
                         >
-                            No tags
+                            No tags added yet
                         </p>
                     </Card>
 

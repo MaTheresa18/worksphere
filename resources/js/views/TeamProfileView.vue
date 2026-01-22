@@ -995,7 +995,7 @@ const canRemoveMember = (member) => {
 
                     <!-- Tabs -->
                     <div
-                        class="flex items-center gap-8 mt-8 border-b border-[var(--border-default)]"
+                        class="flex items-center gap-4 sm:gap-8 mt-8 border-b border-[var(--border-default)] overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0"
                     >
                         <button
                             v-for="tab in [
@@ -1009,7 +1009,7 @@ const canRemoveMember = (member) => {
                             ]"
                             :key="tab"
                             @click="activeTab = tab"
-                            class="pb-4 text-sm font-medium transition-colors relative"
+                            class="pb-4 text-sm font-medium transition-colors relative whitespace-nowrap shrink-0"
                             :class="
                                 activeTab === tab
                                     ? 'text-[var(--interactive-primary)]'
