@@ -353,34 +353,36 @@ let tagUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
 
 async function handleInlineTagsUpdate(newTags: string[]) {
     if (!ticket.value) return;
-    
+
     // Get what was added/removed for the reason
-    const added = newTags.filter(t => !ticket.value!.tags.includes(t));
-    const removed = ticket.value.tags.filter(t => !newTags.includes(t));
-    
+    const added = newTags.filter((t) => !ticket.value!.tags.includes(t));
+    const removed = ticket.value.tags.filter((t) => !newTags.includes(t));
+
     // Optimistic update
     const oldTags = [...ticket.value.tags];
     ticket.value.tags = newTags;
-    
+
     // Debounce the API call
     if (tagUpdateTimeout) clearTimeout(tagUpdateTimeout);
-    
+
     tagUpdateTimeout = setTimeout(async () => {
         isSavingTag.value = true;
         try {
-            let reason = 'Updated tags';
-            if (added.length) reason = `Added tag${added.length > 1 ? 's' : ''}: ${added.join(', ')}`;
-            if (removed.length) reason = `Removed tag${removed.length > 1 ? 's' : ''}: ${removed.join(', ')}`;
-            
+            let reason = "Updated tags";
+            if (added.length)
+                reason = `Added tag${added.length > 1 ? "s" : ""}: ${added.join(", ")}`;
+            if (removed.length)
+                reason = `Removed tag${removed.length > 1 ? "s" : ""}: ${removed.join(", ")}`;
+
             await api.put(`/api/tickets/${ticketId.value}`, {
                 tags: newTags,
                 reason,
             });
-            toast.success('Tags updated');
+            toast.success("Tags updated");
         } catch (error) {
             // Revert on error
             ticket.value!.tags = oldTags;
-            toast.error('Failed to update tags');
+            toast.error("Failed to update tags");
         } finally {
             isSavingTag.value = false;
         }
@@ -500,7 +502,7 @@ async function fetchReporterTickets() {
         });
 
         reporterTickets.value = (response.data.data || []).map((t: any) => ({
-            id: t.public_id,
+            id: t.id, // API returns public_id as 'id'
             displayId: t.display_id,
             title: t.title,
             status: t.status,
@@ -2204,9 +2206,7 @@ function isVisualMedia(att: Attachment) {
                                     class="text-lg font-semibold text-[var(--text-primary)]"
                                 >
                                     Tickets by
-                                    {{
-                                        ticket.reporter?.name || "This User"
-                                    }}
+                                    {{ ticket.reporter?.name || "This User" }}
                                     ({{ reporterTickets.length }})
                                 </h2>
                             </div>
@@ -2224,10 +2224,11 @@ function isVisualMedia(att: Attachment) {
                                 v-else-if="reporterTickets.length"
                                 class="space-y-2"
                             >
-                                <router-link
+                                <a
                                     v-for="t in reporterTickets"
                                     :key="t.id"
-                                    :to="`/tickets/${t.id}`"
+                                    :href="`/tickets/${t.id}`"
+                                    target="_blank"
                                     class="flex items-center justify-between p-3 rounded-lg border border-[var(--border-default)] hover:bg-[var(--surface-secondary)] transition-colors group"
                                 >
                                     <div class="flex-1 min-w-0">
@@ -2272,7 +2273,7 @@ function isVisualMedia(att: Attachment) {
                                             {{ t.priority.label }}
                                         </Badge>
                                     </div>
-                                </router-link>
+                                </a>
                             </div>
 
                             <div
@@ -2420,10 +2421,11 @@ function isVisualMedia(att: Attachment) {
                                 </div>
 
                                 <div v-else class="space-y-2">
-                                    <router-link
+                                    <a
                                         v-for="rTicket in reporterTickets"
                                         :key="rTicket.id"
-                                        :to="`/tickets/${rTicket.id}`"
+                                        :href="`/tickets/${rTicket.id}`"
+                                        target="_blank"
                                         class="block p-2 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] transition-colors"
                                     >
                                         <div
@@ -2454,20 +2456,21 @@ function isVisualMedia(att: Attachment) {
                                         >
                                             {{ rTicket.title }}
                                         </p>
-                                    </router-link>
+                                    </a>
                                 </div>
 
                                 <!-- View All Link -->
-                                <router-link
+                                <a
                                     v-if="
                                         ticket.reporter &&
                                         reporterTickets.length > 0
                                     "
-                                    :to="`/tickets?reporter_id=${ticket.reporter.id}`"
+                                    :href="`/tickets?reporter_id=${ticket.reporter.public_id}`"
+                                    target="_blank"
                                     class="text-xs text-[var(--interactive-primary)] hover:underline mt-2 inline-block"
                                 >
                                     View all tickets by this user →
-                                </router-link>
+                                </a>
                             </div>
 
                             <!-- Hierarchy -->

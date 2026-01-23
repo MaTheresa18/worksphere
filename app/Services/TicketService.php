@@ -573,6 +573,84 @@ class TicketService implements TicketServiceContract
     }
 
     /**
+     * Check and send SLA warning notifications.
+     */
+    public function checkSlaWarnings(): int
+    {
+        $warningCount = 0;
+
+        // Find tickets that have reached warning threshold but not yet warned
+        $tickets = Ticket::query()
+            ->where('sla_breached', false)
+            ->whereNotIn('status', [TicketStatus::Resolved, TicketStatus::Closed])
+            ->where(function ($q) {
+                $q->whereNotNull('sla_response_hours')
+                    ->orWhereNotNull('sla_resolution_hours');
+            })
+            ->get();
+
+        foreach ($tickets as $ticket) {
+            // Check response SLA warning
+            if ($ticket->sla_response_hours && !$ticket->first_response_at && !$ticket->sla_response_warning_at) {
+                if ($ticket->isResponseSlaWarning()) {
+                    $ticket->sla_response_warning_at = now();
+                    $ticket->save();
+                    $warningCount++;
+
+                    $progress = $ticket->getSlaProgress('response');
+                    broadcast(new \App\Events\TicketSlaWarning($ticket, 'response', $progress));
+
+                    // Notify assignee and reporter
+                    $recipients = collect();
+                    if ($ticket->assignee) {
+                        $recipients->push($ticket->assignee);
+                    }
+                    if ($ticket->reporter && $ticket->reporter->id !== $ticket->assignee?->id) {
+                        $recipients->push($ticket->reporter);
+                    }
+
+                    Notification::send($recipients, new TicketNotification(
+                        $ticket,
+                        TicketNotification::TYPE_SLA_BREACH,
+                        null,
+                        "SLA response warning: {$progress}% of time elapsed"
+                    ));
+                }
+            }
+
+            // Check resolution SLA warning
+            if ($ticket->sla_resolution_hours && !$ticket->status->isTerminal() && !$ticket->sla_resolution_warning_at) {
+                if ($ticket->isResolutionSlaWarning()) {
+                    $ticket->sla_resolution_warning_at = now();
+                    $ticket->save();
+                    $warningCount++;
+
+                    $progress = $ticket->getSlaProgress('resolution');
+                    broadcast(new \App\Events\TicketSlaWarning($ticket, 'resolution', $progress));
+
+                    // Notify assignee and reporter
+                    $recipients = collect();
+                    if ($ticket->assignee) {
+                        $recipients->push($ticket->assignee);
+                    }
+                    if ($ticket->reporter && $ticket->reporter->id !== $ticket->assignee?->id) {
+                        $recipients->push($ticket->reporter);
+                    }
+
+                    Notification::send($recipients, new TicketNotification(
+                        $ticket,
+                        TicketNotification::TYPE_SLA_BREACH,
+                        null,
+                        "SLA resolution warning: {$progress}% of time elapsed"
+                    ));
+                }
+            }
+        }
+
+        return $warningCount;
+    }
+
+    /**
      * Check and mark SLA breaches.
      */
     public function checkSlaBreaches(): int
@@ -590,13 +668,18 @@ class TicketService implements TicketServiceContract
             ->get();
 
         foreach ($tickets as $ticket) {
-            if ($ticket->isResponseSlaBreached() || $ticket->isResolutionSlaBreached()) {
+            $isResponseBreached = $ticket->isResponseSlaBreached();
+            $isResolutionBreached = $ticket->isResolutionSlaBreached();
+
+            if ($isResponseBreached || $isResolutionBreached) {
                 $ticket->sla_breached = true;
+                $ticket->sla_breached_at = now();
+                $ticket->sla_breach_type = $isResponseBreached ? 'response' : 'resolution';
                 $ticket->save();
                 $breachedCount++;
 
                 // Broadcast SLA breach event
-                $breachType = $ticket->isResponseSlaBreached() ? 'response' : 'resolution';
+                $breachType = $ticket->sla_breach_type;
                 broadcast(new TicketSlaBreached($ticket, $breachType));
 
                 // Notify assignee and reporter

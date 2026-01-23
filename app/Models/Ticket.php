@@ -45,6 +45,10 @@ class Ticket extends Model implements HasMedia
         'sla_resolution_hours',
         'first_response_at',
         'sla_breached',
+        'sla_response_warning_at',
+        'sla_resolution_warning_at',
+        'sla_breached_at',
+        'sla_breach_type',
         'due_date',
         'deadline_reminded_at',
         'resolved_at',
@@ -52,8 +56,7 @@ class Ticket extends Model implements HasMedia
         'parent_id',
         'archived_at',
         'archive_reason',
-        'archive_reason',
-        'ticket_number', // Added
+        'ticket_number',
         'guest_name',
         'guest_email',
     ];
@@ -209,6 +212,9 @@ class Ticket extends Model implements HasMedia
             'tags' => 'array',
             'sla_breached' => 'boolean',
             'first_response_at' => 'datetime',
+            'sla_response_warning_at' => 'datetime',
+            'sla_resolution_warning_at' => 'datetime',
+            'sla_breached_at' => 'datetime',
             'due_date' => 'datetime',
             'deadline_reminded_at' => 'datetime',
             'resolved_at' => 'datetime',
@@ -311,13 +317,20 @@ class Ticket extends Model implements HasMedia
             return false;
         }
 
+        $slaService = app(\App\Services\SlaCalculationService::class);
+
         if ($this->first_response_at) {
-            $responseTime = $this->created_at->diffInHours($this->first_response_at);
+            $responseTime = $slaService->calculateWorkingHoursBetween(
+                $this->created_at,
+                $this->first_response_at
+            );
 
             return $responseTime > $this->sla_response_hours;
         }
 
-        return $this->created_at->addHours($this->sla_response_hours)->isPast();
+        $deadline = $slaService->getResponseSlaDeadline($this);
+
+        return $deadline ? $deadline->isPast() : false;
     }
 
     /**
@@ -329,8 +342,13 @@ class Ticket extends Model implements HasMedia
             return false;
         }
 
+        $slaService = app(\App\Services\SlaCalculationService::class);
+
         if ($this->resolved_at) {
-            $resolutionTime = $this->created_at->diffInHours($this->resolved_at);
+            $resolutionTime = $slaService->calculateWorkingHoursBetween(
+                $this->created_at,
+                $this->resolved_at
+            );
 
             return $resolutionTime > $this->sla_resolution_hours;
         }
@@ -339,7 +357,9 @@ class Ticket extends Model implements HasMedia
             return false;
         }
 
-        return $this->created_at->addHours($this->sla_resolution_hours)->isPast();
+        $deadline = $slaService->getResolutionSlaDeadline($this);
+
+        return $deadline ? $deadline->isPast() : false;
     }
 
     /**
@@ -473,5 +493,63 @@ class Ticket extends Model implements HasMedia
     public function getIsLockedAttribute(): bool
     {
         return $this->is_archived || ! is_null($this->parent_id);
+    }
+
+    /**
+     * Check if response SLA warning threshold has been reached.
+     */
+    public function isResponseSlaWarning(): bool
+    {
+        if (! $this->sla_response_hours || $this->first_response_at) {
+            return false;
+        }
+
+        $slaService = app(\App\Services\SlaCalculationService::class);
+
+        return $slaService->isWarningThresholdReached($this, 'response');
+    }
+
+    /**
+     * Check if resolution SLA warning threshold has been reached.
+     */
+    public function isResolutionSlaWarning(): bool
+    {
+        if (! $this->sla_resolution_hours || $this->status->isTerminal()) {
+            return false;
+        }
+
+        $slaService = app(\App\Services\SlaCalculationService::class);
+
+        return $slaService->isWarningThresholdReached($this, 'resolution');
+    }
+
+    /**
+     * Get SLA progress percentage (0-100+).
+     */
+    public function getSlaProgress(string $type): float
+    {
+        $slaService = app(\App\Services\SlaCalculationService::class);
+
+        return $slaService->getSlaProgress($this, $type);
+    }
+
+    /**
+     * Get response SLA deadline.
+     */
+    public function getResponseSlaDeadline(): ?\Carbon\Carbon
+    {
+        $slaService = app(\App\Services\SlaCalculationService::class);
+
+        return $slaService->getResponseSlaDeadline($this);
+    }
+
+    /**
+     * Get resolution SLA deadline.
+     */
+    public function getResolutionSlaDeadline(): ?\Carbon\Carbon
+    {
+        $slaService = app(\App\Services\SlaCalculationService::class);
+
+        return $slaService->getResolutionSlaDeadline($this);
     }
 }
