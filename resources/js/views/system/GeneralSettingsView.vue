@@ -20,7 +20,11 @@ import {
 import { toast } from "vue-sonner";
 import axios from "axios";
 import EmailAccountsSection from "@/components/settings/EmailAccountsSection.vue";
+import SupportTicketsSection from "@/components/settings/SupportTicketsSection.vue";
 import BlockedUrlManager from "@/components/settings/BlockedUrlManager.vue";
+import { useAuthStore } from "@/stores/auth";
+
+const authStore = useAuthStore();
 
 const isLoading = ref(true);
 const isSaving = ref(false);
@@ -74,6 +78,23 @@ const settings = ref({
     "teams.deletion_grace_days": 30,
     "teams.auto_delete": false,
     "teams.require_approval": false,
+    // Tickets SLA
+    "tickets.sla.enabled": true,
+    "tickets.sla.business_hours_enabled": false,
+    "tickets.sla.business_hours_start": "09:00",
+    "tickets.sla.business_hours_end": "17:00",
+    "tickets.sla.business_days": [1, 2, 3, 4, 5],
+    "tickets.sla.holiday_country": "US",
+    "tickets.sla.exclude_holidays": false,
+    "tickets.sla.warning_threshold": 80,
+    "tickets.sla.default_response_hours.critical": 1,
+    "tickets.sla.default_response_hours.high": 2,
+    "tickets.sla.default_response_hours.medium": 4,
+    "tickets.sla.default_response_hours.low": 8,
+    "tickets.sla.default_resolution_hours.critical": 4,
+    "tickets.sla.default_resolution_hours.high": 8,
+    "tickets.sla.default_resolution_hours.medium": 24,
+    "tickets.sla.default_resolution_hours.low": 48,
 });
 
 // Sensitive fields that should be masked
@@ -239,12 +260,12 @@ const uploadBrandingFile = async (event, type) => {
         toast.success(
             `${
                 type.charAt(0).toUpperCase() + type.slice(1)
-            } uploaded successfully`
+            } uploaded successfully`,
         );
     } catch (error) {
         console.error(`Failed to upload ${type}:`, error);
         toast.error(
-            error.response?.data?.message || `Failed to upload ${type}`
+            error.response?.data?.message || `Failed to upload ${type}`,
         );
     }
 };
@@ -263,8 +284,8 @@ const saveSettings = async () => {
                         typeof value === "boolean"
                             ? "boolean"
                             : typeof value === "number"
-                            ? "integer"
-                            : "string",
+                              ? "integer"
+                              : "string",
                     group: key.split(".")[0],
                     is_sensitive: isSensitive,
                 };
@@ -329,7 +350,7 @@ const saveAnnouncement = async () => {
         if (editingAnnouncement.value) {
             await axios.put(
                 `/api/admin/announcements/${editingAnnouncement.value.id}`,
-                payload
+                payload,
             );
             toast.success("Announcement updated");
         } else {
@@ -369,7 +390,7 @@ const toggleAnnouncementActive = async (announcement) => {
         toast.success(
             `Announcement ${
                 announcement.is_active ? "activated" : "deactivated"
-            }`
+            }`,
         );
     } catch (error) {
         toast.error("Failed to update announcement");
@@ -683,6 +704,24 @@ onMounted(async () => {
                 <BlockedUrlManager />
             </div>
 
+            <!-- Support Tickets Settings -->
+            <div
+                v-if="
+                    authStore.user?.permissions?.includes(
+                        'system.settings.manage',
+                    ) ||
+                    authStore.user?.roles?.find(
+                        (r) => r.name === 'administrator',
+                    )
+                "
+                class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] overflow-hidden lg:col-span-2"
+            >
+                <SupportTicketsSection
+                    :settings="settings"
+                    @update:settings="(s) => Object.assign(settings, s)"
+                />
+            </div>
+
             <!-- Storage Settings -->
             <div
                 class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] overflow-hidden"
@@ -759,7 +798,9 @@ onMounted(async () => {
                         >
                             <path d="M18 21a8 8 0 0 0-16 0" />
                             <circle cx="10" cy="8" r="5" />
-                            <path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3" />
+                            <path
+                                d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"
+                            />
                         </svg>
                     </div>
                     <h3 class="font-medium text-[var(--text-primary)]">
@@ -1114,7 +1155,7 @@ onMounted(async () => {
                                             type="button"
                                             @click="
                                                 togglePasswordVisibility(
-                                                    'google.client_secret'
+                                                    'google.client_secret',
                                                 )
                                             "
                                             class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--text-muted)]"
@@ -1153,7 +1194,7 @@ onMounted(async () => {
                                             copyToClipboard(
                                                 (settings['app.url'] ||
                                                     window.location.origin) +
-                                                    '/api/auth/google/callback'
+                                                    '/api/auth/google/callback',
                                             )
                                         "
                                     >
@@ -1225,7 +1266,7 @@ onMounted(async () => {
                                             type="button"
                                             @click="
                                                 togglePasswordVisibility(
-                                                    'github.client_secret'
+                                                    'github.client_secret',
                                                 )
                                             "
                                             class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--text-muted)]"
@@ -1264,7 +1305,7 @@ onMounted(async () => {
                                             copyToClipboard(
                                                 (settings['app.url'] ||
                                                     window.location.origin) +
-                                                    '/api/auth/github/callback'
+                                                    '/api/auth/github/callback',
                                             )
                                         "
                                     >
@@ -1315,7 +1356,7 @@ onMounted(async () => {
                                         type="button"
                                         @click="
                                             togglePasswordVisibility(
-                                                'recaptcha.secret_key'
+                                                'recaptcha.secret_key',
                                             )
                                         "
                                         class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--text-muted)]"
@@ -1371,7 +1412,7 @@ onMounted(async () => {
                                         type="button"
                                         @click="
                                             togglePasswordVisibility(
-                                                'twilio.auth_token'
+                                                'twilio.auth_token',
                                             )
                                         "
                                         class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--text-muted)]"
@@ -1427,7 +1468,7 @@ onMounted(async () => {
                                         type="button"
                                         @click="
                                             togglePasswordVisibility(
-                                                'openai.api_key'
+                                                'openai.api_key',
                                             )
                                         "
                                         class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[var(--text-muted)]"
@@ -1542,10 +1583,10 @@ onMounted(async () => {
                                             a.type === 'danger'
                                                 ? 'bg-red-500/10 text-red-600'
                                                 : a.type === 'warning'
-                                                ? 'bg-amber-500/10 text-amber-600'
-                                                : a.type === 'success'
-                                                ? 'bg-green-500/10 text-green-600'
-                                                : 'bg-blue-500/10 text-blue-600',
+                                                  ? 'bg-amber-500/10 text-amber-600'
+                                                  : a.type === 'success'
+                                                    ? 'bg-green-500/10 text-green-600'
+                                                    : 'bg-blue-500/10 text-blue-600',
                                         ]"
                                         >{{ a.type }}</span
                                     >
@@ -1572,7 +1613,7 @@ onMounted(async () => {
                                         >{{
                                             a.starts_at
                                                 ? new Date(
-                                                      a.starts_at
+                                                      a.starts_at,
                                                   ).toLocaleDateString()
                                                 : "Now"
                                         }}
@@ -1580,7 +1621,7 @@ onMounted(async () => {
                                         {{
                                             a.ends_at
                                                 ? new Date(
-                                                      a.ends_at
+                                                      a.ends_at,
                                                   ).toLocaleDateString()
                                                 : "Forever"
                                         }}</span

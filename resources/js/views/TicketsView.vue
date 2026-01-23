@@ -298,6 +298,11 @@ async function fetchTickets() {
             updatedAt: formatRelativeTime(ticket.updated_at),
             isOverdue: ticket.is_overdue,
             slaBreached: ticket.sla_breached,
+            isSlaWarning: !!(
+                (ticket.sla_response_warning_at ||
+                    ticket.sla_resolution_warning_at) &&
+                !ticket.sla_breached
+            ),
         }));
     } catch (error) {
         console.error("Failed to fetch tickets:", error);
@@ -556,29 +561,30 @@ function subscribeToTicketUpdates() {
     if (!echo) {
         // Retry when Echo connects
         const handler = () => {
-            window.removeEventListener('echo:connected', handler);
+            window.removeEventListener("echo:connected", handler);
             subscribeToTicketUpdates();
         };
-        window.addEventListener('echo:connected', handler);
+        window.addEventListener("echo:connected", handler);
         return;
     }
-    
-    ticketChannel = echo.private('tickets.queue')
-        .listen('.ticket.created', (event) => {
-            console.log('[TicketsView] New ticket created:', event);
+
+    ticketChannel = echo
+        .private("tickets.queue")
+        .listen(".ticket.created", (event) => {
+            console.log("[TicketsView] New ticket created:", event);
             toast.info(`New ticket: ${event.title}`);
             fetchTickets();
             fetchStats();
         })
-        .listen('.ticket.updated', (event) => {
-            console.log('[TicketsView] Ticket updated:', event);
+        .listen(".ticket.updated", (event) => {
+            console.log("[TicketsView] Ticket updated:", event);
             fetchTickets();
         });
 }
 
 function unsubscribeFromTicketUpdates() {
     if (ticketChannel && window.Echo) {
-        window.Echo.leave('tickets.queue');
+        window.Echo.leave("tickets.queue");
         ticketChannel = null;
     }
 }
@@ -1170,9 +1176,17 @@ function viewTicket(ticketId) {
                                                 >
                                                 <Badge
                                                     v-if="ticket.slaBreached"
+                                                    variant="danger"
+                                                    size="xs"
+                                                    >SLA Breached</Badge
+                                                >
+                                                <Badge
+                                                    v-else-if="
+                                                        ticket.isSlaWarning
+                                                    "
                                                     variant="warning"
                                                     size="xs"
-                                                    >SLA</Badge
+                                                    >SLA Warning</Badge
                                                 >
                                             </div>
                                         </div>
@@ -1325,7 +1339,7 @@ function viewTicket(ticketId) {
                                 "
                             >
                                 <td
-                                    :colspan="activeView !== 'archived' ? 7 : 6"
+                                    :colspan="activeView !== 'archived' ? 8 : 7"
                                     class="py-12 text-center"
                                 >
                                     <MessageSquare
@@ -1529,10 +1543,17 @@ function viewTicket(ticketId) {
                                     >
                                     <Badge
                                         v-if="ticket.slaBreached"
+                                        variant="danger"
+                                        size="xs"
+                                        class="ml-1"
+                                        >SLA Breached</Badge
+                                    >
+                                    <Badge
+                                        v-else-if="ticket.isSlaWarning"
                                         variant="warning"
                                         size="xs"
                                         class="ml-1"
-                                        >SLA</Badge
+                                        >SLA Warning</Badge
                                     >
                                 </div>
 

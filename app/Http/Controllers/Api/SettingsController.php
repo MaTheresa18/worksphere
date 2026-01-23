@@ -206,7 +206,7 @@ class SettingsController extends Controller
     public function uploadLogo(Request $request): JsonResponse
     {
         $request->validate([
-            'logo' => ['required', 'image', 'max:2048', 'dimensions:min_width=100,min_height=100'],
+            'logo' => ['required', 'file', 'mimes:png,jpg,jpeg,svg,webp', 'max:2048'],
         ]);
 
         $path = $request->file('logo')->store('branding', 'public');
@@ -226,7 +226,7 @@ class SettingsController extends Controller
     public function uploadFavicon(Request $request): JsonResponse
     {
         $request->validate([
-            'favicon' => ['required', 'image', 'max:1024', 'dimensions:max_width=512,max_height=512'],
+            'favicon' => ['required', 'file', 'mimes:png,jpg,jpeg,svg,webp,ico', 'max:1024'],
         ]);
 
         $path = $request->file('favicon')->store('branding', 'public');

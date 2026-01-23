@@ -148,6 +148,16 @@ interface TicketDetail {
     comments: Comment[];
     internalNotes: Comment[];
     attachments: Attachment[];
+    // SLA Fields
+    slaResponseHours?: number;
+    slaResolutionHours?: number;
+    slaResponseProgress?: number;
+    slaResolutionProgress?: number;
+    slaResponseDeadline?: string;
+    slaResolutionDeadline?: string;
+    slaBreachType?: string;
+    slaResponseWarningAt?: string;
+    slaResolutionWarningAt?: string;
 }
 
 const route = useRoute();
@@ -468,6 +478,16 @@ async function fetchTicket() {
                 attachments: n.attachments || [],
             })),
             attachments: [],
+            // SLA Fields
+            slaResponseHours: data.sla_response_hours,
+            slaResolutionHours: data.sla_resolution_hours,
+            slaResponseProgress: data.sla_response_progress,
+            slaResolutionProgress: data.sla_resolution_progress,
+            slaResponseDeadline: data.sla_response_deadline,
+            slaResolutionDeadline: data.sla_resolution_deadline,
+            slaBreachType: data.sla_breach_type,
+            slaResponseWarningAt: data.sla_response_warning_at,
+            slaResolutionWarningAt: data.sla_resolution_warning_at,
         };
 
         isFollowing.value = data.is_following || false;
@@ -1574,9 +1594,9 @@ function isVisualMedia(att: Attachment) {
                 </div>
             </div>
 
-            <div class="grid gap-6 lg:grid-cols-5">
+            <div class="grid gap-6 lg:grid-cols-4">
                 <!-- Main Content -->
-                <div class="lg:col-span-4 space-y-6">
+                <div class="lg:col-span-3 space-y-6">
                     <!-- Description -->
                     <Card padding="lg">
                         <h2
@@ -2288,6 +2308,179 @@ function isVisualMedia(att: Attachment) {
 
                 <!-- Sidebar -->
                 <div class="lg:col-span-1 space-y-6">
+                    <!-- SLA Status -->
+                    <Card padding="lg" v-if="ticket.slaResolutionHours">
+                        <h2
+                            class="text-lg font-semibold text-[var(--text-primary)] mb-4"
+                        >
+                            SLA Status
+                        </h2>
+                        <div class="space-y-4">
+                            <!-- Response SLA -->
+                            <div
+                                v-if="
+                                    ticket.slaResponseHours &&
+                                    ticket.status === 'open'
+                                "
+                            >
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-[var(--text-secondary)]"
+                                        >Response Time</span
+                                    >
+                                    <span
+                                        :class="{
+                                            'text-red-500':
+                                                (ticket.slaResponseProgress ||
+                                                    0) >= 100,
+                                            'text-orange-500':
+                                                (ticket.slaResponseProgress ||
+                                                    0) >=
+                                                ticket.slaResponseWarningAt
+                                                    ? 80
+                                                    : 101,
+                                        }"
+                                    >
+                                        {{
+                                            Math.min(
+                                                ticket.slaResponseProgress || 0,
+                                                100,
+                                            )
+                                        }}%
+                                    </span>
+                                </div>
+                                <div
+                                    class="h-2 w-full bg-[var(--surface-tertiary)] rounded-full overflow-hidden"
+                                >
+                                    <div
+                                        class="h-full rounded-full transition-all duration-500"
+                                        :class="[
+                                            (ticket.slaResponseProgress || 0) >=
+                                            100
+                                                ? 'bg-red-500'
+                                                : (ticket.slaResponseProgress ||
+                                                        0) >= 80
+                                                  ? 'bg-orange-500'
+                                                  : 'bg-green-500',
+                                        ]"
+                                        :style="{
+                                            width: `${Math.min(ticket.slaResponseProgress || 0, 100)}%`,
+                                        }"
+                                    ></div>
+                                </div>
+                                <div
+                                    class="flex justify-between text-[10px] text-[var(--text-muted)] mt-1"
+                                >
+                                    <span
+                                        >Target:
+                                        {{ ticket.slaResponseHours }}h</span
+                                    >
+                                    <span v-if="ticket.slaResponseDeadline"
+                                        >Due:
+                                        {{
+                                            formatRelativeTime(
+                                                ticket.slaResponseDeadline,
+                                            )
+                                        }}</span
+                                    >
+                                </div>
+                            </div>
+
+                            <!-- Resolution SLA -->
+                            <div
+                                v-if="
+                                    ticket.slaResolutionHours &&
+                                    ticket.status !== 'resolved' &&
+                                    ticket.status !== 'closed'
+                                "
+                            >
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-[var(--text-secondary)]"
+                                        >Resolution Time</span
+                                    >
+                                    <span
+                                        :class="{
+                                            'text-red-500':
+                                                (ticket.slaResolutionProgress ||
+                                                    0) >= 100,
+                                            'text-orange-500':
+                                                (ticket.slaResolutionProgress ||
+                                                    0) >= 80,
+                                        }"
+                                    >
+                                        {{
+                                            Math.min(
+                                                ticket.slaResolutionProgress ||
+                                                    0,
+                                                100,
+                                            )
+                                        }}%
+                                    </span>
+                                </div>
+                                <div
+                                    class="h-2 w-full bg-[var(--surface-tertiary)] rounded-full overflow-hidden"
+                                >
+                                    <div
+                                        class="h-full rounded-full transition-all duration-500"
+                                        :class="[
+                                            (ticket.slaResolutionProgress ||
+                                                0) >= 100
+                                                ? 'bg-red-500'
+                                                : (ticket.slaResolutionProgress ||
+                                                        0) >= 80
+                                                  ? 'bg-orange-500'
+                                                  : 'bg-green-500',
+                                        ]"
+                                        :style="{
+                                            width: `${Math.min(ticket.slaResolutionProgress || 0, 100)}%`,
+                                        }"
+                                    ></div>
+                                </div>
+                                <div
+                                    class="flex justify-between text-[10px] text-[var(--text-muted)] mt-1"
+                                >
+                                    <span
+                                        >Target:
+                                        {{ ticket.slaResolutionHours }}h</span
+                                    >
+                                    <span v-if="ticket.slaResolutionDeadline"
+                                        >Due:
+                                        {{
+                                            formatRelativeTime(
+                                                ticket.slaResolutionDeadline,
+                                            )
+                                        }}</span
+                                    >
+                                </div>
+                            </div>
+
+                            <!-- Breached State -->
+                            <div
+                                v-if="ticket.slaBreached"
+                                class="p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-lg"
+                            >
+                                <div class="flex items-start gap-2">
+                                    <AlertTriangle
+                                        class="w-4 h-4 text-red-600 mt-0.5"
+                                    />
+                                    <div>
+                                        <p
+                                            class="text-sm font-medium text-red-700 dark:text-red-400"
+                                        >
+                                            SLA Breached
+                                        </p>
+                                        <p
+                                            class="text-xs text-red-600/80 dark:text-red-400/80 mt-0.5"
+                                        >
+                                            This ticket has exceeded its
+                                            {{ ticket.slaBreachType }} SLA
+                                            target.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+
                     <!-- Details -->
                     <Card padding="lg">
                         <h2

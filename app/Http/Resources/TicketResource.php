@@ -79,6 +79,13 @@ class TicketResource extends JsonResource
             'sla_resolution_hours' => $this->sla_resolution_hours,
             'first_response_at' => $this->first_response_at?->toISOString(),
             'sla_breached' => $this->sla_breached,
+            'sla_breach_type' => $this->sla_breach_type,
+            'sla_response_warning_at' => $this->sla_response_warning_at?->toISOString(),
+            'sla_resolution_warning_at' => $this->sla_resolution_warning_at?->toISOString(),
+            'sla_response_progress' => $this->getSlaProgress('response'),
+            'sla_resolution_progress' => $this->getSlaProgress('resolution'),
+            'sla_response_deadline' => $this->getResponseSlaDeadline()?->toISOString(),
+            'sla_resolution_deadline' => $this->getResolutionSlaDeadline()?->toISOString(),
 
             // Deadline
             'due_date' => $this->due_date?->toISOString(),

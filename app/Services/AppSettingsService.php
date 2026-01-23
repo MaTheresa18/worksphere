@@ -429,6 +429,126 @@ class AppSettingsService
                     'description' => 'Require admin approval for new team creation requests',
                 ],
             ],
+            'tickets' => [
+                // SLA Enable/Disable
+                [
+                    'key' => 'tickets.sla.enabled',
+                    'label' => 'Enable SLA',
+                    'type' => 'boolean',
+                    'value' => $this->get('tickets.sla.enabled', true),
+                    'description' => 'Enable Service Level Agreement (SLA) tracking',
+                ],
+                // Business Hours
+                [
+                    'key' => 'tickets.sla.business_hours_enabled',
+                    'label' => 'Enable Business Hours',
+                    'type' => 'boolean',
+                    'value' => $this->get('tickets.sla.business_hours_enabled', false),
+                    'description' => 'Calculate SLA based on business hours only',
+                ],
+                [
+                    'key' => 'tickets.sla.business_hours_start',
+                    'label' => 'Business Day Start',
+                    'type' => 'string',
+                    'value' => $this->get('tickets.sla.business_hours_start', '09:00'),
+                    'description' => 'Start time of business day (HH:mm)',
+                ],
+                [
+                    'key' => 'tickets.sla.business_hours_end',
+                    'label' => 'Business Day End',
+                    'type' => 'string',
+                    'value' => $this->get('tickets.sla.business_hours_end', '17:00'),
+                    'description' => 'End time of business day (HH:mm)',
+                ],
+                [
+                    'key' => 'tickets.sla.business_days',
+                    'label' => 'Business Days',
+                    'type' => 'json',
+                    'value' => $this->get('tickets.sla.business_days', [1, 2, 3, 4, 5]),
+                    'description' => 'Days of week considered business days (1=Mon)',
+                ],
+                // Holidays
+                [
+                    'key' => 'tickets.sla.holiday_country',
+                    'label' => 'Holiday Country',
+                    'type' => 'string',
+                    'value' => $this->get('tickets.sla.holiday_country', 'US'),
+                    'description' => 'Country code for holiday calendar',
+                ],
+                [
+                    'key' => 'tickets.sla.exclude_holidays',
+                    'label' => 'Exclude Holidays',
+                    'type' => 'boolean',
+                    'value' => $this->get('tickets.sla.exclude_holidays', false),
+                    'description' => 'Exclude public holidays from SLA calculation',
+                ],
+                // Warning Threshold
+                [
+                    'key' => 'tickets.sla.warning_threshold',
+                    'label' => 'Warning Threshold (%)',
+                    'type' => 'integer',
+                    'value' => $this->get('tickets.sla.warning_threshold', 80),
+                    'description' => 'Percentage of SLA time elapsed to trigger warning',
+                ],
+                // Default Response SLA
+                [
+                    'key' => 'tickets.sla.default_response_hours.critical',
+                    'label' => 'Critical Response SLA',
+                    'type' => 'integer',
+                    'value' => $this->get('tickets.sla.default_response_hours.critical', 1),
+                    'description' => 'Default response time for Critical priority (hours)',
+                ],
+                [
+                    'key' => 'tickets.sla.default_response_hours.high',
+                    'label' => 'High Response SLA',
+                    'type' => 'integer',
+                    'value' => $this->get('tickets.sla.default_response_hours.high', 2),
+                    'description' => 'Default response time for High priority (hours)',
+                ],
+                [
+                    'key' => 'tickets.sla.default_response_hours.medium',
+                    'label' => 'Medium Response SLA',
+                    'type' => 'integer',
+                    'value' => $this->get('tickets.sla.default_response_hours.medium', 4),
+                    'description' => 'Default response time for Medium priority (hours)',
+                ],
+                [
+                    'key' => 'tickets.sla.default_response_hours.low',
+                    'label' => 'Low Response SLA',
+                    'type' => 'integer',
+                    'value' => $this->get('tickets.sla.default_response_hours.low', 8),
+                    'description' => 'Default response time for Low priority (hours)',
+                ],
+                // Default Resolution SLA
+                [
+                    'key' => 'tickets.sla.default_resolution_hours.critical',
+                    'label' => 'Critical Resolution SLA',
+                    'type' => 'integer',
+                    'value' => $this->get('tickets.sla.default_resolution_hours.critical', 4),
+                    'description' => 'Default resolution time for Critical priority (hours)',
+                ],
+                [
+                    'key' => 'tickets.sla.default_resolution_hours.high',
+                    'label' => 'High Resolution SLA',
+                    'type' => 'integer',
+                    'value' => $this->get('tickets.sla.default_resolution_hours.high', 8),
+                    'description' => 'Default resolution time for High priority (hours)',
+                ],
+                [
+                    'key' => 'tickets.sla.default_resolution_hours.medium',
+                    'label' => 'Medium Resolution SLA',
+                    'type' => 'integer',
+                    'value' => $this->get('tickets.sla.default_resolution_hours.medium', 24),
+                    'description' => 'Default resolution time for Medium priority (hours)',
+                ],
+                [
+                    'key' => 'tickets.sla.default_resolution_hours.low',
+                    'label' => 'Low Resolution SLA',
+                    'type' => 'integer',
+                    'value' => $this->get('tickets.sla.default_resolution_hours.low', 48),
+                    'description' => 'Default resolution time for Low priority (hours)',
+                ],
+            ],
         ];
     }
 }

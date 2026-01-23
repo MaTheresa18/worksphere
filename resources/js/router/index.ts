@@ -465,6 +465,7 @@ const routes: RouteRecordRaw[] = [
                     title: "Tickets",
                     breadcrumb: "Tickets",
                     transition: "slide-fade",
+                    permission: "tickets.view",
                 },
             },
             {
