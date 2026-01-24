@@ -48,7 +48,9 @@ const form = ref({
     smtp_port: 587,
     smtp_encryption: "tls",
     username: "",
+    username: "",
     password: "",
+    system_usage: "",
 });
 
 const errors = ref({});
@@ -100,7 +102,9 @@ const openModal = (account = null) => {
             smtp_port: account.smtp_port,
             smtp_encryption: account.smtp_encryption,
             username: account.username || "",
+            username: account.username || "",
             password: "",
+            system_usage: account.system_usage || "",
         };
     } else {
         form.value = {
@@ -115,7 +119,9 @@ const openModal = (account = null) => {
             smtp_port: 587,
             smtp_encryption: "tls",
             username: "",
+            username: "",
             password: "",
+            system_usage: "",
         };
     }
     errors.value = {};
@@ -146,7 +152,7 @@ const saveAccount = async () => {
         if (editingAccount.value) {
             await axios.put(
                 `/api/email-accounts/${editingAccount.value.id}`,
-                payload
+                payload,
             );
             toast.success("Email account updated");
         } else {
@@ -183,7 +189,7 @@ const testConnection = async (account) => {
     isTesting.value[account.id] = true;
     try {
         const response = await axios.post(
-            `/api/email-accounts/${account.id}/test`
+            `/api/email-accounts/${account.id}/test`,
         );
         if (response.data.success) {
             toast.success("Connection successful!");
@@ -208,7 +214,7 @@ const testConfiguration = async () => {
     try {
         const response = await axios.post(
             "/api/email-accounts/test-configuration",
-            form.value
+            form.value,
         );
         if (response.data.success) {
             toast.success("Configuration test successful!");
@@ -231,7 +237,7 @@ const connectOAuth = async (provider) => {
     try {
         const params = props.teamId ? `?team_id=${props.teamId}` : "";
         const response = await axios.get(
-            `/api/email-accounts/oauth/${provider}/redirect${params}`
+            `/api/email-accounts/oauth/${provider}/redirect${params}`,
         );
         if (response.data.redirect_url) {
             window.location.href = response.data.redirect_url;
@@ -279,10 +285,18 @@ onMounted(async () => {
                 </div>
                 <div>
                     <h3 class="font-medium text-[var(--text-primary)]">
-                        {{ isSystem ? 'System Email Accounts' : 'Email Accounts' }}
+                        {{
+                            isSystem
+                                ? "System Email Accounts"
+                                : "Email Accounts"
+                        }}
                     </h3>
                     <p class="text-xs text-[var(--text-muted)]">
-                        {{ isSystem ? 'Connect accounts for system notifications. These accounts are for system internal use.' : 'Connect email accounts for sending' }}
+                        {{
+                            isSystem
+                                ? "Connect accounts for system notifications. These accounts are for system internal use."
+                                : "Connect email accounts for sending"
+                        }}
                     </p>
                 </div>
             </div>
@@ -344,8 +358,12 @@ onMounted(async () => {
                             account.provider === 'gmail'
                                 ? 'bg-red-500'
                                 : account.provider === 'outlook'
-                                ? 'bg-blue-500'
-                                : 'bg-gray-500',
+                                  ? 'bg-blue-500'
+                                  : account.provider === 'outlook'
+                                    ? 'bg-blue-500'
+                                    : account.is_system
+                                      ? 'bg-gray-700'
+                                      : 'bg-gray-500',
                         ]"
                     >
                         {{ account.email.charAt(0).toUpperCase() }}
@@ -359,6 +377,11 @@ onMounted(async () => {
                                 v-if="account.is_default"
                                 class="px-1.5 py-0.5 text-xs bg-blue-500/10 text-blue-600 rounded"
                                 >Default</span
+                            >
+                            <span
+                                v-if="account.system_usage"
+                                class="px-1.5 py-0.5 text-xs bg-purple-500/10 text-purple-600 rounded capitalize"
+                                >{{ account.system_usage }}</span
                             >
                             <span
                                 v-if="account.is_shared"
@@ -398,10 +421,10 @@ onMounted(async () => {
                     </div>
                 </div>
                 <div class="flex items-center gap-1">
-                    <Button 
-                        v-if="account.needs_reauth" 
-                        @click="connectOAuth(account.provider)" 
-                        size="xs" 
+                    <Button
+                        v-if="account.needs_reauth"
+                        @click="connectOAuth(account.provider)"
+                        size="xs"
                         class="bg-red-50 text-red-600 hover:bg-red-100 border-red-200 mr-2"
                         variant="outline"
                     >
@@ -575,6 +598,33 @@ onMounted(async () => {
                                 type="email"
                                 placeholder="name@company.com"
                             />
+                        </div>
+
+                        <!-- System Usage (Only for System Mode) -->
+                        <div v-if="isSystem" class="col-span-2">
+                            <label
+                                class="text-sm font-medium text-[var(--text-primary)]"
+                                >System Role</label
+                            >
+                            <select
+                                v-model="form.system_usage"
+                                class="w-full px-3 py-2 mt-1.5 text-sm bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            >
+                                <option value="">None / General</option>
+                                <option value="support">
+                                    Support (Incoming Tickets)
+                                </option>
+                                <option value="notification">
+                                    Notification (Outgoing Alerts)
+                                </option>
+                                <option value="noreply">
+                                    Noreply (Automated Emails)
+                                </option>
+                            </select>
+                            <p class="text-xs text-[var(--text-muted)] mt-1">
+                                Assign a specific role to this account. Only one
+                                active account per role is allowed.
+                            </p>
                         </div>
 
                         <!-- IMAP Settings -->

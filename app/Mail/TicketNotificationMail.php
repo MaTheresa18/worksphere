@@ -37,7 +37,7 @@ class TicketNotificationMail extends Mailable implements ShouldQueue
         public string $type,
         public ?User $actor = null,
         public ?string $customMessage = null,
-        public array $metadata = []
+        public array $meta = []
     ) {}
 
     /**
@@ -63,7 +63,7 @@ class TicketNotificationMail extends Mailable implements ShouldQueue
                 'type' => $this->type,
                 'actor' => $this->actor,
                 'customMessage' => $this->customMessage,
-                'metadata' => $this->metadata,
+                'metadata' => $this->meta,
                 'title' => $this->getTitle(),
                 'message' => $this->getMessage(),
                 'actionUrl' => $this->getActionUrl(),

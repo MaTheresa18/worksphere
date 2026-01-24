@@ -60,20 +60,33 @@ class TicketNotification extends Notification implements ShouldBroadcast, Should
     /**
      * Get the mail representation of the notification.
      */
-    public function toMail(object $notifiable): MailMessage
+    public function toMail(object $notifiable): \Illuminate\Mail\Mailable
     {
-        $title = $this->getTitle();
-        $actionUrl = config('app.url').'/tickets/'.$this->ticket->public_id;
+        // 1. Resolve 'support' system account
+        $supportAccount = app(\App\Services\SystemEmailService::class)->getAccountForUsage('support');
+        
+        // 2. Register dynamic mailer if account exists
+        $mailer = null;
+        if ($supportAccount) {
+            app(\App\Services\DynamicMailerService::class)->registerSystemMailer($supportAccount);
+            $mailer = \App\Services\DynamicMailerService::SYSTEM_MAILER_NAME;
+        }
 
-        return (new MailMessage)
-            ->subject($title)
-            ->greeting('Hello '.$notifiable->name.'!')
-            ->line($this->getMessage())
-            ->line('**Ticket:** '.$this->ticket->ticket_number.' - '.$this->ticket->title)
-            ->line('**Status:** '.$this->ticket->status->label())
-            ->line('**Priority:** '.ucfirst($this->ticket->priority->value))
-            ->action('View Ticket', $actionUrl)
-            ->line('Thank you for using '.config('app.name').'!');
+        // 3. Return Mailable
+        $mailable = new \App\Mail\TicketNotificationMail(
+            ticket: $this->ticket,
+            recipient: $notifiable,
+            type: $this->type,
+            actor: $this->actor,
+            customMessage: $this->message,
+            meta: $this->metadata
+        );
+
+        if ($mailer) {
+            $mailable->mailer($mailer);
+        }
+
+        return $mailable;
     }
 
     /**

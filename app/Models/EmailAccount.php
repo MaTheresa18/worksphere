@@ -40,6 +40,7 @@ class EmailAccount extends Model
         'is_verified',
         'is_default',
         'is_system',
+        'system_usage',
         'last_used_at',
         'last_error',
         'sync_status',
@@ -249,6 +250,11 @@ class EmailAccount extends Model
     public function scopeSystem($query)
     {
         return $query->where('is_system', true);
+    }
+
+    public function scopeForUsage($query, string $usage)
+    {
+        return $query->where('is_system', true)->where('system_usage', $usage);
     }
 
     public function scopeUserAccounts($query)

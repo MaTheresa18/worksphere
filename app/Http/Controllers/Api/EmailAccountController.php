@@ -11,7 +11,8 @@ use Illuminate\Http\Request;
 class EmailAccountController extends Controller
 {
     public function __construct(
-        protected EmailAccountService $emailAccountService
+        protected EmailAccountService $emailAccountService,
+        protected \App\Services\SystemEmailService $systemEmailService
     ) {}
 
     /**
@@ -91,6 +92,7 @@ class EmailAccountController extends Controller
             // Team assignment (for shared accounts)
             'team_id' => 'nullable|exists:teams,id',
             'is_system' => 'boolean',
+            'system_usage' => 'nullable|string|in:support,notification,noreply',
         ]);
 
         // If team_id is provided, verify user belongs to team
@@ -104,6 +106,11 @@ class EmailAccountController extends Controller
                     'message' => 'You do not belong to this team.',
                 ], 403);
             }
+        }
+
+        if (isset($validated['system_usage']) && $validated['system_usage']) {
+            $validated['is_system'] = true;
+            $this->systemEmailService->ensureUniqueUsage($validated['system_usage']);
         }
 
         $account = $this->emailAccountService->create($validated, $request->user());
@@ -134,6 +141,7 @@ class EmailAccountController extends Controller
             'is_active' => 'boolean',
             'is_default' => 'boolean',
             'is_system' => 'boolean',
+            'system_usage' => 'nullable|string|in:support,notification,noreply',
         ]);
 
         // If setting as default, unset other defaults
@@ -141,6 +149,14 @@ class EmailAccountController extends Controller
             EmailAccount::where('user_id', $emailAccount->user_id)
                 ->where('id', '!=', $emailAccount->id)
                 ->update(['is_default' => false]);
+        }
+
+        if (isset($validated['system_usage']) && $validated['system_usage']) {
+            $validated['is_system'] = true;
+            // Ensure unique usage (excluding this account)
+            $this->systemEmailService->ensureUniqueUsage($validated['system_usage'], $emailAccount->id);
+            // Clear cache for this usage
+            $this->systemEmailService->clearCache($validated['system_usage']);
         }
 
         $emailAccount->update($validated);
@@ -282,6 +298,7 @@ class EmailAccountController extends Controller
             'is_verified' => $account->is_verified,
             'is_default' => $account->is_default,
             'is_system' => $account->is_system,
+            'system_usage' => $account->system_usage,
             'is_personal' => $account->isPersonal(),
             'is_shared' => $account->isShared(),
             'last_used_at' => $account->last_used_at?->toIso8601String(),
