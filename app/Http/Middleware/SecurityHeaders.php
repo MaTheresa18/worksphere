@@ -42,6 +42,59 @@ class SecurityHeaders
         // Permissions Policy (formerly Feature Policy)
         $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
 
+        // Content Security Policy
+        $this->addCspHeader($response);
+
         return $response;
+    }
+
+    protected function addCspHeader(Response $response): void
+    {
+        $nonce = app(\App\Services\CSPService::class)->getNonce();
+
+        // Allow unsafe-eval in local development for Vue DevTools / Vite HMR
+        $scriptSrc = "'self' 'nonce-{$nonce}'";
+        $connectSrc = "'self'";
+        $styleSrc = "'self' 'unsafe-inline' https://fonts.bunny.net";
+
+        // Vite Dev Server Handling
+        if (app()->isLocal()) {
+            $scriptSrc .= " 'unsafe-eval'";
+            
+            // Check if Vite is running (hot file exists)
+            $hotFile = public_path('hot');
+            if (file_exists($hotFile)) {
+                $viteUrl = trim(file_get_contents($hotFile));
+                if ($viteUrl) {
+                    // Normalize URL to just origin if needed, or simple add
+                    $scriptSrc .= " {$viteUrl}";
+                    $styleSrc .= " {$viteUrl}";
+                    // Websocket connection for HMR (ws://...)
+                    $connectSrc .= " ws://" . parse_url($viteUrl, PHP_URL_HOST) . ":" . parse_url($viteUrl, PHP_URL_PORT);
+                    $connectSrc .= " {$viteUrl}";
+                }
+            }
+        }
+
+        // Definitions
+        $policy = [
+            "default-src 'self'",
+            "script-src {$scriptSrc}",
+            // Unsafe-inline for styles is required by many UI libraries (Vue/Tailwind components)
+            // Fonts.bunny.net is used for Inter font
+            "style-src {$styleSrc}",
+            // Allow data: fonts (often used by icon sets or inline fonts)
+            "font-src 'self' https://fonts.bunny.net data:",
+            // Allow images from self, data URIs (base64), and S3/R2 (https)
+            "img-src 'self' data: https:",
+            // Connect to self, Vite HMR, and Reverb WebSockets (port 9000 usually)
+            // Adding ws: and wss: schemes generally to allow websocket connections
+            "connect-src {$connectSrc} ws: wss:",
+            "object-src 'none'",
+            "base-uri 'self'",
+            "form-action 'self'",
+        ];
+
+        $response->headers->set('Content-Security-Policy', implode('; ', $policy));
     }
 }

@@ -62,7 +62,7 @@ ChartJS.register(
     Title,
     Tooltip,
     Legend,
-    Filler
+    Filler,
 );
 
 const router = useRouter();
@@ -229,10 +229,10 @@ const fetchQueueData = async () => {
             await Promise.all([
                 axios.get("/api/maintenance/queue/stats"),
                 axios.get(
-                    `/api/maintenance/queue/pending?page=${queuePage.value}&per_page=${queuePerPage.value}`
+                    `/api/maintenance/queue/pending?page=${queuePage.value}&per_page=${queuePerPage.value}`,
                 ),
                 axios.get(
-                    `/api/maintenance/queue/failed?page=${queuePage.value}&per_page=${queuePerPage.value}`
+                    `/api/maintenance/queue/failed?page=${queuePage.value}&per_page=${queuePerPage.value}`,
                 ),
                 axios.get("/api/maintenance/queue/completed?limit=50"),
             ]);
@@ -259,9 +259,16 @@ const fetchStorageStats = async () => {
             axios.get("/api/maintenance/storage?type=s3"),
         ]);
 
+        // Handle legacy single object or new array response
+        let s3Data = s3Res.data.data.s3;
+        // Ensure it's an array if it isn't (legacy single bucket)
+        if (s3Data && !Array.isArray(s3Data)) {
+            s3Data = [s3Data];
+        }
+
         storageStats.value = {
             local: localRes.data.data.local,
-            s3: s3Res.data.data.s3,
+            s3: s3Data,
         };
     } catch (error) {
         console.error("Failed to fetch storage stats:", error);
@@ -300,7 +307,7 @@ const fetchDatabaseHealth = async (page = 1) => {
     databasePagination.value.current_page = page;
     try {
         const response = await axios.get(
-            `/api/maintenance/database-health?page=${page}&per_page=${databasePagination.value.per_page}`
+            `/api/maintenance/database-health?page=${page}&per_page=${databasePagination.value.per_page}`,
         );
         databaseHealth.value = response.data.data.data;
         const meta = response.data.data.pagination;
@@ -322,7 +329,7 @@ const fetchBackups = async (page = 1) => {
     backupPagination.value.current_page = page;
     try {
         const response = await axios.get(
-            `/api/maintenance/backups?page=${page}&per_page=${backupPagination.value.per_page}`
+            `/api/maintenance/backups?page=${page}&per_page=${backupPagination.value.per_page}`,
         );
         backups.value = response.data.data.data;
         const meta = response.data.data.pagination;
@@ -388,7 +395,7 @@ const selectAllBackups = () => {
 const handleBulkDelete = async () => {
     if (
         !confirm(
-            `Are you sure you want to delete ${selectedBackups.value.length} backups?`
+            `Are you sure you want to delete ${selectedBackups.value.length} backups?`,
         )
     )
         return;
@@ -437,7 +444,7 @@ const handleSecureDownload = async () => {
                 reason: secureDownloadForm.value.reason,
                 paths: selectedBackups.value,
             },
-            { responseType: "blob" }
+            { responseType: "blob" },
         );
 
         // Handle file download
@@ -524,7 +531,7 @@ const forgetJob = async (id) => {
 const flushFailedJobs = async () => {
     if (
         !confirm(
-            "Are you sure you want to flush all failed jobs? This cannot be undone."
+            "Are you sure you want to flush all failed jobs? This cannot be undone.",
         )
     )
         return;
@@ -588,7 +595,9 @@ const refreshSystemInfo = async () => {
         fetchAdditionalSystemInfo(),
         fetchDatabaseHealth(databasePagination.value.current_page),
         fetchBackups(backupPagination.value.current_page),
+        fetchBackups(backupPagination.value.current_page),
         fetchExternalServices(),
+        fetchStorageStats(),
     ]);
     isLoading.value = false;
     toast.success("System information refreshed");
@@ -609,7 +618,7 @@ const enableMaintenance = async () => {
     try {
         const response = await axios.post(
             "/api/maintenance/enable",
-            maintenanceForm.value
+            maintenanceForm.value,
         );
         maintenanceMode.value = true;
         maintenanceInfo.value = response.data.data;
@@ -674,7 +683,7 @@ const clearCache = async (type) => {
             response.data.message ||
                 `${
                     type.charAt(0).toUpperCase() + type.slice(1)
-                } cleared successfully`
+                } cleared successfully`,
         );
 
         // Refresh system info to update sizes
@@ -697,7 +706,7 @@ const clearSessionsWithPassword = async () => {
         });
         showSessionsModal.value = false;
         toast.success(
-            response.data.message || "All sessions cleared successfully"
+            response.data.message || "All sessions cleared successfully",
         );
     } catch (error) {
         if (error.response?.status === 422) {
@@ -716,7 +725,7 @@ const runTask = async (taskName) => {
     runningTask.value = taskName;
     try {
         const response = await axios.post(
-            `/api/maintenance/scheduled-tasks/${taskName}/run`
+            `/api/maintenance/scheduled-tasks/${taskName}/run`,
         );
         if (response.data.success) {
             toast.success(response.data.message);
@@ -875,7 +884,7 @@ const setupRealtimeMetrics = () => {
 
             // Safe access to memory data from previous state or init new
             const memDataset = chartData.value.datasets.find(
-                (d) => d.label === "Memory Usage %"
+                (d) => d.label === "Memory Usage %",
             );
             const memoryData = [
                 ...(memDataset
@@ -886,7 +895,7 @@ const setupRealtimeMetrics = () => {
 
             if (cpuViewMode.value === "total") {
                 const cpuDataset = chartData.value.datasets.find(
-                    (d) => d.label === "CPU Usage %"
+                    (d) => d.label === "CPU Usage %",
                 );
                 const cpuTotalData = [
                     ...(cpuDataset
@@ -918,7 +927,7 @@ const setupRealtimeMetrics = () => {
                 for (let i = 0; i < numCores; i++) {
                     const coreLabel = `Core ${i}`;
                     const prevDataset = chartData.value.datasets.find(
-                        (d) => d.label === coreLabel
+                        (d) => d.label === coreLabel,
                     );
                     const prevData = prevDataset
                         ? prevDataset.data.slice(1)
@@ -970,7 +979,7 @@ const setupRealtimeScheduledTasks = () => {
 
             // Find and update the matching task in the list
             const taskIndex = scheduledTasks.value.findIndex(
-                (t) => t.name === taskUpdate.name
+                (t) => t.name === taskUpdate.name,
             );
             if (taskIndex !== -1) {
                 scheduledTasks.value[taskIndex] = {
@@ -1053,8 +1062,8 @@ onUnmounted(() => {
                         maintenanceMode
                             ? 'danger'
                             : systemInfo.health?.status === 'healthy'
-                            ? 'outline'
-                            : 'warning'
+                              ? 'outline'
+                              : 'warning'
                     "
                     class="h-8 px-3"
                 >
@@ -1064,22 +1073,22 @@ onUnmounted(() => {
                             maintenanceMode
                                 ? 'bg-red-500 animate-pulse'
                                 : systemInfo.health?.status === 'healthy'
-                                ? 'bg-green-500'
-                                : 'bg-yellow-500'
+                                  ? 'bg-green-500'
+                                  : 'bg-yellow-500'
                         "
                     ></span>
                     {{
                         maintenanceMode
                             ? "Maintenance Mode"
                             : systemInfo.health?.status === "healthy"
-                            ? "System Online"
-                            : "System " +
-                              (systemInfo.health?.status
-                                  ? systemInfo.health.status
-                                        .charAt(0)
-                                        .toUpperCase() +
-                                    systemInfo.health.status.slice(1)
-                                  : "Degraded")
+                              ? "System Online"
+                              : "System " +
+                                (systemInfo.health?.status
+                                    ? systemInfo.health.status
+                                          .charAt(0)
+                                          .toUpperCase() +
+                                      systemInfo.health.status.slice(1)
+                                    : "Degraded")
                     }}
                 </Badge>
                 <Button
@@ -1378,23 +1387,30 @@ onUnmounted(() => {
                         </div>
 
                         <!-- Storage & Memory -->
+                        <!-- Storage & Memory -->
                         <div class="space-y-3">
                             <h4
                                 class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide"
                             >
-                                Resources
+                                Storage Resources
                             </h4>
-                            <div class="space-y-2">
+                            <div class="space-y-3">
+                                <!-- Disk Space (Local) -->
                                 <div
                                     class="p-3 bg-[var(--surface-secondary)] rounded-lg"
                                 >
                                     <div
                                         class="flex justify-between items-center mb-1"
                                     >
-                                        <span
-                                            class="text-sm text-[var(--text-secondary)]"
-                                            >Disk Space</span
-                                        >
+                                        <div class="flex items-center gap-2">
+                                            <HardDrive
+                                                class="w-3.5 h-3.5 text-[var(--text-secondary)]"
+                                            />
+                                            <span
+                                                class="text-sm text-[var(--text-secondary)]"
+                                                >Local Disk</span
+                                            >
+                                        </div>
                                         <span
                                             class="text-xs text-[var(--text-muted)]"
                                         >
@@ -1415,10 +1431,10 @@ onUnmounted(() => {
                                             :style="{
                                                 width: `${
                                                     (parseFloat(
-                                                        systemInfo.disk_used
+                                                        systemInfo.disk_used,
                                                     ) /
                                                         parseFloat(
-                                                            systemInfo.disk_total
+                                                            systemInfo.disk_total,
                                                         )) *
                                                     100
                                                 }%`,
@@ -1436,6 +1452,75 @@ onUnmounted(() => {
                                             }}</span
                                         >
                                     </div>
+                                </div>
+
+                                <!-- S3 Buckets -->
+                                <template
+                                    v-if="
+                                        storageStats?.s3 &&
+                                        storageStats.s3.length > 0
+                                    "
+                                >
+                                    <div
+                                        v-for="bucket in storageStats.s3"
+                                        :key="bucket.path"
+                                        class="p-3 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-default)]"
+                                    >
+                                        <div
+                                            class="flex justify-between items-start mb-2"
+                                        >
+                                            <div class="min-w-0 pr-2">
+                                                <div
+                                                    class="flex items-center gap-2 mb-0.5"
+                                                >
+                                                    <Cloud
+                                                        class="w-3.5 h-3.5 text-blue-400"
+                                                    />
+                                                    <span
+                                                        class="text-sm font-medium text-[var(--text-primary)] truncate"
+                                                        :title="bucket.path"
+                                                    >
+                                                        {{ bucket.path }}
+                                                    </span>
+                                                </div>
+                                                <div
+                                                    class="flex items-center gap-2"
+                                                >
+                                                    <Badge
+                                                        variant="outline"
+                                                        class="text-[10px] h-4 px-1"
+                                                    >
+                                                        {{
+                                                            bucket.disk || "s3"
+                                                        }}
+                                                    </Badge>
+                                                    <span
+                                                        class="text-xs text-[var(--text-muted)]"
+                                                    >
+                                                        {{
+                                                            bucket.file_count?.toLocaleString() ??
+                                                            0
+                                                        }}
+                                                        files
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <span
+                                                class="text-sm font-semibold text-[var(--text-primary)] whitespace-nowrap"
+                                            >
+                                                {{ bucket.size_formatted }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </template>
+                                <div
+                                    v-else-if="storageStats?.s3 === null"
+                                    class="p-3 bg-[var(--surface-secondary)] rounded-lg text-center"
+                                >
+                                    <span
+                                        class="text-xs text-[var(--text-muted)]"
+                                        >No S3/R2 Buckets Detected</span
+                                    >
                                 </div>
                             </div>
                         </div>
@@ -1492,7 +1577,8 @@ onUnmounted(() => {
                                             labels: chartData.labels,
                                             datasets: chartData.datasets.filter(
                                                 (d) =>
-                                                    d.label !== 'Memory Usage %'
+                                                    d.label !==
+                                                    'Memory Usage %',
                                             ),
                                         }"
                                         :options="chartOptions"
@@ -1532,7 +1618,8 @@ onUnmounted(() => {
                                             labels: chartData.labels,
                                             datasets: chartData.datasets.filter(
                                                 (d) =>
-                                                    d.label === 'Memory Usage %'
+                                                    d.label ===
+                                                    'Memory Usage %',
                                             ),
                                         }"
                                         :options="chartOptions"
@@ -1725,117 +1812,6 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <!-- Storage Usage -->
-            <div
-                class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] overflow-hidden"
-            >
-                <div
-                    class="p-4 border-b border-[var(--border-default)] flex items-center gap-3"
-                >
-                    <div
-                        class="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center"
-                    >
-                        <HardDrive class="w-4 h-4 text-indigo-600" />
-                    </div>
-                    <h3 class="font-medium text-[var(--text-primary)]">
-                        Storage Usage
-                    </h3>
-                    <Button
-                        v-if="storageStats"
-                        variant="ghost"
-                        size="icon"
-                        class="ml-auto w-6 h-6"
-                        @click="fetchStorageStats"
-                        :disabled="isLoadingStorage"
-                        title="Refresh Storage Stats"
-                    >
-                        <RefreshCw
-                            class="w-3 h-3"
-                            :class="{ 'animate-spin': isLoadingStorage }"
-                        />
-                    </Button>
-                </div>
-                <div class="p-4 space-y-4">
-                    <div
-                        v-if="isLoadingStorage && !storageStats"
-                        class="flex justify-center p-4"
-                    >
-                        <Loader2
-                            class="w-6 h-6 animate-spin text-[var(--text-muted)]"
-                        />
-                    </div>
-                    <template v-else-if="storageStats">
-                        <!-- Local Storage -->
-                        <div class="space-y-2">
-                            <div
-                                class="flex justify-between items-center text-sm"
-                            >
-                                <span class="text-[var(--text-secondary)]"
-                                    >Local (Public)</span
-                                >
-                                <span
-                                    class="font-medium text-[var(--text-primary)]"
-                                    >{{
-                                        storageStats.local.size_formatted
-                                    }}</span
-                                >
-                            </div>
-                            <div
-                                class="flex justify-between items-center text-xs text-[var(--text-muted)]"
-                            >
-                                <span
-                                    >{{
-                                        storageStats.local.file_count
-                                    }}
-                                    files</span
-                                >
-                            </div>
-                        </div>
-
-                        <div class="h-px bg-[var(--border-default)]"></div>
-
-                        <!-- S3 Storage -->
-                        <div class="space-y-2">
-                            <div
-                                class="flex justify-between items-center text-sm"
-                            >
-                                <span class="text-[var(--text-secondary)]"
-                                    >AWS S3 Bucket</span
-                                >
-                                <span
-                                    class="font-medium text-[var(--text-primary)]"
-                                    :class="{
-                                        'text-[var(--text-muted)] italic':
-                                            !storageStats.s3,
-                                    }"
-                                >
-                                    {{
-                                        storageStats.s3
-                                            ? storageStats.s3.size_formatted
-                                            : "Not Configured"
-                                    }}
-                                </span>
-                            </div>
-                            <div
-                                v-if="storageStats.s3"
-                                class="flex justify-between items-center text-xs text-[var(--text-muted)]"
-                            >
-                                <span
-                                    >{{
-                                        storageStats.s3.file_count
-                                    }}
-                                    objects</span
-                                >
-                                <span
-                                    class="opacity-75 truncate max-w-[150px]"
-                                    >{{ storageStats.s3.path }}</span
-                                >
-                            </div>
-                        </div>
-                    </template>
-                </div>
-            </div>
-
             <!-- External Services -->
             <div
                 class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] overflow-hidden"
@@ -1967,7 +1943,7 @@ onUnmounted(() => {
                                             'Operational',
                                         'bg-red-500/10 text-red-500':
                                             externalServices.twilio.status.includes(
-                                                'Error'
+                                                'Error',
                                             ) ||
                                             externalServices.twilio.status ===
                                                 'Unreachable' ||
@@ -2243,7 +2219,7 @@ onUnmounted(() => {
                             Math.min(
                                 databasePagination.current_page *
                                     databasePagination.per_page,
-                                databasePagination.total
+                                databasePagination.total,
                             )
                         }}
                         of {{ databasePagination.total }}
@@ -2255,7 +2231,7 @@ onUnmounted(() => {
                             :disabled="databasePagination.current_page === 1"
                             @click="
                                 fetchDatabaseHealth(
-                                    databasePagination.current_page - 1
+                                    databasePagination.current_page - 1,
                                 )
                             "
                         >
@@ -2270,7 +2246,7 @@ onUnmounted(() => {
                             "
                             @click="
                                 fetchDatabaseHealth(
-                                    databasePagination.current_page + 1
+                                    databasePagination.current_page + 1,
                                 )
                             "
                         >
@@ -2481,12 +2457,12 @@ onUnmounted(() => {
                                             <Checkbox
                                                 :checked="
                                                     selectedBackups.includes(
-                                                        backup.path
+                                                        backup.path,
                                                     )
                                                 "
                                                 @update:checked="
                                                     toggleBackupSelection(
-                                                        backup.path
+                                                        backup.path,
                                                     )
                                                 "
                                             />
@@ -2522,7 +2498,7 @@ onUnmounted(() => {
                                                     size="xs"
                                                     @click="
                                                         downloadBackup(
-                                                            backup.path
+                                                            backup.path,
                                                         )
                                                     "
                                                     title="Secure Download"
@@ -2537,7 +2513,7 @@ onUnmounted(() => {
                                                     class="text-[var(--color-error)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10"
                                                     @click="
                                                         deleteBackup(
-                                                            backup.path
+                                                            backup.path,
                                                         )
                                                     "
                                                     :loading="
@@ -2576,7 +2552,7 @@ onUnmounted(() => {
                                     <Checkbox
                                         :checked="
                                             selectedBackups.includes(
-                                                backup.path
+                                                backup.path,
                                             )
                                         "
                                         @click.stop
@@ -2674,7 +2650,7 @@ onUnmounted(() => {
                                         Math.min(
                                             backupPagination.current_page *
                                                 backupPagination.per_page,
-                                            backupPagination.total
+                                            backupPagination.total,
                                         )
                                     }}
                                     of {{ backupPagination.total }}
@@ -2689,7 +2665,7 @@ onUnmounted(() => {
                                         @click="
                                             fetchBackups(
                                                 backupPagination.current_page -
-                                                    1
+                                                    1,
                                             )
                                         "
                                     >
@@ -2708,7 +2684,7 @@ onUnmounted(() => {
                                         @click="
                                             fetchBackups(
                                                 backupPagination.current_page +
-                                                    1
+                                                    1,
                                             )
                                         "
                                     >
@@ -3138,7 +3114,7 @@ onUnmounted(() => {
                                             >
                                                 {{
                                                     new Date(
-                                                        job.completed_at * 1000
+                                                        job.completed_at * 1000,
                                                     ).toLocaleString()
                                                 }}
                                             </td>

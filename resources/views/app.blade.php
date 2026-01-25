@@ -8,9 +8,10 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>{{ config('app.name', 'CoreSync') }}</title>
-    
+
     <!-- SEO -->
-    <meta name="description" content="Unified Data, Seamless Workflow. CoreSync connects your essential business tools into one powerful ecosystem.">
+    <meta name="description"
+        content="Unified Data, Seamless Workflow. CoreSync connects your essential business tools into one powerful ecosystem.">
     <meta name="keywords" content="CoreSync, workflow, automation, efficiency, data sync">
     <meta name="author" content="CoreSync">
 
@@ -18,14 +19,16 @@
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="{{ config('app.name', 'CoreSync') }}">
     <meta property="og:title" content="{{ config('app.name', 'CoreSync') }}">
-    <meta property="og:description" content="Unified Data, Seamless Workflow. CoreSync connects your essential business tools into one powerful ecosystem.">
+    <meta property="og:description"
+        content="Unified Data, Seamless Workflow. CoreSync connects your essential business tools into one powerful ecosystem.">
     <meta property="og:url" content="{{ config('app.url') }}">
     <meta property="og:image" content="{{ asset('static/images/og-image.png') }}">
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="{{ config('app.name', 'CoreSync') }}">
-    <meta name="twitter:description" content="Unified Data, Seamless Workflow. CoreSync connects your essential business tools into one powerful ecosystem.">
+    <meta name="twitter:description"
+        content="Unified Data, Seamless Workflow. CoreSync connects your essential business tools into one powerful ecosystem.">
     <meta name="twitter:image" content="{{ asset('static/images/og-image.png') }}">
 
     <!-- Favicon -->
@@ -39,7 +42,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.ts'])
 
     <!-- Runtime Config -->
-    <script>
+    <script nonce="{{ app(\App\Services\CSPService::class)->getNonce() }}">
         window.CoreSync = {
             name: "{{ config('app.name', 'CoreSync') }}",
             url: "{{ config('app.url') }}",

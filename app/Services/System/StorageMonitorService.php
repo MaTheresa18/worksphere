@@ -57,50 +57,65 @@ class StorageMonitorService
     /**
      * Calculate S3 bucket usage (if configured).
      */
+    /**
+     * Calculate S3 bucket usage (if configured).
+     * Now supports multiple buckets attached to different disks (s3, private, public).
+     */
     public function getS3Usage(): ?array
     {
-        $disk = 's3';
+        $buckets = [];
+        // Check these disks for S3 driver configuration
+        $disksToCheck = ['s3', 'private', 'public'];
 
-        // Check if S3 is configured
-        if (! Config::get("filesystems.disks.{$disk}")) {
-            return null;
-        }
+        foreach ($disksToCheck as $diskName) {
+            $config = Config::get("filesystems.disks.{$diskName}");
+            // Only proceed if disk exists, uses 's3' driver, and has a bucket
+            if ($config && ($config['driver'] ?? '') === 's3' && ! empty($config['bucket'])) {
+                
+                $bucketName = $config['bucket'];
+                
+                // Avoid checking the same bucket multiple times if mapped to multiple disks
+                // Key by bucket name to deduplicate
+                if (isset($buckets[$bucketName])) {
+                    continue;
+                }
 
-        // Check if S3 bucket is configured
-        if (empty(Config::get("filesystems.disks.{$disk}.bucket"))) {
-            return null;
-        }
+                try {
+                    // Optimized listing that fetches metadata including size
+                    $contents = Storage::disk($diskName)->listContents('', true);
 
-        try {
-            // This can be slow for large buckets.
-            // Ideally, we'd use CloudWatch metrics or cache this result heavily.
-            // For now, we'll list all files.
+                    $size = 0;
+                    $count = 0;
 
-            // Optimized listing that fetches metadata including size
-            // This avoids N+1 calls for size()
-            $contents = Storage::disk($disk)->listContents('', true);
+                    foreach ($contents as $item) {
+                        if ($item->isFile()) {
+                            $size += $item->fileSize() ?? 0;
+                            $count++;
+                        }
+                    }
 
-            $size = 0;
-            $count = 0;
+                    $buckets[$bucketName] = $this->formatStats($size, $count, $bucketName);
+                    // Add disk name for context
+                    $buckets[$bucketName]['disk'] = $diskName;
 
-            foreach ($contents as $item) {
-                if ($item->isFile()) {
-                    $size += $item->fileSize() ?? 0;
-                    $count++;
+                } catch (Throwable $e) {
+                    $buckets[$bucketName] = [
+                        'size_bytes' => 0,
+                        'size_formatted' => 'Error',
+                        'file_count' => 0,
+                        'path' => $bucketName,
+                        'disk' => $diskName,
+                        'error' => $e->getMessage(),
+                    ];
                 }
             }
-
-            return $this->formatStats($size, $count, Config::get("filesystems.disks.{$disk}.bucket"));
-
-        } catch (Throwable $e) {
-            return [
-                'size_bytes' => 0,
-                'size_formatted' => 'Error/Unavailable',
-                'file_count' => 0,
-                'path' => Config::get("filesystems.disks.{$disk}.bucket"),
-                'error' => $e->getMessage(),
-            ];
         }
+    
+        if (empty($buckets)) {
+            return null;
+        }
+
+        return array_values($buckets);
     }
 
     protected function formatStats(int $bytes, int $count, string $path = ''): array

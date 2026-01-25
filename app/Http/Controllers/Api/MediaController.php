@@ -63,12 +63,25 @@ class MediaController extends Controller
             $path = $media->getPath();
         }
 
-        if (! file_exists($path)) {
-            \Illuminate\Support\Facades\Log::error('File not found at path', ['path' => $path]);
+        $disk = $media->disk;
+        $driver = config("filesystems.disks.{$disk}.driver");
+
+        // Local Driver: getPath() returns absolute path
+        if ($driver === 'local') {
+            if (! file_exists($path)) {
+                \Illuminate\Support\Facades\Log::error('File not found at path (local)', ['path' => $path]);
+                abort(404);
+            }
+            return response()->file($path);
+        }
+
+        // Remote Driver (S3, etc.): getPath() returns relative key
+        if (! \Illuminate\Support\Facades\Storage::disk($disk)->exists($path)) {
+            \Illuminate\Support\Facades\Log::error('File not found at path (remote)', ['path' => $path, 'disk' => $disk]);
             abort(404);
         }
 
-        return response()->file($path);
+        return \Illuminate\Support\Facades\Storage::disk($disk)->response($path);
     }
 
     /**

@@ -66,6 +66,9 @@ class AppServiceProvider extends ServiceProvider
             \App\Contracts\InvoiceTemplateServiceContract::class,
             \App\Services\InvoiceTemplateService::class
         );
+
+        // Content Security Policy Service (Singleton for consistent nonce per request)
+        $this->app->singleton(\App\Services\CSPService::class);
     }
 
     /**
@@ -114,6 +117,12 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Auth\Notifications\ResetPassword::createUrlUsing(function (object $notifiable, string $token) {
             return config('app.frontend_url', config('app.url'))."/auth/reset-password?token={$token}&email=".urlencode($notifiable->getEmailForPasswordReset());
         });
+
+        // Register CSP Nonce with Vite
+        // This ensures @vite() directive injects nonce into attributes
+        \Illuminate\Support\Facades\Vite::useCspNonce(
+            app(\App\Services\CSPService::class)->getNonce()
+        );
     }
 
     /**
