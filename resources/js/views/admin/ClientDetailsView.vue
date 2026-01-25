@@ -384,7 +384,7 @@ watch(() => route.params.public_id, () => {
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-[var(--border-muted)]">
-                                <tr v-for="invoice in client.invoices" :key="invoice.id" class="hover:bg-[var(--surface-secondary)]/50 transition-colors">
+                                <tr v-for="invoice in client.invoices" :key="invoice.public_id" class="hover:bg-[var(--surface-secondary)]/50 transition-colors">
                                     <td class="px-6 py-4 font-medium text-[var(--text-primary)]">
                                         {{ invoice.invoice_number }}
                                     </td>
@@ -403,7 +403,7 @@ watch(() => route.params.public_id, () => {
                                         {{ formatDate(invoice.issue_date) }}
                                     </td>
                                     <td class="px-6 py-4 text-right">
-                                        <Button variant="ghost" size="sm" @click="router.push({ name: 'admin-invoice-detail', params: { id: invoice.id } })">
+                                        <Button variant="ghost" size="sm" @click="router.push({ name: 'admin-invoice-detail', params: { id: invoice.public_id } })">
                                             View
                                         </Button>
                                     </td>
