@@ -4,7 +4,7 @@ import { Badge, Avatar, Button, Dropdown } from '@/components/ui';
 import { 
     Calendar, MoreHorizontal, CheckCircle2, Circle, Clock, ArrowUpCircle, 
     Upload, Search, CheckCircle, XCircle, Send, XOctagon, CheckSquare, 
-    Archive, AlertCircle, AlertTriangle, Minus, ArrowUp, ArrowDown, Folder, Users
+    Archive, AlertCircle, AlertTriangle, Minus, ArrowUp, ArrowDown, Folder, Users, Building2
 } from 'lucide-vue-next';
 import { isPast, parseISO } from 'date-fns';
 
@@ -142,6 +142,7 @@ const isOverdue = (dateString?: string, status?: any) => {
                 <thead>
                     <tr class="bg-[var(--surface-secondary)]/50 border-b border-[var(--border-subtle)]">
                         <th class="px-6 py-4 text-left text-xs font-semibold uppercase text-[var(--text-muted)] w-10"></th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Client</th>
                         <th v-if="showProject" class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Project</th>
                         <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-1/3">Task</th>
                         <th class="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Assigned To</th>
@@ -175,6 +176,17 @@ const isOverdue = (dateString?: string, status?: any) => {
                                     }"
                                 />
                             </div>
+                        </td>
+
+                        <!-- Client Column -->
+                        <td class="px-6 py-4">
+                            <div v-if="(task as any).project?.client" class="flex items-center gap-2">
+                                <Building2 class="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                                <span class="text-sm font-medium text-[var(--text-secondary)]">
+                                    {{ (task as any).project.client.name }}
+                                </span>
+                            </div>
+                            <span v-else class="text-xs text-[var(--text-muted)]">-</span>
                         </td>
 
                         <!-- Project Column -->

@@ -16,7 +16,7 @@ class StoreEmailTemplateRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'subject' => ['nullable', 'string', 'max:998'],
-            'body' => ['required', 'string'],
+            'body' => ['nullable', 'string'],
         ];
     }
 }

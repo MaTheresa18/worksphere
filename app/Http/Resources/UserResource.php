@@ -76,7 +76,7 @@ class UserResource extends JsonResource
                         'public_id' => $team->public_id,
                         'name' => $team->name,
                         'slug' => $team->slug,
-                        'owner_id' => $team->owner_id,
+                        'owner_id' => $team->owner?->public_id, // Use Public ID
                         'membership' => [
                             'role' => $team->pivot->role,
                             'joined_at' => $team->pivot->joined_at,

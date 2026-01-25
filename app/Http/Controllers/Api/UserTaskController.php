@@ -19,7 +19,7 @@ class UserTaskController extends Controller
         $user = $request->user();
 
         $query = Task::query()
-            ->with(['project.team', 'assignee', 'creator'])
+            ->with(['project.team', 'project.client', 'assignee', 'creator'])
             ->whereHas('project', function ($q) use ($user) {
                 // Ensure user has access to the project via team membership
                 $q->whereHas('team', function ($t) use ($user) {

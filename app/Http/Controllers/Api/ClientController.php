@@ -118,11 +118,13 @@ class ClientController extends Controller
             'projects.team:id,name,public_id', // If we want to show team context
             'invoices' => function ($query) {
                 $query->latest()->limit(5); // Recent invoices
-            }
+            },
+            'contacts', // Load all contacts
+            'team:id,public_id,name', // Load client team for helper data
         ]);
 
         // Append counts
-        $client->loadCount(['projects', 'invoices']);
+        $client->loadCount(['projects', 'invoices', 'contacts']);
 
         return response()->json($client);
     }

@@ -44,7 +44,7 @@ class TeamController extends Controller
 
         $teams = $query->paginate($request->per_page ?? 15);
 
-        return response()->json($teams);
+        return \App\Http\Resources\TeamResource::collection($teams)->response();
     }
 
     /**
@@ -85,7 +85,9 @@ class TeamController extends Controller
         // Add owner as a member with 'team_lead' role
         $team->members()->attach($owner->id, ['role' => \App\Enums\TeamRole::TeamLead->value]);
 
-        return response()->json($team, 201);
+        $team->load('owner');
+
+        return response()->json(new \App\Http\Resources\TeamResource($team), 201);
     }
 
     /**
@@ -95,15 +97,9 @@ class TeamController extends Controller
     {
         $this->authorize('view', $team);
 
-        $team->load(['owner']);
+        $team->load(['owner', 'members']);
 
-        // Members need special handling to use TeamMemberResource for consistent Public IDs and security
-        $members = $team->members;
-
-        $teamData = $team->toArray();
-        $teamData['members'] = \App\Http\Resources\TeamMemberResource::collection($members);
-
-        return response()->json($teamData);
+        return response()->json(new \App\Http\Resources\TeamResource($team));
     }
 
     /**
@@ -147,7 +143,7 @@ class TeamController extends Controller
 
         $team->save();
 
-        return response()->json($team);
+        return response()->json(new \App\Http\Resources\TeamResource($team));
     }
 
     /**

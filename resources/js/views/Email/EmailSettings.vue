@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue';
 import { 
     XIcon, 
     PenToolIcon, 
@@ -12,7 +12,7 @@ import {
     BoldIcon,
     ItalicIcon,
     ListIcon,
-    AlertTriangleIcon,
+    ImageIcon,
 } from 'lucide-vue-next';
 import { Button, Card } from '@/components/ui';
 import { useEmailSignatures } from './composables/useEmailSignatures';
@@ -20,6 +20,7 @@ import { useEmailTemplates } from './composables/useEmailTemplates';
 import { useEditor, EditorContent } from "@tiptap/vue-3";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import Image from "@tiptap/extension-image";
 
 const tabs = [
     { id: 'signatures', label: 'Signatures', icon: PenToolIcon },
@@ -31,8 +32,15 @@ const tabs = [
 const activeTab = ref('signatures');
 
 // --- Signatures Logic ---
-const { signatures, addSignature, updateSignature, deleteSignature } = useEmailSignatures();
-const selectedSignatureId = ref<string | null>(null);
+const { 
+    signatures, 
+    selectedSignatureId, 
+    fetchSignatures, 
+    addSignature, 
+    updateSignature, 
+    deleteSignature,
+    uploadImage: uploadSignatureImage
+} = useEmailSignatures();
 
 const activeSignature = computed(() => 
     signatures.value.find(s => s.id === selectedSignatureId.value)
@@ -44,6 +52,7 @@ const signatureEditor = useEditor({
     extensions: [
         StarterKit,
         Placeholder.configure({ placeholder: 'Create your signature...' }),
+        Image,
     ],
     editorProps: {
         attributes: {
@@ -56,24 +65,25 @@ const signatureEditor = useEditor({
 watch(selectedSignatureId, (newId) => {
     if (newId && activeSignature.value) {
         signatureName.value = activeSignature.value.name;
-        signatureEditor.value?.commands.setContent(activeSignature.value.content);
+        // Only update content if different to avoid cursor jumps if we were auto-saving (though here we switch IDs)
+        if (signatureEditor.value?.getHTML() !== (activeSignature.value.content || '')) {
+             signatureEditor.value?.commands.setContent(activeSignature.value.content || '');
+        }
     } else {
         signatureName.value = '';
         signatureEditor.value?.commands.setContent('');
     }
 });
 
-function handleNewSignature() {
-    selectedSignatureId.value = null; // Clear selection first to ensure watchers trigger if logic specific
-    // Actually, let's create a temporary "new" state or just create it immediately?
-    // Let's create a draft behavior:
-    const newSig = addSignature({ name: 'My New Signature', content: '' });
+async function handleNewSignature() {
+    // Create a default signature
+    const newSig = await addSignature({ name: 'New Signature', content: '' });
     selectedSignatureId.value = newSig.id;
 }
 
-function handleSaveSignature() {
+async function handleSaveSignature() {
     if (!selectedSignatureId.value) return;
-    updateSignature(selectedSignatureId.value, {
+    await updateSignature(selectedSignatureId.value, {
         name: signatureName.value,
         content: signatureEditor.value?.getHTML() || ''
     });
@@ -88,14 +98,16 @@ function handleDeleteSignature(id: string) {
     }
 }
 
-// Select first signature on mount if available
-if (signatures.value.length > 0) {
-    selectedSignatureId.value = signatures.value[0].id;
-}
-
 // --- Templates Logic ---
-const { templates, addTemplate, updateTemplate, deleteTemplate } = useEmailTemplates();
-const selectedTemplateId = ref<string | null>(null);
+const { 
+    templates, 
+    selectedTemplateId, 
+    fetchTemplates, 
+    addTemplate, 
+    updateTemplate, 
+    deleteTemplate,
+    uploadImage: uploadTemplateImage 
+} = useEmailTemplates();
 
 const activeTemplate = computed(() => 
     templates.value.find(t => t.id === selectedTemplateId.value)
@@ -108,6 +120,7 @@ const templateEditor = useEditor({
     extensions: [
         StarterKit,
         Placeholder.configure({ placeholder: 'Write your template content...' }),
+        Image,
     ],
     editorProps: {
         attributes: {
@@ -120,7 +133,9 @@ watch(selectedTemplateId, (newId) => {
     if (newId && activeTemplate.value) {
         templateName.value = activeTemplate.value.name;
         templateSubject.value = activeTemplate.value.subject;
-        templateEditor.value?.commands.setContent(activeTemplate.value.body);
+        if (templateEditor.value?.getHTML() !== (activeTemplate.value.body || '')) {
+             templateEditor.value?.commands.setContent(activeTemplate.value.body || '');
+        }
     } else {
         templateName.value = '';
         templateSubject.value = '';
@@ -128,14 +143,14 @@ watch(selectedTemplateId, (newId) => {
     }
 });
 
-function handleNewTemplate() {
-    const newTpl = addTemplate({ name: 'New Template', subject: '', body: '' });
+async function handleNewTemplate() {
+    const newTpl = await addTemplate({ name: 'New Template', subject: '', body: '' });
     selectedTemplateId.value = newTpl.id;
 }
 
-function handleSaveTemplate() {
+async function handleSaveTemplate() {
     if (!selectedTemplateId.value) return;
-    updateTemplate(selectedTemplateId.value, {
+    await updateTemplate(selectedTemplateId.value, {
         name: templateName.value,
         subject: templateSubject.value,
         body: templateEditor.value?.getHTML() || ''
@@ -151,9 +166,55 @@ function handleDeleteTemplate(id: string) {
     }
 }
 
-if (templates.value.length > 0) {
-    selectedTemplateId.value = templates.value[0].id;
+// Image Upload Logic
+const fileInput = ref<HTMLInputElement | null>(null);
+
+function triggerImageUpload() {
+    fileInput.value?.click();
 }
+
+async function handleImageUpload(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    const isSignature = activeTab.value === 'signatures';
+    const id = isSignature ? selectedSignatureId.value : selectedTemplateId.value;
+
+    if (!id) return;
+
+    try {
+        const result = isSignature 
+            ? await uploadSignatureImage(id, file)
+            : await uploadTemplateImage(id, file);
+
+        const editor = isSignature ? signatureEditor.value : templateEditor.value;
+        if (result && result.url) {
+            editor?.chain().focus().setImage({ src: result.url }).run();
+            // Save immediately to persist the image URL in content
+            isSignature ? handleSaveSignature() : handleSaveTemplate();
+        }
+    } catch (e) {
+        // Error handled in service
+    } finally {
+        input.value = ''; // Reset
+    }
+}
+
+
+onMounted(async () => {
+    await Promise.all([
+        fetchSignatures(),
+        fetchTemplates()
+    ]);
+    
+    if (signatures.value.length > 0) {
+        selectedSignatureId.value = signatures.value[0].id;
+    }
+    if (templates.value.length > 0) {
+        selectedTemplateId.value = templates.value[0].id;
+    }
+});
 
 // ... existing imports
 import EmailAccountsSection from "@/components/settings/EmailAccountsSection.vue";
@@ -308,7 +369,7 @@ onBeforeUnmount(() => {
                                             <Trash2Icon class="w-3.5 h-3.5" />
                                         </button>
                                     </div>
-                                    <div class="mt-1.5 text-xs text-[var(--text-secondary)] line-clamp-2 opacity-80 font-normal leading-relaxed" v-html="sig.content.replace(/<[^>]*>/g, ' ').substring(0, 100) || 'Empty signature'"></div>
+                                    <div class="mt-1.5 text-xs text-[var(--text-secondary)] line-clamp-2 opacity-80 font-normal leading-relaxed" v-html="(sig.content || '').replace(/<[^>]*>/g, ' ').substring(0, 100) || 'Empty signature'"></div>
                                 </div>
                             </template>
                             
@@ -395,13 +456,19 @@ onBeforeUnmount(() => {
                                     <button @click="signatureEditor?.chain().focus().toggleItalic().run()" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] transition-colors" :class="{ 'bg-[var(--surface-active)] text-[var(--interactive-primary)] shadow-sm': signatureEditor?.isActive('italic'), 'text-[var(--text-secondary)]': !signatureEditor?.isActive('italic') }"><ItalicIcon class="w-4 h-4" /></button>
                                     <div class="w-px h-4 bg-[var(--border-default)] mx-1"></div>
                                     <button @click="signatureEditor?.chain().focus().toggleBulletList().run()" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] transition-colors" :class="{ 'bg-[var(--surface-active)] text-[var(--interactive-primary)] shadow-sm': signatureEditor?.isActive('bulletList'), 'text-[var(--text-secondary)]': !signatureEditor?.isActive('bulletList') }"><ListIcon class="w-4 h-4" /></button>
+                                    <div class="w-px h-4 bg-[var(--border-default)] mx-1"></div>
+                                    <button @click="triggerImageUpload" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] transition-colors text-[var(--text-secondary)]"><ImageIcon class="w-4 h-4" /></button>
                                 </template>
                                  <template v-else>
                                     <button @click="templateEditor?.chain().focus().toggleBold().run()" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] transition-colors" :class="{ 'bg-[var(--surface-active)] text-[var(--interactive-primary)] shadow-sm': templateEditor?.isActive('bold'), 'text-[var(--text-secondary)]': !templateEditor?.isActive('bold') }"><BoldIcon class="w-4 h-4" /></button>
                                     <button @click="templateEditor?.chain().focus().toggleItalic().run()" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] transition-colors" :class="{ 'bg-[var(--surface-active)] text-[var(--interactive-primary)] shadow-sm': templateEditor?.isActive('italic'), 'text-[var(--text-secondary)]': !templateEditor?.isActive('italic') }"><ItalicIcon class="w-4 h-4" /></button>
                                     <div class="w-px h-4 bg-[var(--border-default)] mx-1"></div>
                                     <button @click="templateEditor?.chain().focus().toggleBulletList().run()" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] transition-colors" :class="{ 'bg-[var(--surface-active)] text-[var(--interactive-primary)] shadow-sm': templateEditor?.isActive('bulletList'), 'text-[var(--text-secondary)]': !templateEditor?.isActive('bulletList') }"><ListIcon class="w-4 h-4" /></button>
+                                    <div class="w-px h-4 bg-[var(--border-default)] mx-1"></div>
+                                    <button @click="triggerImageUpload" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] transition-colors text-[var(--text-secondary)]"><ImageIcon class="w-4 h-4" /></button>
                                 </template>
+                                <!-- Hidden File Input -->
+                                <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="handleImageUpload">
                             </div>
 
                             <!-- Actual Editor -->
@@ -415,6 +482,7 @@ onBeforeUnmount(() => {
                         </template>
 
                         <div v-else class="flex-1 flex flex-col items-center justify-center text-[var(--text-muted)] z-10">
+                            <!-- ... Empty State logic matches original but logic is wrapped in v-else ... -->
                             <div class="w-20 h-20 rounded-3xl bg-[var(--surface-secondary)] flex items-center justify-center mb-6 border border-[var(--border-default)] shadow-sm transform -rotate-3">
                                 <component :is="activeTab === 'signatures' ? PenToolIcon : FileTextIcon" class="w-10 h-10 opacity-40 text-[var(--text-primary)]" />
                             </div>

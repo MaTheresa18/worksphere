@@ -438,11 +438,11 @@ export const useEmailStore = defineStore('email', () => {
                      selectedAccountId.value = null;
                 }
             } catch (error: any) {
-                console.warn('Failed to load selected email account, resetting selection:', error);
-                
-                // If 404 Not Found or 403 Forbidden, clear the stale ID
+                // If 404 Not Found or 403 Forbidden, clear the stale ID silently
                 if (error.response && (error.response.status === 404 || error.response.status === 403)) {
                     selectedAccountId.value = null;
+                } else {
+                    console.error('Failed to load selected email account:', error);
                 }
                 
                 accountStatus.value = null;

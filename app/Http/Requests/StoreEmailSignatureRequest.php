@@ -15,7 +15,7 @@ class StoreEmailSignatureRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'content' => ['required', 'string'],
+            'content' => ['nullable', 'string'],
             'is_default' => ['boolean'],
         ];
     }

@@ -156,4 +156,14 @@ class Client extends Model
     {
         return $this->hasMany(Project::class);
     }
+
+    /**
+     * Get additional contacts for this client.
+     *
+     * @return HasMany<ClientContact>
+     */
+    public function contacts(): HasMany
+    {
+        return $this->hasMany(ClientContact::class);
+    }
 }

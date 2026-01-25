@@ -50,7 +50,7 @@ class TaskController extends Controller
             ->when(! $request->boolean('include_subtasks'), function ($query) {
                 $query->whereNull('parent_id'); // Only top-level tasks by default
             })
-            ->with(['assignee', 'creator', 'subtasks'])
+            ->with(['assignee', 'creator', 'subtasks', 'project.client'])
             ->withCount(['subtasks', 'comments'])
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
@@ -230,6 +230,7 @@ class TaskController extends Controller
             'subtasks.assignee',
             'qaReviews.reviewer',
             'media',
+            'project.client',
         ]);
         $task->loadCount(['subtasks', 'comments']);
 

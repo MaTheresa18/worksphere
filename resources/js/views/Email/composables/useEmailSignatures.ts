@@ -1,58 +1,84 @@
 import { ref } from 'vue';
+import { emailSignatureService, type EmailSignature } from '@/services/email-signature.service';
+import { toast } from 'vue-sonner';
 
-export interface Signature {
-    id: string;
-    name: string;
-    content: string; // HTML allowed
-}
-
-const defaultSignatures: Signature[] = [
-    {
-        id: 'sig-1',
-        name: 'Default',
-        content: '<p>Best regards,<br><strong>Alice Smith</strong><br>Product Manager<br>CoreSync Inc.</p>'
-    },
-    {
-        id: 'sig-2',
-        name: 'Short',
-        content: '<p>Thanks,<br>Alice</p>'
-    }
-];
-
-const signatures = ref<Signature[]>([...defaultSignatures]);
-const selectedSignatureId = ref<string>('sig-1');
-
-function getSignatureById(id: string): Signature | undefined {
-    return signatures.value.find(s => s.id === id);
-}
+const signatures = ref<EmailSignature[]>([]);
+const selectedSignatureId = ref<string | null>(null);
+const loading = ref(false);
 
 export function useEmailSignatures() {
-    function addSignature(signature: { name: string; content: string }) {
-        const newSig = {
-            id: Math.random().toString(36).substr(2, 9),
-            ...signature,
-        };
-        signatures.value.push(newSig);
-        return newSig;
-    }
-
-    function updateSignature(id: string, updates: { name: string; content: string }) {
-        const index = signatures.value.findIndex((s) => s.id === id);
-        if (index !== -1) {
-            signatures.value[index] = { ...signatures.value[index], ...updates };
+    
+    async function fetchSignatures() {
+        loading.value = true;
+        try {
+            signatures.value = await emailSignatureService.list();
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to load signatures');
+        } finally {
+            loading.value = false;
         }
     }
 
-    function deleteSignature(id: string) {
-        signatures.value = signatures.value.filter((s) => s.id !== id);
+    async function addSignature(data: Partial<EmailSignature>) {
+        try {
+            const newSig = await emailSignatureService.create(data);
+            signatures.value.push(newSig);
+            toast.success('Signature created');
+            return newSig;
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to create signature');
+            throw error;
+        }
+    }
+
+    async function updateSignature(id: string, updates: Partial<EmailSignature>) {
+        try {
+            const updatedSig = await emailSignatureService.update(id, updates);
+            const index = signatures.value.findIndex(s => s.id === id);
+            if (index !== -1) {
+                signatures.value[index] = updatedSig;
+            }
+            toast.success('Signature saved');
+            return updatedSig;
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to save signature');
+            throw error;
+        }
+    }
+
+    async function deleteSignature(id: string) {
+        try {
+            await emailSignatureService.delete(id);
+            signatures.value = signatures.value.filter(s => s.id !== id);
+            toast.success('Signature deleted');
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to delete signature');
+        }
+    }
+
+    async function uploadImage(id: string, file: File) {
+        try {
+            return await emailSignatureService.uploadImage(id, file);
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to upload image');
+            throw error;
+        }
     }
 
     return {
         signatures,
         selectedSignatureId,
-        getSignatureById,
+        loading,
+        fetchSignatures,
         addSignature,
         updateSignature,
         deleteSignature,
+        uploadImage
     };
 }
+

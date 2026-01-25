@@ -36,6 +36,8 @@ import {
     Trash2,
     GripVertical,
     Paperclip,
+    Folder,
+    Building2,
 } from "lucide-vue-next";
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth";
@@ -1351,6 +1353,42 @@ watch(
                         >
 
                         <dl class="space-y-5">
+                            <!-- Context -->
+                            <div>
+                                <dt
+                                    class="text-xs font-medium text-[var(--text-secondary)] mb-1.5"
+                                >
+                                    Context
+                                </dt>
+                                <dd class="space-y-2">
+                                    <div
+                                        v-if="task.project?.client"
+                                        class="flex items-center gap-2"
+                                    >
+                                        <Building2
+                                            class="w-4 h-4 text-[var(--text-muted)]"
+                                        />
+                                        <span
+                                            class="text-sm font-medium text-[var(--text-primary)]"
+                                            >{{
+                                                task.project.client.name
+                                            }}</span
+                                        >
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <Folder
+                                            class="w-4 h-4 text-[var(--text-muted)]"
+                                        />
+                                        <span
+                                            class="text-sm font-medium text-[var(--text-primary)]"
+                                            >{{
+                                                task.project?.name ||
+                                                "Project"
+                                            }}</span
+                                        >
+                                    </div>
+                                </dd>
+                            </div>
                             <!-- Assignee -->
                             <div>
                                 <dt

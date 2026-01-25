@@ -247,7 +247,7 @@ class AuthController extends Controller
     public function user(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => new UserResource($request->user()->load('teams')),
+            'data' => new UserResource($request->user()->load(['teams.owner'])),
         ]);
     }
 

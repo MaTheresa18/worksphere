@@ -55,7 +55,7 @@ class SecurityHeaders
         // Allow unsafe-eval in local development for Vue DevTools / Vite HMR
         $scriptSrc = "'self' 'nonce-{$nonce}'";
         $connectSrc = "'self'";
-        $styleSrc = "'self' 'unsafe-inline' https://fonts.bunny.net";
+        $styleSrc = "'self' 'unsafe-inline' https://fonts.bunny.net https://fonts.googleapis.com";
 
         // Vite Dev Server Handling
         if (app()->isLocal()) {
@@ -84,7 +84,7 @@ class SecurityHeaders
             // Fonts.bunny.net is used for Inter font
             "style-src {$styleSrc}",
             // Allow data: fonts (often used by icon sets or inline fonts)
-            "font-src 'self' https://fonts.bunny.net data:",
+            "font-src 'self' https://fonts.bunny.net https://fonts.gstatic.com data:",
             // Allow images from self, data URIs (base64), and S3/R2 (https)
             "img-src 'self' data: https:",
             // Connect to self, Vite HMR, and Reverb WebSockets (port 9000 usually)

@@ -398,6 +398,13 @@ const requestDeleteClient = (client) => {
     deleteModalOpen.value = true;
 };
 
+const handleViewClient = (client) => {
+    router.push({
+        name: 'admin-client-detail',
+        params: { public_id: client.public_id }
+    });
+};
+
 // Fetch Team Data
 const fetchTeam = async () => {
     loading.value = true;
@@ -1177,6 +1184,7 @@ const canRemoveMember = (member) => {
                                     v-for="client in clients.slice(0, 5)"
                                     :key="client.id"
                                     class="flex items-center gap-3 p-3 hover:bg-[var(--surface-secondary)] rounded-lg transition-colors cursor-pointer"
+                                    @click="handleViewClient(client)"
                                 >
                                     <div class="h-8 w-8 rounded bg-[var(--surface-primary)] border border-[var(--border-default)] flex items-center justify-center text-xs font-bold text-[var(--text-secondary)] uppercase">
                                         {{ client.initials }}
@@ -1244,6 +1252,7 @@ const canRemoveMember = (member) => {
                         :pagination="clientListParams"
                         @edit="openClientEdit"
                         @delete="requestDeleteClient"
+                        @view="handleViewClient"
                         @page-change="fetchClients"
                     >
                          <template #empty-actions>

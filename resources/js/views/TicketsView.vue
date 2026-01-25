@@ -73,7 +73,7 @@ const ticketStats = ref({
 const currentPage = ref(1);
 const totalPages = ref(1);
 const totalItems = ref(0);
-const perPage = ref(15);
+const perPage = ref(25);
 
 // Modal state
 const showNewTicketModal = ref(false);
@@ -116,10 +116,10 @@ const priorityOptions = [
 ];
 
 const perPageOptions = [
-    { value: 15, label: '15 per page' },
-    { value: 25, label: '25 per page' },
-    { value: 50, label: '50 per page' },
-    { value: 100, label: '100 per page' }
+    { value: 15, label: '15' },
+    { value: 25, label: '25' },
+    { value: 50, label: '50' },
+    { value: 100, label: '100' }
 ];
 
 // Bulk Actions
@@ -1707,10 +1707,10 @@ function viewTicket(ticketId) {
                         >
                             <option
                                 v-for="opt in perPageOptions"
-                                :key="opt"
-                                :value="opt"
+                                :key="opt.value"
+                                :value="opt.value"
                             >
-                                {{ opt }}
+                                {{ opt.label }}
                             </option>
                         </select>
                     </div>

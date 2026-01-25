@@ -41,6 +41,10 @@ class TaskResource extends JsonResource
                     'team_id' => $this->project->team->public_id ?? null,
                     'name' => $this->project->name,
                     'slug' => $this->project->slug,
+                    'client' => $this->project->client ? [
+                        'id' => $this->project->client->public_id,
+                        'name' => $this->project->client->name,
+                    ] : null,
                 ];
             }),
             'parent' => $this->whenLoaded('parent', function () {

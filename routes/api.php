@@ -321,6 +321,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
 
         // Clients
         Route::get('/clients', [\App\Http\Controllers\Api\ClientController::class, 'index']);
+        Route::apiResource('clients.contacts', \App\Http\Controllers\Api\ClientContactController::class)->shallow();
 
         // Invoices Management
         Route::prefix('invoices')->group(function () {
@@ -397,9 +398,11 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
         Route::get('folder-counts', [\App\Http\Controllers\Api\EmailController::class, 'folderCounts']);
 
         // Signatures
+        Route::post('signatures/{signature}/media', [\App\Http\Controllers\Api\EmailSignatureController::class, 'uploadMedia']);
         Route::apiResource('signatures', \App\Http\Controllers\Api\EmailSignatureController::class);
 
         // Templates
+        Route::post('templates/{template}/media', [\App\Http\Controllers\Api\EmailTemplateController::class, 'uploadMedia']);
         Route::apiResource('templates', \App\Http\Controllers\Api\EmailTemplateController::class);
 
         // Attachments

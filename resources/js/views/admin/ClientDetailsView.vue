@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import api from '@/lib/api';
 import { Button } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth';
+import { toast } from 'vue-sonner';
 import ClientFormModal from '@/components/clients/ClientFormModal.vue';
 import {
     Briefcase,
@@ -15,8 +16,12 @@ import {
     ArrowLeft,
     Pencil,
     Building2,
-    Calendar
+    Calendar,
+    Plus,
+    Trash2,
+    Copy
 } from 'lucide-vue-next';
+import ClientContactModal from '@/components/clients/ClientContactModal.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -26,6 +31,23 @@ const client = ref(null);
 const isLoading = ref(true);
 const activeTab = ref('overview');
 const showEditModal = ref(false);
+const showContactModal = ref(false);
+const contactToEdit = ref(null);
+
+const openContactModal = (contact = null) => {
+    contactToEdit.value = contact;
+    showContactModal.value = true;
+};
+
+const deleteContact = async (contactId) => {
+    if (!confirm('Are you sure you want to delete this contact?')) return;
+    try {
+        await api.delete(`/api/clients/${route.params.public_id}/contacts/${contactId}`);
+        fetchClient();
+    } catch (e) {
+        console.error('Failed to delete contact', e);
+    }
+};
 
 const breadcrumbs = computed(() => {
     return [
@@ -81,6 +103,12 @@ onMounted(() => {
     fetchClient();
 });
 
+const copyToClipboard = (text) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    toast.success('Email copied to clipboard');
+};
+
 watch(() => route.params.public_id, () => {
     fetchClient();
 });
@@ -93,8 +121,8 @@ watch(() => route.params.public_id, () => {
 
     <div v-else-if="client" class="flex flex-col h-full bg-[var(--surface-subtle)]">
         <!-- Header -->
-        <div class="bg-[var(--surface-primary)] border-b border-[var(--border-muted)] px-6 py-4">
-            <div class="max-w-7xl mx-auto w-full">
+        <div class="bg-[var(--surface-primary)]  border-[var(--border-muted)] px-6 py-4">
+            <div class="mx-auto w-full">
                 <div class="mb-4">
                     <button @click="router.push({ name: 'admin-clients' })" class="flex items-center text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
                         <ArrowLeft class="w-4 h-4 mr-1" />
@@ -171,23 +199,24 @@ watch(() => route.params.public_id, () => {
                             {{ client.invoices_count || 0 }}
                         </span>
                     </button>
-                    <button
-                        @click="activeTab = 'members'"
+                    <button 
+                        @click="activeTab = 'contacts'"
                         class="pb-3 text-sm font-medium border-b-2 transition-colors"
-                         :class="activeTab === 'members' ? 'border-[var(--color-primary-500)] text-[var(--color-primary-500)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)]'"
+                        :class="activeTab === 'contacts' ? 'border-[var(--color-primary-500)] text-[var(--color-primary-500)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)]'"
                     >
-                        Portal Users
-                         <span class="ml-1.5 px-1.5 py-0.5 rounded-md bg-[var(--surface-tertiary)] text-xs text-[var(--text-secondary)]">
-                            0 <!-- Placeholder -->
+                        Contacts
+                        <span class="ml-1.5 px-1.5 py-0.5 rounded-md bg-[var(--surface-tertiary)] text-xs text-[var(--text-secondary)]">
+                            {{ client.contacts_count || 0 }}
                         </span>
                     </button>
+                    <!-- Portal Users placeholder removed -->
                 </div>
             </div>
         </div>
 
         <!-- Content -->
         <div class="flex-1 overflow-y-auto bg-[var(--surface-subtle)] p-6">
-            <div class="max-w-7xl mx-auto w-full">
+            <div class="mx-auto w-full">
                 
                 <!-- Overview Tab -->
                 <div v-show="activeTab === 'overview'" class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -216,6 +245,9 @@ watch(() => route.params.public_id, () => {
                                     <div class="flex items-center gap-2">
                                         <Mail class="w-4 h-4 text-[var(--text-muted)]" />
                                         <a v-if="client.email" :href="'mailto:' + client.email" class="text-[var(--color-primary-600)] hover:underline">{{ client.email }}</a>
+                                        <button v-if="client.email" @click="copyToClipboard(client.email)" class="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1" title="Copy email">
+                                            <Copy class="w-3.5 h-3.5" />
+                                        </button>
                                         <span v-else class="text-[var(--text-muted)]">N/A</span>
                                     </div>
                                 </div>
@@ -386,12 +418,81 @@ watch(() => route.params.public_id, () => {
             </div>
         </div>
 
+        <!-- Contacts Tab -->
+        <div v-show="activeTab === 'contacts'" class="flex-1 overflow-y-auto bg-[var(--surface-subtle)] p-6">
+            <div class="mx-auto w-full">
+                <div class="bg-[var(--surface-primary)] rounded-xl border border-[var(--border-muted)] overflow-hidden shadow-sm">
+                    <div class="p-4 border-b border-[var(--border-muted)] flex justify-between items-center">
+                        <h3 class="text-sm font-medium text-[var(--text-primary)]">Additional Contacts</h3>
+                        <Button size="sm" @click="openContactModal()">
+                            <Plus class="w-4 h-4 mr-2" />
+                            Add Contact
+                        </Button>
+                    </div>
+                    <div v-if="client.contacts && client.contacts.length > 0">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-[var(--surface-secondary)] border-b border-[var(--border-muted)]">
+                                    <th class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Name</th>
+                                    <th class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Role</th>
+                                    <th class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Email</th>
+                                    <th class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Phone</th>
+                                    <th class="px-6 py-3 text-right"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-[var(--border-muted)]">
+                                <tr v-for="contact in client.contacts" :key="contact.id">
+                                    <td class="px-6 py-4 text-sm font-medium text-[var(--text-primary)]">
+                                        {{ contact.name }}
+                                        <span v-if="contact.is_primary" class="ml-2 px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-700 rounded-full">Primary</span>
+                                    </td>
+                                    <td class="px-6 py-4 text-sm text-[var(--text-secondary)]">{{ contact.role || '-' }}</td>
+                                    <td class="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                                        <div class="flex items-center gap-2">
+                                            {{ contact.email || '-' }}
+                                            <button v-if="contact.email" @click="copyToClipboard(contact.email)" class="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1 opacity-0 group-hover:opacity-100" title="Copy email">
+                                                <Copy class="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 text-sm text-[var(--text-secondary)]">{{ contact.phone || '-' }}</td>
+                                    <td class="px-6 py-4 text-right">
+                                        <div class="flex items-center justify-end gap-2">
+                                            <button @click="openContactModal(contact)" class="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                                                <Pencil class="w-4 h-4" />
+                                            </button>
+                                            <button @click="deleteContact(contact.id)" class="p-1 text-[var(--text-muted)] hover:text-[var(--color-error)]">
+                                                <Trash2 class="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div v-else class="p-12 text-center text-[var(--text-secondary)]">
+                        <Users class="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p>No additional contacts added.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Edit Modal -->
         <ClientFormModal
             v-if="client"
             :open="showEditModal"
             :client="client"
             @close="showEditModal = false"
+            @saved="handleSaved"
+        />
+
+        <!-- Contact Modal -->
+        <ClientContactModal
+            :open="showContactModal"
+            :contact="contactToEdit"
+            :client-public-id="client?.public_id"
+            @close="showContactModal = false"
             @saved="handleSaved"
         />
     </div>

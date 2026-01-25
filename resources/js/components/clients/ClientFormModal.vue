@@ -101,7 +101,8 @@ watch(() => props.open, (isOpen) => {
                 address: props.client.address || '',
                 status: props.client.status,
             };
-            selectedTeamId.value = props.client.team_id;
+            // Use public_id if team relation is loaded, otherwise team_id (fallback)
+            selectedTeamId.value = props.client.team?.public_id || props.client.team_id;
         } else {
             // Create Mode
             formData.value = {
