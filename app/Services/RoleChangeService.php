@@ -41,7 +41,7 @@ class RoleChangeService
     public function requiresApproval(Role $role): bool
     {
         $restrictedRoles = config('roles.approval_required_roles', []);
-        
+
         return in_array($role->name, $restrictedRoles);
     }
 

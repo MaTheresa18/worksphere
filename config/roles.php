@@ -495,7 +495,7 @@ return [
             'tasks.qa_review', // Can review
             'tasks.approve',   // Can approve
             'tasks.reject',    // Can reject
-            
+
             // Cannot create/delete tasks, but can see them
         ],
         'operator' => [
@@ -503,10 +503,10 @@ return [
             'teams.view',
             'projects.view_assigned',
             'tasks.view_assigned',
-            
+
             // CANNOT update task details, add/remove checklist (controlled by policies/UI)
             // But can likely "complete" subtasks if assigned? Instructions said "cannot update task details"
-            
+
             'tickets.view_own', // Or assigned
             'reports.view', // Maybe?
         ],
@@ -522,7 +522,7 @@ return [
     */
 
     'role_change_approval_count' => 2,
-    
+
     'approval_required_roles' => [
         'administrator',
         'it_support',

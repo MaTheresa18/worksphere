@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Notifications\SystemResetPassword;
 use App\Notifications\TicketNotification;
 use App\Services\DynamicMailerService;
-use App\Services\SystemEmailService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Notification;
@@ -47,7 +46,7 @@ class SystemEmailIntegrationTest extends TestCase
 
         // 3. Trigger Notification
         $notification = new TicketNotification($ticket, TicketNotification::TYPE_CREATED);
-        
+
         // Mock the DynamicMailerService to verify it gets called
         $this->mock(DynamicMailerService::class, function ($mock) use ($supportAccount) {
             $mock->shouldReceive('registerSystemMailer')
@@ -79,7 +78,7 @@ class SystemEmailIntegrationTest extends TestCase
         });
 
         $mailable = $notification->toMail($this->user);
-        
+
         // Should still return the Mailable, but without dynamic config
         $this->assertInstanceOf(\App\Mail\TicketNotificationMail::class, $mailable);
     }
@@ -104,7 +103,7 @@ class SystemEmailIntegrationTest extends TestCase
 
         // 2. Trigger Password Reset Notification (manual instantiation)
         $notification = new SystemResetPassword('token123');
-        
+
         // Mock DynamicMailerService
         $this->mock(DynamicMailerService::class, function ($mock) use ($noreplyAccount) {
             $mock->shouldReceive('registerSystemMailer')
@@ -118,7 +117,7 @@ class SystemEmailIntegrationTest extends TestCase
 
         // Verify it returned a MailMessage (or configured object)
         $this->assertNotNull($mailMessage);
-        
+
         // Check if the mailer property was set on the message instance
         // MailMessage has public mailer property in recent Laravel versions?
         // Actually MailMessage stores it in $mailer property, accessor ->mailer

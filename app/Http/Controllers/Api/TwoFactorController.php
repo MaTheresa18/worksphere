@@ -478,7 +478,7 @@ class TwoFactorController extends Controller
             }
 
             if (! $valid) {
-                 \Illuminate\Support\Facades\Log::warning('2FA Verify Failed', ['user_id' => $user->id]);
+                \Illuminate\Support\Facades\Log::warning('2FA Verify Failed', ['user_id' => $user->id]);
                 throw ValidationException::withMessages(['code' => ['Invalid verification code']]);
             }
         }

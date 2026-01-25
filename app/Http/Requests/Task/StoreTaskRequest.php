@@ -40,7 +40,7 @@ class StoreTaskRequest extends FormRequest
             'checklist.*.is_completed' => ['sometimes', 'boolean'],
         ];
     }
-    
+
     /**
      * Get custom messages for validator errors.
      *

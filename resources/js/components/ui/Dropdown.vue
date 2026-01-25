@@ -85,6 +85,7 @@ defineSlots<{
                                 : 'text-[var(--text-primary)]'
                         "
                         @select="item.action"
+                        @click="item.action"
                     >
                         <component
                             :is="item.icon"

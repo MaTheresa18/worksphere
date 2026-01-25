@@ -5,10 +5,8 @@ namespace App\Services;
 use App\Models\EmailAccount;
 use Illuminate\Mail\Mailer;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Symfony\Component\Mailer\Transport\Dsn;
-use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransportFactory;
 
 class DynamicMailerService
 {
@@ -45,14 +43,14 @@ class DynamicMailerService
             'timeout' => null,
             'local_domain' => env('MAIL_EHLO_DOMAIN'),
         ];
-        
-        // For 'ssl' (SMTPS, port 465), Laravel 10/Symfony Mailer handles DSN scheme automatically 
+
+        // For 'ssl' (SMTPS, port 465), Laravel 10/Symfony Mailer handles DSN scheme automatically
         // if we use the DSN constructor, but Config-based setup relies on 'scheme' or 'encryption'.
         // Let's set the config explicitly for the 'mail.mailers' array.
 
         // 3. Set the config
-        Config::set('mail.mailers.' . self::SYSTEM_MAILER_NAME, $config);
-        
+        Config::set('mail.mailers.'.self::SYSTEM_MAILER_NAME, $config);
+
         // 4. Purge any existing instance to force re-resolution
         Mail::purge(self::SYSTEM_MAILER_NAME);
     }
@@ -66,7 +64,7 @@ class DynamicMailerService
         // (Reusing logic from SendEmailJob for consistency if needed specifically,
         // but the registerSystemMailer approach is better for Mailables)
         // ... omitted for now to keep it DRY, assuming registerSystemMailer works for Mailable::send()
-        
+
         return app('mailer')->driver(self::SYSTEM_MAILER_NAME);
     }
 }

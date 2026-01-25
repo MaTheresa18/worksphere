@@ -29,18 +29,18 @@ class ClientController extends Controller
 
         // Allow admins to filter by team_id (public_id)
         if ($request->filled('team_id') && ($user->hasRole('administrator') || $user->can('clients.manage_any_team'))) {
-             $teamPublicId = $request->input('team_id');
-             $targetTeam = \App\Models\Team::where('public_id', $teamPublicId)->firstOrFail();
-             $targetTeamId = $targetTeam->id;
-        } elseif (!$targetTeamId) {
-             abort(403, 'Team context required');
+            $teamPublicId = $request->input('team_id');
+            $targetTeam = \App\Models\Team::where('public_id', $teamPublicId)->firstOrFail();
+            $targetTeamId = $targetTeam->id;
+        } elseif (! $targetTeamId) {
+            abort(403, 'Team context required');
         }
 
         $query = Client::where('team_id', $targetTeamId)
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%");
+                        ->orWhere('email', 'like', "%{$search}%");
                 });
             })
             ->when($request->status, function ($query, $status) {
@@ -68,17 +68,17 @@ class ClientController extends Controller
 
         // Allow admins to specify team_id (public_id)
         if ($request->has('team_id') && ($user->hasRole('administrator') || $user->can('clients.manage_any_team'))) {
-             $teamPublicId = $request->input('team_id');
-             $targetTeam = \App\Models\Team::where('public_id', $teamPublicId)->first();
-             if (!$targetTeam) {
-                 throw \Illuminate\Validation\ValidationException::withMessages(['team_id' => 'Invalid team.']);
-             }
-             $teamId = $targetTeam->id;
+            $teamPublicId = $request->input('team_id');
+            $targetTeam = \App\Models\Team::where('public_id', $teamPublicId)->first();
+            if (! $targetTeam) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['team_id' => 'Invalid team.']);
+            }
+            $teamId = $targetTeam->id;
         } else {
-             if (!$team) {
-                 abort(403, 'Team context required');
-             }
-             $teamId = $team->id;
+            if (! $team) {
+                abort(403, 'Team context required');
+            }
+            $teamId = $team->id;
         }
 
         $validated = $request->validate([
@@ -90,7 +90,7 @@ class ClientController extends Controller
             'address' => ['nullable', 'string', 'max:1000'],
             'status' => ['required', 'in:active,inactive'],
         ]);
-        
+
         // Ensure team_id is set in validated data
         $validated['team_id'] = $teamId;
 
@@ -105,7 +105,7 @@ class ClientController extends Controller
     public function show(Request $request, Client $client): JsonResponse
     {
         $team = $request->attributes->get('current_team');
-        
+
         if ($client->team_id !== $team->id) {
             abort(403, 'Client does not belong to this team');
         }
@@ -139,19 +139,19 @@ class ClientController extends Controller
         $targetTeamId = $client->team_id;
 
         // Strict team check for non-admins
-        if (!$user->hasRole('administrator') && !$user->can('clients.manage_any_team')) {
+        if (! $user->hasRole('administrator') && ! $user->can('clients.manage_any_team')) {
             if ($client->team_id !== $team->id) {
                 abort(403, 'Client does not belong to this team');
             }
         }
-        
+
         // Allow updating team_id (public_id) if admin
         if ($request->has('team_id') && ($user->hasRole('administrator') || $user->can('clients.manage_any_team'))) {
-             $teamPublicId = $request->input('team_id');
-             $targetTeam = \App\Models\Team::where('public_id', $teamPublicId)->first();
-             if ($targetTeam) {
-                 $targetTeamId = $targetTeam->id;
-             }
+            $teamPublicId = $request->input('team_id');
+            $targetTeam = \App\Models\Team::where('public_id', $teamPublicId)->first();
+            if ($targetTeam) {
+                $targetTeamId = $targetTeam->id;
+            }
         }
 
         $validated = $request->validate([
@@ -163,7 +163,7 @@ class ClientController extends Controller
             'address' => ['nullable', 'string', 'max:1000'],
             'status' => ['sometimes', 'in:active,inactive'],
         ]);
-        
+
         // If updating team_id, we need to replace the public_id in validated array with the resolved DB ID
         if (isset($validated['team_id'])) {
             $validated['team_id'] = $targetTeamId;
@@ -180,7 +180,7 @@ class ClientController extends Controller
     public function destroy(Request $request, Client $client): JsonResponse
     {
         $team = $request->attributes->get('current_team');
-        
+
         if ($client->team_id !== $team->id) {
             abort(403, 'Client does not belong to this team');
         }

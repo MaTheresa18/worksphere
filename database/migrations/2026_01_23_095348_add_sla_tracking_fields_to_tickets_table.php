@@ -15,11 +15,11 @@ return new class extends Migration
             // SLA Warning Timestamps
             $table->timestamp('sla_response_warning_at')->nullable()->after('sla_breached');
             $table->timestamp('sla_resolution_warning_at')->nullable()->after('sla_response_warning_at');
-            
+
             // SLA Breach Tracking
             $table->timestamp('sla_breached_at')->nullable()->after('sla_resolution_warning_at');
             $table->string('sla_breach_type')->nullable()->after('sla_breached_at'); // 'response' or 'resolution'
-            
+
             // Index for reporting queries
             $table->index('sla_breached_at');
         });

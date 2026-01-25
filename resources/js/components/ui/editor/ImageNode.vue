@@ -119,14 +119,14 @@ const containerStyle = computed(() => {
             >
                 <!-- Layout Controls -->
                 <div
-                    class="flex bg-white/90 rounded-md shadow-lg overflow-hidden mr-2"
+                    class="flex bg-[var(--surface-elevated)] border border-[var(--border-default)] rounded-md shadow-lg overflow-hidden mr-2"
                 >
                     <button
                         type="button"
                         @click="setLayout('left')"
-                        class="p-1.5 hover:bg-gray-100 transition-colors"
+                        class="p-1.5 hover:bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                         :class="{
-                            'bg-blue-100 text-blue-600':
+                            'bg-[var(--surface-tertiary)] text-[var(--interactive-primary)]':
                                 node.attrs.layout === 'left',
                         }"
                         title="Float Left"
@@ -136,9 +136,9 @@ const containerStyle = computed(() => {
                     <button
                         type="button"
                         @click="setLayout('center')"
-                        class="p-1.5 hover:bg-gray-100 transition-colors"
+                        class="p-1.5 hover:bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                         :class="{
-                            'bg-blue-100 text-blue-600':
+                            'bg-[var(--surface-tertiary)] text-[var(--interactive-primary)]':
                                 node.attrs.layout === 'center',
                         }"
                         title="Center"
@@ -148,9 +148,9 @@ const containerStyle = computed(() => {
                     <button
                         type="button"
                         @click="setLayout('right')"
-                        class="p-1.5 hover:bg-gray-100 transition-colors"
+                        class="p-1.5 hover:bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                         :class="{
-                            'bg-blue-100 text-blue-600':
+                            'bg-[var(--surface-tertiary)] text-[var(--interactive-primary)]':
                                 node.attrs.layout === 'right',
                         }"
                         title="Float Right"
@@ -160,9 +160,10 @@ const containerStyle = computed(() => {
                     <button
                         type="button"
                         @click="setLayout(null)"
-                        class="p-1.5 hover:bg-gray-100 transition-colors border-l"
+                        class="p-1.5 hover:bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors border-l border-[var(--border-default)]"
                         :class="{
-                            'bg-blue-100 text-blue-600': !node.attrs.layout,
+                            'bg-[var(--surface-tertiary)] text-[var(--interactive-primary)]':
+                                !node.attrs.layout,
                         }"
                         title="Reset Layout"
                     >

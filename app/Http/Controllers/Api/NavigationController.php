@@ -150,9 +150,9 @@ class NavigationController extends Controller
 
             // Enrich Clients - show recent clients from user's teams
             if (isset($item['id']) && $item['id'] === 'clients') {
-                 $userTeamIds = $user->teams()->pluck('teams.id');
+                $userTeamIds = $user->teams()->pluck('teams.id');
 
-                 if ($userTeamIds->isNotEmpty()) {
+                if ($userTeamIds->isNotEmpty()) {
                     // Fetch recent clients for user's teams
                     $clients = \App\Models\Client::whereIn('team_id', $userTeamIds)
                         ->where('status', 'active')
@@ -176,10 +176,10 @@ class NavigationController extends Controller
                         $clientChildren[] = [
                             'id' => 'client-'.$client->public_id,
                             'label' => $client->name,
-                             // NOTE: Linking to admin view with filter, assuming we have a way to view details there
-                             // Or we can add a specific details route. For now, use query param to select it.
-                            'route' => '/admin/clients/'.$client->public_id, 
-                             'team_badge' => $client->team->name ?? null,
+                            // NOTE: Linking to admin view with filter, assuming we have a way to view details there
+                            // Or we can add a specific details route. For now, use query param to select it.
+                            'route' => '/admin/clients/'.$client->public_id,
+                            'team_badge' => $client->team->name ?? null,
                         ];
                     }
 
@@ -192,7 +192,7 @@ class NavigationController extends Controller
                     ];
 
                     $item['children'] = $clientChildren;
-                 }
+                }
             }
 
             // Recurse for children

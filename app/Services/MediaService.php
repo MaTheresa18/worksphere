@@ -12,7 +12,7 @@ class MediaService
         protected FileSecurityValidator $fileValidator
     ) {}
 
-    public function attach(Model $model, UploadedFile $file, string $collection, ?string $fileName = null, ?string $friendName = null): Media
+    public function attach(Model $model, UploadedFile $file, string $collection, ?string $fileName = null, ?string $friendName = null, ?string $disk = null): Media
     {
         $this->fileValidator->validate($file);
 
@@ -30,10 +30,10 @@ class MediaService
             $fileAdder->usingName(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
         }
 
-        return $fileAdder->toMediaCollection($collection);
+        return $fileAdder->toMediaCollection($collection, $disk ?? config('media-library.disk_name'));
     }
 
-    public function attachFromRequest(Model $model, string $key, string $collection, ?string $fileName = null, ?string $friendName = null): Media
+    public function attachFromRequest(Model $model, string $key, string $collection, ?string $fileName = null, ?string $friendName = null, ?string $disk = null): Media
     {
         $file = request()->file($key);
 
@@ -45,7 +45,7 @@ class MediaService
             throw new \InvalidArgumentException("Multiple files found for key: {$key}. Use attachMultipleFromRequest or handle individually.");
         }
 
-        return $this->attach($model, $file, $collection, $fileName, $friendName);
+        return $this->attach($model, $file, $collection, $fileName, $friendName, $disk);
     }
 
     public function remove(Media $media): void

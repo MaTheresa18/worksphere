@@ -1,226 +1,402 @@
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue';
-import { 
-    XIcon, 
-    PenToolIcon, 
-    UsersIcon, 
+import { ref, computed, watch, onMounted } from "vue";
+import {
+    PenToolIcon,
+    UsersIcon,
     HardDriveIcon,
     PlusIcon,
     Trash2Icon,
     MailIcon,
     FileTextIcon,
-    BoldIcon,
-    ItalicIcon,
-    ListIcon,
     ImageIcon,
-} from 'lucide-vue-next';
-import { Button, Card } from '@/components/ui';
-import { useEmailSignatures } from './composables/useEmailSignatures';
-import { useEmailTemplates } from './composables/useEmailTemplates';
+    SearchIcon,
+    SettingsIcon,
+    CheckIcon,
+    AlertCircleIcon,
+    ChevronRightIcon,
+    Loader2,
+    ArrowLeftIcon,
+} from "lucide-vue-next";
+import { Button, Card, Input } from "@/components/ui";
+import { useEmailSignatures } from "./composables/useEmailSignatures";
+import { useEmailTemplates } from "./composables/useEmailTemplates";
 import { useEditor, EditorContent } from "@tiptap/vue-3";
-import StarterKit from "@tiptap/starter-kit";
-import Placeholder from "@tiptap/extension-placeholder";
-import Image from "@tiptap/extension-image";
+import EmailAccountsSection from "@/components/settings/EmailAccountsSection.vue";
+import { emailAccountService } from "@/services/email-account.service";
+import { RichTextEditor } from "@/components/ui";
+import { useDebounceFn } from "@vueuse/core";
+import api from "@/lib/api";
+
+// Auto-save debounced handlers
+const debouncedSaveSignature = useDebounceFn(() => {
+    handleSaveSignature();
+}, 1000);
+
+const debouncedSaveTemplate = useDebounceFn(() => {
+    handleSaveTemplate();
+}, 1000);
 
 const tabs = [
-    { id: 'signatures', label: 'Signatures', icon: PenToolIcon },
-    { id: 'templates', label: 'Templates', icon: FileTextIcon },
-    { id: 'accounts', label: 'Accounts', icon: UsersIcon },
-    { id: 'storage', label: 'Storage', icon: HardDriveIcon },
+    {
+        id: "signatures",
+        label: "Signatures",
+        icon: PenToolIcon,
+        description: "Manage email signatures",
+    },
+    {
+        id: "templates",
+        label: "Templates",
+        icon: FileTextIcon,
+        description: "Pre-defined email responses",
+    },
+    {
+        id: "accounts",
+        label: "Connected Accounts",
+        icon: UsersIcon,
+        description: "Manage email providers",
+    },
+    {
+        id: "storage",
+        label: "Storage Usage",
+        icon: HardDriveIcon,
+        description: "View storage quotas",
+    },
 ];
 
-const activeTab = ref('signatures');
+const activeTab = ref("signatures");
+const searchQuery = ref("");
 
 // --- Signatures Logic ---
-const { 
-    signatures, 
-    selectedSignatureId, 
-    fetchSignatures, 
-    addSignature, 
-    updateSignature, 
+const {
+    signatures,
+    selectedSignatureId,
+    fetchSignatures,
+    addSignature,
+    updateSignature,
     deleteSignature,
-    uploadImage: uploadSignatureImage
 } = useEmailSignatures();
 
-const activeSignature = computed(() => 
-    signatures.value.find(s => s.id === selectedSignatureId.value)
+const activeSignature = computed(() =>
+    signatures.value.find((s) => s.id === selectedSignatureId.value),
 );
 
-const signatureName = ref('');
-const signatureEditor = useEditor({
-    content: '',
-    extensions: [
-        StarterKit,
-        Placeholder.configure({ placeholder: 'Create your signature...' }),
-        Image,
-    ],
-    editorProps: {
-        attributes: {
-            class: 'prose dark:prose-invert max-w-none focus:outline-none min-h-[150px] text-[var(--text-primary)] px-4 py-3',
-        },
-    },
+const filteredSignatures = computed(() => {
+    if (!searchQuery.value) return signatures.value;
+    return signatures.value.filter((s) =>
+        s.name.toLowerCase().includes(searchQuery.value.toLowerCase()),
+    );
 });
+
+const signatureName = ref("");
+// Editor ref
+const signatureEditorRef = ref<any>(null);
+const signatureContent = ref("");
+
+// Save State
+const saveStatus = ref<"saved" | "saving" | "error">("saved");
 
 // Watch for selection change to update form
 watch(selectedSignatureId, (newId) => {
     if (newId && activeSignature.value) {
         signatureName.value = activeSignature.value.name;
-        // Only update content if different to avoid cursor jumps if we were auto-saving (though here we switch IDs)
-        if (signatureEditor.value?.getHTML() !== (activeSignature.value.content || '')) {
-             signatureEditor.value?.commands.setContent(activeSignature.value.content || '');
-        }
+        signatureContent.value = activeSignature.value.content || "";
+        saveStatus.value = "saved";
     } else {
-        signatureName.value = '';
-        signatureEditor.value?.commands.setContent('');
+        signatureName.value = "";
+        signatureContent.value = "";
+        saveStatus.value = "saved";
     }
 });
 
 async function handleNewSignature() {
-    // Create a default signature
-    const newSig = await addSignature({ name: 'New Signature', content: '' });
+    const newSig = await addSignature({ name: "New Signature", content: "" });
     selectedSignatureId.value = newSig.id;
+    saveStatus.value = "saved";
 }
 
 async function handleSaveSignature() {
     if (!selectedSignatureId.value) return;
-    await updateSignature(selectedSignatureId.value, {
-        name: signatureName.value,
-        content: signatureEditor.value?.getHTML() || ''
-    });
+    saveStatus.value = "saving";
+    try {
+        await updateSignature(selectedSignatureId.value, {
+            name: signatureName.value,
+            content: activeSignature.value?.content || "",
+        });
+        saveStatus.value = "saved";
+    } catch (e) {
+        saveStatus.value = "error";
+    }
 }
 
 function handleDeleteSignature(id: string) {
-    if (confirm('Delete this signature?')) {
+    if (confirm("Delete this signature?")) {
         deleteSignature(id);
         if (selectedSignatureId.value === id) {
-            selectedSignatureId.value = signatures.value.length > 0 ? signatures.value[0].id : null;
+            selectedSignatureId.value =
+                signatures.value.length > 0 ? signatures.value[0].id : null;
         }
     }
 }
 
 // --- Templates Logic ---
-const { 
-    templates, 
-    selectedTemplateId, 
-    fetchTemplates, 
-    addTemplate, 
-    updateTemplate, 
+const {
+    templates,
+    selectedTemplateId,
+    fetchTemplates,
+    addTemplate,
+    updateTemplate,
     deleteTemplate,
-    uploadImage: uploadTemplateImage 
 } = useEmailTemplates();
 
-const activeTemplate = computed(() => 
-    templates.value.find(t => t.id === selectedTemplateId.value)
+const activeTemplate = computed(() =>
+    templates.value.find((t) => t.id === selectedTemplateId.value),
 );
 
-const templateName = ref('');
-const templateSubject = ref('');
-const templateEditor = useEditor({
-    content: '',
-    extensions: [
-        StarterKit,
-        Placeholder.configure({ placeholder: 'Write your template content...' }),
-        Image,
-    ],
-    editorProps: {
-        attributes: {
-            class: 'prose dark:prose-invert max-w-none focus:outline-none min-h-[200px] text-[var(--text-primary)] px-4 py-3',
-        },
-    },
+const filteredTemplates = computed(() => {
+    if (!searchQuery.value) return templates.value;
+    return templates.value.filter(
+        (t) =>
+            t.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+            t.subject.toLowerCase().includes(searchQuery.value.toLowerCase()),
+    );
 });
+
+const templateName = ref("");
+const templateSubject = ref("");
+// Editor ref
+const templateEditorRef = ref<any>(null);
+const templateContent = ref("");
 
 watch(selectedTemplateId, (newId) => {
     if (newId && activeTemplate.value) {
         templateName.value = activeTemplate.value.name;
         templateSubject.value = activeTemplate.value.subject;
-        if (templateEditor.value?.getHTML() !== (activeTemplate.value.body || '')) {
-             templateEditor.value?.commands.setContent(activeTemplate.value.body || '');
-        }
+        templateContent.value = activeTemplate.value.body || "";
+        saveStatus.value = "saved";
     } else {
-        templateName.value = '';
-        templateSubject.value = '';
-        templateEditor.value?.commands.setContent('');
+        templateName.value = "";
+        templateSubject.value = "";
+        templateContent.value = "";
+        saveStatus.value = "saved";
     }
 });
 
 async function handleNewTemplate() {
-    const newTpl = await addTemplate({ name: 'New Template', subject: '', body: '' });
+    const newTpl = await addTemplate({
+        name: "New Template",
+        subject: "",
+        body: "",
+    });
     selectedTemplateId.value = newTpl.id;
+    saveStatus.value = "saved";
 }
 
 async function handleSaveTemplate() {
     if (!selectedTemplateId.value) return;
-    await updateTemplate(selectedTemplateId.value, {
-        name: templateName.value,
-        subject: templateSubject.value,
-        body: templateEditor.value?.getHTML() || ''
-    });
+    saveStatus.value = "saving";
+    try {
+        await updateTemplate(selectedTemplateId.value, {
+            name: templateName.value,
+            subject: templateSubject.value,
+            body: activeTemplate.value?.body || "",
+        });
+        saveStatus.value = "saved";
+    } catch (e) {
+        saveStatus.value = "error";
+    }
 }
 
 function handleDeleteTemplate(id: string) {
-     if (confirm('Delete this template?')) {
+    if (confirm("Delete this template?")) {
         deleteTemplate(id);
         if (selectedTemplateId.value === id) {
-            selectedTemplateId.value = templates.value.length > 0 ? templates.value[0].id : null;
+            selectedTemplateId.value =
+                templates.value.length > 0 ? templates.value[0].id : null;
         }
     }
 }
 
-// Image Upload Logic
-const fileInput = ref<HTMLInputElement | null>(null);
+// --- Media Manager Logic ---
+const showMediaBar = ref(false); // Collapsed by default in this layout
+const mediaFiles = ref<any[]>([]);
+const mediaLoading = ref(false);
+const mediaUploadQueue = ref<any[]>([]);
+const isUploading = ref(false);
 
-function triggerImageUpload() {
-    fileInput.value?.click();
-}
+const fetchMedia = async () => {
+    const isSignature = activeTab.value === "signatures";
+    const id = isSignature
+        ? selectedSignatureId.value
+        : selectedTemplateId.value;
 
-async function handleImageUpload(event: Event) {
-    const input = event.target as HTMLInputElement;
-    if (!input.files || input.files.length === 0) return;
+    if (!id) {
+        mediaFiles.value = [];
+        return;
+    }
 
-    const file = input.files[0];
-    const isSignature = activeTab.value === 'signatures';
-    const id = isSignature ? selectedSignatureId.value : selectedTemplateId.value;
+    mediaLoading.value = true;
+    try {
+        const endpoint = isSignature
+            ? `/api/emails/signatures/${id}/media`
+            : `/api/emails/templates/${id}/media`;
+        const response = await api.get(endpoint);
+        mediaFiles.value = response.data.data;
+    } catch (e) {
+        console.error("Failed to fetch media", e);
+    } finally {
+        mediaLoading.value = false;
+    }
+};
+
+// Refresh media when selection changes
+watch(
+    [activeTab, selectedSignatureId, selectedTemplateId],
+    () => {
+        if (
+            activeTab.value === "signatures" ||
+            activeTab.value === "templates"
+        ) {
+            fetchMedia();
+        }
+    },
+    { immediate: true },
+);
+
+const handleMediaUpload = (files) => {
+    files.forEach((file) => {
+        mediaUploadQueue.value.push({
+            id: Math.random().toString(36).substr(2, 9),
+            file,
+            progress: 0,
+            status: "pending",
+        });
+    });
+    processUploadQueue();
+};
+
+const removeUpload = (index) => {
+    mediaUploadQueue.value.splice(index, 1);
+};
+
+const processUploadQueue = async () => {
+    if (isUploading.value) return;
+
+    const isSignature = activeTab.value === "signatures";
+    const id = isSignature
+        ? selectedSignatureId.value
+        : selectedTemplateId.value;
 
     if (!id) return;
 
-    try {
-        const result = isSignature 
-            ? await uploadSignatureImage(id, file)
-            : await uploadTemplateImage(id, file);
+    const pendingItems = mediaUploadQueue.value.filter(
+        (i) => i.status === "pending",
+    );
+    if (pendingItems.length === 0) return;
 
-        const editor = isSignature ? signatureEditor.value : templateEditor.value;
-        if (result && result.url) {
-            editor?.chain().focus().setImage({ src: result.url }).run();
-            // Save immediately to persist the image URL in content
-            isSignature ? handleSaveSignature() : handleSaveTemplate();
+    isUploading.value = true;
+    let successCount = 0;
+
+    for (const item of pendingItems) {
+        item.status = "uploading";
+        const formData = new FormData();
+        formData.append("file", item.file);
+
+        try {
+            const endpoint = isSignature
+                ? `/api/emails/signatures/${id}/media`
+                : `/api/emails/templates/${id}/media`;
+
+            await api.post(endpoint, formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+                onUploadProgress: (progressEvent) => {
+                    const percentCompleted = Math.round(
+                        (progressEvent.loaded * 100) / progressEvent.total,
+                    );
+                    item.progress = percentCompleted;
+                },
+            });
+            item.status = "completed";
+            item.progress = 100;
+            successCount++;
+        } catch (error) {
+            console.error(`Error uploading ${item.file.name}:`, error);
+            item.status = "error";
         }
-    } catch (e) {
-        // Error handled in service
-    } finally {
-        input.value = ''; // Reset
     }
-}
 
+    if (successCount > 0) {
+        fetchMedia();
+        // Clear completed
+        mediaUploadQueue.value = mediaUploadQueue.value.filter(
+            (item) => item.status !== "completed",
+        );
+    }
+
+    isUploading.value = mediaUploadQueue.value.some(
+        (i) => i.status === "uploading",
+    );
+};
+
+const handleMediaDelete = async (id) => {
+    if (!confirm("Delete this image?")) return;
+
+    const isSignature = activeTab.value === "signatures";
+    const parentId = isSignature
+        ? selectedSignatureId.value
+        : selectedTemplateId.value;
+    
+    try {
+        const endpoint = isSignature
+             ? `/api/emails/signatures/${parentId}/media/${id}`
+             : `/api/emails/templates/${parentId}/media/${id}`;
+        
+        await api.delete(endpoint);
+        fetchMedia();
+    } catch (e) {
+        console.error("Failed to delete media", e);
+    }
+};
+
+const insertImage = (media) => {
+    const isSignature = activeTab.value === "signatures";
+    const editor = isSignature
+        ? signatureEditorRef.value?.editor
+        : templateEditorRef.value?.editor;
+
+    if (editor && media.url) {
+        editor.chain().focus().setImage({ src: media.url }).run();
+    }
+};
+
+// Drag and drop setup for the drop zone
+const isDragging = ref(false);
+const handleDrop = (e) => {
+    isDragging.value = false;
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+        handleMediaUpload(files);
+    }
+};
 
 onMounted(async () => {
-    await Promise.all([
-        fetchSignatures(),
-        fetchTemplates()
-    ]);
-    
-    if (signatures.value.length > 0) {
+    await Promise.all([fetchSignatures(), fetchTemplates()]);
+
+    // Select first item by default if available and nothing selected
+    if (
+        activeTab.value === "signatures" &&
+        signatures.value.length > 0 &&
+        !selectedSignatureId.value
+    ) {
         selectedSignatureId.value = signatures.value[0].id;
     }
-    if (templates.value.length > 0) {
+    if (
+        activeTab.value === "templates" &&
+        templates.value.length > 0 &&
+        !selectedTemplateId.value
+    ) {
         selectedTemplateId.value = templates.value[0].id;
     }
 });
-
-// ... existing imports
-import EmailAccountsSection from "@/components/settings/EmailAccountsSection.vue";
-
-// --- Accounts Logic ---
-// Content handled by EmailAccountsSection component
 
 // --- Storage Logic ---
 const loadingStorage = ref(false);
@@ -229,7 +405,7 @@ const storageAccounts = ref<any[]>([]);
 async function fetchStorageData() {
     loadingStorage.value = true;
     try {
-        const response = await emailAccountService.list(); 
+        const response = await emailAccountService.list();
         storageAccounts.value = response;
     } catch (e) {
         console.error("Failed to fetch storage data", e);
@@ -239,346 +415,481 @@ async function fetchStorageData() {
 }
 
 watch(activeTab, (newTab) => {
-    if (newTab === 'storage') {
-        fetchStorageData();
-    }
+    if (newTab === "storage") fetchStorageData();
+    searchQuery.value = ""; // Reset search on tab change
 });
 
 // Format helpers
-function formatDate(date: string) {
-    if (!date) return '';
-    return new Date(date).toLocaleDateString() + ' ' + new Date(date).toLocaleTimeString();
-}
-
 function formatBytes(bytes: number | null) {
-    if (bytes === null || bytes === undefined) return '0 B';
-    if (bytes === 0) return '0 B';
-    
+    if (bytes === null || bytes === undefined) return "0 B";
+    if (bytes === 0) return "0 B";
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const sizes = ["B", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
-function getUsagePercent(account: any) {
-    if (!account.storage_limit || account.storage_limit === 0) return 0;
-    return (account.storage_used / account.storage_limit) * 100;
+function getUsageDetails(account: any) {
+    if (!account.storage_limit || account.storage_limit === 0) {
+        return { percent: 0, color: "text-gray-500", bg: "bg-gray-200" };
+    }
+    const percent = Math.min(
+        (account.storage_used / account.storage_limit) * 100,
+        100,
+    );
+    let color = "text-[var(--brand-primary)]";
+    let bg = "bg-[var(--brand-primary)]";
+
+    if (percent >= 90) {
+        color = "text-red-500";
+        bg = "bg-red-500";
+    } else if (percent >= 75) {
+        color = "text-amber-500";
+        bg = "bg-amber-500";
+    }
+
+    return { percent, color, bg };
 }
-
-function getUsageColorClass(percent: number) {
-    if (percent >= 90) return 'text-red-500';
-    if (percent >= 75) return 'text-amber-500';
-    return 'text-[var(--brand-primary)]';
-}
-
-function getProgressBarColorClass(percent: number) {
-    if (percent >= 90) return 'bg-red-500';
-    if (percent >= 75) return 'bg-amber-500';
-    return 'bg-[var(--brand-primary)]';
-}
-
-import { emailAccountService } from '@/services/email-account.service';
-
-// Cleanup
-onBeforeUnmount(() => {
-    signatureEditor.value?.destroy();
-    templateEditor.value?.destroy();
-});
 </script>
 
 <template>
-    <div class="flex flex-col h-full bg-[var(--surface-primary)] overflow-hidden">
-        
+    <div class="p-6 space-y-6 w-full">
         <!-- Header -->
-        <div class="px-8 py-6 border-b border-[var(--border-default)] flex items-center justify-between shrink-0 bg-[var(--surface-primary)]">
-            <div>
-                <h1 class="text-2xl font-bold text-[var(--text-primary)] tracking-tight">Email Settings</h1>
-                <p class="text-sm text-[var(--text-secondary)] mt-1">Manage your signatures, templates, and preferences.</p>
-            </div>
-            <button
-                @click="$router.push('/email')"
-                class="p-2 -mr-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] rounded-full transition-colors"
+        <div class="flex items-center gap-4">
+            <Button
+                variant="ghost"
+                size="icon"
+                class="rounded-full"
+                @click="$router.push({ name: 'email' })"
             >
-                <XIcon class="w-5 h-5" />
-            </button>
+                <ArrowLeftIcon class="w-5 h-5 text-[var(--text-secondary)]" />
+            </Button>
+            <div>
+                <h1 class="text-2xl font-bold text-[var(--text-primary)]">
+                    Email Settings
+                </h1>
+                <p class="text-[var(--text-secondary)]">
+                    Manage your email signatures, templates, and connected accounts.
+                </p>
+            </div>
         </div>
 
-        <div class="flex flex-1 overflow-hidden">
+        <div class="flex flex-col lg:flex-row gap-6">
             <!-- Sidebar Navigation -->
-            <div class="w-64 p-4 flex flex-col gap-1 shrink-0 bg-[var(--surface-primary)] border-r border-[var(--border-default)]">
-                <button
-                    v-for="tab in tabs"
-                    :key="tab.id"
-                    @click="activeTab = tab.id"
-                    class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-all text-left group"
-                    :class="[
-                        activeTab === tab.id
-                            ? 'bg-[var(--surface-elevated)] text-[var(--text-primary)] shadow-sm ring-1 ring-[var(--border-default)]'
-                            : 'text-[var(--text-secondary)] hover:bg-[var(--surface-tertiary)] hover:text-[var(--text-primary)]'
-                    ]"
-                >
-                    <div 
-                        class="p-1 rounded-lg transition-colors"
-                        :class="activeTab === tab.id ? 'bg-[var(--interactive-primary)]/10 text-[var(--interactive-primary)]' : 'bg-transparent text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]'"
+            <div class="w-full lg:w-64 shrink-0">
+                <nav class="space-y-1">
+                    <button
+                        v-for="tab in tabs"
+                        :key="tab.id"
+                        @click="activeTab = tab.id"
+                        class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors"
+                        :class="[
+                            activeTab === tab.id
+                                ? 'bg-[var(--surface-elevated)] text-[var(--brand-primary)] shadow-sm border border-[var(--border-default)]'
+                                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]',
+                        ]"
                     >
                         <component :is="tab.icon" class="w-4 h-4" />
-                    </div>
-                    {{ tab.label }}
-                </button>
+                        {{ tab.label }}
+                    </button>
+                </nav>
             </div>
 
             <!-- Content Area -->
-            <div class="flex-1 overflow-hidden bg-[var(--surface-secondary)]/30 relative">
-                
-                <!-- Signatures & Templates (Unified Master-Detail Layout) -->
-                <div v-if="activeTab === 'signatures' || activeTab === 'templates'" class="flex h-full">
-                    
-                    <!-- Left Pane: List -->
-                    <div class="w-80 border-r border-[var(--border-default)] bg-[var(--surface-primary)] flex flex-col">
-                        <div class="p-4 border-b border-[var(--border-default)] flex items-center justify-between shrink-0 bg-[var(--surface-primary)]">
+            <div class="flex-1 min-w-0 space-y-6">
+                <!-- Signatures / Templates -->
+                <Card
+                    v-if="
+                        activeTab === 'signatures' || activeTab === 'templates'
+                    "
+                    class="overflow-hidden min-h-[500px] flex flex-col"
+                >
+                    <div
+                        class="border-b border-[var(--border-default)] p-4 flex items-center justify-between"
+                    >
+                        <div class="flex items-center gap-3">
                             <h2 class="font-semibold text-[var(--text-primary)]">
-                                {{ activeTab === 'signatures' ? 'All Signatures' : 'All Templates' }}
+                                {{
+                                    activeTab === "signatures"
+                                        ? "Signatures"
+                                        : "Templates"
+                                }}
                             </h2>
-                            <button 
-                                @click="activeTab === 'signatures' ? handleNewSignature() : handleNewTemplate()"
-                                class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white bg-[var(--interactive-primary)] hover:bg-[var(--interactive-primary-hover)] transition-all shadow-sm active:scale-95"
+                            <!-- Status Indicator -->
+                             <div
+                                v-if="saveStatus === 'saved'"
+                                class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium border border-emerald-500/20"
                             >
-                                <PlusIcon class="w-3.5 h-3.5" />
-                                New
-                            </button>
+                                <CheckIcon class="w-3 h-3" />
+                                Saved
+                            </div>
+                            <div
+                                v-else-if="saveStatus === 'saving'"
+                                class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] text-xs font-medium border border-[var(--brand-primary)]/20"
+                            >
+                                <div
+                                    class="w-3 h-3 border-2 border-[var(--brand-primary)] border-t-transparent rounded-full animate-spin"
+                                ></div>
+                                Saving...
+                            </div>
+                            <div
+                                v-else-if="saveStatus === 'error'"
+                                class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-medium border border-red-500/20"
+                            >
+                                <AlertCircleIcon class="w-3 h-3" />
+                            </div>
                         </div>
-                        
-                        <div class="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-thin">
-                            <template v-if="activeTab === 'signatures'">
-                                <div 
-                                    v-for="sig in signatures" 
-                                    :key="sig.id"
-                                    @click="selectedSignatureId = sig.id"
-                                    class="p-3 rounded-xl border transition-all cursor-pointer group relative"
-                                    :class="selectedSignatureId === sig.id 
-                                        ? 'bg-[var(--surface-elevated)] border-[var(--interactive-primary)]/40 ring-1 ring-[var(--interactive-primary)]/20 shadow-sm z-10' 
-                                        : 'bg-[var(--surface-secondary)]/50 border-transparent hover:bg-[var(--surface-tertiary)] hover:border-[var(--border-muted)]'"
-                                >
-                                    <div class="flex justify-between items-start">
-                                        <span class="font-medium text-sm text-[var(--text-primary)]">{{ sig.name }}</span>
-                                        <button 
-                                            @click.stop="handleDeleteSignature(sig.id)"
-                                            class="opacity-0 group-hover:opacity-100 p-1 text-[var(--text-muted)] hover:text-[var(--color-error)] transition-all"
-                                        >
-                                            <Trash2Icon class="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                    <div class="mt-1.5 text-xs text-[var(--text-secondary)] line-clamp-2 opacity-80 font-normal leading-relaxed" v-html="(sig.content || '').replace(/<[^>]*>/g, ' ').substring(0, 100) || 'Empty signature'"></div>
-                                </div>
-                            </template>
-                            
-                            <template v-else>
-                                <div 
-                                    v-for="tpl in templates" 
-                                    :key="tpl.id"
-                                    @click="selectedTemplateId = tpl.id"
-                                    class="p-3 rounded-xl border transition-all cursor-pointer group relative"
-                                    :class="selectedTemplateId === tpl.id 
-                                        ? 'bg-[var(--surface-elevated)] border-[var(--interactive-primary)]/40 ring-1 ring-[var(--interactive-primary)]/20 shadow-sm z-10' 
-                                        : 'bg-[var(--surface-secondary)]/50 border-transparent hover:bg-[var(--surface-tertiary)] hover:border-[var(--border-muted)]'"
-                                >
-                                    <div class="flex justify-between items-start">
-                                        <span class="font-medium text-sm text-[var(--text-primary)]">{{ tpl.name }}</span>
-                                        <button 
-                                            @click.stop="handleDeleteTemplate(tpl.id)"
-                                            class="opacity-0 group-hover:opacity-100 p-1 text-[var(--text-muted)] hover:text-[var(--color-error)] transition-all"
-                                        >
-                                            <Trash2Icon class="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                    <div class="mt-1 text-xs text-[var(--text-primary)] truncate font-medium">{{ tpl.subject || '(No subject)' }}</div>
-                                    <div class="mt-1 text-xs text-[var(--text-muted)] truncate">{{ tpl.body ? 'Has content' : 'Empty body' }}</div>
-                                </div>
-                            </template>
-                        </div>
+                        <Button
+                            size="sm"
+                            @click="
+                                activeTab === 'signatures'
+                                    ? handleNewSignature()
+                                    : handleNewTemplate()
+                            "
+                        >
+                            <PlusIcon class="w-4 h-4 mr-1.5" />
+                            Create New
+                        </Button>
                     </div>
 
-                    <!-- Right Pane: Editor -->
-                    <div class="flex-1 flex flex-col bg-[var(--surface-primary)] h-full overflow-hidden relative">
-                        <!-- Background Pattern/Logo for nice feel -->
-                        <div class="absolute inset-0 pointer-events-none opacity-[0.02] flex items-center justify-center overflow-hidden">
-                            <MailIcon class="w-96 h-96" />
+                    <div class="flex flex-1 flex-col md:flex-row h-full">
+                        <!-- List Column -->
+                        <div
+                            class="w-full md:w-64 border-b md:border-b-0 md:border-r border-[var(--border-default)] bg-[var(--surface-subtle)] flex flex-col shrink-0"
+                        >
+                            <div class="p-3 border-b border-[var(--border-default)]">
+                                <div class="relative">
+                                    <SearchIcon
+                                        class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]"
+                                    />
+                                    <input
+                                        v-model="searchQuery"
+                                        type="text"
+                                        placeholder="Search..."
+                                        class="w-full pl-8 pr-3 py-1.5 text-xs bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-md focus:outline-none focus:ring-1 focus:ring-[var(--brand-primary)]"
+                                    />
+                                </div>
+                            </div>
+                            <div class="flex-1 overflow-y-auto p-2 space-y-1 max-h-[300px] md:max-h-[600px]">
+                                <template v-if="activeTab === 'signatures'">
+                                    <button
+                                        v-for="sig in filteredSignatures"
+                                        :key="sig.id"
+                                        @click="selectedSignatureId = sig.id"
+                                        class="w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center justify-between group"
+                                        :class="
+                                            selectedSignatureId === sig.id
+                                                ? 'bg-[var(--surface-elevated)] shadow-sm text-[var(--text-primary)] font-medium ring-1 ring-[var(--border-default)]'
+                                                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text-primary)]'
+                                        "
+                                    >
+                                        <span class="truncate">{{ sig.name }}</span>
+                                        <button
+                                            @click.stop="handleDeleteSignature(sig.id)"
+                                            class="opacity-0 group-hover:opacity-100 p-1 text-[var(--text-muted)] hover:text-red-500 rounded transition-opacity"
+                                        >
+                                            <Trash2Icon class="w-3.5 h-3.5" />
+                                        </button>
+                                    </button>
+                                </template>
+                                <template v-else>
+                                    <button
+                                        v-for="tpl in filteredTemplates"
+                                        :key="tpl.id"
+                                        @click="selectedTemplateId = tpl.id"
+                                        class="w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex flex-col gap-0.5 group"
+                                        :class="
+                                            selectedTemplateId === tpl.id
+                                                ? 'bg-[var(--surface-elevated)] shadow-sm text-[var(--text-primary)] font-medium ring-1 ring-[var(--border-default)]'
+                                                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text-primary)]'
+                                        "
+                                    >
+                                        <div class="flex items-center justify-between w-full">
+                                             <span class="truncate">{{ tpl.name }}</span>
+                                              <div
+                                                @click.stop="handleDeleteTemplate(tpl.id)"
+                                                class="opacity-0 group-hover:opacity-100 p-1 -mr-1 text-[var(--text-muted)] hover:text-red-500 rounded transition-opacity cursor-pointer"
+                                            >
+                                                <Trash2Icon class="w-3.5 h-3.5" />
+                                            </div>
+                                        </div>
+                                         <span class="text-xs text-[var(--text-muted)] truncate">{{ tpl.subject || '(No Subject)' }}</span>
+                                    </button>
+                                </template>
+                            </div>
                         </div>
 
-                        <template v-if="(activeTab === 'signatures' && selectedSignatureId) || (activeTab === 'templates' && selectedTemplateId)">
-                            <!-- Editor Header -->
-                            <div class="px-8 py-5 border-b border-[var(--border-default)] shrink-0 z-10 bg-[var(--surface-primary)]/90 backdrop-blur-md space-y-4">
-                                <div class="flex items-center justify-between gap-4">
-                                    <input 
-                                        v-if="activeTab === 'signatures'"
-                                        v-model="signatureName"
-                                        @blur="handleSaveSignature"
-                                        type="text"
-                                        class="bg-transparent text-2xl font-bold text-[var(--text-primary)] focus:outline-none placeholder-[var(--text-muted)] w-full tracking-tight"
-                                        placeholder="Signature Name"
-                                    />
-                                    <input 
-                                        v-else
-                                        v-model="templateName"
-                                        @blur="handleSaveTemplate"
-                                        type="text"
-                                        class="bg-transparent text-2xl font-bold text-[var(--text-primary)] focus:outline-none placeholder-[var(--text-muted)] w-full tracking-tight"
-                                        placeholder="Template Name"
-                                    />
-                                    
-                                    <div class="flex items-center gap-2 shrink-0">
-                                         <div class="flex items-center gap-1.5 px-2 py-1 rounded bg-green-500/10 text-green-500 text-xs font-medium border border-green-500/20">
-                                            <div class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                                            Auto-saved
+                        <!-- Editor Column -->
+                        <div class="flex-1 flex flex-col min-w-0 bg-[var(--surface-primary)]">
+                            <template
+                                v-if="
+                                    (activeTab === 'signatures' && selectedSignatureId) ||
+                                    (activeTab === 'templates' && selectedTemplateId)
+                                "
+                            >
+                                <div class="p-4 border-b border-[var(--border-default)] space-y-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1">Name</label>
+                                        <Input
+                                            v-if="activeTab === 'signatures'"
+                                            v-model="signatureName"
+                                            @blur="handleSaveSignature"
+                                            placeholder="Signature Name"
+                                        />
+                                        <Input
+                                            v-else
+                                            v-model="templateName"
+                                            @blur="handleSaveTemplate"
+                                            placeholder="Template Name"
+                                        />
+                                    </div>
+                                    <div v-if="activeTab === 'templates'">
+                                         <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1">Subject</label>
+                                        <Input
+                                            v-model="templateSubject"
+                                            @blur="handleSaveTemplate"
+                                            placeholder="Email Subject"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="flex-1 flex flex-col relative min-h-[400px]">
+                                     <!-- Toolbar / Media Toggle -->
+                                    <div class="px-4 py-2 border-b border-[var(--border-default)] bg-[var(--surface-subtle)] flex justify-end">
+                                        <button
+                                            @click="showMediaBar = !showMediaBar"
+                                            class="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium transition-colors"
+                                        >
+                                            <ImageIcon class="w-3.5 h-3.5" />
+                                            {{ showMediaBar ? 'Hide Media' : 'Show Media' }}
+                                        </button>
+                                    </div>
+
+                                    <div class="flex-1 flex">
+                                         <!-- Editor -->
+                                        <div class="flex-1 flex flex-col">
+                                             <RichTextEditor
+                                                v-if="activeTab === 'signatures'"
+                                                ref="signatureEditorRef"
+                                                v-model="activeSignature.content"
+                                                :content="signatureContent"
+                                                @update:modelValue="debouncedSaveSignature"
+                                                placeholder="Write your signature..."
+                                                class="flex-1 border-0 rounded-none focus-within:ring-0"
+                                            />
+                                            <RichTextEditor
+                                                v-else
+                                                ref="templateEditorRef"
+                                                v-model="activeTemplate.body"
+                                                :content="templateContent"
+                                                @update:modelValue="debouncedSaveTemplate"
+                                                placeholder="Write your template..."
+                                                class="flex-1 border-0 rounded-none focus-within:ring-0"
+                                            />
+                                        </div>
+
+                                        <!-- Media Sidebar (Inline) -->
+                                        <div 
+                                            v-if="showMediaBar"
+                                            class="w-64 border-l border-[var(--border-default)] bg-[var(--surface-subtle)] flex flex-col"
+                                        >
+                                            <div class="p-3 border-b border-[var(--border-default)]">
+                                                <h3 class="text-xs font-bold text-[var(--text-secondary)] uppercase">Media Library</h3>
+                                            </div>
+                                            
+                                            <div 
+                                                class="flex-1 p-3 overflow-y-auto"
+                                                @dragover.prevent="isDragging = true"
+                                                @dragleave.prevent="isDragging = false"
+                                                @drop.prevent="handleDrop"
+                                            >
+                                                <!-- Drop Zone Overlay -->
+                                                 <div
+                                                    v-if="isDragging"
+                                                    class="absolute inset-0 bg-[var(--brand-primary)]/10 z-50 flex items-center justify-center border-2 border-dashed border-[var(--brand-primary)] m-2 rounded-lg pointer-events-none"
+                                                >
+                                                    <span class="text-[var(--brand-primary)] font-bold">Drop files here</span>
+                                                </div>
+
+                                                 <!-- Upload Button -->
+                                                <label class="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed border-[var(--border-default)] rounded-lg hover:border-[var(--brand-primary)] hover:bg-[var(--surface-elevated)] cursor-pointer transition-all mb-4 group">
+                                                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                                        <PlusIcon class="w-6 h-6 text-[var(--text-muted)] group-hover:text-[var(--brand-primary)] mb-1" />
+                                                        <p class="text-[10px] text-[var(--text-muted)]">Upload Image</p>
+                                                    </div>
+                                                    <input type="file" class="hidden" multiple accept="image/*" @change="(e) => handleMediaUpload(Array.from(e.target.files))" />
+                                                </label>
+
+                                                 <!-- Upload Queue -->
+                                                <div v-if="mediaUploadQueue.length > 0" class="space-y-2 mb-4">
+                                                    <div v-for="(item, idx) in mediaUploadQueue" :key="idx" class="text-xs bg-[var(--surface-elevated)] p-2 rounded border border-[var(--border-default)]">
+                                                        <div class="flex justify-between mb-1">
+                                                            <span class="truncate max-w-[100px]">{{ item.file.name }}</span>
+                                                            <span :class="{'text-[var(--brand-primary)]': item.status === 'uploading', 'text-red-500': item.status === 'error'}">
+                                                                {{ item.status }}
+                                                            </span>
+                                                        </div>
+                                                        <div class="w-full bg-[var(--surface-tertiary)] rounded-full h-1">
+                                                            <div class="bg-[var(--brand-primary)] h-1 rounded-full transition-all" :style="{ width: item.progress + '%' }"></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Grid -->
+                                                <div v-if="mediaLoading" class="flex justify-center py-4">
+                                                    <Loader2 class="w-5 h-5 animate-spin text-[var(--text-muted)]" />
+                                                </div>
+                                                
+                                                <div v-else class="grid grid-cols-2 gap-2">
+                                                    <div
+                                                        v-for="media in mediaFiles"
+                                                        :key="media.id"
+                                                        class="group relative aspect-square rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] overflow-hidden cursor-pointer hover:ring-2 hover:ring-[var(--brand-primary)]"
+                                                        draggable="true"
+                                                        @dragstart="(e) => {
+                                                            e.dataTransfer.setData('text/plain', media.url);
+                                                            e.dataTransfer.setData('text/html', `<img src='${media.url}' />`);
+                                                        }"
+                                                        @click="insertImage(media)"
+                                                    >
+                                                        <img
+                                                            :src="media.thumbnail_url || media.url"
+                                                            class="w-full h-full object-cover"
+                                                            loading="lazy"
+                                                        />
+                                                         <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                                                                <button 
+                                                                    @click.stop="handleMediaDelete(media.id)"
+                                                                    class="p-1 rounded bg-red-500 text-white hover:bg-red-600"
+                                                                    title="Delete"
+                                                                >
+                                                                    <Trash2Icon class="w-3 h-3" />
+                                                                </button>
+                                                         </div>
+                                                    </div>
+                                                </div>
+
+                                                <div v-if="!mediaLoading && mediaFiles.length === 0" class="text-center py-8 text-[var(--text-muted)] text-xs">
+                                                    No media found.
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                                
-                                <div v-if="activeTab === 'templates'" class="relative group">
-                                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <span class="text-[var(--text-muted)] text-sm font-medium">Subject:</span>
-                                    </div>
-                                    <input 
-                                        v-model="templateSubject"
-                                        @blur="handleSaveTemplate"
-                                        type="text"
-                                        class="w-full bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg py-2.5 pl-20 pr-4 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--interactive-primary)]/20 focus:border-[var(--interactive-primary)] transition-all placeholder-[var(--text-muted)]"
-                                        placeholder="Enter email subject line..."
+                            </template>
+                             <div v-else class="flex flex-col items-center justify-center p-12 text-center h-[400px]">
+                                <div class="w-12 h-12 rounded-full bg-[var(--surface-secondary)] flex items-center justify-center mb-3">
+                                    <SettingsIcon class="w-6 h-6 text-[var(--text-muted)]" />
+                                </div>
+                                <h3 class="text-[var(--text-primary)] font-medium">Select an item to edit</h3>
+                                <p class="text-[var(--text-secondary)] text-sm mt-1">Or create a new one to get started.</p>
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+
+                <!-- Accounts Tab -->
+                <div v-else-if="activeTab === 'accounts'">
+                    <EmailAccountsSection />
+                </div>
+
+                <!-- Storage Tab -->
+                <Card v-else-if="activeTab === 'storage'">
+                    <div class="p-6">
+                        <h2 class="text-lg font-bold text-[var(--text-primary)] mb-4">Storage Usage</h2>
+                        <div v-if="loadingStorage" class="flex justify-center py-12">
+                             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand-primary)]"></div>
+                        </div>
+                        <div v-else class="space-y-6">
+                            <div
+                                v-if="storageAccounts.length === 0"
+                                class="text-center py-12"
+                            >
+                                <div
+                                    class="w-16 h-16 mx-auto rounded-full bg-[var(--surface-secondary)] flex items-center justify-center mb-4"
+                                >
+                                    <HardDriveIcon
+                                        class="w-8 h-8 text-[var(--text-muted)]"
                                     />
                                 </div>
+                                <h3
+                                    class="text-lg font-medium text-[var(--text-primary)]"
+                                >
+                                    No Connected Accounts
+                                </h3>
+                                <p
+                                    class="text-[var(--text-secondary)] mt-1 max-w-sm mx-auto"
+                                >
+                                    Connect an email account to view storage
+                                    usage statistics.
+                                </p>
+                                <Button
+                                    variant="outline"
+                                    class="mt-6"
+                                    @click="activeTab = 'accounts'"
+                                >
+                                    Connect Account
+                                </Button>
                             </div>
-
-                            <!-- Toolbar -->
-                            <div class="px-6 py-2 border-b border-[var(--border-default)] bg-[var(--surface-secondary)]/50 flex items-center gap-1 shrink-0 z-10">
-                                <template v-if="activeTab === 'signatures'">
-                                    <button @click="signatureEditor?.chain().focus().toggleBold().run()" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] transition-colors" :class="{ 'bg-[var(--surface-active)] text-[var(--interactive-primary)] shadow-sm': signatureEditor?.isActive('bold'), 'text-[var(--text-secondary)]': !signatureEditor?.isActive('bold') }"><BoldIcon class="w-4 h-4" /></button>
-                                    <button @click="signatureEditor?.chain().focus().toggleItalic().run()" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] transition-colors" :class="{ 'bg-[var(--surface-active)] text-[var(--interactive-primary)] shadow-sm': signatureEditor?.isActive('italic'), 'text-[var(--text-secondary)]': !signatureEditor?.isActive('italic') }"><ItalicIcon class="w-4 h-4" /></button>
-                                    <div class="w-px h-4 bg-[var(--border-default)] mx-1"></div>
-                                    <button @click="signatureEditor?.chain().focus().toggleBulletList().run()" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] transition-colors" :class="{ 'bg-[var(--surface-active)] text-[var(--interactive-primary)] shadow-sm': signatureEditor?.isActive('bulletList'), 'text-[var(--text-secondary)]': !signatureEditor?.isActive('bulletList') }"><ListIcon class="w-4 h-4" /></button>
-                                    <div class="w-px h-4 bg-[var(--border-default)] mx-1"></div>
-                                    <button @click="triggerImageUpload" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] transition-colors text-[var(--text-secondary)]"><ImageIcon class="w-4 h-4" /></button>
-                                </template>
-                                 <template v-else>
-                                    <button @click="templateEditor?.chain().focus().toggleBold().run()" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] transition-colors" :class="{ 'bg-[var(--surface-active)] text-[var(--interactive-primary)] shadow-sm': templateEditor?.isActive('bold'), 'text-[var(--text-secondary)]': !templateEditor?.isActive('bold') }"><BoldIcon class="w-4 h-4" /></button>
-                                    <button @click="templateEditor?.chain().focus().toggleItalic().run()" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] transition-colors" :class="{ 'bg-[var(--surface-active)] text-[var(--interactive-primary)] shadow-sm': templateEditor?.isActive('italic'), 'text-[var(--text-secondary)]': !templateEditor?.isActive('italic') }"><ItalicIcon class="w-4 h-4" /></button>
-                                    <div class="w-px h-4 bg-[var(--border-default)] mx-1"></div>
-                                    <button @click="templateEditor?.chain().focus().toggleBulletList().run()" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] transition-colors" :class="{ 'bg-[var(--surface-active)] text-[var(--interactive-primary)] shadow-sm': templateEditor?.isActive('bulletList'), 'text-[var(--text-secondary)]': !templateEditor?.isActive('bulletList') }"><ListIcon class="w-4 h-4" /></button>
-                                    <div class="w-px h-4 bg-[var(--border-default)] mx-1"></div>
-                                    <button @click="triggerImageUpload" class="p-1.5 rounded-md hover:bg-[var(--surface-tertiary)] transition-colors text-[var(--text-secondary)]"><ImageIcon class="w-4 h-4" /></button>
-                                </template>
-                                <!-- Hidden File Input -->
-                                <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="handleImageUpload">
+                            <div
+                                v-else
+                                v-for="account in storageAccounts"
+                                :key="account.id"
+                                class="p-4 rounded-xl border border-[var(--border-default)] bg-[var(--surface-subtle)]"
+                            >
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-xl shadow-sm">
+                                            {{ account.email[0].toUpperCase() }}
+                                        </div>
+                                        <div>
+                                            <div class="font-medium text-[var(--text-primary)]">{{ account.email }}</div>
+                                            <div class="text-xs text-[var(--text-secondary)] capitalize">{{ account.provider }}</div>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-sm font-bold text-[var(--text-primary)]">
+                                            {{ formatBytes(account.storage_used) }}
+                                        </div>
+                                        <div class="text-xs text-[var(--text-secondary)]">
+                                            of {{ formatBytes(account.storage_limit) }}
+                                        </div>
+                                    </div>
+                                </div>
+                                 <div class="w-full bg-[var(--surface-tertiary)] rounded-full h-2 overflow-hidden">
+                                    <div
+                                        class="h-full rounded-full transition-all duration-500"
+                                        :class="getUsageDetails(account).bg"
+                                        :style="{ width: `${getUsageDetails(account).percent}%` }"
+                                    ></div>
+                                </div>
                             </div>
-
-                            <!-- Actual Editor -->
-                            <div class="flex-1 overflow-y-auto bg-[var(--surface-primary)] z-0 px-8 py-6">
-                                 <editor-content 
-                                    :editor="activeTab === 'signatures' ? signatureEditor : templateEditor" 
-                                    class="h-full max-w-3xl mx-auto"
-                                    @update="activeTab === 'signatures' ? handleSaveSignature() : handleSaveTemplate()"
-                                />
-                            </div>
-                        </template>
-
-                        <div v-else class="flex-1 flex flex-col items-center justify-center text-[var(--text-muted)] z-10">
-                            <!-- ... Empty State logic matches original but logic is wrapped in v-else ... -->
-                            <div class="w-20 h-20 rounded-3xl bg-[var(--surface-secondary)] flex items-center justify-center mb-6 border border-[var(--border-default)] shadow-sm transform -rotate-3">
-                                <component :is="activeTab === 'signatures' ? PenToolIcon : FileTextIcon" class="w-10 h-10 opacity-40 text-[var(--text-primary)]" />
-                            </div>
-                            <p class="text-xl font-semibold text-[var(--text-primary)]">No {{ activeTab === 'signatures' ? 'signature' : 'template' }} selected</p>
-                            <p class="text-sm mt-2 max-w-xs text-center text-[var(--text-secondary)]">Select an item from the list on the left to edit it, or create a new one to get started.</p>
-                            <Button class="mt-8" @click="activeTab === 'signatures' ? handleNewSignature() : handleNewTemplate()">
-                                <PlusIcon class="w-4 h-4 mr-2" />
-                                {{ activeTab === 'signatures' ? 'Create Signature' : 'Create Template' }}
-                            </Button>
                         </div>
                     </div>
-                </div>
-
-                <!-- Accounts Tab (Cards) -->
-                <div v-if="activeTab === 'accounts'" class="p-8 max-w-5xl mx-auto w-full h-full overflow-y-auto">
-                    <EmailAccountsSection mode="personal" />
-                </div>
-
-                <!-- Storage Tab (Centered Card) -->
-                <!-- Storage Tab (List of Cards) -->
-                <div v-if="activeTab === 'storage'" class="flex flex-col items-center h-full p-8 overflow-y-auto">
-                    <div class="max-w-3xl w-full">
-                        <div class="text-center mb-10">
-                            <h2 class="text-3xl font-bold text-[var(--text-primary)] tracking-tight">Storage Usage</h2>
-                            <p class="text-base text-[var(--text-secondary)] mt-2">View storage usage for each connected account.</p>
-                        </div>
-
-                        <div v-if="loadingStorage" class="flex justify-center p-12">
-                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand-primary)]"></div>
-                        </div>
-
-                        <div v-else class="space-y-8">
-                            <Card v-for="account in storageAccounts" :key="account.id" padding="xl" class="shadow-xl border-[var(--border-active)] w-full relative overflow-hidden transition-all hover:shadow-2xl">
-                                 <!-- Header -->
-                                <div class="flex items-center gap-3 mb-6">
-                                    <div class="p-2 rounded-lg bg-[var(--surface-tertiary)] text-[var(--text-primary)]">
-                                        <MailIcon class="w-6 h-6" />
-                                    </div>
-                                    <div>
-                                        <h3 class="text-lg font-bold text-[var(--text-primary)]">{{ account.email }}</h3>
-                                        <p class="text-xs text-[var(--text-muted)]">{{ account.provider_name }}</p>
-                                    </div>
-                                    <div class="ml-auto text-xs text-[var(--text-muted)] italic" v-if="account.storage_updated_at">
-                                        Updated {{ formatDate(account.storage_updated_at) }}
-                                    </div>
-                                </div>
-
-                                <div class="flex items-end justify-between mb-8 relative">
-                                    <div v-if="account.storage_limit">
-                                        <div class="text-4xl font-bold text-[var(--text-primary)] tracking-tighter">{{ formatBytes(account.storage_used) }}</div>
-                                        <div class="text-sm font-medium text-[var(--text-muted)] mt-2 uppercase tracking-wider">Used of {{ formatBytes(account.storage_limit) }}</div>
-                                    </div>
-                                    <div v-else>
-                                        <div class="text-4xl font-bold text-[var(--text-primary)] tracking-tighter">{{ formatBytes(account.storage_used) }}</div>
-                                        <div class="text-sm font-medium text-[var(--text-muted)] mt-2 uppercase tracking-wider">Storage Used</div>
-                                    </div>
-                                    
-                                    <div v-if="account.storage_limit" class="text-2xl font-bold" :class="getUsageColorClass(getUsagePercent(account))">
-                                        {{ getUsagePercent(account).toFixed(1) }}%
-                                    </div>
-                                    <div v-else class="text-2xl font-bold text-[var(--text-secondary)]">
-                                        Unknown Limit
-                                    </div>
-                                </div>
-
-                                <!-- Progress Bar -->
-                                <div v-if="account.storage_limit" class="h-4 w-full bg-[var(--surface-tertiary)] rounded-full overflow-hidden flex mb-6 ring-1 ring-[var(--border-default)] relative shadow-inner">
-                                    <div 
-                                        class="h-full relative group transition-all duration-1000 ease-out" 
-                                        :class="getProgressBarColorClass(getUsagePercent(account))"
-                                        :style="{ width: `${getUsagePercent(account)}%` }"
-                                    >
-                                        <div class="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                    </div>
-                                </div>
-                                <div v-else class="h-4 w-full bg-[var(--surface-tertiary)] rounded-full overflow-hidden mb-6 relative">
-                                     <div class="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--surface-tertiary)]/50 to-transparent w-1/2 animate-[shimmer_2s_infinite]"></div>
-                                </div>
-
-                                <div class="flex justify-between text-sm text-[var(--text-secondary)]">
-                                    <span>Emails & Attachments</span>
-                                    <span class="font-mono font-bold">{{ formatBytes(account.storage_used) }}</span>
-                                </div>
-                            </Card>
-                        </div>
-                   
-                        <!-- Empty State -->
-                        <div v-if="!loadingStorage && storageAccounts.length === 0" class="text-center p-12 text-[var(--text-muted)]">
-                            <HardDriveIcon class="w-12 h-12 mx-auto mb-4 opacity-50" />
-                            <p>No verified email accounts connected.</p>
-                        </div>
-
-                    </div>
-                </div>
-
+                </Card>
             </div>
         </div>
     </div>
 </template>
+
+<style scoped>
+/* Force RichTextEditor to integrate seamlessly */
+:deep(.prose) {
+    max-width: none;
+}
+
+/* Override inner container rounding and borders */
+:deep(.rounded-xl) {
+    border-radius: 0 !important;
+    border: none !important;
+}
+
+:deep(.rounded-t-xl) {
+    border-radius: 0 !important;
+}
+
+/* Ensure editor toolbar border bottom matches */
+:deep(.border-b) {
+    border-bottom: 1px solid var(--border-default) !important;
+}
+</style>

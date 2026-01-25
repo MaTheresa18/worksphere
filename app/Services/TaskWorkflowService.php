@@ -353,19 +353,19 @@ class TaskWorkflowService
     public function toggleHold(Task $task, User $user, ?string $notes = null): bool
     {
         $targetStatus = $task->status === TaskStatus::OnHold ? TaskStatus::InProgress : TaskStatus::OnHold;
-        
+
         // If coming back from hold, we might return to Open if it wasn't started?
         // But simplified logic: OnHold <-> InProgress (or previous state)
         // For now, let's assume OnHold usually goes back to InProgress or Open.
         // Based on allowedTransitions: OnHold -> InProgress, Open.
-        
+
         if ($targetStatus === TaskStatus::InProgress && ! $task->canTransitionTo(TaskStatus::InProgress)) {
-             // Fallback to Open if InProgress is not allowed (e.g. from Draft -> OnHold -> Open)
-             if ($task->canTransitionTo(TaskStatus::Open)) {
-                 $targetStatus = TaskStatus::Open;
-             } else {
-                 return false;
-             }
+            // Fallback to Open if InProgress is not allowed (e.g. from Draft -> OnHold -> Open)
+            if ($task->canTransitionTo(TaskStatus::Open)) {
+                $targetStatus = TaskStatus::Open;
+            } else {
+                return false;
+            }
         }
 
         if (! $task->canTransitionTo($targetStatus)) {
@@ -387,7 +387,7 @@ class TaskWorkflowService
         $result = $task->transitionTo(TaskStatus::PmReview, $user, $notes ?? 'Sent to PM for review');
 
         if ($result) {
-             $this->auditService->log(
+            $this->auditService->log(
                 AuditAction::Updated,
                 AuditCategory::TaskManagement,
                 $task,

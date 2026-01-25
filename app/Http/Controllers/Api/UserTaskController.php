@@ -33,7 +33,7 @@ class UserTaskController extends Controller
         if ($request->input('scope') === 'assigned') {
             // Optimized: User's assigned tasks imply visibility, skip deep project checks
             // We still eager load project.team for the UI
-             $query = Task::query()
+            $query = Task::query()
                 ->with(['project.team', 'assignee', 'creator'])
                 ->where('assigned_to', $user->id);
             // We don't need the deep whereHas check here because assignment implies visibility

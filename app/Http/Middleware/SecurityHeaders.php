@@ -60,7 +60,7 @@ class SecurityHeaders
         // Vite Dev Server Handling
         if (app()->isLocal()) {
             $scriptSrc .= " 'unsafe-eval'";
-            
+
             // Check if Vite is running (hot file exists)
             $hotFile = public_path('hot');
             if (file_exists($hotFile)) {
@@ -70,7 +70,7 @@ class SecurityHeaders
                     $scriptSrc .= " {$viteUrl}";
                     $styleSrc .= " {$viteUrl}";
                     // Websocket connection for HMR (ws://...)
-                    $connectSrc .= " ws://" . parse_url($viteUrl, PHP_URL_HOST) . ":" . parse_url($viteUrl, PHP_URL_PORT);
+                    $connectSrc .= ' ws://'.parse_url($viteUrl, PHP_URL_HOST).':'.parse_url($viteUrl, PHP_URL_PORT);
                     $connectSrc .= " {$viteUrl}";
                 }
             }
@@ -79,7 +79,7 @@ class SecurityHeaders
         // Definitions
         $policy = [
             "default-src 'self'",
-            "script-src {$scriptSrc}",
+            "script-src {$scriptSrc} https://www.google.com https://www.gstatic.com",
             // Unsafe-inline for styles is required by many UI libraries (Vue/Tailwind components)
             // Fonts.bunny.net is used for Inter font
             "style-src {$styleSrc}",
@@ -89,7 +89,9 @@ class SecurityHeaders
             "img-src 'self' data: https:",
             // Connect to self, Vite HMR, and Reverb WebSockets (port 9000 usually)
             // Adding ws: and wss: schemes generally to allow websocket connections
-            "connect-src {$connectSrc} ws: wss:",
+            "connect-src {$connectSrc} ws: wss: https://www.google.com",
+            // Frame src for reCAPTCHA
+            "frame-src 'self' https://www.google.com https://www.gstatic.com",
             "object-src 'none'",
             "base-uri 'self'",
             "form-action 'self'",

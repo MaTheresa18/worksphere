@@ -384,9 +384,9 @@ const emit = defineEmits<{
 }>();
 
 // Composables
-const { signatures, selectedSignatureId, getSignatureById } =
+const { signatures, selectedSignatureId, getSignatureById, fetchSignatures } =
     useEmailSignatures();
-const { templates, getTemplateById } = useEmailTemplates();
+const { templates, getTemplateById, fetchTemplates } = useEmailTemplates();
 const store = useEmailStore();
 
 // Account Management
@@ -409,6 +409,10 @@ const accountItems = computed(() =>
 
 // Fetch accounts and set default
 onMounted(async () => {
+    // Start parallel fetches for independent data
+    fetchSignatures();
+    fetchTemplates();
+    
     try {
         const response = await emailAccountService.list();
         accounts.value = response || [];

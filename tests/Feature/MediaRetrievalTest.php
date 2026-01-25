@@ -27,7 +27,7 @@ class MediaRetrievalTest extends TestCase
 
         $user = User::factory()->create();
         $file = UploadedFile::fake()->create('test.jpg', 100);
-        
+
         // Manually create media attached to user
         $media = $user->addMedia($file)->toMediaCollection('avatar', 'public');
 
@@ -39,9 +39,9 @@ class MediaRetrievalTest extends TestCase
     public function test_it_serves_file_from_s3_disk()
     {
         Storage::fake('s3');
-        
+
         $user = User::factory()->create();
-        
+
         // Manually create media record for S3
         $media = Media::create([
             'model_type' => User::class,
@@ -62,7 +62,7 @@ class MediaRetrievalTest extends TestCase
         Storage::disk('s3')->put($media->getPath(), 'content');
 
         $this->actingAs($user)
-             ->getJson("/api/media/{$media->id}")
-             ->assertStatus(200);
+            ->getJson("/api/media/{$media->id}")
+            ->assertStatus(200);
     }
 }

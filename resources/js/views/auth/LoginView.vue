@@ -85,7 +85,7 @@ function toTitleCase(str: string | null | undefined): string {
     if (!str) return "";
     return str.replace(
         /\w\S*/g,
-        (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+        (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase(),
     );
 }
 
@@ -99,7 +99,7 @@ onMounted(async () => {
     // Handle social login verification required
     if (route.query.verification_required) {
         toast.error(
-            (route.query.message as string) || "Verification required."
+            (route.query.message as string) || "Verification required.",
         );
         router.replace({ path: route.path });
     }
@@ -147,13 +147,13 @@ onMounted(async () => {
             const reason = route.query.reason as string;
             if (reason === "expired_or_invalid_link") {
                 toast.error(
-                    "This verification link has expired or is invalid. Please request a new one."
+                    "This verification link has expired or is invalid. Please request a new one.",
                 );
             } else if (reason === "user_not_found") {
                 toast.error("Account not found. Please register first.");
             } else {
                 toast.error(
-                    "Invalid verification link. Please request a new one."
+                    "Invalid verification link. Please request a new one.",
                 );
             }
         }
@@ -250,13 +250,13 @@ const errors = ref<AuthErrors>({});
 
 // Computed
 const hasUserHints = computed(
-    () => authStore.userHints.hasVisited && hintsLoaded.value
+    () => authStore.userHints.hasVisited && hintsLoaded.value,
 );
 const userHintName = computed(
-    () => toTitleCase(authStore.userHints.nameHint) || "there"
+    () => toTitleCase(authStore.userHints.nameHint) || "there",
 );
 const userHintInitials = computed(
-    () => authStore.initialsHint || authStore.initials || "U"
+    () => authStore.initialsHint || authStore.initials || "U",
 );
 
 // Password strength validation
@@ -325,8 +325,16 @@ async function handleLogin() {
         return;
     }
 
-    // Get reCAPTCHA token if enabled
-    const recaptchaToken = recaptchaEnabled.value ? 'generate_fresh' : undefined;
+    // Generate reCAPTCHA token if enabled
+    let recaptchaToken: string | undefined = undefined;
+    if (recaptchaEnabled.value) {
+        try {
+            console.log("Executing reCAPTCHA for login...");
+            recaptchaToken = await executeRecaptcha("login");
+        } catch (e) {
+            console.error("ReCAPTCHA execution failed", e);
+        }
+    }
 
     const result = await authStore.login({
         ...loginForm.value,
@@ -389,7 +397,7 @@ async function handle2FA() {
         twoFactorForm.value.method || "totp",
         twoFactorForm.value.useRecoveryCode
             ? twoFactorForm.value.recoveryCode
-            : undefined
+            : undefined,
     );
 
     if (result.success) {
@@ -445,8 +453,16 @@ async function handleRegister() {
 
     console.log("[LoginView] All validations passed");
 
-    // Get reCAPTCHA token if enabled
-    const recaptchaToken = recaptchaEnabled.value ? 'generate_fresh' : undefined;
+    // Generate reCAPTCHA token if enabled
+    let recaptchaToken: string | undefined = undefined;
+    if (recaptchaEnabled.value) {
+        try {
+            console.log("Executing reCAPTCHA for registration...");
+            recaptchaToken = await executeRecaptcha("register");
+        } catch (e) {
+            console.error("ReCAPTCHA execution failed", e);
+        }
+    }
 
     const payload = {
         name: registerForm.value.name,
@@ -467,7 +483,7 @@ async function handleRegister() {
 
     if (result.success) {
         console.log(
-            "[LoginView] Registration successful, redirecting to dashboard"
+            "[LoginView] Registration successful, redirecting to dashboard",
         );
         animateExit("/dashboard?welcome=1");
     } else {
@@ -526,7 +542,7 @@ async function handleChallengeVerified(token: string) {
     showChallenge.value = false;
     // Retry login with the new v2 token
     // We need to pass it to authStore.login
-    
+
     // Refresh v3 token as well, as the previous one likely expired
     let freshV3Token: string | null = null;
     if (recaptchaEnabled.value) {
@@ -536,25 +552,28 @@ async function handleChallengeVerified(token: string) {
     const payload = {
         ...loginForm.value,
         recaptcha_v2_token: token,
-        recaptcha_token: freshV3Token || undefined
+        recaptcha_token: freshV3Token || undefined,
     };
-    
+
     const result = await authStore.login(payload);
-    
-     if (result.success) {
+
+    if (result.success) {
         animateExit("/dashboard");
     } else if (result.requires_2fa) {
         // Reuse logic from handleLogin - ideally refactor this common logic
         // For brevity, copy-paste or extract. I'll extract common 2FA handler if it gets complex.
-         twoFactorMethods.value = result.methods || ["totp"];
-         // ... rest of 2FA setup ...
-         // Copying essential parts
+        twoFactorMethods.value = result.methods || ["totp"];
+        // ... rest of 2FA setup ...
+        // Copying essential parts
         try {
             const { data } = await api.get("/api/two-factor-challenge/methods");
             if (data.methods) twoFactorMethods.value = data.methods;
-             twoFactorContactInfo.value = { phone: data.phone, email: data.email };
+            twoFactorContactInfo.value = {
+                phone: data.phone,
+                email: data.email,
+            };
         } catch (e) {}
-        
+
         if (twoFactorMethods.value.length === 1) {
             twoFactorForm.value.method = twoFactorMethods.value[0];
         } else {
@@ -562,7 +581,8 @@ async function handleChallengeVerified(token: string) {
         }
         currentView.value = "2fa";
     } else {
-        errors.value.loginGeneral = result.error || "Login failed after challenge.";
+        errors.value.loginGeneral =
+            result.error || "Login failed after challenge.";
     }
 }
 
@@ -570,59 +590,71 @@ async function handleChallengeVerified(token: string) {
 import { remove } from "animejs";
 
 const enter = (el: Element, done: () => void) => {
-    if (!el) { done(); return; }
+    if (!el) {
+        done();
+        return;
+    }
     remove(el);
     animate(el as HTMLElement, {
         opacity: [0, 1],
         translateY: [20, 0],
         duration: 400,
-        easing: 'easeOutExpo',
+        easing: "easeOutExpo",
     }).then(() => done());
 };
 
 const leave = (el: Element, done: () => void) => {
-    if (!el) { done(); return; }
+    if (!el) {
+        done();
+        return;
+    }
     remove(el);
     animate(el as HTMLElement, {
         opacity: 0,
         translateY: -20,
         duration: 200,
-        easing: 'easeInQuad',
+        easing: "easeInQuad",
     }).then(() => done());
 };
 
 const slideFadeEnter = (el: Element, done: () => void) => {
-    if (!el) { done(); return; }
+    if (!el) {
+        done();
+        return;
+    }
     remove(el);
     // Prepare initial state
     const target = el as HTMLElement;
-    target.style.opacity = '0';
-    target.style.height = '0';
-    target.style.overflow = 'hidden';
-    target.style.transform = 'translateY(-10px)';
+    target.style.opacity = "0";
+    target.style.height = "0";
+    target.style.overflow = "hidden";
+    target.style.transform = "translateY(-10px)";
 
     // Measure full height
-    const targetHeight = target.scrollHeight + 'px';
+    const targetHeight = target.scrollHeight + "px";
 
     animate(target, {
         opacity: [0, 1],
         height: [0, targetHeight],
         translateY: [-10, 0],
         duration: 400,
-        easing: 'easeOutExpo',
+        easing: "easeOutExpo",
     }).then(() => {
-        target.style.height = 'auto'; // Reset to auto after animation
-        target.style.overflow = '';
+        target.style.height = "auto"; // Reset to auto after animation
+        target.style.overflow = "";
         done();
     });
 };
 
 const slideFadeLeave = (el: Element, done: () => void) => {
-    if (!el) { done(); return; }
+    if (!el) {
+        done();
+        return;
+    }
     remove(el);
     const target = el as HTMLElement;
-    target.style.overflow = 'hidden';
-    target.style.height = target.scrollHeight + 'px'; // Set explicit height to animate from
+    target.style.overflow = "hidden";
+    target.style.height = target.scrollHeight + "px"; // Set explicit height to animate from
 
     animate(target, {
         opacity: 0,
@@ -633,39 +665,38 @@ const slideFadeLeave = (el: Element, done: () => void) => {
         paddingTop: 0,
         paddingBottom: 0,
         duration: 300,
-        easing: 'easeInExpo',
+        easing: "easeInExpo",
     }).then(() => done());
 };
 
 // Exit animation before redirect
 async function animateExit(path: string) {
     // Select the main container (first child of the transition wrapper)
-    const container = document.querySelector('.auth-container'); 
-    
+    const container = document.querySelector(".auth-container");
+
     if (container) {
         await animate(container as HTMLElement, {
             opacity: [1, 0],
             translateY: [0, -20],
             scale: [1, 0.95],
             duration: 400,
-            easing: 'easeInExpo'
+            easing: "easeInExpo",
         }).finished;
     }
-    
+
     router.push(path);
 }
 </script>
 
 <template>
     <div class="relative min-h-[400px]">
-        <Transition
-            mode="out-in"
-            :css="false"
-            @enter="enter"
-            @leave="leave"
-        >
+        <Transition mode="out-in" :css="false" @enter="enter" @leave="leave">
             <!-- Login View -->
-            <div v-if="currentView === 'login'" key="login" class="space-y-6 auth-container">
+            <div
+                v-if="currentView === 'login'"
+                key="login"
+                class="space-y-6 auth-container"
+            >
                 <!-- Welcome Back Banner (if user has visited before) -->
                 <Transition
                     :css="false"
@@ -888,7 +919,6 @@ async function animateExit(path: string) {
 
             <!-- 2FA Challenge View -->
             <div v-else-if="currentView === '2fa'" key="2fa" class="space-y-6">
-
                 <!-- Header -->
                 <div class="space-y-2">
                     <button
@@ -945,8 +975,8 @@ async function animateExit(path: string) {
                                     method === "totp"
                                         ? "Authenticator App"
                                         : method === "sms"
-                                        ? "SMS Verification"
-                                        : "Email Verification"
+                                          ? "SMS Verification"
+                                          : "Email Verification"
                                 }}
                             </h3>
                             <p
@@ -956,8 +986,8 @@ async function animateExit(path: string) {
                                     method === "totp"
                                         ? "Use a code from your authenticator app"
                                         : method === "sms"
-                                        ? "Receive a code via text message"
-                                        : "Receive a code via email"
+                                          ? "Receive a code via text message"
+                                          : "Receive a code via email"
                                 }}
                             </p>
                         </div>
@@ -1037,8 +1067,8 @@ async function animateExit(path: string) {
                                     twoFactorForm.method === "totp"
                                         ? "Authenticator App"
                                         : twoFactorForm.method === "sms"
-                                        ? "SMS Verification"
-                                        : "Email Verification"
+                                          ? "SMS Verification"
+                                          : "Email Verification"
                                 }}
                             </h3>
                             <p
@@ -1048,13 +1078,13 @@ async function animateExit(path: string) {
                                     twoFactorForm.method === "totp"
                                         ? "Enter the 6-digit code from your app"
                                         : hasSent2FACode
-                                        ? "Code sent to " +
-                                          (twoFactorForm.method === "sms"
-                                              ? twoFactorContactInfo.phone ||
-                                                "your phone"
-                                              : twoFactorContactInfo.email ||
-                                                "your email")
-                                        : "We need to verify your identity."
+                                          ? "Code sent to " +
+                                            (twoFactorForm.method === "sms"
+                                                ? twoFactorContactInfo.phone ||
+                                                  "your phone"
+                                                : twoFactorContactInfo.email ||
+                                                  "your email")
+                                          : "We need to verify your identity."
                                 }}
                             </p>
                         </div>
@@ -1453,7 +1483,7 @@ async function animateExit(path: string) {
             </div>
         </Transition>
 
-        <RecaptchaChallengeModal 
+        <RecaptchaChallengeModal
             :show="showChallenge"
             @close="showChallenge = false"
             @verified="handleChallengeVerified"

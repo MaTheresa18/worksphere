@@ -5,9 +5,7 @@ namespace Tests\Feature;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class TeamMemberProfileTest extends TestCase
@@ -123,11 +121,12 @@ class TeamMemberProfileTest extends TestCase
 
         $response->assertStatus(403);
     }
+
     public function test_team_owner_can_upload_avatar()
     {
         $owner = User::factory()->create();
         $team = Team::factory()->create(['owner_id' => $owner->id]);
-        
+
         $team->members()->syncWithoutDetaching([
             $owner->id => ['role' => \App\Enums\TeamRole::TeamLead->value],
         ]);
@@ -140,7 +139,7 @@ class TeamMemberProfileTest extends TestCase
             ]);
 
         $response->assertStatus(200);
-        
+
         // Assert file exists in storage/media and is on public disk
         $media = $team->fresh()->getMedia('avatars')->first();
         $this->assertNotNull($media);

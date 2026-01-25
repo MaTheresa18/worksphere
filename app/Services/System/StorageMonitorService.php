@@ -71,9 +71,9 @@ class StorageMonitorService
             $config = Config::get("filesystems.disks.{$diskName}");
             // Only proceed if disk exists, uses 's3' driver, and has a bucket
             if ($config && ($config['driver'] ?? '') === 's3' && ! empty($config['bucket'])) {
-                
+
                 $bucketName = $config['bucket'];
-                
+
                 // Avoid checking the same bucket multiple times if mapped to multiple disks
                 // Key by bucket name to deduplicate
                 if (isset($buckets[$bucketName])) {
@@ -110,7 +110,7 @@ class StorageMonitorService
                 }
             }
         }
-    
+
         if (empty($buckets)) {
             return null;
         }

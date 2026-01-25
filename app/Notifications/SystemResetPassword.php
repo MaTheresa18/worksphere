@@ -18,7 +18,7 @@ class SystemResetPassword extends ResetPassword implements ShouldQueue
     {
         // 1. Resolve 'noreply' system account
         $noreplyAccount = app(\App\Services\SystemEmailService::class)->getAccountForUsage('noreply');
-        
+
         // 2. Register dynamic mailer if account exists
         $mailer = null;
         if ($noreplyAccount) {
@@ -27,7 +27,7 @@ class SystemResetPassword extends ResetPassword implements ShouldQueue
         }
 
         $link = $this->resetUrl($notifiable);
-        
+
         // 3. Build the MailMessage
         $message = (new MailMessage)
             ->subject('Reset Password Notification')

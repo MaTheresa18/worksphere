@@ -7,8 +7,8 @@ use App\Http\Resources\PermissionOverrideResource;
 use App\Models\PermissionOverride;
 use App\Models\Team;
 use App\Models\User;
-use App\Services\PermissionService;
 use App\Services\LockoutProtectionService;
+use App\Services\PermissionService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -124,7 +124,7 @@ class PermissionOverrideController extends Controller
         if ($override->type === 'grant') {
             try {
                 // If we are destroying a grant, it's effectively "revoking", so we check if this removal is safe
-                // The action name 'revoke' is arbitrary here as long as service logs correctly, 
+                // The action name 'revoke' is arbitrary here as long as service logs correctly,
                 // but for validation we just need to know we are removing this permission access.
                 // The service method 'validatePermissionOverride' handles checking if removing this permission is safe.
                 $this->lockoutProtection->validatePermissionOverride($override->user, $override->permission, 'revoke');

@@ -17,7 +17,7 @@ class SmartMediaUrlServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new SmartMediaUrlService();
+        $this->service = new SmartMediaUrlService;
     }
 
     public function test_is_private_returns_true_for_private_disk(): void

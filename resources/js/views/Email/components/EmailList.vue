@@ -343,9 +343,7 @@
         >
             <span
                 >{{ filteredEmails.length }} of
-                {{
-                    store.$state.totalEmails || filteredEmails.length
-                }}
+                {{ totalEmails || filteredEmails.length }}
                 emails</span
             >
             <div class="flex items-center gap-3">
@@ -411,13 +409,10 @@ const {
     isLoadingMore,
     newEmailCount,
     accountStatus,
+    totalEmails,
 } = storeToRefs(store);
 
 // Track total email count from store
-const totalEmails = computed(() => store.emails.length);
-const totalEmailsServer = computed(
-    () => (store as any).$state?.totalEmails || 0,
-);
 
 const listRef = ref<HTMLElement | null>(null);
 let animation: any = null;

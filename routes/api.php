@@ -398,11 +398,15 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
         Route::get('folder-counts', [\App\Http\Controllers\Api\EmailController::class, 'folderCounts']);
 
         // Signatures
+        Route::get('signatures/{signature}/media', [\App\Http\Controllers\Api\EmailSignatureController::class, 'indexMedia']);
         Route::post('signatures/{signature}/media', [\App\Http\Controllers\Api\EmailSignatureController::class, 'uploadMedia']);
+        Route::delete('signatures/{signature}/media/{media}', [\App\Http\Controllers\Api\EmailSignatureController::class, 'deleteMedia']);
         Route::apiResource('signatures', \App\Http\Controllers\Api\EmailSignatureController::class);
 
         // Templates
+        Route::get('templates/{template}/media', [\App\Http\Controllers\Api\EmailTemplateController::class, 'indexMedia']);
         Route::post('templates/{template}/media', [\App\Http\Controllers\Api\EmailTemplateController::class, 'uploadMedia']);
+        Route::delete('templates/{template}/media/{media}', [\App\Http\Controllers\Api\EmailTemplateController::class, 'deleteMedia']);
         Route::apiResource('templates', \App\Http\Controllers\Api\EmailTemplateController::class);
 
         // Attachments

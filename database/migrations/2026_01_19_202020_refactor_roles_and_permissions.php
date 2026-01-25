@@ -1,13 +1,11 @@
 <?php
 
+use App\Models\Team;
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use App\Models\Team;
-use App\Models\TeamRole;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 return new class extends Migration
 {
@@ -34,12 +32,12 @@ return new class extends Migration
         })->values();
 
         foreach ($allPermissions as $perm) {
-             Permission::firstOrCreate(['name' => $perm, 'guard_name' => 'web']);
+            Permission::firstOrCreate(['name' => $perm, 'guard_name' => 'web']);
         }
 
         foreach ($rolesConfig as $name => $config) {
             $role = Role::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
-            
+
             // Assign Permissions
             if (isset($config['permissions'])) {
                 if (in_array('*', $config['permissions'])) {
@@ -77,7 +75,7 @@ return new class extends Migration
                             ->where('id', $member->id) // pivot id usually
                             ->update([
                                 'role' => $newRoleSlug,
-                                'team_role_id' => $newTeamRole->id
+                                'team_role_id' => $newTeamRole->id,
                             ]);
                     }
                 }
@@ -90,13 +88,14 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // It's a destructive one-way migration effectively. 
+        // It's a destructive one-way migration effectively.
         // We could define logic to restore old roles, but user said "don't worry about existing data".
     }
 
     protected function mapLegacyRole(string $oldRole): string
     {
         $oldRole = strtolower($oldRole);
+
         return match ($oldRole) {
             'owner' => 'team_lead', // Owner becomes Team Lead
             'admin' => 'subject_matter_expert', // Admin becomes SME

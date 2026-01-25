@@ -6,9 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\RoleResource;
 use App\Models\RoleChangeRequest;
 use App\Models\User;
-use App\Http\Resources\UserResource;
-use App\Services\RoleChangeService;
 use App\Services\LockoutProtectionService;
+use App\Services\RoleChangeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -22,6 +21,7 @@ class RoleController extends Controller
         protected RoleChangeService $roleChangeService,
         protected LockoutProtectionService $lockoutProtection
     ) {}
+
     /**
      * Get all roles with their permissions.
      */
@@ -146,7 +146,7 @@ class RoleController extends Controller
             $currentPermissions = $role->permissions->pluck('name')->toArray();
             $newPermissions = $validated['permissions'];
             $removedPermissions = array_diff($currentPermissions, $newPermissions);
-            
+
             try {
                 $this->lockoutProtection->validateRolePermissionChange($role, $removedPermissions);
             } catch (\Exception $e) {
@@ -157,11 +157,11 @@ class RoleController extends Controller
         // 2. Check Approval Requirements
         if ($this->roleChangeService->requiresApproval($role)) {
             $roleChangeRequest = null;
-            $reason = "Update role " . $role->name; // In a real app, we'd valid 'reason' from request
+            $reason = 'Update role '.$role->name; // In a real app, we'd valid 'reason' from request
 
             // Create request for permission change
             if (isset($validated['permissions'])) {
-                 $roleChangeRequest = $this->roleChangeService->requestRolePermissionChange(
+                $roleChangeRequest = $this->roleChangeService->requestRolePermissionChange(
                     $role,
                     $validated['permissions'],
                     $reason,
@@ -170,21 +170,21 @@ class RoleController extends Controller
             }
             // Create request for title change check (if name changed)
             elseif (isset($validated['name']) && $validated['name'] !== $role->name) {
-                 $roleChangeRequest = $this->roleChangeService->requestRoleTitleChange(
+                $roleChangeRequest = $this->roleChangeService->requestRoleTitleChange(
                     $role,
                     $validated['name'],
                     $reason,
                     $request->user()
                 );
             }
-            
+
             if ($roleChangeRequest) {
                 return response()->json([
                     'message' => 'Role update requires approval. Request created.',
                     'data' => [
-                        'request_id' => $roleChangeRequest->id, 
-                        'status' => 'pending_approval'
-                    ]
+                        'request_id' => $roleChangeRequest->id,
+                        'status' => 'pending_approval',
+                    ],
                 ], 202);
             }
         }

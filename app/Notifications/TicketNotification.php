@@ -8,7 +8,6 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\BroadcastMessage;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Str;
 
@@ -64,7 +63,7 @@ class TicketNotification extends Notification implements ShouldBroadcast, Should
     {
         // 1. Resolve 'support' system account
         $supportAccount = app(\App\Services\SystemEmailService::class)->getAccountForUsage('support');
-        
+
         // 2. Register dynamic mailer if account exists
         $mailer = null;
         if ($supportAccount) {

@@ -591,7 +591,7 @@ class TicketService implements TicketServiceContract
 
         foreach ($tickets as $ticket) {
             // Check response SLA warning
-            if ($ticket->sla_response_hours && !$ticket->first_response_at && !$ticket->sla_response_warning_at) {
+            if ($ticket->sla_response_hours && ! $ticket->first_response_at && ! $ticket->sla_response_warning_at) {
                 if ($ticket->isResponseSlaWarning()) {
                     $ticket->sla_response_warning_at = now();
                     $ticket->save();
@@ -619,7 +619,7 @@ class TicketService implements TicketServiceContract
             }
 
             // Check resolution SLA warning
-            if ($ticket->sla_resolution_hours && !$ticket->status->isTerminal() && !$ticket->sla_resolution_warning_at) {
+            if ($ticket->sla_resolution_hours && ! $ticket->status->isTerminal() && ! $ticket->sla_resolution_warning_at) {
                 if ($ticket->isResolutionSlaWarning()) {
                     $ticket->sla_resolution_warning_at = now();
                     $ticket->save();

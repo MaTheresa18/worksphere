@@ -92,7 +92,7 @@ class TeamPermission
         // Useful for resource controllers that receive team_id in payload
         $inputTeamId = $request->input('team_id') ?? $request->input('team');
         if ($inputTeamId) {
-             return Team::where('public_id', $inputTeamId)
+            return Team::where('public_id', $inputTeamId)
                 ->orWhere('id', $inputTeamId)
                 ->first();
         }

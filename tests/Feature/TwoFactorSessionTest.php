@@ -26,7 +26,7 @@ class TwoFactorSessionTest extends TestCase
         // Disable Audit Logging
         \Illuminate\Support\Facades\Config::set('audit.models', []);
         \Illuminate\Support\Facades\Config::set('audit.async', false);
-        
+
         // Disable Recaptcha for this test
         \Illuminate\Support\Facades\Config::set('recaptcha.enabled', false);
 
@@ -45,25 +45,25 @@ class TwoFactorSessionTest extends TestCase
 
         // Assert user is NOT fully authenticated yet
         $this->assertFalse(Auth::check());
-        
+
         // Assert session has the login.id
         $this->assertEquals($user->id, session('login.id'));
         $initialSessionId = session()->getId();
 
         // 3. Verify 2FA challenge
-        // We need to generate a valid TOTP code. 
-        // Since we mocked the secret, we can use a library or just mock the verification in the controller if we wanted, 
-        // but it's better to use a real code if possible. 
+        // We need to generate a valid TOTP code.
+        // Since we mocked the secret, we can use a library or just mock the verification in the controller if we wanted,
+        // but it's better to use a real code if possible.
         // However, generating a TOTP code in test might be complex without the library content.
-        // Let's rely on the fact that we can mock the Google2FA provider OR just force the verification to pass 
+        // Let's rely on the fact that we can mock the Google2FA provider OR just force the verification to pass
         // by mocking the method if needed.
-        
+
         // Actually, looking at TwoFactorController, it uses PragmaRX\Google2FA\Google2FA.
-        
-        // For simplicity, let's mock the Verify action in the controller? 
-        // No, that changes the code we are testing. 
+
+        // For simplicity, let's mock the Verify action in the controller?
+        // No, that changes the code we are testing.
         // Let's create a recovery code which is easier to test.
-        
+
         $recoveryCode = '12345678-1234-1234-1234-123456789012';
         $user->update([
             'two_factor_recovery_codes' => encrypt(json_encode([$recoveryCode])),
@@ -85,12 +85,12 @@ class TwoFactorSessionTest extends TestCase
         $this->assertNotEquals($initialSessionId, $newSessionId);
 
         // 6. Attempt a subsequent API call (Dashboard)
-        // This is key: The test client handles cookies automatically. 
-        // If this passes, it means the backend session logic is sound. 
+        // This is key: The test client handles cookies automatically.
+        // If this passes, it means the backend session logic is sound.
         // The issue likely resides in the FRONTEND handling of the new CSRF token.
-        
+
         $dashboardResponse = $this->getJson('/api/dashboard', ['Referer' => 'http://localhost']);
-        
+
         $dashboardResponse->assertStatus(200);
     }
 }

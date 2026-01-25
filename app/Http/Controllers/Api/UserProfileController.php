@@ -34,6 +34,7 @@ class UserProfileController extends Controller
             ],
         ]);
     }
+
     /**
      * Get tasks assigned to the user (Team Work).
      */

@@ -480,6 +480,7 @@ export const useEmailStore = defineStore('email', () => {
         filterDateFrom,
         filterDateTo,
         newEmailCount,
+        totalEmails,
         accountStatus,
         
         // Getters

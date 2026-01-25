@@ -3,8 +3,6 @@
 namespace Tests\Feature;
 
 use App\Events\TicketCreated;
-use App\Events\TicketSlaBreached;
-use App\Events\TicketUpdated;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Notifications\TicketNotification;

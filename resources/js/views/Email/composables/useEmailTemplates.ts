@@ -70,6 +70,11 @@ export function useEmailTemplates() {
         }
     }
 
+    function getTemplateById(id: string | null) {
+        if (!id) return null;
+        return templates.value.find(t => t.id === id) || null;
+    }
+
     return {
         templates,
         selectedTemplateId,
@@ -78,7 +83,8 @@ export function useEmailTemplates() {
         addTemplate,
         updateTemplate,
         deleteTemplate,
-        uploadImage
+        uploadImage,
+        getTemplateById
     };
 }
 

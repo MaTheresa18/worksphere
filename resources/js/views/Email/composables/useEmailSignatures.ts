@@ -70,6 +70,11 @@ export function useEmailSignatures() {
         }
     }
 
+    function getSignatureById(id: string | null) {
+        if (!id) return null;
+        return signatures.value.find(s => s.id === id) || null;
+    }
+
     return {
         signatures,
         selectedSignatureId,
@@ -78,7 +83,8 @@ export function useEmailSignatures() {
         addSignature,
         updateSignature,
         deleteSignature,
-        uploadImage
+        uploadImage,
+        getSignatureById
     };
 }
 

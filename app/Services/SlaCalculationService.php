@@ -24,7 +24,7 @@ class SlaCalculationService
 
         $workingHours = 0;
         $current = $start->copy();
-        
+
         $businessStart = $this->getBusinessHoursStart();
         $businessEnd = $this->getBusinessHoursEnd();
         $businessDays = $this->getBusinessDays();
@@ -33,12 +33,14 @@ class SlaCalculationService
             // Check if current day is a business day
             if (! in_array($current->dayOfWeek, $businessDays)) {
                 $current->addDay()->startOfDay();
+
                 continue;
             }
 
             // Check if current day is a holiday
             if ($this->isHoliday($current)) {
                 $current->addDay()->startOfDay();
+
                 continue;
             }
 
@@ -113,7 +115,7 @@ class SlaCalculationService
 
         return Cache::remember($cacheKey, now()->addDays(30), function () use ($countryCode, $date) {
             $holidays = $this->holidayService->getHolidays($countryCode, $date->year);
-            
+
             foreach ($holidays as $holiday) {
                 if ($holiday['date'] === $date->format('Y-m-d')) {
                     return true;
@@ -135,11 +137,11 @@ class SlaCalculationService
 
         $result = $start->copy();
         $hoursToAdd = $hours;
-        
+
         $businessStart = $this->getBusinessHoursStart();
         $businessEnd = $this->getBusinessHoursEnd();
         $businessDays = $this->getBusinessDays();
-        
+
         // Calculate hours in a business day
         $hoursPerDay = Carbon::parse($businessStart)->floatDiffInHours(Carbon::parse($businessEnd));
 
@@ -147,6 +149,7 @@ class SlaCalculationService
             // Skip to next business day if current day is not a business day
             if (! in_array($result->dayOfWeek, $businessDays) || $this->isHoliday($result)) {
                 $result->addDay()->startOfDay();
+
                 continue;
             }
 
@@ -161,6 +164,7 @@ class SlaCalculationService
             // If we're past business hours, move to next day
             if ($result->gte($dayEnd)) {
                 $result->addDay()->startOfDay();
+
                 continue;
             }
 
@@ -217,7 +221,7 @@ class SlaCalculationService
 
             $deadline = $this->getResponseSlaDeadline($ticket);
             $elapsed = $this->calculateWorkingHoursBetween($ticket->created_at, now());
-            
+
             return ($elapsed / $ticket->sla_response_hours) * 100;
         }
 
@@ -228,7 +232,7 @@ class SlaCalculationService
 
             $deadline = $this->getResolutionSlaDeadline($ticket);
             $elapsed = $this->calculateWorkingHoursBetween($ticket->created_at, now());
-            
+
             return ($elapsed / $ticket->sla_resolution_hours) * 100;
         }
 
@@ -284,7 +288,7 @@ class SlaCalculationService
     protected function getBusinessDays(): array
     {
         $days = $this->settingsService->get('tickets.sla.business_days', [1, 2, 3, 4, 5]);
-        
+
         return is_array($days) ? $days : json_decode($days, true) ?? [1, 2, 3, 4, 5];
     }
 

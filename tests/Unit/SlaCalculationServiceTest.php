@@ -12,16 +12,18 @@ use Tests\TestCase;
 class SlaCalculationServiceTest extends TestCase
 {
     protected $settingsService;
+
     protected $holidayService;
+
     protected $service;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         $this->settingsService = Mockery::mock(AppSettingsService::class);
         $this->holidayService = Mockery::mock(HolidayService::class);
-        
+
         $this->service = new SlaCalculationService(
             $this->settingsService,
             $this->holidayService
@@ -62,7 +64,7 @@ class SlaCalculationServiceTest extends TestCase
         // Start: Monday 16:00
         // End: Tuesday 10:00
         // Expected: 1 hour (Mon 16-17) + 1 hour (Tue 9-10) = 2 hours
-        
+
         $start = Carbon::parse('2023-06-05 16:00:00'); // Monday
         $end = Carbon::parse('2023-06-06 10:00:00'); // Tuesday
 
@@ -95,11 +97,11 @@ class SlaCalculationServiceTest extends TestCase
         $this->settingsService->shouldReceive('get')
             ->with('tickets.sla.holiday_country', 'US')
             ->andReturn('US');
-            
+
         // Mock holiday service to return a holiday on Tuesday 2023-06-06
         $this->holidayService->shouldReceive('getHolidays')
             ->andReturn([
-                ['date' => '2023-06-06', 'name' => 'Test Holiday']
+                ['date' => '2023-06-06', 'name' => 'Test Holiday'],
             ]);
 
         // Start: Monday 16:00

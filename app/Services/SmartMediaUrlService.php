@@ -21,7 +21,6 @@ class SmartMediaUrlService
      * @param  Media  $media  The media item
      * @param  string  $conversion  Optional conversion name (e.g., 'thumb', 'optimized')
      * @param  int  $expiryMinutes  Expiry time for signed URLs (default: 60 minutes)
-     * @return string|null
      */
     public function getUrl(Media $media, string $conversion = '', int $expiryMinutes = 60): ?string
     {
@@ -29,8 +28,9 @@ class SmartMediaUrlService
             $diskName = $media->disk;
             $diskConfig = config("filesystems.disks.{$diskName}");
 
-            if (!$diskConfig) {
+            if (! $diskConfig) {
                 Log::warning("SmartMediaUrlService: Unknown disk '{$diskName}' for media ID {$media->id}");
+
                 return null;
             }
 
@@ -51,6 +51,7 @@ class SmartMediaUrlService
                 'error' => $e->getMessage(),
                 'disk' => $media->disk,
             ]);
+
             return null;
         }
     }
@@ -59,8 +60,6 @@ class SmartMediaUrlService
      * Get URLs for multiple media items.
      *
      * @param  iterable<Media>  $mediaItems
-     * @param  string  $conversion
-     * @param  int  $expiryMinutes
      * @return array<int, string|null>
      */
     public function getUrls(iterable $mediaItems, string $conversion = '', int $expiryMinutes = 60): array
@@ -69,15 +68,12 @@ class SmartMediaUrlService
         foreach ($mediaItems as $media) {
             $urls[$media->id] = $this->getUrl($media, $conversion, $expiryMinutes);
         }
+
         return $urls;
     }
 
     /**
      * Format a media item with smart URL for API responses.
-     *
-     * @param  Media  $media
-     * @param  int  $expiryMinutes
-     * @return array
      */
     public function formatForApi(Media $media, int $expiryMinutes = 60): array
     {
@@ -93,20 +89,17 @@ class SmartMediaUrlService
             'thumb_url' => $media->hasGeneratedConversion('thumb')
                 ? $this->getUrl($media, 'thumb', $expiryMinutes)
                 : null,
-            'is_private' => !$this->isPublicDisk(config("filesystems.disks.{$media->disk}")),
+            'is_private' => ! $this->isPublicDisk(config("filesystems.disks.{$media->disk}")),
             'created_at' => $media->created_at?->toIso8601String(),
         ];
     }
 
     /**
      * Determine if a disk configuration is public.
-     *
-     * @param  array|null  $diskConfig
-     * @return bool
      */
     protected function isPublicDisk(?array $diskConfig): bool
     {
-        if (!$diskConfig) {
+        if (! $diskConfig) {
             return false;
         }
 
@@ -116,7 +109,7 @@ class SmartMediaUrlService
         }
 
         // Check if disk has a public URL configured
-        if (!empty($diskConfig['url'])) {
+        if (! empty($diskConfig['url'])) {
             return true;
         }
 
@@ -125,13 +118,11 @@ class SmartMediaUrlService
 
     /**
      * Check if a media item is on a private disk.
-     *
-     * @param  Media  $media
-     * @return bool
      */
     public function isPrivate(Media $media): bool
     {
         $diskConfig = config("filesystems.disks.{$media->disk}");
-        return !$this->isPublicDisk($diskConfig);
+
+        return ! $this->isPublicDisk($diskConfig);
     }
 }

@@ -21,7 +21,7 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         \Illuminate\Support\Facades\Log::info('Dashboard Index Called', [
-            'user_id' => $user->id, 
+            'user_id' => $user->id,
             'session_id' => $request->session()->getId(),
         ]);
         $team = $this->resolveTeam($request);

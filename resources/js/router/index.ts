@@ -912,7 +912,12 @@ const routes: RouteRecordRaw[] = [
                 path: "/email/settings",
                 name: "email-settings",
                 component: () => import("@/views/Email/EmailSettings.vue"),
-                meta: { title: "Email Settings" },
+                meta: {
+                    title: "Email Settings",
+                    breadcrumb: "Settings",
+                    breadcrumbParent: { name: "email", label: "Email" },
+                    showBreadcrumbs: true,
+                },
             },
             {
                 path: "email",
