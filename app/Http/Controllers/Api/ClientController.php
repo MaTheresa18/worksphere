@@ -69,45 +69,54 @@ class ClientController extends Controller
         $user = $request->user();
         $isAdmin = $user->hasRole('administrator');
         $query = Client::query()->with(['team']);
+        
+        // Check for route parameter 'team' from teams/{team}/clients
+        $routeTeam = $request->route('team');
+        
+        // If route parameter is present (string public_id due to implicit binding typically being disabled or custom in API routes for this structure, or model if bound)
+        // Given existing code uses 'public_id', lets check if we got a string or model. 
+        // Typically in this codebase, we see manual resolution often.
+        // Let's rely on standard resolution logic combined with the input check.
+
+        $requestedTeamId = $routeTeam ?? $request->header('X-Team-ID') ?? $request->input('team_id');
 
         // 1. Resolve Scope
         if ($isAdmin) {
-            // Admin can see everything, or filter by specific team
-            if ($request->filled('team_id')) {
-                $teamPublicId = $request->input('team_id');
-                // Resolve team by public_id ONLY. orWhere('id') is dangerous with UUIDs
-                // as MySQL casts strings to integers if they look like digits.
-                $targetTeam = \App\Models\Team::where('public_id', $teamPublicId)->firstOrFail();
+             // Admin Scoping
+            if ($requestedTeamId) {
+                // Check if it's already a model (Route Model Binding) or string
+                if ($requestedTeamId instanceof \App\Models\Team) {
+                    $targetTeam = $requestedTeamId;
+                } else {
+                     $targetTeam = \App\Models\Team::where('public_id', $requestedTeamId)->firstOrFail();
+                }
                 $query->where('team_id', $targetTeam->id);
             }
             // If no team_id, returns all clients globally
         } else {
             // Regular User: Strict Scoping
-            // Check if specific team requested via header or param
-            $requestedTeamId = $request->header('X-Team-ID') ?? $request->input('team_id');
-            
             if ($requestedTeamId) {
-                // Resolve requested team by public_id ONLY.
-                $targetTeam = \App\Models\Team::where('public_id', $requestedTeamId)
-                    ->first();
+                if ($requestedTeamId instanceof \App\Models\Team) {
+                    $targetTeam = $requestedTeamId;
+                } else {
+                    $targetTeam = \App\Models\Team::where('public_id', $requestedTeamId)->first();
+                }
 
                 if (! $targetTeam) {
                     abort(404, 'Team not found');
                 }
 
-                // Verify Membership & Permission
-                // We use the PermissionService via app() container for consistency with middleware
+                // Verify Permissions
                 $permissionService = app(\App\Services\PermissionService::class);
+                // Allow if user is member (basic) or specific permission? existing code used 'clients.view'
+                // But index might be called by dropdowns, so 'clients.view' is reasonable.
                 if (! $permissionService->hasTeamPermission($user, $targetTeam, 'clients.view')) {
-                    abort(403, 'Insufficient permissions for this team.');
+                     abort(403, 'Insufficient permissions for this team.');
                 }
 
                 $query->where('team_id', $targetTeam->id);
             } else {
                 // No specific team requested. Show clients from ALL teams where user has permission.
-                // Iterate user teams and collect IDs where they have permission.
-                // Only active teams? Assuming user->teams returns active membership.
-                
                 $permissionService = app(\App\Services\PermissionService::class);
                 $allowedTeamIds = $user->teams->filter(function ($team) use ($user, $permissionService) {
                     return $permissionService->hasTeamPermission($user, $team, 'clients.view');

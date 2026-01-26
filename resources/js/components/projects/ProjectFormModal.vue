@@ -19,7 +19,7 @@ const props = defineProps<Props>();
 const emit = defineEmits(['update:open', 'saved']);
 
 const authStore = useAuthStore();
-const currentTeamId = computed(() => authStore.user?.teams?.length === 1 ? authStore.user.teams[0].public_id : (authStore.currentTeam?.public_id || formValues.value.team_id));
+// const currentTeamId removed as it is no longer used
 const isEditing = computed(() => !!props.project);
 const isLoading = ref(false);
 const clients = ref<any[]>([]);
@@ -80,20 +80,30 @@ const priorityOptions = [
 // Fetch clients
 const fetchClients = async () => {
     try {
-        const teamId = currentTeamId.value;
-        if (!teamId) return;
+        const teamId = formValues.value.team_id;
+        if (!teamId) {
+            clients.value = [];
+            return;
+        }
 
         const response = await axios.get(`/api/teams/${teamId}/clients`);
-        console.log('Fetched clients:', response.data.data);
         clients.value = response.data.data || [];
     } catch (e) {
         console.error('Failed to fetch clients', e);
+        clients.value = [];
     }
 };
 
-watch(() => currentTeamId.value, (newVal) => {
+watch(() => formValues.value.team_id, (newVal) => {
     if (newVal) {
+        // Clear client selection if team changes and client doesn't belong to new team (simple check: just clear it)
+        // Unless we are in edit mode and initializing
+        if (!isEditing.value || (isEditing.value && newVal !== props.project?.team_id)) {
+             formValues.value.client_id = '';
+        }
         fetchClients();
+    } else {
+        clients.value = [];
     }
 });
 
@@ -130,7 +140,7 @@ watch(() => props.project, (newProject) => {
         formValues.value = {
             name: newProject.name,
             description: newProject.description || '',
-            team_id: newProject.team_id,
+            team_id: newProject.team_id, // This will trigger the watcher
             client_id: newProject.client?.id || newProject.client?.public_id || '',
             status: newProject.status?.value || newProject.status || 'active',
             priority: newProject.priority?.value || newProject.priority || 'medium',
@@ -140,10 +150,11 @@ watch(() => props.project, (newProject) => {
         };
     } else {
         resetForm();
+        const defaultTeamId = authStore.currentTeam?.public_id || (authStore.user?.teams?.length === 1 ? authStore.user.teams[0].public_id : '');
         formValues.value = {
             name: '',
             description: '',
-            team_id: authStore.user?.teams?.length === 1 ? authStore.user.teams[0].public_id : '',
+            team_id: defaultTeamId,
             client_id: '',
             status: 'active',
             priority: 'medium',
@@ -167,7 +178,8 @@ onMounted(() => {
 });
 
 const onSubmit = async () => {
-    if (!currentTeamId.value) {
+    const selectedTeamId = formValues.value.team_id;
+    if (!selectedTeamId) {
         toast.error('Please select a team.');
         return;
     }
@@ -186,11 +198,11 @@ const onSubmit = async () => {
         };
 
         if (isEditing.value && props.project) {
-            const response = await axios.put(`/api/teams/${currentTeamId.value}/projects/${props.project.public_id}`, payload);
+            const response = await axios.put(`/api/teams/${selectedTeamId}/projects/${props.project.public_id}`, payload);
             emit('saved', response.data.data);
             toast.success('Project updated successfully');
         } else {
-            const response = await axios.post(`/api/teams/${currentTeamId.value}/projects`, payload);
+            const response = await axios.post(`/api/teams/${selectedTeamId}/projects`, payload);
             emit('saved', response.data.data);
             toast.success('Project created successfully');
         }
@@ -198,6 +210,7 @@ const onSubmit = async () => {
         isOpen.value = false;
     } catch (err: any) {
         console.error('Failed to save project', err);
+        // Handle team creation limit error specifically if needed, though general error is fine
         toast.error(err.response?.data?.message || 'Failed to save project');
     } finally {
         isLoading.value = false;
