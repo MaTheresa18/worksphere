@@ -218,24 +218,27 @@ class CalendarOAuthController extends Controller
 
         $channelId = $request->header('X-Goog-Channel-ID');
         $resourceState = $request->header('X-Goog-Resource-State');
+        $resourceId = $request->header('X-Goog-Resource-ID');
 
-        Log::info('Google Calendar Webhook Received', [
-            'headers' => $request->headers->all(),
+        Log::info('DEBUG: Google Calendar Webhook Received', [
             'channel_id' => $channelId,
+            'resource_id' => $resourceId,
             'state' => $resourceState,
-            'resource_id' => $request->header('X-Goog-Resource-ID'),
+            'headers' => $request->headers->all(), // Keep full headers for deep debug
         ]);
 
         if ($resourceState === 'sync') {
+            Log::info("DEBUG: Google Calendar Webhook - Sync Confirmation (Channel: {$channelId})");
             return response('OK', 200);
         }
 
         if ($resourceState === 'exists') {
+            Log::info("DEBUG: Google Calendar Webhook - Changes Detected. Dispatching Job for Channel: {$channelId}");
+            
             // Dispatch job to process the change
-            // We need to map Channel ID back to a User/Calendar
-            // Typically we store channel_id -> user_id in DB (maybe in social_accounts table)
-            // For now, logging payload.
             \App\Jobs\HandleGoogleWebhookJob::dispatch($channelId);
+            
+            Log::info("DEBUG: Google Calendar Webhook - Job Dispatched (Channel: {$channelId})");
         }
 
         return response('OK', 200);
