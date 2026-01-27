@@ -248,7 +248,7 @@ class RoleChangeService
                 'role_permission_change' => $this->applyRolePermissionChange($request, $changes),
                 'role_create' => $this->applyRoleCreate($request, $changes),
                 'role_delete' => $this->applyRoleDelete($request, $changes),
-                default => throw new \InvalidArgumentException("Unknown request type: {$request->type}"),
+                default => throw new \InvalidArgumentException("Unknown request type: " . htmlspecialchars($request->type)),
             };
 
             $request->update([

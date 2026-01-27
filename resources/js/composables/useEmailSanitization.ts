@@ -40,13 +40,21 @@ export function useEmailSanitization(email: () => Email | null) {
         attachments.forEach((att) => {
             if (att.content_id && att.url) {
                 // Match src="cid:content_id" patterns
-                const cidPattern = new RegExp(
-                    `src=["']cid:${att.content_id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']`,
-                    'gi'
-                );
+                // Using split/join or replaceAll is safer/faster than dynamic RegExp
+                const search = `cid:${att.content_id}`;
                 
-                if (cidPattern.test(result)) {
-                    result = result.replace(cidPattern, `src="${att.url}"`);
+                // Replace in src="cid:..." and src='cid:...'
+                const doubleQuoteSearch = `src="cid:${att.content_id}"`;
+                const singleQuoteSearch = `src='cid:${att.content_id}'`;
+                const replacement = `src="${att.url}"`;
+
+                if (result.includes(doubleQuoteSearch)) {
+                    result = result.replaceAll(doubleQuoteSearch, replacement);
+                    usedCids.add(att.content_id);
+                }
+                
+                if (result.includes(singleQuoteSearch)) {
+                    result = result.replaceAll(singleQuoteSearch, replacement);
                     usedCids.add(att.content_id);
                 }
             }

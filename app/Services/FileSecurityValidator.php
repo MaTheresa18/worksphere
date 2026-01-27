@@ -96,7 +96,7 @@ class FileSecurityValidator
 
         if (in_array($extension, self::BLOCKED_EXTENSIONS, true)) {
             throw ValidationException::withMessages([
-                'file' => "Files with extension '.{$extension}' are not allowed for security reasons.",
+                'file' => "Files with extension '." . htmlspecialchars($extension) . "' are not allowed for security reasons.",
             ]);
         }
     }
@@ -113,7 +113,7 @@ class FileSecurityValidator
 
         if (! in_array($fileMime, $allowedMimes, true)) {
             throw ValidationException::withMessages([
-                'file' => "File type '{$fileMime}' is not allowed. Allowed types: ".implode(', ', $allowedMimes),
+                'file' => "File type '" . htmlspecialchars($fileMime) . "' is not allowed. Allowed types: ".implode(', ', $allowedMimes),
             ]);
         }
     }
@@ -172,7 +172,7 @@ class FileSecurityValidator
 
         if (! $signatureMatches) {
             throw ValidationException::withMessages([
-                'file' => "File content does not match the expected format for '{$mimeType}'. The file may be corrupted or mislabeled.",
+                'file' => "File content does not match the expected format for '" . htmlspecialchars($mimeType) . "'. The file may be corrupted or mislabeled.",
             ]);
         }
     }
@@ -208,7 +208,7 @@ class FileSecurityValidator
 
         if ($suspiciousExtension && in_array(strtolower($suspiciousExtension), self::BLOCKED_EXTENSIONS, true)) {
             throw ValidationException::withMessages([
-                'file' => "Filename '{$originalName}' contains suspicious double extension. Please rename the file.",
+                'file' => "Filename '" . htmlspecialchars($originalName) . "' contains suspicious double extension. Please rename the file.",
             ]);
         }
     }

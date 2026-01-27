@@ -1427,19 +1427,61 @@ class MaintenanceService
 
         try {
             // Simple approach for reasonably sized logs:
-            // Use shell 'tail' if available (Linux)
-            if (function_exists('exec') && (str_starts_with(PHP_OS, 'LIN') || PHP_OS === 'Darwin')) {
-                $output = [];
-                exec("tail -n $lines ".escapeshellarg($logFile), $output);
-
-                // Add color coding or filtering here if needed
-
+            // Native PHP tail implementation
+            $chunkSize = 4096;
+            $fileSize = File::size($logFile);
+            $handle = fopen($logFile, 'rb');
+            
+            if (!$handle) {
                 return [
-                    'content' => $output,
-                    'file_size' => $this->formatBytes(File::size($logFile)),
+                    'content' => [],
+                    'file_size' => $this->formatBytes($fileSize),
                     'path' => $logFile,
                 ];
             }
+
+            $linesFound = [];
+            $position = $fileSize;
+            $currentLine = '';
+
+            while ($position > 0 && count($linesFound) < $lines) {
+                $readSize = min($chunkSize, $position);
+                $position -= $readSize;
+                
+                fseek($handle, $position);
+                $chunk = fread($handle, $readSize);
+                
+                // Process chunk in reverse
+                for ($i = strlen($chunk) - 1; $i >= 0; $i--) {
+                    $char = $chunk[$i];
+                    if ($char === "\n") {
+                        if ($currentLine !== '') {
+                            // Prepend because we are reading backwards
+                            array_unshift($linesFound, strrev($currentLine));
+                            $currentLine = '';
+                        }
+                        
+                        if (count($linesFound) >= $lines) {
+                            break;
+                        }
+                    } else {
+                        $currentLine .= $char;
+                    }
+                }
+            }
+            
+            // Add any remaining line segment
+            if ($currentLine !== '') {
+                 array_unshift($linesFound, strrev($currentLine));
+            }
+
+            fclose($handle);
+
+            return [
+                'content' => $linesFound,
+                'file_size' => $this->formatBytes($fileSize),
+                'path' => $logFile,
+            ];
 
             // Fallback for purely PHP
             $content = file($logFile);

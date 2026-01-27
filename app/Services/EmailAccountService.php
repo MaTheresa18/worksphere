@@ -143,7 +143,7 @@ class EmailAccountService
     {
         $config = $this->oauthConfig[$provider] ?? null;
         if (! $config) {
-            throw new \InvalidArgumentException("Unknown provider: {$provider}");
+            throw new \InvalidArgumentException("Unknown provider: " . htmlspecialchars($provider));
         }
 
         $params = [

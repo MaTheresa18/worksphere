@@ -38,11 +38,11 @@ class MediaService
         $file = request()->file($key);
 
         if (! $file) {
-            throw new \InvalidArgumentException("No file found for key: {$key}");
+            throw new \InvalidArgumentException("No file found for key: " . htmlspecialchars($key));
         }
 
         if (is_array($file)) {
-            throw new \InvalidArgumentException("Multiple files found for key: {$key}. Use attachMultipleFromRequest or handle individually.");
+            throw new \InvalidArgumentException("Multiple files found for key: " . htmlspecialchars($key) . ". Use attachMultipleFromRequest or handle individually.");
         }
 
         return $this->attach($model, $file, $collection, $fileName, $friendName, $disk);

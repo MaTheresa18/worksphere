@@ -310,13 +310,28 @@ export function initMediaViewer() {
                 });
             }
 
-            // Render metadata
-            this.infoContent.innerHTML = metadata.map(item => `
-                <div class="mv-info-row">
-                    <span class="mv-info-label">${item.label}</span>
-                    <span class="mv-info-value">${item.value}</span>
-                </div>
-            `).join('');
+            // Render metadata safely
+            this.infoContent.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+
+            metadata.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'mv-info-row';
+
+                const labelSpan = document.createElement('span');
+                labelSpan.className = 'mv-info-label';
+                labelSpan.innerText = item.label;
+
+                const valueSpan = document.createElement('span');
+                valueSpan.className = 'mv-info-value';
+                valueSpan.innerText = item.value;
+
+                row.appendChild(labelSpan);
+                row.appendChild(valueSpan);
+                fragment.appendChild(row);
+            });
+
+            this.infoContent.appendChild(fragment);
         },
 
         getFilename(url) {

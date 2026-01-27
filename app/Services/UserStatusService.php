@@ -35,7 +35,7 @@ class UserStatusService
         // Validate status
         $allowedStatuses = array_keys(config('roles.statuses', []));
         if (! in_array($newStatus, $allowedStatuses)) {
-            throw new \InvalidArgumentException("Invalid status: {$newStatus}");
+            throw new \InvalidArgumentException("Invalid status: " . htmlspecialchars($newStatus));
         }
 
         // Don't allow changing to same status

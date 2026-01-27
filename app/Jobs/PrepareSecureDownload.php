@@ -75,22 +75,34 @@ class PrepareSecureDownload implements ShouldQueue
         }
 
         // Zip Logic
-        $fileList = array_map('escapeshellarg', $filesToZip);
-        $fileListStr = implode(' ', $fileList);
+        $zip = new \ZipArchive;
+        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true) {
+            foreach ($filesToZip as $file) {
+                $filePath = $tempDir.'/'.$file;
+                if (file_exists($filePath)) {
+                    $zip->addFile($filePath, $file);
+                }
+            }
+            
+            // Set password if supported by this PHP version/Zip extension
+            if (method_exists($zip, 'setPassword')) {
+                $zip->setPassword($password);
+            }
+            
+            $zip->close();
+        } else {
+             throw new \Exception('Failed to create secure zip archive.');
+        }
 
-        // Using exec zip (assuming Linux environment as per user info)
-        $cmd = 'cd '.escapeshellarg($tempDir).' && zip -P '.escapeshellarg($password).' -j '.escapeshellarg($zipName).' '.$fileListStr;
-
-        exec($cmd, $output, $returnVar);
+        // Validate zip created successfully
+        if (!file_exists($zipPath)) {
+            Log::error('Zip creation failed');
+            throw new \Exception('Failed to create secure zip archive (file missing).');
+        }
 
         // Cleanup temp files immediately
         foreach ($filesToZip as $f) {
             @unlink($tempDir.'/'.$f);
-        }
-
-        if ($returnVar !== 0) {
-            Log::error('Zip creation failed', ['output' => $output]);
-            throw new \Exception('Failed to create secure zip archive.');
         }
 
         // 1. Send Email to requester
