@@ -86,10 +86,23 @@ class ProjectController extends Controller
      */
     public function index(Request $request, Team $team): AnonymousResourceCollection
     {
-        $this->authorizeTeamPermission($team, 'projects.view');
+        $user = $request->user();
+        $hasView = $this->permissionService->hasTeamPermission($user, $team, 'projects.view');
+        $hasViewAssigned = $this->permissionService->hasTeamPermission($user, $team, 'projects.view_assigned');
+
+        if (! $hasView && ! $hasViewAssigned) {
+            abort(403, 'You do not have permission to view projects in this team.');
+        }
 
         $query = $this->getProjectsQuery($request)
             ->where('team_id', $team->id);
+
+        // If user only has assigned view, filter by membership
+        if (! $hasView && $hasViewAssigned) {
+            $query->whereHas('members', function ($q) use ($user) {
+                $q->where('users.id', $user->id);
+            });
+        }
 
         $projects = $query->paginate($request->integer('per_page', 15));
 
@@ -320,8 +333,21 @@ class ProjectController extends Controller
      */
     public function show(Team $team, Project $project): JsonResponse
     {
-        $this->authorizeTeamPermission($team, 'projects.view');
+        $user = request()->user();
+        $hasView = $this->permissionService->hasTeamPermission($user, $team, 'projects.view');
+        $hasViewAssigned = $this->permissionService->hasTeamPermission($user, $team, 'projects.view_assigned');
+
+        if (! $hasView && ! $hasViewAssigned) {
+            abort(403, 'You do not have permission to perform this action.');
+        }
+
         $this->ensureProjectBelongsToTeam($team, $project);
+
+        if (! $hasView && $hasViewAssigned) {
+            if (! $project->hasMember($user)) {
+                abort(403, 'You do not have permission to view this project.');
+            }
+        }
 
         $project->load(['creator', 'client', 'members', 'archiver', 'team']);
         $project->loadCount(['tasks', 'members']);
@@ -556,8 +582,21 @@ class ProjectController extends Controller
      */
     public function stats(Team $team, Project $project): JsonResponse
     {
-        $this->authorizeTeamPermission($team, 'projects.view');
+        $user = request()->user();
+        $hasView = $this->permissionService->hasTeamPermission($user, $team, 'projects.view');
+        $hasViewAssigned = $this->permissionService->hasTeamPermission($user, $team, 'projects.view_assigned');
+
+        if (! $hasView && ! $hasViewAssigned) {
+            abort(403, 'You do not have permission to perform this action.');
+        }
+
         $this->ensureProjectBelongsToTeam($team, $project);
+
+        if (! $hasView && $hasViewAssigned) {
+            if (! $project->hasMember($user)) {
+                abort(403, 'You do not have permission to view this project stats.');
+            }
+        }
 
         $stats = [
             'total_tasks' => $project->tasks()->count(),
@@ -583,8 +622,21 @@ class ProjectController extends Controller
      */
     public function files(Request $request, Team $team, Project $project): JsonResponse
     {
-        $this->authorizeTeamPermission($team, 'projects.view');
+        $user = request()->user();
+        $hasView = $this->permissionService->hasTeamPermission($user, $team, 'projects.view');
+        $hasViewAssigned = $this->permissionService->hasTeamPermission($user, $team, 'projects.view_assigned');
+
+        if (! $hasView && ! $hasViewAssigned) {
+             abort(403, 'You do not have permission to perform this action.');
+        }
+
         $this->ensureProjectBelongsToTeam($team, $project);
+
+        if (! $hasView && $hasViewAssigned) {
+            if (! $project->hasMember($user)) {
+                abort(403, 'You do not have permission to view this project files.');
+            }
+        }
 
         $collection = $request->input('collection', 'attachments');
         $media = $project->getMedia($collection);
@@ -616,6 +668,8 @@ class ProjectController extends Controller
 
         return response()->json($files);
     }
+
+    // ... (upload/delete file methods stay strictly manage_files) ...
 
     /**
      * Upload a file to the project.
@@ -702,8 +756,22 @@ class ProjectController extends Controller
      */
     public function calendar(Request $request, Team $team, Project $project): JsonResponse
     {
-        $this->authorizeTeamPermission($team, 'projects.view');
+        $user = request()->user();
+        $hasView = $this->permissionService->hasTeamPermission($user, $team, 'projects.view');
+        $hasViewAssigned = $this->permissionService->hasTeamPermission($user, $team, 'projects.view_assigned');
+
+        if (! $hasView && ! $hasViewAssigned) {
+             abort(403, 'You do not have permission to perform this action.');
+        }
+
         $this->ensureProjectBelongsToTeam($team, $project);
+
+        if (! $hasView && $hasViewAssigned) {
+            if (! $project->hasMember($user)) {
+                abort(403, 'You do not have permission to view this project.');
+            }
+        }
+
 
         $events = [];
 

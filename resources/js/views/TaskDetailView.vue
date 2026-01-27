@@ -99,7 +99,9 @@ const isBulkDeleting = ref(false);
 const showEditModal = ref(false);
 
 // Current team
-const currentTeamId = computed(() => authStore.currentTeam?.public_id);
+const currentTeamId = computed(() => {
+    return (route.params.teamId as string) || authStore.currentTeam?.public_id;
+});
 
 // Status & Priority configs - synced with backend TaskStatus enum
 const statusConfig: Record<

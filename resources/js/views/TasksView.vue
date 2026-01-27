@@ -74,6 +74,7 @@ const statusOptions = [
 ];
 
 const priorityOptions = [
+    { label: "All", value: "" },
     { label: "Low", value: "1" },
     { label: "Medium", value: "2" },
     { label: "High", value: "3" },
@@ -91,18 +92,31 @@ const showCreateModal = ref(false);
 const showEditModal = ref(false);
 const selectedTask = ref<any>(null);
 
-const fetchProjects = async () => {
-    if (!authStore.currentTeamId) return;
+// Fetch Projects for a specific team
+const fetchProjects = async (teamId: string) => {
+    projectOptions.value = [];
+    projectFilter.value = ""; // Reset project filter
+    
+    if (!teamId) return;
+
     try {
         const response = await axios.get(
-            `/api/teams/${authStore.currentTeamId}/projects`
+            `/api/teams/${teamId}/projects`
         );
-        projectOptions.value = response.data.data.map((p: any) => ({
+        // Handle no projects case safely
+        const projects = response.data.data || [];
+        
+        projectOptions.value = projects.map((p: any) => ({
             label: p.name,
             value: p.id,
         }));
+
+        // Default to first project as requested by user
+        if (projectOptions.value.length > 0) {
+            projectFilter.value = projectOptions.value[0].value;
+        }
     } catch (e) {
-        console.error("Failed to fetch projects");
+        console.error("Failed to fetch projects", e);
     }
 };
 
@@ -112,10 +126,24 @@ const onCreateTask = () => {
 };
 
 const onTaskClick = (task: any) => {
-    // Navigate to full detail page
-    router.push(
-        `/projects/${task.project.id}/tasks/${task.public_id}`
-    );
+    // Navigate to full detail page using Team Scope
+    // Assuming task.project.team is available. If not, fallback to authStore.currentTeamId?
+    // UserTaskController eager loads project.team.
+    const teamId = task.project?.team?.public_id || task.project?.team_id || authStore.currentTeamId;
+    
+    if (teamId) {
+        router.push({
+            name: 'team-task-detail',
+            params: {
+                teamId: teamId,
+                projectId: task.project?.id || task.project_id,
+                taskId: task.public_id
+            }
+        });
+    } else {
+        // Fallback for safety (though unlikely if model structure holds)
+        router.push(`/projects/${task.project?.id || task.project_id}/tasks/${task.public_id}`);
+    }
 };
 
 const onEditTask = (task: any) => {
@@ -131,9 +159,9 @@ const onTaskCreated = (newTask: any) => {
                           newTask.assignee?.public_id === authStore.user?.public_id;
     
     if (scopeFilter.value === 'assigned' && !isAssignedToMe) {
-         toast.success("Task created. Switch to 'Created by me' or 'All Tasks' to view it.");
+         // toast.success("Task created. Switch to 'Created by me' or 'All Tasks' to view it.");
     } else {
-         toast.success("Task created");
+         // toast.success("Task created");
     }
     
     fetchTasks();
@@ -144,31 +172,7 @@ const onTaskSaved = () => {
     showEditModal.value = false;
 };
 
-// ... (Modals/options logic same)
-
-// Watch Tab Changes to update filters
-watch(currentTab, (newTab) => {
-    // Reset filters first
-    statusFilter.value = "";
-    priorityFilter.value = "";
-    scopeFilter.value = "all"; // Default to all usually, overridden by specific tab logic
-
-    switch (newTab) {
-        case "my_tasks":
-            scopeFilter.value = "assigned";
-            break;
-        case "qa_queue":
-            statusFilter.value = "submitted,in_qa";
-            break;
-        case "pm_queue":
-            statusFilter.value = "pm_review";
-            break;
-        case "all_tasks":
-            scopeFilter.value = "all";
-            break;
-    }
-    // Fetch triggered by watchers on filters
-});
+// ... (Modals/options logic same) ... 
 
 // Fetch Tasks
 const fetchTasks = async () => {
@@ -180,13 +184,16 @@ const fetchTasks = async () => {
             status: statusFilter.value,
             priority: priorityFilter.value,
             include_archived: false,
-            team_id: authStore.currentTeamId,
+            // Use the locally selected team ID, not the global store one, 
+            // because the user is filtering by team in this view.
+            team_id: selectedTeamId.value, 
             project_id: projectFilter.value,
         };
         
+        console.log("Fetching tasks with params:", params); // Debug log
+
         // Specific sorts or additional filters per tab can go here
         if (currentTab.value === 'qa_queue') {
-             // For QA, maybe we want to see oldest submitted first?
              params.sort = 'submitted_at';
              params.direction = 'asc';
         }
@@ -199,17 +206,34 @@ const fetchTasks = async () => {
         loading.value = false;
     }
 };
-// ... (rest of handlers)
 
 // Initial Load
-onMounted(() => {
-    // Check route filters? 
-    // For now default to my_tasks
+onMounted(async () => {
+    // 1. Populate Team Options
+    if (authStore.user?.teams?.length > 0) {
+         teamOptions.value = authStore.user.teams.map((t: any) => ({
+             label: t.name,
+             value: t.public_id
+         }));
+         
+         // 2. Default Team Selection
+         // Prioritize current auth team if in list, else first one
+         const currentInList = teamOptions.value.find(t => t.value === authStore.currentTeamId);
+         selectedTeamId.value = currentInList ? currentInList.value : teamOptions.value[0].value;
+    }
+
+    // 3. Set Default Filters
     currentTab.value = "my_tasks"; 
+    statusFilter.value = "open"; 
+    scopeFilter.value = "assigned";
+
+    // 4. Fetch Projects & Tasks
+    if (selectedTeamId.value) {
+        await fetchProjects(selectedTeamId.value);
+    }
     
-    // Explicitly fetch tasks on mount to ensure data loads even if currentTab doesn't change
+    // Explicitly call fetchTasks AFTER project defaults are set
     fetchTasks();
-    fetchProjects();
 });
 
 // Watchers
@@ -217,16 +241,21 @@ watch([scopeFilter, statusFilter, priorityFilter, projectFilter], () => {
     fetchTasks();
 });
 
-
-// Watch current team changes to refetch
-watch(
-    () => authStore.currentTeamId,
-    () => {
-        projectFilter.value = ""; // Reset project filter
+// Watch Team Selection Change
+watch(selectedTeamId, async (newTeamId) => {
+    if (newTeamId) {
+        // When team changes, fetch projects for that team
+        await fetchProjects(newTeamId);
+        // Then fetch tasks (projectFilter change above might trigger it, but let's ensure)
+        // Actually projectFilter change triggers watcher above.
+        // But if projectFilter goes "" -> "", watcher might not fire.
+        // So we should enforce fetchTasks if projectFilter didn't change?
+        // Or simpler: fetchTasks relies on defaults.
+        // If projects empty, projectFilter is "".
         fetchTasks();
-        fetchProjects();
     }
-);
+});
+
 
 // Computed
 const activeFilterCount = computed(() => {

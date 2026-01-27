@@ -51,8 +51,11 @@ const getStatusLabel = (status: any) => {
 
 const navigateToProject = (projectId: string) => {
     router.push({ 
-        name: 'project-detail', 
-        params: { id: projectId } 
+        name: 'team-project-detail', 
+        params: { 
+            teamId: props.teamId,
+            id: projectId 
+        } 
     });
 };
 

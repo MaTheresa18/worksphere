@@ -93,7 +93,9 @@ const memberRoleOptions = [
     { value: "manager", label: "Manager" },
 ];
 
-const currentTeamId = computed(() => authStore.currentTeam?.public_id);
+const currentTeamId = computed(() => {
+    return (route.params.teamId as string) || authStore.currentTeam?.public_id;
+});
 const projectId = computed(() => route.params.id as string);
 
 const formatDate = (dateString?: string) => {
@@ -117,13 +119,17 @@ const isOverdue = (dateString?: string) => {
     return new Date(dateString) < new Date();
 };
 
+
+
+// ...
+
 const getTabIcon = (tab: string) => {
     switch (tab) {
         case "overview":
             return PieChart;
         case "tasks":
             return CheckCircle2;
-        case "team":
+        case "members": // Renamed from team
             return Users;
         case "files":
             return Folder;
@@ -135,6 +141,11 @@ const getTabIcon = (tab: string) => {
             return FileText;
     }
 };
+
+// ...
+
+// In Template (around line 848)
+// <button v-for="tab in ['overview', 'tasks', 'gantt', 'workload', 'members', 'files']" ...
 
 const isScrolled = ref(false);
 const checkScroll = (e: Event) => {
@@ -494,6 +505,28 @@ const addProjectMember = async () => {
     }
 };
 
+const removeProjectMember = async (member: any) => {
+    if (!confirm(`Are you sure you want to remove ${member.name} from this project?`)) return;
+    
+    try {
+        await axios.delete(
+            `/api/teams/${currentTeamId.value}/projects/${projectId.value}/members/${member.public_id || member.id}`
+        );
+        toast.success("Member removed from project");
+        await fetchProject(); // Refresh list
+    } catch (err: any) {
+        toast.error(err.response?.data?.message || "Failed to remove member");
+    }
+};
+
+// Helper for 'joined_at' fallback
+const getJoinedDate = (member: any) => {
+    // member.pivot?.joined_at is from the resource
+    // If not present, fallback to created_at (though technically incorrect, better than blank if data missing)
+    // But ideally we want the project join date. 
+    return member.joined_at || member.pivot?.joined_at || member.created_at; 
+};
+
 interface ProjectFile {
     id: string | number;
     file_name: string;
@@ -843,7 +876,7 @@ onMounted(() => {
                     class="px-6 sm:px-8 flex gap-8 border-t border-[var(--border-subtle)]/50"
                 >
                     <button
-                        v-for="tab in ['overview', 'tasks', 'gantt', 'workload', 'team', 'files']"
+                        v-for="tab in ['overview', 'tasks', 'gantt', 'workload', 'members', 'files']"
                         :key="tab"
                         class="py-3 text-sm font-medium border-b-2 capitalize transition-all duration-200 flex items-center gap-2"
                         :class="
@@ -1248,7 +1281,7 @@ onMounted(() => {
                         />
                     </div>
                     <div
-                        v-else-if="activeTab === 'team'"
+                        v-else-if="activeTab === 'members'"
                         class="w-full p-6 sm:p-8 space-y-8"
                     >
                         <div class="flex items-center justify-between">
@@ -1256,10 +1289,10 @@ onMounted(() => {
                                 <h2
                                     class="text-2xl font-bold text-[var(--text-primary)]"
                                 >
-                                    Team Members
+                                    Project Members
                                 </h2>
                                 <p class="text-[var(--text-muted)] mt-1">
-                                    Manage access and roles for this project
+                                    Manage access and roles for this specific project.
                                 </p>
                             </div>
                             <Button @click="openMemberInvite">
@@ -1274,85 +1307,69 @@ onMounted(() => {
                             <div
                                 v-for="member in project.members"
                                 :key="member.id"
-                                class="group relative overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-0 transition-all hover:border-[var(--interactive-primary)]/50 hover:shadow-lg dark:bg-gray-900/40"
+                                class="group relative overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-5 transition-all hover:border-[var(--interactive-primary)]/50 hover:shadow-lg hover:-translate-y-1"
                             >
-                                <!-- Card Header / Banner -->
-                                <div
-                                    class="h-24 w-full bg-gradient-to-r from-[var(--surface-secondary)] to-[var(--bg-default)] relative opacity-50 group-hover:opacity-80 transition-opacity"
-                                >
-                                    <div
-                                        class="absolute inset-0 bg-grid-white/[0.02] bg-[length:16px_16px]"
-                                    ></div>
+                                <!-- Top Row: Avatar & Actions -->
+                                <div class="flex justify-between items-start mb-4 relative z-10">
+                                    <Avatar
+                                        :name="member.name"
+                                        :src="member.avatar_url"
+                                        size="lg"
+                                        class="ring-2 ring-[var(--bg-default)] shadow-sm"
+                                    />
+                                    <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <a 
+                                            :href="'mailto:' + member.email"
+                                            class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] transition-colors"
+                                            title="Send Email"
+                                        >
+                                            <Mail class="w-4 h-4" />
+                                        </a>
+                                        <button 
+                                            @click="removeProjectMember(member)"
+                                            class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                            title="Remove from Project"
+                                        >
+                                            <X class="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
 
-                                <!-- Content -->
-                                <div class="relative px-6 pb-6 -mt-10">
-                                    <div class="flex justify-between items-end">
-                                        <Avatar
-                                            :name="member.name"
-                                            :src="member.avatar_url"
-                                            size="lg"
-                                            class="ring-4 ring-[var(--bg-default)] shadow-sm"
-                                        />
-                                        <Badge
-                                            variant="secondary"
-                                            class="mb-6 capitalize bg-[var(--surface-secondary)] text-[var(--text-secondary)] group-hover:bg-[var(--interactive-primary)]/10 group-hover:text-[var(--interactive-primary)] transition-colors"
-                                        >
-                                            {{ member.role }}
-                                        </Badge>
-                                    </div>
+                                <!-- Info -->
+                                <div class="mb-4">
+                                    <h3 class="font-bold text-lg text-[var(--text-primary)] leading-tight mb-1">
+                                        {{ member.name }}
+                                    </h3>
+                                    <p class="text-xs text-[var(--text-muted)] truncate">
+                                        {{ member.email }}
+                                    </p>
+                                </div>
 
-                                    <div class="mt-4 space-y-1">
-                                        <h3
-                                            class="font-bold text-lg text-[var(--text-primary)] group-hover:text-[var(--interactive-primary)] transition-colors"
-                                        >
-                                            {{ member.name }}
-                                        </h3>
-                                        <p
-                                            class="text-sm text-[var(--text-muted)]"
-                                        >
-                                            {{ member.email }}
-                                        </p>
-                                    </div>
-
-                                    <div
-                                        class="mt-6 flex items-center gap-3 pt-6 border-t border-[var(--border-subtle)]"
+                                <!-- Footer: Role & Joined -->
+                                <div class="flex items-center justify-between pt-4 border-t border-[var(--border-subtle)]">
+                                    <Badge
+                                        variant="secondary"
+                                        class="capitalize bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-0"
                                     >
-                                        <div
-                                            class="flex-1 text-xs text-[var(--text-muted)]"
-                                        >
-                                            <span class="block font-medium"
-                                                >Joined</span
-                                            >
-                                            {{ formatDate(member.created_at) }}
-                                        </div>
-                                        <div class="flex gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                class="h-8 w-8 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                                            >
-                                                <Mail class="w-4 h-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                class="h-8 w-8 text-[var(--text-muted)] hover:text-red-500 hover:bg-red-500/10"
-                                            >
-                                                <X class="w-4 h-4" />
-                                            </Button>
-                                        </div>
+                                        {{ member.pivot?.role || member.role }}
+                                    </Badge>
+                                    <div class="text-[10px] text-[var(--text-muted)] flex items-center gap-1">
+                                        <Clock class="w-3 h-3" />
+                                        <span>Joined {{ formatDate(getJoinedDate(member)) }}</span>
                                     </div>
                                 </div>
+                                
+                                <!-- Decorative Gradient Blob -->
+                                <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-[var(--interactive-primary)]/10 to-transparent rounded-bl-full -mr-8 -mt-8 pointer-events-none"></div>
                             </div>
 
                             <!-- Add New Member Placeholder Card -->
                             <button
                                 @click="openMemberInvite"
-                                class="group relative flex h-full min-h-[200px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-subtle)]/50 transition-all hover:border-[var(--interactive-primary)] hover:bg-[var(--interactive-primary)]/5"
+                                class="group relative flex h-full min-h-[200px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-subtle)]/30 transition-all hover:border-[var(--interactive-primary)] hover:bg-[var(--interactive-primary)]/5"
                             >
                                 <div
-                                    class="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--surface-secondary)] group-hover:scale-110 transition-transform mb-4"
+                                    class="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--surface-primary)] group-hover:scale-110 transition-transform mb-4 shadow-sm"
                                 >
                                     <Plus
                                         class="w-6 h-6 text-[var(--text-muted)] group-hover:text-[var(--interactive-primary)]"
@@ -1360,7 +1377,7 @@ onMounted(() => {
                                 </div>
                                 <span
                                     class="font-medium text-[var(--text-secondary)] group-hover:text-[var(--interactive-primary)]"
-                                    >Add Team Member</span
+                                    >Add Project Member</span
                                 >
                             </button>
                         </div>
@@ -1400,6 +1417,7 @@ onMounted(() => {
                         </div>
                     </div>
                 </Transition>
+                <!-- Debug Info Removed -->
             </div>
 
             <!-- Modals -->
@@ -1508,14 +1526,7 @@ onMounted(() => {
                 <ArrowLeft class="w-4 h-4 mr-2" />
                 Return to Projects
             </Button>
-            <div
-                class="mt-8 p-4 bg-gray-100 dark:bg-gray-800 rounded text-left text-xs font-mono overflow-auto max-w-lg"
-            >
-                <p>Debug Info:</p>
-                <p>Team ID: {{ currentTeamId || "None" }}</p>
-                <p>Project ID: {{ projectId || "None" }}</p>
-                <p>Loading: {{ isLoading }}</p>
-            </div>
+            <!-- Debug Info Removed -->
         </div>
     </div>
 </template>

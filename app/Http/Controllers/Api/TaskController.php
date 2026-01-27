@@ -42,7 +42,14 @@ class TaskController extends Controller
      */
     public function index(Request $request, Team $team, Project $project): AnonymousResourceCollection
     {
-        $this->authorizeTeamPermission($team, 'tasks.view');
+        $user = $request->user();
+        $hasView = $this->permissionService->hasTeamPermission($user, $team, 'tasks.view');
+        $hasViewAssigned = $this->permissionService->hasTeamPermission($user, $team, 'tasks.view_assigned');
+
+        if (! $hasView && ! $hasViewAssigned) {
+            abort(403, 'You do not have permission to view tasks in this team.');
+        }
+
         $this->ensureProjectBelongsToTeam($team, $project);
 
         $query = Task::query()
@@ -94,6 +101,14 @@ class TaskController extends Controller
             }, function ($query) {
                 $query->orderBy('sort_order')->orderBy('created_at', 'desc');
             });
+
+        if (! $hasView && $hasViewAssigned) {
+            $query->where(function ($q) use ($user) {
+                $q->where('assigned_to', $user->id)
+                    ->orWhere('qa_user_id', $user->id)
+                    ->orWhere('created_by', $user->id);
+            });
+        }
 
         $tasks = $query->paginate($request->integer('per_page', 25));
 
@@ -283,9 +298,26 @@ class TaskController extends Controller
      */
     public function show(Team $team, Project $project, Task $task): JsonResponse
     {
-        $this->authorizeTeamPermission($team, 'tasks.view');
+        $user = request()->user();
+        $hasView = $this->permissionService->hasTeamPermission($user, $team, 'tasks.view');
+        $hasViewAssigned = $this->permissionService->hasTeamPermission($user, $team, 'tasks.view_assigned');
+
+        if (! $hasView && ! $hasViewAssigned) {
+            abort(403, 'You do not have permission to view tasks in this team.');
+        }
+
         $this->ensureProjectBelongsToTeam($team, $project);
         $this->ensureTaskBelongsToProject($project, $task);
+
+        if (! $hasView && $hasViewAssigned) {
+            $isAssociated = $task->assigned_to === $user->id ||
+                          $task->qa_user_id === $user->id ||
+                          $task->created_by === $user->id;
+
+            if (! $isAssociated) {
+                abort(403, 'You do not have permission to view this task.');
+            }
+        }
 
         $task->load([
             'project',

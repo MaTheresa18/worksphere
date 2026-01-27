@@ -1020,6 +1020,38 @@ const routes: RouteRecordRaw[] = [
                 },
             },
             {
+                path: "teams/:teamId/projects/:id",
+                name: "team-project-detail",
+                component: () => import("@/views/admin/ProjectDetailView.vue"),
+                meta: {
+                    title: "Project Details",
+                    breadcrumb: "Project",
+                    breadcrumbParent: {
+                        name: "team-profile",
+                        label: "Team",
+                        paramKey: "public_id",
+                        sourceParam: "teamId",
+                    },
+                    transition: "slide-fade",
+                },
+            },
+            {
+                path: "teams/:teamId/projects/:projectId/tasks/:taskId",
+                name: "team-task-detail",
+                component: () => import("@/views/TaskDetailView.vue"),
+                meta: {
+                    title: "Task Details",
+                    breadcrumb: "Task",
+                    breadcrumbParent: {
+                        name: "team-project-detail",
+                        label: "Project",
+                        paramKey: "id",
+                        sourceParam: "projectId",
+                    },
+                    transition: "slide-fade",
+                },
+            },
+            {
                 path: "teams/:id/templates/tasks",
                 name: "team-task-templates",
                 component: () =>
