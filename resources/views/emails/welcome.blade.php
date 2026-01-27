@@ -14,7 +14,7 @@
     @if($requiresPasswordSetup ?? false)
         <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 24px; color: #374151;">
             Since you signed up via a social provider, you need to set up a password to secure your account. Please click the
-            button below to verify your email and set your password.
+            button below to set your password.
         </p>
     @else
         <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 24px; color: #374151;">

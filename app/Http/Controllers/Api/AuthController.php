@@ -613,7 +613,7 @@ class AuthController extends Controller
             'name' => $socialUser->getName() ?? $socialUser->getNickname(),
             'email' => $socialUser->getEmail(),
             'username' => $socialUser->getNickname() ?? explode('@', $socialUser->getEmail())[0].rand(100, 999),
-            'email_verified_at' => null, // Do not auto-verify, require email verification
+            'email_verified_at' => now(), // Auto-verify social login users
             'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(32)),
             'status' => 'active',
             'is_password_set' => false,
