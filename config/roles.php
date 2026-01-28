@@ -213,16 +213,19 @@ return [
             'tasks.view' => 'View all tasks',
             'tasks.view_assigned' => 'View assigned tasks',
             'tasks.create' => 'Create tasks',
-            'tasks.update' => 'Update tasks',
-            'tasks.update_assigned' => 'Update assigned tasks',
+            'tasks.edit_all' => 'Edit all task fields',
+            'tasks.update_assigned' => 'Update assigned tasks (limited)',
             'tasks.delete' => 'Delete tasks',
             'tasks.assign' => 'Assign tasks to users',
+            'tasks.manage_checklist' => 'Add/Remove checklist items',
+            'tasks.complete_items' => 'Complete checklist items',
             'tasks.submit' => 'Submit tasks',
             'tasks.qa_review' => 'Review tasks (QA)',
             'tasks.approve' => 'Approve tasks',
             'tasks.reject' => 'Reject tasks',
             'tasks.send_to_client' => 'Send tasks to client',
             'tasks.archive' => 'Archive tasks',
+            'tasks.comment' => 'Add comments to tasks',
         ],
 
         // Ticket Management (Team context)
@@ -376,6 +379,7 @@ return [
             'tasks.reject',
             'tasks.send_to_client',
             'tasks.archive',
+            'tasks.comment',
 
             // Task templates
             'task_templates.view',
@@ -452,6 +456,7 @@ return [
             'tasks.reject',
             'tasks.send_to_client',
             'tasks.archive',
+            'tasks.comment',
 
             // Task templates
             'task_templates.view',
@@ -498,6 +503,8 @@ return [
             'tasks.qa_review', // Can review
             'tasks.approve',   // Can approve
             'tasks.reject',    // Can reject
+            'tasks.comment',
+            'tasks.complete_items', // Occasionally need to fix/complete something in QA context?
 
             // Cannot create/delete tasks, but can see them
         ],
@@ -506,6 +513,9 @@ return [
             'teams.view',
             'projects.view_assigned',
             'tasks.view_assigned',
+            'tasks.complete_items',
+            'tasks.submit',
+            'tasks.comment',
 
             // CANNOT update task details, add/remove checklist (controlled by policies/UI)
             // But can likely "complete" subtasks if assigned? Instructions said "cannot update task details"

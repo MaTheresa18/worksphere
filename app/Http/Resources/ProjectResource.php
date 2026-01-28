@@ -88,6 +88,10 @@ class ProjectResource extends JsonResource
                         'avatar_url' => $member->avatar_url,
                         'role' => $member->pivot->role,
                         'team_role' => $teamRoles[$member->id] ?? null,
+                        'is_qa_eligible' => in_array(
+                            'tasks.qa_review', 
+                            config("roles.team_role_permissions." . ($teamRoles[$member->id] ?? ''), [])
+                        ),
                         'joined_at' => $member->pivot->joined_at,
                     ];
                 });

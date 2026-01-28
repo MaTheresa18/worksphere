@@ -99,13 +99,7 @@ const selectedEvent = ref(null);
 const calendarRange = ref({ start: null, end: null });
 
 const isTeamAdmin = computed(() => {
-    if (!team.value) return false;
-    if (authStore.user?.public_id === team.value.owner.public_id) return true;
-
-    const membership = members.value.find(
-        (m) => m.public_id === authStore.user?.public_id,
-    );
-    return ["team_lead", "subject_matter_expert"].includes(membership?.role);
+    return team.value?.can?.update || team.value?.can?.manage_members;
 });
 
 async function fetchCalendarEvents(start, end) {
@@ -327,11 +321,7 @@ const paginatedFiles = computed(() => {
 });
 
 const isOwner = computed(() => {
-    return (
-        authStore.user?.public_id === team.value?.owner?.public_id ||
-        members.value.find((m) => m.public_id === authStore.user?.public_id)
-            ?.role === "team_lead"
-    );
+    return team.value?.can?.update || team.value?.can?.delete;
 });
 
 // Invite
@@ -925,39 +915,13 @@ const formatSize = (bytes) => {
 
 const canRemoveMember = (member) => {
     // Cannot remove self
-    if (member.id === authStore.user?.id) return false;
+    if (member.public_id === authStore.user?.public_id) return false;
 
-    // Cannot remove owner (use public_id comparison)
-    if (member.public_id === team.value.owner.public_id) return false;
+    // Cannot remove owner
+    if (member.public_id === team.value?.owner?.public_id) return false;
 
-    // Owner can remove anyone (except self, handled above)
-    if (authStore.user?.public_id === team.value.owner.public_id) return true;
-
-    // Check if current user is admin
-    const currentUserMember = members.value.find(
-        (m) => m.id === authStore.user?.id,
-    ); // ID availability depends on auth user, better use public_id if possible but authStore.user usually has id.
-    // Wait, members list items have 'id' (user id) usually but strictly public_id is safer if id is hidden.
-    // But members endpoint returns User models. ID is hidden.
-    // So member.id is undefined. We must use public_id.
-
-    // Check if current user is admin
-    const currentUserMemberObj = members.value.find(
-        (m) => m.public_id === authStore.user?.public_id,
-    );
-    const isCurrentUserAdmin = ["team_lead", "subject_matter_expert"].includes(
-        currentUserMemberObj?.pivot?.role,
-    );
-
-    // Admin can remove members, but not other admins or owner
-    if (
-        isCurrentUserAdmin &&
-        !["team_lead", "subject_matter_expert"].includes(member.pivot?.role)
-    ) {
-        return true;
-    }
-
-    return false;
+    // Check if current user has permission to manage members
+    return team.value?.can?.manage_members;
 };
 </script>
 
@@ -1058,7 +1022,7 @@ const canRemoveMember = (member) => {
                         </div>
                         <div class="flex items-center gap-3">
                             <Button
-                                v-if="isTeamAdmin"
+                                v-if="team.can?.invite"
                                 @click="showInviteModal = true"
                             >
                                 <Plus class="h-4 w-4" />

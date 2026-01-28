@@ -35,7 +35,7 @@ import {
     X,
     Shield,
     Activity, // for Activity tab/section
-    Target,   // for Deadlines or Workload
+    Target, // for Deadlines or Workload
     BarChart, // for Workload
 } from "lucide-vue-next";
 import axios from "axios";
@@ -80,10 +80,10 @@ const isFetchingTeamMembers = ref(false);
 const availableTeamMembers = computed(() => {
     if (!teamMembers.value.length || !project.value) return [];
     const projectMemberIds = (project.value.members || []).map(
-        (m: any) => m.public_id || m.id
+        (m: any) => m.public_id || m.id,
     );
     return teamMembers.value.filter(
-        (m: any) => !projectMemberIds.includes(m.public_id || m.id)
+        (m: any) => !projectMemberIds.includes(m.public_id || m.id),
     );
 });
 
@@ -118,8 +118,6 @@ const isOverdue = (dateString?: string) => {
     if (!dateString) return false;
     return new Date(dateString) < new Date();
 };
-
-
 
 // ...
 
@@ -171,46 +169,53 @@ watch(
         if (newTeamId && newProjectId) {
             fetchProject();
         }
-    }
+    },
 );
 
 const isExternalProject = computed(() => {
     if (!project.value || !authStore.user) return false;
-    
+
     // Check if the project's team is in the user's teams list
     const userTeams = authStore.user.teams || [];
     const projectTeamId = project.value.team_id;
     const userId = authStore.user.public_id || authStore.user.id;
-    
+
     // Check matching ID or Public ID to be safe
     let isMember = userTeams.some((t: any) => {
-        const matches = String(t.id) === String(projectTeamId) || 
-                        String(t.public_id) === String(projectTeamId);
+        const matches =
+            String(t.id) === String(projectTeamId) ||
+            String(t.public_id) === String(projectTeamId);
         return matches;
     });
 
     // Fallback: Check if user is in project.members (if loaded)
-    if (!isMember && project.value.members && Array.isArray(project.value.members)) {
-        isMember = project.value.members.some((m: any) => 
-            String(m.id) === String(userId) || 
-            String(m.public_id) === String(userId)
+    if (
+        !isMember &&
+        project.value.members &&
+        Array.isArray(project.value.members)
+    ) {
+        isMember = project.value.members.some(
+            (m: any) =>
+                String(m.id) === String(userId) ||
+                String(m.public_id) === String(userId),
         );
     }
 
     // Fallback: Check if user is the team owner (if loaded)
     if (!isMember && project.value.team && project.value.team.owner_id) {
-         isMember = String(project.value.team.owner_id) === String(authStore.user.id);
+        isMember =
+            String(project.value.team.owner_id) === String(authStore.user.id);
     }
-    
+
     // It is external if NOT a member
     return !isMember;
 });
 
 const goBack = () => {
-    if (route.name === 'admin-project-detail') {
-        router.push({ name: 'admin-projects' });
+    if (route.name === "admin-project-detail") {
+        router.push({ name: "admin-projects" });
     } else {
-        router.push({ name: 'projects' });
+        router.push({ name: "projects" });
     }
 };
 
@@ -245,35 +250,43 @@ const fetchProject = async () => {
         // Fetch project details
         let projectRes;
 
-        const isAdmin = authStore.user?.roles?.find((r: any) => r.name === 'administrator') || authStore.user?.is_admin;
+        const isAdmin =
+            authStore.user?.roles?.find(
+                (r: any) => r.name === "administrator",
+            ) || authStore.user?.is_admin;
 
         if (isAdmin) {
-             // Admin optimization: Try global fetch directly to avoid 404s on cross-team projects
-             try {
-                console.log("[ProjectDetail] Admin detected, attempting global fetch first...");
+            // Admin optimization: Try global fetch directly to avoid 404s on cross-team projects
+            try {
+                console.log(
+                    "[ProjectDetail] Admin detected, attempting global fetch first...",
+                );
                 const globalUrl = `/api/projects/${projectId.value}`;
                 projectRes = await axios.get(globalUrl);
-             } catch (globalErr: any) {
+            } catch (globalErr: any) {
                 // If global fetch fails (e.g. not found), we could try team fetch but likely it won't work either.
                 // However, let's allow fallback just in case or throw.
-                console.warn("[ProjectDetail] Global fetch failed for admin, falling back to team scope (unlikely to succeed if global failed)", globalErr);
-                 const url = `/api/teams/${currentTeamId.value}/projects/${projectId.value}`;
-                 projectRes = await axios.get(url);
-             }
+                console.warn(
+                    "[ProjectDetail] Global fetch failed for admin, falling back to team scope (unlikely to succeed if global failed)",
+                    globalErr,
+                );
+                const url = `/api/teams/${currentTeamId.value}/projects/${projectId.value}`;
+                projectRes = await axios.get(url);
+            }
         } else {
             // Standard User: Team Scoped
             try {
-                 const url = `/api/teams/${currentTeamId.value}/projects/${projectId.value}`;
-                 projectRes = await axios.get(url);
+                const url = `/api/teams/${currentTeamId.value}/projects/${projectId.value}`;
+                projectRes = await axios.get(url);
             } catch (err) {
                 throw err;
             }
         }
- 
+
         console.log(
             "[ProjectDetail] API Response:",
             projectRes.status,
-            projectRes.data
+            projectRes.data,
         );
         // Handle both wrapped {data: project} and unwrapped {project} responses
         project.value = projectRes.data.data || projectRes.data;
@@ -281,13 +294,15 @@ const fetchProject = async () => {
         // Fetch stats
         try {
             let statsUrl = `/api/teams/${currentTeamId.value}/projects/${projectId.value}/stats`;
-            
+
             // Check if we are in global mode (project team ID != current team ID)
-            const isGlobalMode = project.value && project.value.team_id !== authStore.currentTeam?.id;
-            
+            const isGlobalMode =
+                project.value &&
+                project.value.team_id !== authStore.currentTeam?.id;
+
             if (isGlobalMode) {
-                 console.log("[ProjectDetail] Fetching Global Stats");
-                 statsUrl = `/api/projects/${projectId.value}/stats`;
+                console.log("[ProjectDetail] Fetching Global Stats");
+                statsUrl = `/api/projects/${projectId.value}/stats`;
             }
 
             const statsRes = await axios.get(statsUrl);
@@ -305,7 +320,7 @@ const fetchProject = async () => {
             message: err.message,
         });
         toast.error(
-            err.response?.data?.message || "Failed to load project details"
+            err.response?.data?.message || "Failed to load project details",
         );
     } finally {
         isLoading.value = false;
@@ -325,7 +340,9 @@ const fetchTasks = async () => {
         let tasksUrl = `/api/teams/${currentTeamId.value}/projects/${projectId.value}/tasks`;
 
         // Check if we are in global mode (project team ID != current team ID)
-        const isGlobalMode = project.value && project.value.team_id !== authStore.currentTeam?.id;
+        const isGlobalMode =
+            project.value &&
+            project.value.team_id !== authStore.currentTeam?.id;
 
         if (isGlobalMode) {
             console.log("[ProjectDetail] Fetching Global Tasks");
@@ -354,10 +371,12 @@ const onTaskMoved = async (taskId: string, newStatus: string) => {
 
         try {
             let updateUrl = `/api/teams/${currentTeamId.value}/projects/${projectId.value}/tasks/${taskId}`;
-             
+
             // Check if we are in global mode
-            const isGlobalMode = project.value && project.value.team_id !== authStore.currentTeam?.id;
-            
+            const isGlobalMode =
+                project.value &&
+                project.value.team_id !== authStore.currentTeam?.id;
+
             if (isGlobalMode) {
                 // We might need a global update endpoint here if we want to support moving tasks globally
                 // For now, let's assume we can't move tasks globally or we need to implement updateGlobal
@@ -371,22 +390,21 @@ const onTaskMoved = async (taskId: string, newStatus: string) => {
                 // If I don't add it, this will fail.
                 // Let's use the standard route but with the PROJECT'S team ID if possible?
                 // Admin has access to that team? Not necessarily contextually.
-                
+
                 // If I haven't implemented updateGlobal, I should probably disable drag/drop for external projects.
                 // OR I quickly add updateGlobal.
                 // Given the user constraint, I should probably fix `fetchStats` first as that's the current error.
                 // I will update this to just Log/Error for now to prevent 404 until I implement updateGlobal?
                 // Or better, let's skip the optimistic update call if global for now.
-                console.warn("Global task update not yet fully supported backend-side for admins on external teams.");
-                return; 
+                console.warn(
+                    "Global task update not yet fully supported backend-side for admins on external teams.",
+                );
+                return;
             }
 
-            await axios.put(
-                updateUrl,
-                {
-                    status: newStatus,
-                }
-            );
+            await axios.put(updateUrl, {
+                status: newStatus,
+            });
             toast.success("Task status updated");
             // Refresh specific task to get updated data (e.g. if workflow changed something else)
         } catch (err: any) {
@@ -460,7 +478,7 @@ const fetchTeamMembers = async () => {
     try {
         isFetchingTeamMembers.value = true;
         const response = await axios.get(
-            `/api/teams/${currentTeamId.value}/members`
+            `/api/teams/${currentTeamId.value}/members`,
         );
         teamMembers.value = response.data.data || response.data || [];
     } catch (err) {
@@ -492,7 +510,7 @@ const addProjectMember = async () => {
             `/api/teams/${currentTeamId.value}/projects/${projectId.value}/members/${selectedMemberToAdd.value}`,
             {
                 role: selectedMemberRole.value,
-            }
+            },
         );
         toast.success("Member added to project");
         showMemberInvite.value = false;
@@ -506,11 +524,16 @@ const addProjectMember = async () => {
 };
 
 const removeProjectMember = async (member: any) => {
-    if (!confirm(`Are you sure you want to remove ${member.name} from this project?`)) return;
-    
+    if (
+        !confirm(
+            `Are you sure you want to remove ${member.name} from this project?`,
+        )
+    )
+        return;
+
     try {
         await axios.delete(
-            `/api/teams/${currentTeamId.value}/projects/${projectId.value}/members/${member.public_id || member.id}`
+            `/api/teams/${currentTeamId.value}/projects/${projectId.value}/members/${member.public_id || member.id}`,
         );
         toast.success("Member removed from project");
         await fetchProject(); // Refresh list
@@ -523,8 +546,8 @@ const removeProjectMember = async (member: any) => {
 const getJoinedDate = (member: any) => {
     // member.pivot?.joined_at is from the resource
     // If not present, fallback to created_at (though technically incorrect, better than blank if data missing)
-    // But ideally we want the project join date. 
-    return member.joined_at || member.pivot?.joined_at || member.created_at; 
+    // But ideally we want the project join date.
+    return member.joined_at || member.pivot?.joined_at || member.created_at;
 };
 
 interface ProjectFile {
@@ -574,7 +597,7 @@ const filteredFiles = computed(() => {
                 (f) =>
                     f.mime_type.includes("pdf") ||
                     f.mime_type.includes("word") ||
-                    f.mime_type.includes("text")
+                    f.mime_type.includes("text"),
             );
         }
     }
@@ -595,9 +618,15 @@ const fetchFiles = async () => {
         let filesUrl = `/api/teams/${currentTeamId.value}/projects/${projectId.value}/files`;
 
         // Check if we are in global mode
-        const isGlobalMode = project.value && String(project.value.team_id) !== String(authStore.currentTeam?.id);
-        
-        console.log("[ProjectDetail] fetchFiles", { isGlobalMode, projectTeam: project.value.team_id, currentTeam: authStore.currentTeam?.id });
+        const isGlobalMode =
+            project.value &&
+            String(project.value.team_id) !== String(authStore.currentTeam?.id);
+
+        console.log("[ProjectDetail] fetchFiles", {
+            isGlobalMode,
+            projectTeam: project.value.team_id,
+            currentTeam: authStore.currentTeam?.id,
+        });
 
         if (isGlobalMode) {
             console.log("[ProjectDetail] Fetching Global Files (Admin)");
@@ -636,7 +665,7 @@ const handleUpload = async (newFiles: File[]) => {
 const processUploadQueue = async () => {
     if (isUploading.value) return;
     const pendingItems = uploadQueue.value.filter(
-        (i) => i.status === "pending"
+        (i) => i.status === "pending",
     );
     if (pendingItems.length === 0) return;
 
@@ -657,11 +686,11 @@ const processUploadQueue = async () => {
                     onUploadProgress: (progressEvent) => {
                         const total = progressEvent.total || 100; // Default to avoids divide by zero/undefined
                         const percentCompleted = Math.round(
-                            (progressEvent.loaded * 100) / total
+                            (progressEvent.loaded * 100) / total,
                         );
                         item.progress = percentCompleted;
                     },
-                }
+                },
             );
             item.status = "completed";
             item.progress = 100;
@@ -679,7 +708,7 @@ const processUploadQueue = async () => {
         fetchFiles();
         // Clear completed
         uploadQueue.value = uploadQueue.value.filter(
-            (item) => item.status !== "completed"
+            (item) => item.status !== "completed",
         );
     }
 
@@ -694,7 +723,7 @@ const handleDeleteFile = async (mediaId: string) => {
     if (!confirm("Are you sure you want to delete this file?")) return;
     try {
         await axios.delete(
-            `/api/teams/${currentTeamId.value}/projects/${projectId.value}/files/${mediaId}`
+            `/api/teams/${currentTeamId.value}/projects/${projectId.value}/files/${mediaId}`,
         );
         toast.success("File deleted successfully");
         fetchFiles();
@@ -721,7 +750,7 @@ const handleBulkDelete = async (mediaIds: string[]) => {
         // Let's loop for now to be safe.
         for (const id of mediaIds) {
             await axios.delete(
-                `/api/teams/${currentTeamId.value}/projects/${projectId.value}/files/${id}`
+                `/api/teams/${currentTeamId.value}/projects/${projectId.value}/files/${id}`,
             );
         }
         toast.success("Files deleted successfully");
@@ -750,9 +779,36 @@ watch(activeTab, (newTab) => {
 });
 
 onMounted(() => {
+    // Initialize from query params
+    if (route.query.tab) {
+        activeTab.value = route.query.tab as string;
+    }
+    if (
+        route.query.view &&
+        (route.query.view === "board" || route.query.view === "list")
+    ) {
+        taskViewMode.value = route.query.view as "board" | "list";
+    }
+
     fetchProject();
     fetchTeamMembers();
 });
+
+// Watch for query param changes (e.g. back/forward navigation)
+watch(
+    () => route.query,
+    (newQuery) => {
+        if (newQuery.tab) {
+            activeTab.value = newQuery.tab as string;
+        }
+        if (
+            newQuery.view &&
+            (newQuery.view === "board" || newQuery.view === "list")
+        ) {
+            taskViewMode.value = newQuery.view as "board" | "list";
+        }
+    },
+);
 </script>
 
 <template>
@@ -789,9 +845,9 @@ onMounted(() => {
                                 class="text-lg font-bold text-[var(--text-primary)] leading-none mb-1 flex items-center gap-2"
                             >
                                 {{ project.name }}
-                                <Badge 
-                                    v-if="isExternalProject" 
-                                    variant="outline" 
+                                <Badge
+                                    v-if="isExternalProject"
+                                    variant="outline"
                                     class="ml-2 border-amber-500/50 text-amber-500 flex items-center gap-1"
                                 >
                                     <Shield class="w-3 h-3" />
@@ -876,7 +932,14 @@ onMounted(() => {
                     class="px-6 sm:px-8 flex gap-8 border-t border-[var(--border-subtle)]/50"
                 >
                     <button
-                        v-for="tab in ['overview', 'tasks', 'gantt', 'workload', 'members', 'files']"
+                        v-for="tab in [
+                            'overview',
+                            'tasks',
+                            'gantt',
+                            'workload',
+                            'members',
+                            'files',
+                        ]"
                         :key="tab"
                         class="py-3 text-sm font-medium border-b-2 capitalize transition-all duration-200 flex items-center gap-2"
                         :class="
@@ -900,7 +963,10 @@ onMounted(() => {
                         class="absolute inset-0 overflow-y-auto p-6 sm:p-8 space-y-8 bg-[var(--bg-default)]"
                     >
                         <!-- Stats Grid with Premium Glass Look -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8" v-if="stats">
+                        <div
+                            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+                            v-if="stats"
+                        >
                             <!-- Progress -->
                             <div
                                 class="p-6 bg-[var(--surface-primary)] border border-[var(--border-subtle)] rounded-xl relative overflow-hidden group shadow-lg"
@@ -908,17 +974,40 @@ onMounted(() => {
                                 <div
                                     class="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent opacity-50 group-hover:opacity-100 transition-opacity"
                                 ></div>
-                                <div class="relative z-10 flex flex-col justify-between h-full">
-                                    <div class="flex justify-between items-start mb-4">
-                                        <div class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                                             <PieChart class="w-5 h-5 text-blue-500" />
+                                <div
+                                    class="relative z-10 flex flex-col justify-between h-full"
+                                >
+                                    <div
+                                        class="flex justify-between items-start mb-4"
+                                    >
+                                        <div
+                                            class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center"
+                                        >
+                                            <PieChart
+                                                class="w-5 h-5 text-blue-500"
+                                            />
                                         </div>
-                                        <Badge variant="secondary" size="xs" class="bg-blue-500/10 text-blue-500 border-blue-500/20">Overall</Badge>
+                                        <Badge
+                                            variant="secondary"
+                                            size="xs"
+                                            class="bg-blue-500/10 text-blue-500 border-blue-500/20"
+                                            >Overall</Badge
+                                        >
                                     </div>
                                     <div>
-                                        <h3 class="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1">Project Progress</h3>
+                                        <h3
+                                            class="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1"
+                                        >
+                                            Project Progress
+                                        </h3>
                                         <div class="flex items-end gap-2">
-                                            <span class="text-3xl font-bold text-[var(--text-primary)]">{{ stats.progress_percentage || 0 }}%</span>
+                                            <span
+                                                class="text-3xl font-bold text-[var(--text-primary)]"
+                                                >{{
+                                                    stats.progress_percentage ||
+                                                    0
+                                                }}%</span
+                                            >
                                         </div>
                                     </div>
                                 </div>
@@ -931,17 +1020,39 @@ onMounted(() => {
                                 <div
                                     class="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent opacity-50 group-hover:opacity-100 transition-opacity"
                                 ></div>
-                                <div class="relative z-10 flex flex-col justify-between h-full">
-                                    <div class="flex justify-between items-start mb-4">
-                                        <div class="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                                             <CheckCircle2 class="w-5 h-5 text-emerald-500" />
+                                <div
+                                    class="relative z-10 flex flex-col justify-between h-full"
+                                >
+                                    <div
+                                        class="flex justify-between items-start mb-4"
+                                    >
+                                        <div
+                                            class="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center"
+                                        >
+                                            <CheckCircle2
+                                                class="w-5 h-5 text-emerald-500"
+                                            />
                                         </div>
-                                        <Badge variant="secondary" size="xs" class="bg-emerald-500/10 text-emerald-500 border-emerald-500/20">Tasks</Badge>
+                                        <Badge
+                                            variant="secondary"
+                                            size="xs"
+                                            class="bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                            >Tasks</Badge
+                                        >
                                     </div>
                                     <div>
-                                        <h3 class="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1">Completed</h3>
+                                        <h3
+                                            class="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1"
+                                        >
+                                            Completed
+                                        </h3>
                                         <div class="flex items-end gap-2">
-                                            <span class="text-3xl font-bold text-[var(--text-primary)]">{{ stats.completed_tasks || 0 }}</span>
+                                            <span
+                                                class="text-3xl font-bold text-[var(--text-primary)]"
+                                                >{{
+                                                    stats.completed_tasks || 0
+                                                }}</span
+                                            >
                                         </div>
                                     </div>
                                 </div>
@@ -954,18 +1065,50 @@ onMounted(() => {
                                 <div
                                     class="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent opacity-50 group-hover:opacity-100 transition-opacity"
                                 ></div>
-                                <div class="relative z-10 flex flex-col justify-between h-full">
-                                    <div class="flex justify-between items-start mb-4">
-                                        <div class="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                                             <Clock class="w-5 h-5 text-amber-500" />
+                                <div
+                                    class="relative z-10 flex flex-col justify-between h-full"
+                                >
+                                    <div
+                                        class="flex justify-between items-start mb-4"
+                                    >
+                                        <div
+                                            class="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center"
+                                        >
+                                            <Clock
+                                                class="w-5 h-5 text-amber-500"
+                                            />
                                         </div>
-                                        <Badge variant="secondary" size="xs" class="bg-amber-500/10 text-amber-500 border-amber-500/20">Active</Badge>
+                                        <Badge
+                                            variant="secondary"
+                                            size="xs"
+                                            class="bg-amber-500/10 text-amber-500 border-amber-500/20"
+                                            >Active</Badge
+                                        >
                                     </div>
                                     <div>
-                                        <h3 class="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1">In Progress</h3>
+                                        <h3
+                                            class="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1"
+                                        >
+                                            In Progress
+                                        </h3>
                                         <div class="flex items-end gap-2">
-                                            <span class="text-3xl font-bold text-[var(--text-primary)]">{{ stats.in_progress_tasks || 0 }}</span>
-                                            <span class="text-xs text-amber-500" v-if="(stats.pending_tasks || 0) > 0">+{{ stats.pending_tasks }} pending</span>
+                                            <span
+                                                class="text-3xl font-bold text-[var(--text-primary)]"
+                                                >{{
+                                                    stats.in_progress_tasks || 0
+                                                }}</span
+                                            >
+                                            <span
+                                                class="text-xs text-amber-500"
+                                                v-if="
+                                                    (stats.pending_tasks || 0) >
+                                                    0
+                                                "
+                                                >+{{
+                                                    stats.pending_tasks
+                                                }}
+                                                pending</span
+                                            >
                                         </div>
                                     </div>
                                 </div>
@@ -978,17 +1121,39 @@ onMounted(() => {
                                 <div
                                     class="absolute inset-0 bg-gradient-to-br from-red-500/10 to-transparent opacity-50 group-hover:opacity-100 transition-opacity"
                                 ></div>
-                                <div class="relative z-10 flex flex-col justify-between h-full">
-                                    <div class="flex justify-between items-start mb-4">
-                                        <div class="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-                                             <AlertCircle class="w-5 h-5 text-red-500" />
+                                <div
+                                    class="relative z-10 flex flex-col justify-between h-full"
+                                >
+                                    <div
+                                        class="flex justify-between items-start mb-4"
+                                    >
+                                        <div
+                                            class="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center"
+                                        >
+                                            <AlertCircle
+                                                class="w-5 h-5 text-red-500"
+                                            />
                                         </div>
-                                        <Badge variant="secondary" size="xs" class="bg-red-500/10 text-red-500 border-red-500/20">Action</Badge>
+                                        <Badge
+                                            variant="secondary"
+                                            size="xs"
+                                            class="bg-red-500/10 text-red-500 border-red-500/20"
+                                            >Action</Badge
+                                        >
                                     </div>
                                     <div>
-                                        <h3 class="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1">Overdue</h3>
+                                        <h3
+                                            class="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1"
+                                        >
+                                            Overdue
+                                        </h3>
                                         <div class="flex items-end gap-2">
-                                            <span class="text-3xl font-bold text-[var(--text-primary)]">{{ stats.overdue_tasks || 0 }}</span>
+                                            <span
+                                                class="text-3xl font-bold text-[var(--text-primary)]"
+                                                >{{
+                                                    stats.overdue_tasks || 0
+                                                }}</span
+                                            >
                                         </div>
                                     </div>
                                 </div>
@@ -1012,29 +1177,80 @@ onMounted(() => {
                                     <div
                                         class="prose prose-sm dark:prose-invert max-w-none text-[var(--text-secondary)] leading-relaxed"
                                     >
-                                        {{ project.description || "No description provided." }}
+                                        {{
+                                            project.description ||
+                                            "No description provided."
+                                        }}
                                     </div>
                                 </Card>
 
                                 <!-- Recent Activity Section -->
-                                <Card padding="lg" class="border-[var(--border-subtle)] shadow-sm">
-                                    <h3 class="text-base font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-                                        <Activity class="w-4 h-4 text-[var(--interactive-primary)]" />
+                                <Card
+                                    padding="lg"
+                                    class="border-[var(--border-subtle)] shadow-sm"
+                                >
+                                    <h3
+                                        class="text-base font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2"
+                                    >
+                                        <Activity
+                                            class="w-4 h-4 text-[var(--interactive-primary)]"
+                                        />
                                         Recent Activity
                                     </h3>
                                     <div class="space-y-4">
                                         <div class="flex gap-3 text-sm">
-                                            <div class="w-2 h-2 mt-1.5 rounded-full bg-[var(--interactive-primary)]"></div>
+                                            <div
+                                                class="w-2 h-2 mt-1.5 rounded-full bg-[var(--interactive-primary)]"
+                                            ></div>
                                             <div>
-                                                <p class="text-[var(--text-primary)]">Project <span class="font-medium text-[var(--text-primary)]">{{ project.name }}</span> was created</p>
-                                                <p class="text-[var(--text-muted)] text-xs mt-0.5">{{ formatDate(project.created_at) }}</p>
+                                                <p
+                                                    class="text-[var(--text-primary)]"
+                                                >
+                                                    Project
+                                                    <span
+                                                        class="font-medium text-[var(--text-primary)]"
+                                                        >{{
+                                                            project.name
+                                                        }}</span
+                                                    >
+                                                    was created
+                                                </p>
+                                                <p
+                                                    class="text-[var(--text-muted)] text-xs mt-0.5"
+                                                >
+                                                    {{
+                                                        formatDate(
+                                                            project.created_at,
+                                                        )
+                                                    }}
+                                                </p>
                                             </div>
                                         </div>
-                                         <div class="flex gap-3 text-sm" v-if="project.updated_at !== project.created_at">
-                                            <div class="w-2 h-2 mt-1.5 rounded-full bg-[var(--text-secondary)]"></div>
+                                        <div
+                                            class="flex gap-3 text-sm"
+                                            v-if="
+                                                project.updated_at !==
+                                                project.created_at
+                                            "
+                                        >
+                                            <div
+                                                class="w-2 h-2 mt-1.5 rounded-full bg-[var(--text-secondary)]"
+                                            ></div>
                                             <div>
-                                                <p class="text-[var(--text-primary)]">Project details updated</p>
-                                                <p class="text-[var(--text-muted)] text-xs mt-0.5">{{ formatDate(project.updated_at) }}</p>
+                                                <p
+                                                    class="text-[var(--text-primary)]"
+                                                >
+                                                    Project details updated
+                                                </p>
+                                                <p
+                                                    class="text-[var(--text-muted)] text-xs mt-0.5"
+                                                >
+                                                    {{
+                                                        formatDate(
+                                                            project.updated_at,
+                                                        )
+                                                    }}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
@@ -1048,88 +1264,228 @@ onMounted(() => {
                                     padding="lg"
                                     class="border-[var(--border-subtle)] shadow-sm bg-[var(--surface-secondary)]/30"
                                 >
-                                    <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-4">
+                                    <h3
+                                        class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-4"
+                                    >
                                         Project Details
                                     </h3>
                                     <dl class="space-y-4 text-sm">
                                         <div class="flex justify-between">
-                                            <dt class="text-[var(--text-secondary)] flex items-center gap-2">
-                                                <Calendar class="w-4 h-4" /> Start Date
+                                            <dt
+                                                class="text-[var(--text-secondary)] flex items-center gap-2"
+                                            >
+                                                <Calendar class="w-4 h-4" />
+                                                Start Date
                                             </dt>
-                                            <dd class="font-medium text-[var(--text-primary)]">
-                                                {{ formatDate(project.start_date) || "Not set" }}
+                                            <dd
+                                                class="font-medium text-[var(--text-primary)]"
+                                            >
+                                                {{
+                                                    formatDate(
+                                                        project.start_date,
+                                                    ) || "Not set"
+                                                }}
                                             </dd>
                                         </div>
                                         <div class="flex justify-between">
-                                            <dt class="text-[var(--text-secondary)] flex items-center gap-2">
-                                                <Clock class="w-4 h-4" /> Due Date
+                                            <dt
+                                                class="text-[var(--text-secondary)] flex items-center gap-2"
+                                            >
+                                                <Clock class="w-4 h-4" /> Due
+                                                Date
                                             </dt>
-                                            <dd class="font-medium text-[var(--text-primary)]" :class="isOverdue(project.due_date) ? 'text-red-500' : ''">
-                                                {{ formatDate(project.due_date) || "Not set" }}
+                                            <dd
+                                                class="font-medium text-[var(--text-primary)]"
+                                                :class="
+                                                    isOverdue(project.due_date)
+                                                        ? 'text-red-500'
+                                                        : ''
+                                                "
+                                            >
+                                                {{
+                                                    formatDate(
+                                                        project.due_date,
+                                                    ) || "Not set"
+                                                }}
                                             </dd>
                                         </div>
-                                        <div class="flex justify-between pt-2 border-t border-[var(--border-subtle)]">
-                                            <dt class="text-[var(--text-secondary)] flex items-center gap-2">
-                                                <div class="w-4 h-4 flex items-center justify-center font-bold text-[var(--text-muted)]">$</div>
+                                        <div
+                                            class="flex justify-between pt-2 border-t border-[var(--border-subtle)]"
+                                        >
+                                            <dt
+                                                class="text-[var(--text-secondary)] flex items-center gap-2"
+                                            >
+                                                <div
+                                                    class="w-4 h-4 flex items-center justify-center font-bold text-[var(--text-muted)]"
+                                                >
+                                                    $
+                                                </div>
                                                 Budget
                                             </dt>
-                                            <dd class="font-medium text-[var(--text-primary)]">
-                                                {{ project.budget ? formatCurrency(project.budget, project.currency) : "Not set" }}
+                                            <dd
+                                                class="font-medium text-[var(--text-primary)]"
+                                            >
+                                                {{
+                                                    project.budget
+                                                        ? formatCurrency(
+                                                              project.budget,
+                                                              project.currency,
+                                                          )
+                                                        : "Not set"
+                                                }}
                                             </dd>
                                         </div>
-                                        <div class="flex justify-between pt-2 border-t border-[var(--border-subtle)]">
-                                            <dt class="text-[var(--text-secondary)] flex items-center gap-2">
-                                                <Users class="w-4 h-4" /> Creator
+                                        <div
+                                            class="flex justify-between pt-2 border-t border-[var(--border-subtle)]"
+                                        >
+                                            <dt
+                                                class="text-[var(--text-secondary)] flex items-center gap-2"
+                                            >
+                                                <Users class="w-4 h-4" />
+                                                Creator
                                             </dt>
                                             <dd class="flex items-center gap-2">
-                                                <Avatar :name="project.creator?.name" :src="project.creator?.avatar_url" size="xs" />
-                                                <span class="text-[var(--text-primary)] line-clamp-1">{{ project.creator?.name }}</span>
+                                                <Avatar
+                                                    :name="
+                                                        project.creator?.name
+                                                    "
+                                                    :src="
+                                                        project.creator
+                                                            ?.avatar_url
+                                                    "
+                                                    size="xs"
+                                                />
+                                                <span
+                                                    class="text-[var(--text-primary)] line-clamp-1"
+                                                    >{{
+                                                        project.creator?.name
+                                                    }}</span
+                                                >
                                             </dd>
                                         </div>
                                     </dl>
                                 </Card>
 
                                 <!-- Client Card -->
-                                <Card v-if="project.client" padding="lg" class="border-[var(--border-subtle)] shadow-sm">
-                                    <h3 class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-4">Client</h3>
+                                <Card
+                                    v-if="project.client"
+                                    padding="lg"
+                                    class="border-[var(--border-subtle)] shadow-sm"
+                                >
+                                    <h3
+                                        class="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-4"
+                                    >
+                                        Client
+                                    </h3>
                                     <div class="flex items-center gap-3">
-                                        <Avatar :name="project.client.name" variant="square" size="sm" class="rounded-md" />
+                                        <Avatar
+                                            :name="project.client.name"
+                                            variant="square"
+                                            size="sm"
+                                            class="rounded-md"
+                                        />
                                         <div>
-                                            <p class="text-sm font-medium text-[var(--text-primary)]">{{ project.client.name }}</p>
-                                            <p class="text-xs text-[var(--text-secondary)]">{{ project.client.email }}</p>
+                                            <p
+                                                class="text-sm font-medium text-[var(--text-primary)]"
+                                            >
+                                                {{ project.client.name }}
+                                            </p>
+                                            <p
+                                                class="text-xs text-[var(--text-secondary)]"
+                                            >
+                                                {{ project.client.email }}
+                                            </p>
                                         </div>
                                     </div>
-                                    <div v-if="project.client.phone || project.client.contact_person" class="mt-4 pt-4 border-t border-[var(--border-subtle)] flex gap-4 text-xs">
-                                         <div v-if="project.client.contact_person">
-                                            <span class="text-[var(--text-muted)] block mb-0.5">Contact</span>
+                                    <div
+                                        v-if="
+                                            project.client.phone ||
+                                            project.client.contact_person
+                                        "
+                                        class="mt-4 pt-4 border-t border-[var(--border-subtle)] flex gap-4 text-xs"
+                                    >
+                                        <div
+                                            v-if="project.client.contact_person"
+                                        >
+                                            <span
+                                                class="text-[var(--text-muted)] block mb-0.5"
+                                                >Contact</span
+                                            >
                                             {{ project.client.contact_person }}
-                                         </div>
+                                        </div>
                                     </div>
                                 </Card>
 
                                 <!-- Upcoming Deadlines -->
-                                <Card padding="lg" class="border-[var(--border-subtle)] shadow-sm">
-                                    <h3 class="text-base font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-                                        <Target class="w-4 h-4 text-[var(--interactive-primary)]" />
+                                <Card
+                                    padding="lg"
+                                    class="border-[var(--border-subtle)] shadow-sm"
+                                >
+                                    <h3
+                                        class="text-base font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2"
+                                    >
+                                        <Target
+                                            class="w-4 h-4 text-[var(--interactive-primary)]"
+                                        />
                                         Upcoming Deadlines
                                     </h3>
                                     <div class="space-y-3">
-                                        <div v-if="!tasks || tasks.length === 0" class="text-sm text-[var(--text-muted)] italic">
+                                        <div
+                                            v-if="!tasks || tasks.length === 0"
+                                            class="text-sm text-[var(--text-muted)] italic"
+                                        >
                                             No upcoming tasks.
                                         </div>
-                                        <div v-else 
-                                             v-for="task in tasks.filter(t => t.due_date).sort((a,b) => new Date(a.due_date) - new Date(b.due_date)).slice(0, 3)" 
-                                             :key="task.id"
-                                             class="flex items-start justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] transition-colors"
+                                        <div
+                                            v-else
+                                            v-for="task in tasks
+                                                .filter((t) => t.due_date)
+                                                .sort(
+                                                    (a, b) =>
+                                                        new Date(a.due_date) -
+                                                        new Date(b.due_date),
+                                                )
+                                                .slice(0, 3)"
+                                            :key="task.id"
+                                            class="flex items-start justify-between p-2 rounded-lg hover:bg-[var(--surface-secondary)] transition-colors"
                                         >
-                                            <div class="flex items-center gap-3">
-                                                 <div class="w-1.5 h-1.5 rounded-full" :class="isOverdue(task.due_date) ? 'bg-red-500' : 'bg-amber-500'"></div>
-                                                 <div>
-                                                     <p class="text-sm font-medium text-[var(--text-primary)] line-clamp-1 truncate max-w-[150px]">{{ task.name || task.title }}</p>
-                                                     <p class="text-xs text-[var(--text-muted)]">{{ formatDate(task.due_date) }}</p>
-                                                 </div>
+                                            <div
+                                                class="flex items-center gap-3"
+                                            >
+                                                <div
+                                                    class="w-1.5 h-1.5 rounded-full"
+                                                    :class="
+                                                        isOverdue(task.due_date)
+                                                            ? 'bg-red-500'
+                                                            : 'bg-amber-500'
+                                                    "
+                                                ></div>
+                                                <div>
+                                                    <p
+                                                        class="text-sm font-medium text-[var(--text-primary)] line-clamp-1 truncate max-w-[150px]"
+                                                    >
+                                                        {{
+                                                            task.name ||
+                                                            task.title
+                                                        }}
+                                                    </p>
+                                                    <p
+                                                        class="text-xs text-[var(--text-muted)]"
+                                                    >
+                                                        {{
+                                                            formatDate(
+                                                                task.due_date,
+                                                            )
+                                                        }}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <Badge size="xs" variant="outline" class="text-[10px]">{{ task.priority }}</Badge>
+                                            <Badge
+                                                size="xs"
+                                                variant="outline"
+                                                class="text-[10px]"
+                                                >{{ task.priority }}</Badge
+                                            >
                                         </div>
                                     </div>
                                 </Card>
@@ -1138,15 +1494,28 @@ onMounted(() => {
 
                         <!-- Recent Tasks Footer -->
                         <div class="mt-8">
-                            <h3 class="text-base font-semibold text-[var(--text-primary)] mb-4 flex items-center justify-between">
+                            <h3
+                                class="text-base font-semibold text-[var(--text-primary)] mb-4 flex items-center justify-between"
+                            >
                                 <span class="flex items-center gap-2">
-                                    <CheckCircle2 class="w-4 h-4 text-[var(--interactive-primary)]" />
+                                    <CheckCircle2
+                                        class="w-4 h-4 text-[var(--interactive-primary)]"
+                                    />
                                     Recent Tasks
                                 </span>
-                                <Button variant="ghost" size="sm" @click="activeTab = 'tasks'" class="text-xs">View All</Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    @click="activeTab = 'tasks'"
+                                    class="text-xs"
+                                    >View All</Button
+                                >
                             </h3>
                             <div class="space-y-2">
-                                <div v-if="tasks.length === 0" class="text-center py-6 text-[var(--text-muted)] text-sm border border-dashed border-[var(--border-subtle)] rounded-lg">
+                                <div
+                                    v-if="tasks.length === 0"
+                                    class="text-center py-6 text-[var(--text-muted)] text-sm border border-dashed border-[var(--border-subtle)] rounded-lg"
+                                >
                                     No tasks found.
                                 </div>
                                 <div
@@ -1154,19 +1523,51 @@ onMounted(() => {
                                     v-for="task in tasks.slice(0, 5)"
                                     :key="task.id"
                                     class="flex items-center justify-between p-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)]/20 hover:bg-[var(--surface-secondary)] transition-all cursor-pointer"
-                                     @click="onCreateTask" 
+                                    @click="onCreateTask"
                                 >
-                                   <div class="flex items-center gap-3">
-                                        <div class="w-2 h-2 rounded-full" :class="{'bg-emerald-500': task.status === 'completed', 'bg-blue-500': task.status === 'active', 'bg-gray-500': task.status === 'draft'}"></div>
-                                        <span class="text-sm font-medium text-[var(--text-primary)]">{{ task.name || task.title }}</span>
+                                    <div class="flex items-center gap-3">
+                                        <div
+                                            class="w-2 h-2 rounded-full"
+                                            :class="{
+                                                'bg-emerald-500':
+                                                    task.status === 'completed',
+                                                'bg-blue-500':
+                                                    task.status === 'active',
+                                                'bg-gray-500':
+                                                    task.status === 'draft',
+                                            }"
+                                        ></div>
+                                        <span
+                                            class="text-sm font-medium text-[var(--text-primary)]"
+                                            >{{ task.name || task.title }}</span
+                                        >
                                     </div>
                                     <div class="flex items-center gap-4">
-                                        <Avatar v-if="task.assignees?.[0] || task.assignee" :name="task.assignees?.[0]?.name || task.assignee?.name" :src="task.assignees?.[0]?.avatar_url || task.assignee?.avatar_url" size="xs" />
-                                        <Badge variant="secondary" size="xs">{{ typeof task.status === 'string' ? task.status : task.status?.label }}</Badge>
+                                        <Avatar
+                                            v-if="
+                                                task.assignees?.[0] ||
+                                                task.assignee
+                                            "
+                                            :name="
+                                                task.assignees?.[0]?.name ||
+                                                task.assignee?.name
+                                            "
+                                            :src="
+                                                task.assignees?.[0]
+                                                    ?.avatar_url ||
+                                                task.assignee?.avatar_url
+                                            "
+                                            size="xs"
+                                        />
+                                        <Badge variant="secondary" size="xs">{{
+                                            typeof task.status === "string"
+                                                ? task.status
+                                                : task.status?.label
+                                        }}</Badge>
                                     </div>
                                 </div>
-                             </div>
-                         </div>
+                            </div>
+                        </div>
                     </div>
                     <div
                         v-else-if="activeTab === 'tasks'"
@@ -1259,12 +1660,14 @@ onMounted(() => {
                     >
                         <Card padding="lg">
                             <div class="flex items-center justify-between mb-6">
-                                <h2 class="text-lg font-semibold text-[var(--text-primary)]">
+                                <h2
+                                    class="text-lg font-semibold text-[var(--text-primary)]"
+                                >
                                     Project Schedule
                                 </h2>
                             </div>
-                            <ProjectGanttChart 
-                                :tasks="tasks" 
+                            <ProjectGanttChart
+                                :tasks="tasks"
                                 :project-start-date="project.start_date"
                                 :project-due-date="project.due_date"
                                 @task-click="onTaskClick"
@@ -1292,7 +1695,8 @@ onMounted(() => {
                                     Project Members
                                 </h2>
                                 <p class="text-[var(--text-muted)] mt-1">
-                                    Manage access and roles for this specific project.
+                                    Manage access and roles for this specific
+                                    project.
                                 </p>
                             </div>
                             <Button @click="openMemberInvite">
@@ -1310,22 +1714,26 @@ onMounted(() => {
                                 class="group relative overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-5 transition-all hover:border-[var(--interactive-primary)]/50 hover:shadow-lg hover:-translate-y-1"
                             >
                                 <!-- Top Row: Avatar & Actions -->
-                                <div class="flex justify-between items-start mb-4 relative z-10">
+                                <div
+                                    class="flex justify-between items-start mb-4 relative z-10"
+                                >
                                     <Avatar
                                         :name="member.name"
                                         :src="member.avatar_url"
                                         size="lg"
                                         class="ring-2 ring-[var(--bg-default)] shadow-sm"
                                     />
-                                    <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <a 
+                                    <div
+                                        class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <a
                                             :href="'mailto:' + member.email"
                                             class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] transition-colors"
                                             title="Send Email"
                                         >
                                             <Mail class="w-4 h-4" />
                                         </a>
-                                        <button 
+                                        <button
                                             @click="removeProjectMember(member)"
                                             class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
                                             title="Remove from Project"
@@ -1337,30 +1745,47 @@ onMounted(() => {
 
                                 <!-- Info -->
                                 <div class="mb-4">
-                                    <h3 class="font-bold text-lg text-[var(--text-primary)] leading-tight mb-1">
+                                    <h3
+                                        class="font-bold text-lg text-[var(--text-primary)] leading-tight mb-1"
+                                    >
                                         {{ member.name }}
                                     </h3>
-                                    <p class="text-xs text-[var(--text-muted)] truncate">
+                                    <p
+                                        class="text-xs text-[var(--text-muted)] truncate"
+                                    >
                                         {{ member.email }}
                                     </p>
                                 </div>
 
                                 <!-- Footer: Role & Joined -->
-                                <div class="flex items-center justify-between pt-4 border-t border-[var(--border-subtle)]">
+                                <div
+                                    class="flex items-center justify-between pt-4 border-t border-[var(--border-subtle)]"
+                                >
                                     <Badge
                                         variant="secondary"
                                         class="capitalize bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-0"
                                     >
                                         {{ member.pivot?.role || member.role }}
                                     </Badge>
-                                    <div class="text-[10px] text-[var(--text-muted)] flex items-center gap-1">
+                                    <div
+                                        class="text-[10px] text-[var(--text-muted)] flex items-center gap-1"
+                                    >
                                         <Clock class="w-3 h-3" />
-                                        <span>Joined {{ formatDate(getJoinedDate(member)) }}</span>
+                                        <span
+                                            >Joined
+                                            {{
+                                                formatDate(
+                                                    getJoinedDate(member),
+                                                )
+                                            }}</span
+                                        >
                                     </div>
                                 </div>
-                                
+
                                 <!-- Decorative Gradient Blob -->
-                                <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-[var(--interactive-primary)]/10 to-transparent rounded-bl-full -mr-8 -mt-8 pointer-events-none"></div>
+                                <div
+                                    class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-[var(--interactive-primary)]/10 to-transparent rounded-bl-full -mr-8 -mt-8 pointer-events-none"
+                                ></div>
                             </div>
 
                             <!-- Add New Member Placeholder Card -->

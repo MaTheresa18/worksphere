@@ -382,9 +382,9 @@ const isOverdue = (dateString?: string, status?: any) => {
                         <!-- Assigned To Column -->
                         <td class="px-4 py-3">
                             <div
-                                @click.stop="emit('quick-assign', task, 'operator')"
-                                class="cursor-pointer hover:opacity-80 transition-opacity"
-                                title="Quick Assign Operator"
+                                @click.stop="task.can?.assign && emit('quick-assign', task, 'operator')"
+                                :class="task.can?.assign ? 'cursor-pointer hover:opacity-80 transition-opacity' : 'cursor-default'"
+                                :title="task.can?.assign ? 'Quick Assign Operator' : ''"
                             >
                                 <div
                                     v-if="task.assignee"
@@ -415,9 +415,9 @@ const isOverdue = (dateString?: string, status?: any) => {
                         <!-- QA Owner Column -->
                         <td class="px-4 py-3">
                             <div
-                                @click.stop="emit('quick-assign', task, 'qa')"
-                                class="cursor-pointer hover:opacity-80 transition-opacity"
-                                title="Quick Assign QA"
+                                @click.stop="task.can?.assign && emit('quick-assign', task, 'qa')"
+                                :class="task.can?.assign ? 'cursor-pointer hover:opacity-80 transition-opacity' : 'cursor-default'"
+                                :title="task.can?.assign ? 'Quick Assign QA' : ''"
                             >
                                 <div
                                     v-if="task.qa_user"

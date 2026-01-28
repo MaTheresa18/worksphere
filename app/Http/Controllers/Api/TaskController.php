@@ -252,7 +252,7 @@ class TaskController extends Controller
         if (! empty($taskData['checklist']) && is_array($taskData['checklist'])) {
             foreach ($taskData['checklist'] as $index => $item) {
                 // If item is string, use it as text. If object, look for text property.
-                $text = is_array($item) ? ($item['text'] ?? '') : $item;
+                $text = is_array($item) ? ($item['text'] ?? $item['title'] ?? '') : $item;
                 $isCompleted = is_array($item) ? ($item['is_completed'] ?? false) : false;
 
                 if (! empty($text)) {
@@ -290,6 +290,8 @@ class TaskController extends Controller
         );
 
         $task->load(['assignee', 'creator', 'project']);
+
+        \App\Events\TaskCreated::dispatch($task);
 
         return response()->json(new TaskResource($task), 201);
     }
@@ -345,14 +347,28 @@ class TaskController extends Controller
      */
     public function update(UpdateTaskRequest $request, Team $team, Project $project, Task $task): JsonResponse
     {
-        // Allow if user has team permission OR is the assignee
-        if (! $this->permissionService->hasTeamPermission($request->user(), $team, 'tasks.update') &&
-            $task->assigned_to !== $request->user()->id) {
+        $user = $request->user();
+        $this->ensureProjectBelongsToTeam($team, $project);
+        $this->ensureTaskBelongsToProject($project, $task);
+
+        $hasEditAll = $this->permissionService->hasTeamPermission($user, $team, 'tasks.edit_all');
+        $hasAssign = $this->permissionService->hasTeamPermission($user, $team, 'tasks.assign');
+        $isAssignee = $task->assigned_to === $user->id;
+        $isQaUser = $task->qa_user_id === $user->id;
+
+        // Basic permission check
+        if (! $hasEditAll && ! $isAssignee && ! $isQaUser) {
             abort(403, 'You do not have permission to update this task.');
         }
 
-        $this->ensureProjectBelongsToTeam($team, $project);
-        $this->ensureTaskBelongsToProject($project, $task);
+        // Read-only logic: If in QA, only those with tasks.qa_review (Admin/Lead/QA) can edit.
+        // Unless it was rejected (workflow handles that transitions).
+        $isInReview = in_array($task->status, [TaskStatus::Submitted, TaskStatus::InQa, TaskStatus::PmReview]);
+        $hasQaPermission = $this->permissionService->hasTeamPermission($user, $team, 'tasks.qa_review');
+
+        if ($isInReview && ! $hasQaPermission) {
+            abort(403, 'Task is currently in review and cannot be modified.');
+        }
 
         $validated = $request->validated();
         $oldValues = $task->only(['title', 'description', 'status', 'priority', 'due_date']);
@@ -368,11 +384,16 @@ class TaskController extends Controller
             'checklist' => $validated['checklist'] ?? null,
         ], fn ($value) => $value !== null);
 
+        // Metadata Restrictions: Only those with tasks.edit_all can change core metadata
+        if (! $hasEditAll) {
+            unset($updateData['title'], $updateData['description'], $updateData['priority'], $updateData['due_date']);
+        }
+
         // Handle status change through workflow if provided
         if (isset($validated['status']) && $validated['status'] !== $task->status->value) {
             $newStatus = TaskStatus::from($validated['status']);
             if ($task->canTransitionTo($newStatus)) {
-                $task->transitionTo($newStatus, $request->user());
+                $task->transitionTo($newStatus, $user);
             } else {
                 return response()->json([
                     'message' => "Cannot transition from '{$task->status->label()}' to '{$newStatus->label()}'. Allowed transitions: ".
@@ -381,16 +402,22 @@ class TaskController extends Controller
             }
         }
 
-        // Handle assignee change
+        // Handle assignee change - Requires tasks.assign
         if (isset($validated['assigned_to'])) {
+            if (! $hasAssign) {
+                return response()->json(['message' => 'You do not have permission to change the assignee.'], 403);
+            }
             $assignee = User::where('public_id', $validated['assigned_to'])->first();
             if ($assignee && $project->hasMember($assignee)) {
-                $this->workflowService->assignTask($task, $assignee, $request->user());
+                $this->workflowService->assignTask($task, $assignee, $user);
             }
         }
 
-        // Handle QA user change
+        // Handle QA user change - Requires tasks.assign
         if (array_key_exists('qa_user_id', $validated)) {
+            if (! $hasAssign) {
+                 return response()->json(['message' => 'You do not have permission to change the QA owner.'], 403);
+            }
             if (empty($validated['qa_user_id'])) {
                 $updateData['qa_user_id'] = null;
             } else {
@@ -419,6 +446,8 @@ class TaskController extends Controller
         );
 
         $task->load(['assignee', 'creator', 'project']);
+
+        \App\Events\TaskUpdated::dispatch($task);
 
         return response()->json(new TaskResource($task));
     }
@@ -470,6 +499,8 @@ class TaskController extends Controller
         $this->workflowService->assignTask($task, $assignee, $request->user());
         $task->load(['assignee', 'creator', 'project']);
 
+        \App\Events\TaskUpdated::dispatch($task);
+
         return response()->json([
             'message' => 'Task assigned successfully.',
             'task' => new TaskResource($task),
@@ -497,6 +528,8 @@ class TaskController extends Controller
         }
 
         $task->load(['assignee', 'creator', 'project']);
+
+        \App\Events\TaskUpdated::dispatch($task);
 
         return response()->json([
             'message' => 'Task started successfully.',
@@ -533,6 +566,8 @@ class TaskController extends Controller
         }
 
         $task->load(['assignee', 'creator', 'project']);
+
+        \App\Events\TaskUpdated::dispatch($task);
 
         return response()->json([
             'message' => 'Task submitted for QA successfully.',
@@ -659,6 +694,8 @@ class TaskController extends Controller
         }
 
         $task->refresh()->load(['assignee', 'creator', 'project', 'qaReviews.reviewer']);
+
+        \App\Events\TaskUpdated::dispatch($task);
 
         return response()->json([
             'message' => $validated['approved'] ? 'Task approved.' : 'Task rejected.',

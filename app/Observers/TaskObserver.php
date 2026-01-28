@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Task;
+use Illuminate\Support\Facades\Log;
 
 class TaskObserver
 {
@@ -14,6 +15,18 @@ class TaskObserver
         if ($task->project) {
             $task->project->recalculateProgress();
         }
+
+        // Notify assignee if assigned at creation, unless assigned to self
+        if ($task->assigned_to && $task->assigned_to !== \Illuminate\Support\Facades\Auth::id()) {
+             $task->loadMissing('assignee');
+             if ($task->assignee) {
+                 $task->assignee->notify(new \App\Notifications\TaskNotification(
+                     $task,
+                     \App\Notifications\TaskNotification::TYPE_ASSIGNED,
+                     \Illuminate\Support\Facades\Auth::user()
+                 ));
+             }
+        }
     }
 
     /**
@@ -23,6 +36,18 @@ class TaskObserver
     {
         if ($task->project && $task->wasChanged('status')) {
             $task->project->recalculateProgress();
+        }
+
+        // Notify new assignee if assignment changed
+        if ($task->wasChanged('assigned_to') && $task->assigned_to && $task->assigned_to !== \Illuminate\Support\Facades\Auth::id()) {
+             $task->load('assignee');
+             if ($task->assignee) {
+                 $task->assignee->notify(new \App\Notifications\TaskNotification(
+                     $task,
+                     \App\Notifications\TaskNotification::TYPE_ASSIGNED,
+                     \Illuminate\Support\Facades\Auth::user()
+                 ));
+             }
         }
     }
 

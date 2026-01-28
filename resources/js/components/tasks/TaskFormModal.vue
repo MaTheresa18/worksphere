@@ -6,6 +6,10 @@ import { toTypedSchema } from "@vee-validate/zod";
 import * as z from "zod";
 import axios from "axios";
 import { toast } from "vue-sonner";
+import { useAuthStore } from "@/stores/auth";
+import { taskTemplateService, type TaskTemplate } from "@/services/task-template.service";
+
+const authStore = useAuthStore();
 
 interface Props {
     open: boolean;
@@ -14,9 +18,6 @@ interface Props {
     projectId?: string;
     projectMembers?: any[];
 }
-
-import { useAuthStore } from "@/stores/auth";
-const authStore = useAuthStore();
 
 const props = withDefaults(defineProps<Props>(), {
     projectMembers: () => [],
@@ -48,7 +49,7 @@ const schema = toTypedSchema(
     }),
 );
 
-const { setValues, resetForm } = useForm({
+const { setValues } = useForm({
     validationSchema: schema,
     initialValues: {
         status: "open",
@@ -105,8 +106,8 @@ const resetFormValues = () => {
     newChecklistItem.value = "";
     selectedTemplateId.value = "";
 };
-// ...
 
+// Options
 const statusOptions = [
     { value: "open", label: "To Do" },
     { value: "in_progress", label: "In Progress" },
@@ -131,7 +132,11 @@ const priorityOptions = [
 
 const localMembers = ref<any[]>([]);
 
-const QA_ROLES = ["subject_matter_expert", "quality_assessor", "team_lead", "manager", "owner", "admin", "administrator"];
+const canEditMetadata = computed(() => !props.task || (props.task as any).can?.edit_metadata);
+const canManageChecklist = computed(() => !props.task || (props.task as any).can?.manage_checklist);
+const canAssign = computed(() => !props.task || (props.task as any).can?.assign);
+const isReadOnly = computed(() => (props.task as any)?.can?.is_read_only);
+
 
 const operatorMemberOptions = computed(() => {
     const list = props.projectMembers && props.projectMembers.length > 0
@@ -152,9 +157,7 @@ const qaMemberOptions = computed(() => {
         : localMembers.value;
 
     return list
-        .filter((m: any) => {
-            return QA_ROLES.includes(m.role) || QA_ROLES.includes(m.team_role);
-        })
+        .filter((m: any) => m.is_qa_eligible)
         .map((m: any) => ({
             value: m.public_id || m.id,
             label: m.name,
@@ -162,9 +165,6 @@ const qaMemberOptions = computed(() => {
             subtitle: (m.team_role || m.role)?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || m.email
         }));
 });
-
-// For backward compatibility or internal usage if needed
-const memberOptions = operatorMemberOptions;
 
 // Dynamic State for Selectors
 const selectedTeamId = ref("");
@@ -197,23 +197,15 @@ const fetchProjects = async () => {
 };
 
 const fetchMembers = async () => {
-    // If members are already provided via props, don't fetch
-    if (props.projectMembers && props.projectMembers.length > 0) {
-        return;
-    }
-
-    // Need both team and project to fetch
+    if (props.projectMembers && props.projectMembers.length > 0) return;
     if (!selectedTeamId.value || !selectedProjectId.value) return;
 
     try {
         isFetchingMembers.value = true;
-        
         const response = await axios.get(
             `/api/teams/${selectedTeamId.value}/projects/${selectedProjectId.value}`,
         );
-        
         localMembers.value = response.data.data?.members || [];
-        console.log("TaskFormModal: Fetched project members:", localMembers.value);
     } catch (error) {
         console.error("Failed to fetch project members", error);
     } finally {
@@ -221,11 +213,10 @@ const fetchMembers = async () => {
     }
 };
 
-// Watch team changes - only when user manually changes team (not from props)
+// Watchers for Dependencies
 watch(
     () => selectedTeamId.value,
     (newVal, oldVal) => {
-        // Only reset project and fetch if this is a manual team change (not initial prop sync)
         if (oldVal && newVal !== oldVal) {
             projectOptions.value = [];
             selectedProjectId.value = "";
@@ -237,7 +228,6 @@ watch(
     },
 );
 
-// Watch project changes for fetching members
 watch(
     () => selectedProjectId.value,
     (newVal, oldVal) => {
@@ -249,11 +239,6 @@ watch(
 );
 
 // Templates Logic
-import {
-    taskTemplateService,
-    type TaskTemplate,
-} from "@/services/task-template.service";
-
 const templates = ref<TaskTemplate[]>([]);
 const selectedTemplateId = ref("");
 
@@ -285,7 +270,6 @@ watch(
     },
 );
 
-// Apply template
 watch(
     () => selectedTemplateId.value,
     (newVal) => {
@@ -294,53 +278,37 @@ watch(
             setValues({
                 status: "open",
                 priority:
-                    template.default_priority === "low"
-                        ? 1
-                        : template.default_priority === "medium"
-                          ? 2
-                          : template.default_priority === "high"
-                            ? 3
-                            : template.default_priority === "urgent"
-                              ? 4
-                              : 2,
+                    template.default_priority === "low" ? 1
+                    : template.default_priority === "medium" ? 2
+                    : template.default_priority === "high" ? 3
+                    : template.default_priority === "urgent" ? 4
+                    : 2,
             });
 
-            // Update formValues
             formValues.value.title = template.name.replace(" (Template)", "");
-            formValues.value.description =
-                template.description || formValues.value.description;
+            formValues.value.description = template.description || formValues.value.description;
             formValues.value.priority =
-                template.default_priority === "low"
-                    ? 1
-                    : template.default_priority === "medium"
-                      ? 2
-                      : template.default_priority === "high"
-                        ? 3
-                        : template.default_priority === "urgent"
-                          ? 4
-                          : 2;
-            formValues.value.estimated_hours =
-                template.default_estimated_hours || 0;
+                template.default_priority === "low" ? 1
+                : template.default_priority === "medium" ? 2
+                : template.default_priority === "high" ? 3
+                : template.default_priority === "urgent" ? 4
+                : 2;
+            formValues.value.estimated_hours = template.default_estimated_hours || 0;
 
-            // Clone checklist
             if (template.checklist_template) {
                 formValues.value.checklist = JSON.parse(
                     JSON.stringify(template.checklist_template),
                 );
             }
-
             toast.success("Template loaded");
         }
     },
 );
 
-// Initialize modal state when opened
 const initializeModal = async () => {
-    // Set team and project from props synchronously
     if (props.teamId) {
         selectedTeamId.value = props.teamId;
     } else if (!selectedTeamId.value && authStore.user?.teams?.length === 1) {
-        // Auto-select if user has only one team
         selectedTeamId.value = authStore.user.teams[0].public_id;
     }
 
@@ -348,22 +316,13 @@ const initializeModal = async () => {
         selectedProjectId.value = props.projectId;
     }
 
-    // Fetch projects list if we have a team selected but no projects yet
     if (selectedTeamId.value && projectOptions.value.length === 0) {
         await fetchProjects();
     }
-
-    // Fetch templates if we have a team
     if (selectedTeamId.value && templates.value.length === 0) {
         await fetchTemplates();
     }
-
-    // Fetch members if we have both IDs and no members provided via props
-    if (
-        selectedTeamId.value &&
-        selectedProjectId.value &&
-        (!props.projectMembers || props.projectMembers.length === 0)
-    ) {
+    if (selectedTeamId.value && selectedProjectId.value && (!props.projectMembers || props.projectMembers.length === 0)) {
         await fetchMembers();
     }
 };
@@ -383,24 +342,15 @@ watch(
     () => props.task,
     (newTask) => {
         if (newTask) {
-            // Extract status and priority values - they can be objects or strings
-            const statusValue =
-                typeof newTask.status === "object"
-                    ? newTask.status?.value
-                    : newTask.status;
-            const priorityValue =
-                typeof newTask.priority === "object"
-                    ? newTask.priority?.value
-                    : newTask.priority;
+            const statusValue = typeof newTask.status === "object" ? newTask.status?.value : newTask.status;
+            const priorityValue = typeof newTask.priority === "object" ? newTask.priority?.value : newTask.priority;
 
             setValues({
                 title: newTask.title,
                 description: newTask.description,
                 status: statusValue || "open",
                 priority: priorityValue || 2,
-                due_date: newTask.due_date
-                    ? new Date(newTask.due_date).toISOString()
-                    : "",
+                due_date: newTask.due_date ? new Date(newTask.due_date).toISOString() : "",
                 assigned_to: newTask.assignee?.id || newTask.assigned_to || "",
                 estimated_hours: Number(newTask.estimated_hours) || 0,
             });
@@ -410,23 +360,14 @@ watch(
                 description: newTask.description || "",
                 status: statusValue || "open",
                 priority: priorityValue || 2,
-                due_date: newTask.due_date
-                    ? new Date(newTask.due_date).toISOString().split("T")[0]
-                    : "",
+                due_date: newTask.due_date ? new Date(newTask.due_date).toISOString().split("T")[0] : "",
                 assigned_to: newTask.assignee?.id || newTask.assigned_to || "",
-                qa_user_id:
-                    newTask.qa_user?.id || newTask.qa_user_id || "",
+                qa_user_id: newTask.qa_user?.id || newTask.qa_user_id || "",
                 estimated_hours: Number(newTask.estimated_hours) || 0,
-                checklist:
-                    newTask.checklist?.map((item: any) => ({
-                        title: typeof item === "string" ? item : item.title || item.text,
-                        is_completed:
-                            typeof item === "string"
-                                ? false
-                                : item.is_completed ||
-                                  item.status === "done" ||
-                                  false,
-                    })) || [],
+                checklist: newTask.checklist?.map((item: any) => ({
+                    title: typeof item === "string" ? item : item.title || item.text,
+                    is_completed: typeof item === "string" ? false : item.is_completed || item.status === "done" || false,
+                })) || [],
                 save_as_template: false,
             };
         } else {
@@ -448,7 +389,6 @@ watch(
 );
 
 const onSubmit = async () => {
-    // Manual validation
     if (!formValues.value.title) {
         toast.error("Title is required");
         return;
@@ -456,7 +396,6 @@ const onSubmit = async () => {
 
     try {
         isLoading.value = true;
-
         const payload = {
             ...formValues.value,
             checklist: formValues.value.checklist.map((item) => {
@@ -467,21 +406,8 @@ const onSubmit = async () => {
             }),
         };
 
-        // Resolve team and project IDs with fallbacks
-        // Task from API has nested project.team_id and project.id
-        const teamId =
-            selectedTeamId.value ||
-            props.teamId ||
-            props.task?.project?.team_id ||
-            props.task?.team_id ||
-            "";
-        const projectId =
-            selectedProjectId.value ||
-            props.projectId ||
-            props.task?.project?.id ||
-            props.task?.project?.public_id ||
-            props.task?.project_id ||
-            "";
+        const teamId = selectedTeamId.value || props.teamId || props.task?.project?.team_id || props.task?.team_id || "";
+        const projectId = selectedProjectId.value || props.projectId || props.task?.project?.id || props.task?.project?.public_id || props.task?.project_id || "";
 
         if (!teamId || !projectId) {
             toast.error("Please select a team and project");
@@ -505,7 +431,6 @@ const onSubmit = async () => {
             emit("task-saved", response.data.data);
             toast.success("Task created successfully");
         }
-
         isOpen.value = false;
     } catch (err: any) {
         console.error("Failed to save task", err);
@@ -520,126 +445,166 @@ const onSubmit = async () => {
     <Modal
         v-model:open="isOpen"
         :title="isEditing ? 'Edit Task' : 'Create New Task'"
-        size="xl"
+        size="2xl"
     >
         <template #default>
             <form
                 id="task-form"
                 @submit.prevent="onSubmit"
-                class="flex flex-col md:flex-row gap-6 h-full p-1"
+                class="flex flex-col gap-6 p-2"
             >
-                <!-- Left Column: Main Content -->
-                <div class="flex-1 space-y-6 min-w-0">
-                    <!-- Template Selector -->
-                    <div
-                        v-if="!isEditing && templates.length > 0"
-                        class="p-3 bg-[var(--surface-secondary)]/50 backdrop-blur-sm rounded-xl border border-[var(--border-subtle)]"
-                    >
-                        <label
-                            class="block text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-2"
-                            >Load from Template</label
-                        >
+                <div class="space-y-4">
+                  <!-- Project/Team Context (Horizontal) -->
+                   <div v-if="!props.projectId && !isEditing" class="grid grid-cols-2 gap-4">
                         <SelectFilter
+                            v-model="selectedTeamId"
+                            :options="teamOptions"
+                            placeholder="Select Team"
+                            class="w-full"
+                        />
+                        <SelectFilter
+                            v-model="selectedProjectId"
+                            :options="projectOptions"
+                            placeholder="Select Project"
+                            :disabled="!selectedTeamId"
+                            class="w-full"
+                        />
+                   </div>
+                   
+                   <!-- Template Loader -->
+                   <div v-if="!isEditing && templates.length > 0 && selectedTeamId">
+                         <SelectFilter
                             v-model="selectedTemplateId"
                             :options="templateOptions"
-                            placeholder="Select a template..."
+                            placeholder="Load from template..."
                             class="w-full"
+                        />
+                   </div>
+
+                    <!-- Title -->
+                    <div>
+                        <Input
+                            v-model="formValues.title"
+                            placeholder="Task Title"
+                            required
+                            class="text-xl font-bold border-none px-0 shadow-none focus:ring-0 bg-transparent placeholder-[var(--text-muted)]"
+                            :disabled="!canEditMetadata || isReadOnly"
+                        />
+                    </div>
+                
+                    <!-- Properties Grid -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 bg-[var(--surface-secondary)]/30 p-4 rounded-xl border border-[var(--border-subtle)]">
+                        <!-- Status -->
+                         <div class="space-y-1">
+                             <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Status</label>
+                             <SelectFilter
+                                v-model="formValues.status"
+                                :options="statusOptions"
+                                placeholder="Status"
+                                class="w-full text-sm"
+                                :disabled="isReadOnly"
+                            />
+                         </div>
+
+                         <!-- Priority -->
+                         <div class="space-y-1">
+                             <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Priority</label>
+                             <SelectFilter
+                                v-model="formValues.priority"
+                                :options="priorityOptions"
+                                placeholder="Priority"
+                                class="w-full text-sm"
+                                :disabled="!canEditMetadata || isReadOnly"
+                            />
+                         </div>
+                         
+                         <!-- Due Date -->
+                          <div class="space-y-1">
+                             <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Due Date</label>
+                             <Input type="date" v-model="formValues.due_date" class="w-full text-sm h-10" :disabled="!canEditMetadata || isReadOnly" />
+                         </div>
+
+                          <!-- Est Hours -->
+                          <div class="space-y-1">
+                             <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Est. Hours</label>
+                             <Input type="number" step="0.5" v-model="formValues.estimated_hours" class="w-full text-sm h-10" placeholder="0" :disabled="!canEditMetadata || isReadOnly" />
+                         </div>
+                    </div>
+
+                    <!-- People Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                             <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Assignee</label>
+                             <SelectFilter
+                                v-model="formValues.assigned_to"
+                                :options="operatorMemberOptions"
+                                :placeholder="operatorMemberOptions.length === 0 ? 'No members' : 'Unassigned'"
+                                :disabled="operatorMemberOptions.length === 0 || !canAssign || isReadOnly"
+                                class="w-full"
+                                searchable
+                            />
+                        </div>
+                        <div class="space-y-1">
+                             <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">QA Owner</label>
+                             <SelectFilter
+                                v-model="formValues.qa_user_id"
+                                :options="qaMemberOptions"
+                                :placeholder="qaMemberOptions.length === 0 ? 'No members' : 'Unassigned'"
+                                :disabled="qaMemberOptions.length === 0 || isFetchingMembers || !canAssign || isReadOnly"
+                                class="w-full"
+                                searchable
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="space-y-2">
+                         <label class="text-sm font-medium text-[var(--text-secondary)]">Description</label>
+                         <Textarea
+                            v-model="formValues.description"
+                            placeholder="Add more details..."
+                            rows="5"
+                            class="resize-y min-h-[100px] bg-[var(--surface-primary)] border-[var(--border-default)] focus:border-[var(--primary-DEFAULT)]"
+                            :disabled="!canEditMetadata || isReadOnly"
                         />
                     </div>
 
-                    <div class="space-y-4">
-                        <div class="space-y-2">
-                            <label
-                                class="block text-sm font-semibold text-[var(--text-primary)]"
-                                >Title <span class="text-red-500">*</span></label
-                            >
-                            <Input
-                                v-model="formValues.title"
-                                placeholder="Task title"
-                                required
-                                class="text-lg font-medium"
-                            />
-                        </div>
-
-                        <div class="space-y-2">
-                            <label
-                                class="block text-sm font-semibold text-[var(--text-primary)]"
-                                >Description</label
-                            >
-                            <Textarea
-                                v-model="formValues.description"
-                                placeholder="Describe the task..."
-                                rows="6"
-                                class="resize-y min-h-[120px]"
-                            />
-                        </div>
-                    </div>
-
-                    <!-- Checklist Section -->
+                    <!-- Checklist -->
                     <div class="space-y-3 pt-4 border-t border-[var(--border-subtle)]">
                         <div class="flex items-center justify-between">
-                            <label
-                                class="block text-sm font-semibold text-[var(--text-primary)]"
-                                >Checklist</label
-                            >
+                            <label class="text-sm font-medium text-[var(--text-secondary)]">Checklist</label>
                             <span class="text-xs text-[var(--text-muted)]">{{ formValues.checklist.filter(i => typeof i === 'string' ? false : i.is_completed).length }}/{{ formValues.checklist.length }}</span>
                         </div>
-
+                        
                         <div class="space-y-2">
                              <div class="flex gap-2">
                                 <Input
                                     v-model="newChecklistItem"
-                                    placeholder="Add sub-item..."
+                                    placeholder="Add item..."
                                     @keydown.enter.prevent="addChecklistItem"
                                     class="flex-1"
+                                    :disabled="!canManageChecklist || isReadOnly"
                                 />
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="secondary"
-                                    @click="addChecklistItem"
-                                    >Add</Button
-                                >
+                                <Button type="button" size="sm" variant="secondary" @click="addChecklistItem">Add</Button>
                             </div>
-
-                            <div
-                                v-if="formValues.checklist.length > 0"
-                                class="space-y-1 mt-2 max-h-60 overflow-y-auto pr-1"
-                            >
+                            
+                            <div v-if="formValues.checklist.length > 0" class="space-y-2 mt-2">
                                 <div
                                     v-for="(item, index) in formValues.checklist"
                                     :key="index"
-                                    class="flex items-center gap-3 p-2 rounded-lg bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] hover:border-[var(--border-default)] transition-colors group"
+                                    class="flex items-center gap-3 p-2 rounded-lg bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] hover:border-[var(--border-default)] transition-all group"
                                 >
-                                    <!-- Simple checkbox visual for list usage (logic handled in details view usually, but good for visualization here) -->
-                                    <div class="w-4 h-4 rounded border border-[var(--border-default)] flex items-center justify-center">
-                                        <div v-if="typeof item !== 'string' && item.is_completed" class="w-2 h-2 bg-[var(--text-primary)] rounded-sm"></div>
+                                    <div class="w-4 h-4 rounded-full border border-[var(--border-default)] flex items-center justify-center">
+                                       <div v-if="typeof item !== 'string' && item.is_completed" class="w-2.5 h-2.5 bg-[var(--success-DEFAULT)] rounded-full"></div>
                                     </div>
-
-                                    <span class="text-sm flex-1 text-[var(--text-secondary)]">{{
-                                        typeof item === "string" ? item : item.title
-                                    }}</span>
-                                    
+                                    <span class="text-sm flex-1 text-[var(--text-primary)]">{{ typeof item === "string" ? item : item.title }}</span>
                                     <button
+                                        v-if="canManageChecklist && !isReadOnly"
                                         type="button"
                                         @click="removeChecklistItem(index)"
-                                        class="text-[var(--text-muted)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                                        class="text-[var(--text-muted)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                                     >
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="14"
-                                            height="14"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            stroke-width="2"
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                        >
-                                            <path d="M3 6h18" />
-                                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                                        </svg>
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                                     </button>
                                 </div>
                             </div>
@@ -647,168 +612,17 @@ const onSubmit = async () => {
                     </div>
                 </div>
 
-                <!-- Right Column: Sidebar Meta -->
-                <div class="w-full md:w-80 space-y-6">
-                    <div class="bg-[var(--surface-secondary)]/50 p-5 rounded-2xl border border-[var(--border-subtle)] space-y-5">
-                        
-                        <!-- Project Context (if creating new) -->
-                         <div
-                            v-if="!props.projectId && !isEditing"
-                            class="space-y-4 pb-4 border-b border-[var(--border-subtle)]"
-                        >
-                            <div class="space-y-1.5">
-                                <label
-                                    class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"
-                                    >Team <span class="text-red-500">*</span></label
-                                >
-                                <SelectFilter
-                                    v-model="selectedTeamId"
-                                    :options="teamOptions"
-                                    placeholder="Select Team"
-                                    class="w-full"
-                                />
-                            </div>
-                            <div class="space-y-1.5">
-                                <label
-                                    class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"
-                                    >Project <span class="text-red-500">*</span></label
-                                >
-                                <SelectFilter
-                                    v-model="selectedProjectId"
-                                    :options="projectOptions"
-                                    placeholder="Select Project"
-                                    :disabled="!selectedTeamId"
-                                    class="w-full"
-                                />
-                            </div>
-                        </div>
-
-                        <!-- Status & Priority -->
-                        <div class="grid grid-cols-2 gap-3">
-                            <div class="space-y-1.5">
-                                <label
-                                    class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"
-                                    >Status</label
-                                >
-                                <SelectFilter
-                                    v-model="formValues.status"
-                                    :options="statusOptions"
-                                    placeholder="Status"
-                                    class="w-full"
-                                />
-                            </div>
-                            <div class="space-y-1.5">
-                                <label
-                                    class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"
-                                    >Priority</label
-                                >
-                                <SelectFilter
-                                    v-model="formValues.priority"
-                                    :options="priorityOptions"
-                                    placeholder="Priority"
-                                    class="w-full"
-                                />
-                            </div>
-                        </div>
-
-                        <!-- People -->
-                        <div class="space-y-4">
-                            <div class="space-y-1.5">
-                                <label
-                                    class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"
-                                    >Assignee</label
-                                >
-                                <div
-                                    v-if="isFetchingMembers"
-                                    class="h-9 flex items-center justify-center bg-[var(--surface-primary)] rounded-lg border border-[var(--border-default)]"
-                                >
-                                    <span class="text-xs text-[var(--text-muted)] animate-pulse"
-                                        >Loading...</span
-                                    >
-                                </div>
-                                <SelectFilter
-                                    v-else
-                                    v-model="formValues.assigned_to"
-                                    :options="operatorMemberOptions"
-                                    :placeholder="operatorMemberOptions.length === 0 ? 'No members' : 'Unassigned'"
-                                    :disabled="operatorMemberOptions.length === 0"
-                                    class="w-full"
-                                    searchable
-                                />
-                            </div>
-
-                            <div class="space-y-1.5">
-                                <label
-                                    class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"
-                                    >QA Owner</label
-                                >
-                                <SelectFilter
-                                    v-model="formValues.qa_user_id"
-                                    :options="qaMemberOptions"
-                                    :placeholder="qaMemberOptions.length === 0 ? 'No members' : 'Unassigned'"
-                                    :disabled="qaMemberOptions.length === 0 || isFetchingMembers"
-                                    class="w-full"
-                                    searchable
-                                />
-                            </div>
-                        </div>
-
-                        <!-- Dates & Estimation -->
-                        <div class="space-y-4 pt-4 border-t border-[var(--border-subtle)]">
-                            <div class="space-y-1.5">
-                                <label
-                                    class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"
-                                    >Due Date</label
-                                >
-                                <Input type="date" v-model="formValues.due_date" class="w-full" />
-                            </div>
-
-                            <div class="space-y-1.5">
-                                <label
-                                    class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"
-                                    >Est. Hours</label
-                                >
-                                <Input
-                                    type="number"
-                                    step="0.5"
-                                    v-model="formValues.estimated_hours"
-                                    placeholder="0"
-                                    class="w-full"
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Template Save Option -->
-                     <div
-                        v-if="!isEditing"
-                        class="p-3 bg-[var(--surface-secondary)]/30 rounded-lg"
-                    >
-                        <label
-                            class="flex items-start gap-3 cursor-pointer select-none"
-                        >
-                            <input
-                                type="checkbox"
-                                v-model="formValues.save_as_template"
-                                class="mt-1 rounded border-[var(--border-default)] text-[var(--brand-primary)] focus:ring-[var(--brand-ring)]"
-                            />
-                            <div class="text-sm">
-                                <span class="font-medium text-[var(--text-primary)]">Save as Template</span>
-                                <p class="text-xs text-[var(--text-muted)] mt-0.5">Reuse this structure later</p>
-                            </div>
-                        </label>
-                    </div>
+                <div class="flex items-center gap-2 pt-4 border-t border-[var(--border-subtle)] mt-auto">
+                    <!-- Save as template -->
+                    <label class="flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer select-none">
+                        <input type="checkbox" v-model="formValues.save_as_template" class="rounded border-[var(--border-default)] text-[var(--primary-DEFAULT)] focus:ring-[var(--primary-DEFAULT)]" />
+                        Save as Template
+                    </label>
+                    <div class="flex-1"></div>
+                    <Button variant="ghost" type="button" @click="isOpen = false">Cancel</Button>
+                    <Button type="submit" :loading="isLoading">{{ isEditing ? 'Save Changes' : 'Create Task' }}</Button>
                 </div>
             </form>
-        </template>
-
-        <template #footer>
-            <div class="flex justify-end gap-3 w-full">
-                <Button variant="ghost" @click="isOpen = false">Cancel</Button>
-                <Button :loading="isLoading" @click="onSubmit" class="min-w-[120px]">
-                    {{ isEditing ? "Save Changes" : "Create Task" }}
-                </Button>
-            </div>
         </template>
     </Modal>
 </template>

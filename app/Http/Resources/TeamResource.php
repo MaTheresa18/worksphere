@@ -41,6 +41,13 @@ class TeamResource extends JsonResource
             'updated_at' => $this->updated_at,
             'lifecycle_status' => $this->lifecycle_status,
             'last_activity_at' => $this->last_activity_at,
+            'can' => [
+                'view' => $request->user()?->can('view', $this->resource),
+                'update' => $request->user()?->can('update', $this->resource),
+                'delete' => $request->user()?->can('delete', $this->resource),
+                'invite' => $request->user()?->can('invite', $this->resource),
+                'manage_members' => $request->user()?->can('update', $this->resource), // Members are managed via update policy
+            ],
         ];
     }
 }

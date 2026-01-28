@@ -27,7 +27,7 @@ const hasTeams = computed(() => authStore.hasTeams);
 // Helper to check permissions
 const can = (permission: string) => authStore.hasPermission(permission);
 
-// Role Logic
+// Role Logic - DEPRECATED: Use permissions via can() helper instead
 const userRole = computed(() => {
     if (!authStore.user || !authStore.currentTeamId) return null;
     const team = authStore.user.teams.find(
@@ -35,10 +35,6 @@ const userRole = computed(() => {
     );
     return team?.membership?.role || null;
 });
-
-const isTeamLead = computed(() => userRole.value === "team_lead");
-const isQA = computed(() => userRole.value === "quality_assessor");
-const isOperator = computed(() => userRole.value === "operator");
 
 // State
 const tasks = ref<any[]>([]);
@@ -60,9 +56,9 @@ const tabs = [
 
 const visibleTabs = computed(() => {
     return tabs.filter((tab) => {
-        if (tab.id === "pm_queue") return isTeamLead.value;
-        if (tab.id === "qa_queue") return isTeamLead.value || isQA.value;
-        if (tab.id === "all_tasks") return !isOperator.value;
+        if (tab.id === "pm_queue") return can('tasks.approve');
+        if (tab.id === "qa_queue") return can('tasks.qa_review');
+        if (tab.id === "all_tasks") return can('tasks.view');
         return true;
     });
 });

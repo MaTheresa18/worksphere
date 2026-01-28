@@ -1036,6 +1036,23 @@ const routes: RouteRecordRaw[] = [
                 },
             },
             {
+                path: "teams/:teamId/projects/:projectId/board",
+                redirect: (to) => {
+                    return {
+                        name: "team-project-detail",
+                        params: {
+                            teamId: to.params.teamId,
+                            id: to.params.projectId,
+                        },
+                        query: {
+                            tab: "tasks",
+                            view: "board",
+                            ...to.query, // Pass through 'task' param key
+                        },
+                    };
+                },
+            },
+            {
                 path: "teams/:teamId/projects/:projectId/tasks/:taskId",
                 name: "team-task-detail",
                 component: () => import("@/views/TaskDetailView.vue"),

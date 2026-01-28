@@ -38,6 +38,7 @@ import {
     Paperclip,
     Folder,
     Building2,
+    Lock,
 } from "lucide-vue-next";
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth";
@@ -259,6 +260,14 @@ const isAssignee = computed(() => {
         task.value?.assignee?.id === authStore.user?.id
     );
 });
+
+// Permission-based computed properties
+const canEditMetadata = computed(() => task.value?.can?.edit_metadata);
+const canManageChecklist = computed(() => task.value?.can?.manage_checklist && !task.value?.can?.is_read_only);
+const canCompleteItems = computed(() => task.value?.can?.complete_items && !task.value?.can?.is_read_only);
+const canAssign = computed(() => task.value?.can?.assign);
+const canAddComment = computed(() => task.value?.can?.add_comment);
+const isReadOnly = computed(() => task.value?.can?.is_read_only);
 
 const completedItemsCount = computed(() => {
     return checklistItems.value.filter((i: any) => i.status === "done").length;
@@ -732,7 +741,7 @@ watch(
                                     >
                                 </div>
                             </div>
-                            <div class="flex items-center gap-2">
+                            <div v-if="canEditMetadata" class="flex items-center gap-2">
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -963,17 +972,17 @@ watch(
                                                     getNextStatus(item.status),
                                                 )
                                             "
-                                            :disabled="!isAssignee"
+                                            :disabled="!canCompleteItems"
                                             class="shrink-0"
                                             :class="
-                                                isAssignee
+                                                canCompleteItems
                                                     ? 'cursor-pointer hover:scale-110 transition-transform'
                                                     : 'cursor-not-allowed opacity-50'
                                             "
                                             :title="
-                                                isAssignee
+                                                canCompleteItems
                                                     ? 'Click to change status'
-                                                    : 'Only assignee can change status'
+                                                    : 'You do not have permission to change status or the task is locked'
                                             "
                                         >
                                             <component
@@ -1026,6 +1035,7 @@ watch(
 
                                         <!-- Delete Button -->
                                         <button
+                                            v-if="canManageChecklist"
                                             @click="deleteChecklistItem(item)"
                                             class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[var(--surface-tertiary)] transition-all text-[var(--text-muted)] hover:text-red-500"
                                         >
@@ -1045,7 +1055,7 @@ watch(
                         </div>
 
                         <!-- Add Item Form -->
-                        <div class="flex gap-2">
+                        <div v-if="canManageChecklist" class="flex gap-2">
                             <Input
                                 v-model="newChecklistText"
                                 placeholder="Add a checklist item..."
@@ -1060,6 +1070,12 @@ watch(
                                 <Plus class="w-4 h-4 mr-1" />
                                 Add
                             </Button>
+                        </div>
+
+                        <!-- Read Only Warning -->
+                        <div v-else-if="isReadOnly" class="bg-[var(--surface-secondary)] rounded-lg p-3 border border-[var(--border-default)] flex items-center gap-3">
+                             <Lock class="w-4 h-4 text-[var(--text-muted)]" />
+                             <span class="text-xs text-[var(--text-muted)] italic">Checklist is locked while task is in review.</span>
                         </div>
                     </Card>
 
@@ -1146,7 +1162,7 @@ watch(
 
                         <!-- Comments Tab -->
                         <div v-if="activeTab === 'comments'" class="space-y-4">
-                            <div class="flex gap-3">
+                            <div v-if="canAddComment" class="flex gap-3">
                                 <Avatar
                                     :name="authStore.user?.name"
                                     :src="authStore.avatarUrl"
@@ -1158,12 +1174,13 @@ watch(
                                         v-model="newComment"
                                         placeholder="Add a comment..."
                                         class="min-h-[80px]"
+                                        :disabled="isReadOnly"
                                     />
                                     <div class="flex justify-end">
                                         <Button
                                             size="sm"
                                             :loading="isSubmittingComment"
-                                            :disabled="!newComment.trim()"
+                                            :disabled="!newComment.trim() || isReadOnly"
                                             @click="submitComment"
                                         >
                                             <Send class="w-3.5 h-3.5 mr-1.5" />
@@ -1171,6 +1188,9 @@ watch(
                                         </Button>
                                     </div>
                                 </div>
+                            </div>
+                            <div v-else class="bg-[var(--surface-secondary)]/50 rounded-lg p-4 text-center border border-dashed border-[var(--border-subtle)]">
+                                <p class="text-xs text-[var(--text-muted)]">You do not have permission to add comments.</p>
                             </div>
 
                             <div class="space-y-3 mt-4">
@@ -1413,9 +1433,10 @@ watch(
                                     Operator
                                 </dt>
                                 <dd 
-                                    class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity p-1 -ml-1 rounded hover:bg-[var(--surface-secondary)]" 
-                                    @click="onQuickAssign('operator')"
-                                    title="Click to assign"
+                                    class="flex items-center gap-2 p-1 -ml-1 rounded transition-all" 
+                                    :class="canAssign ? 'cursor-pointer hover:bg-[var(--surface-secondary)] hover:opacity-80' : 'cursor-default'"
+                                    @click="canAssign && onQuickAssign('operator')"
+                                    :title="canAssign ? 'Click to assign' : ''"
                                 >
                                     <Avatar
                                         v-if="task.assignee"
@@ -1454,9 +1475,10 @@ watch(
                                     QA
                                 </dt>
                                 <dd 
-                                    class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity p-1 -ml-1 rounded hover:bg-[var(--surface-secondary)]" 
-                                    @click="onQuickAssign('qa')"
-                                    title="Click to assign QA owner"
+                                    class="flex items-center gap-2 p-1 -ml-1 rounded transition-all" 
+                                    :class="canAssign ? 'cursor-pointer hover:bg-[var(--surface-secondary)] hover:opacity-80' : 'cursor-default'"
+                                    @click="canAssign && onQuickAssign('qa')"
+                                    :title="canAssign ? 'Click to assign QA owner' : ''"
                                 >
                                     <Avatar
                                         v-if="task.qa_user"

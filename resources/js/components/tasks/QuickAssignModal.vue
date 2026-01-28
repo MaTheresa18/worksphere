@@ -24,7 +24,6 @@ const members = ref<any[]>([]);
 const selectedMemberId = ref<string | null>(null);
 
 // Roles allowed for QA assignment
-const QA_ROLES = ['subject_matter_expert', 'quality_assessor', 'team_lead', 'admin', 'administrator', 'owner'];
 
 const fetchMembers = async () => {
     const teamId = props.task.project?.team_id || 
@@ -51,7 +50,7 @@ const fetchMembers = async () => {
 
         let filteredMembers = rawMembers;
         if (props.assignType === 'qa') {
-            filteredMembers = rawMembers.filter((m: any) => QA_ROLES.includes(m.role));
+            filteredMembers = rawMembers.filter((m: any) => m.is_qa_eligible);
         }
         
         members.value = filteredMembers.map((m: any) => ({

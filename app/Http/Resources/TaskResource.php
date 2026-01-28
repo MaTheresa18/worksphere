@@ -169,6 +169,17 @@ class TaskResource extends JsonResource
             'archived_at' => $this->archived_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
+            'can' => [
+                'edit' => $request->user()->can('update', $this->resource), // Fallback to policy or service
+                'edit_metadata' => app(\App\Services\PermissionService::class)->hasTeamPermission($request->user(), $this->project->team, 'tasks.edit_all'),
+                'manage_checklist' => app(\App\Services\PermissionService::class)->hasTeamPermission($request->user(), $this->project->team, 'tasks.manage_checklist'),
+                'complete_items' => app(\App\Services\PermissionService::class)->hasTeamPermission($request->user(), $this->project->team, 'tasks.complete_items') || $this->assigned_to === $request->user()->id,
+                'assign' => app(\App\Services\PermissionService::class)->hasTeamPermission($request->user(), $this->project->team, 'tasks.assign'),
+                'qa_review' => app(\App\Services\PermissionService::class)->hasTeamPermission($request->user(), $this->project->team, 'tasks.qa_review'),
+                'add_comment' => app(\App\Services\PermissionService::class)->hasTeamPermission($request->user(), $this->project->team, 'tasks.comment'),
+                'is_read_only' => in_array($this->status, [\App\Enums\TaskStatus::Submitted, \App\Enums\TaskStatus::InQa, \App\Enums\TaskStatus::PmReview]) && 
+                                  !app(\App\Services\PermissionService::class)->hasTeamPermission($request->user(), $this->project->team, 'tasks.qa_review'),
+            ],
         ];
     }
 }

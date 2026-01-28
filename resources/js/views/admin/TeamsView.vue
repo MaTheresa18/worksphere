@@ -40,6 +40,9 @@ const selectedTeams = ref([]);
 const selectAll = ref(false);
 const viewMode = ref('list'); // 'list' or 'grid'
 
+const ownedTeams = computed(() => teams.value.filter(team => team.owner_id === authStore.user?.id || team.owner_id === authStore.user?.public_id));
+const joinedTeams = computed(() => teams.value.filter(team => team.owner_id !== authStore.user?.id && team.owner_id !== authStore.user?.public_id));
+
 const pagination = ref({
     current_page: 1,
     last_page: 1,
@@ -408,6 +411,114 @@ onMounted(() => {
                                 </td>
                             </tr>
                         </tbody>
+                        <tbody v-else-if="isPersonalScope" class="divide-y divide-[var(--border-default)]">
+                            <!-- Owned Teams Section -->
+                            <tr v-if="ownedTeams.length > 0" class="bg-[var(--surface-tertiary)]/30">
+                                <td colspan="6" class="px-6 py-2 text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Owned Teams</td>
+                            </tr>
+                            <tr v-for="team in ownedTeams" :key="'owned-' + team.public_id" class="group hover:bg-[var(--surface-secondary)]/60 transition-colors duration-200">
+                                <!-- ... Row content (copied below for simplicity in this replacement) ... -->
+                                <td class="px-6 py-4 text-center">
+                                    <input type="checkbox" :value="team.public_id" v-model="selectedTeams" @change="toggleSelection" class="rounded border-[var(--border-strong)] text-[var(--interactive-primary)] focus:ring-[var(--interactive-primary)] bg-[var(--surface-elevated)] w-4 h-4 cursor-pointer opacity-50 group-hover:opacity-100 transition-opacity">
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-4">
+                                        <div class="relative group-hover:scale-105 transition-transform duration-300">
+                                            <Avatar :src="team.avatar_url" size="md" class="ring-1 ring-[var(--border-default)] shadow-sm" />
+                                        </div>
+                                        <div>
+                                            <div class="font-semibold text-[var(--text-primary)] group-hover:text-[var(--interactive-primary)] transition-colors text-base">{{ team.name }}</div>
+                                            <div class="text-xs text-[var(--text-secondary)] font-mono">/{{ team.slug }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div v-if="team.owner" class="flex items-center gap-3 p-1 rounded-full group-hover:bg-[var(--surface-tertiary)]/50 transition-colors w-fit pr-3">
+                                        <Avatar :src="team.owner.avatar_url" size="sm" class="ring-1 ring-white dark:ring-gray-800" />
+                                        <span class="text-sm text-[var(--text-primary)] font-medium">{{ team.owner.name }}</span>
+                                    </div>
+                                    <span v-else class="text-[var(--text-muted)] italic text-sm pl-2">Unassigned</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="flex -space-x-2 overflow-hidden items-center h-8">
+                                            <template v-if="team.members && team.members.length > 0">
+                                                <Avatar v-for="member in team.members.slice(0, 3)" :key="member.id" :src="member.avatar_url" size="xs" class="ring-2 ring-[var(--surface-primary)] hover:scale-110 transition-transform bg-[var(--surface-tertiary)]" />
+                                                <div v-if="team.member_count > 3" class="flex h-6 w-6 items-center justify-center rounded-full ring-2 ring-[var(--surface-primary)] bg-[var(--surface-tertiary)] text-[10px] font-medium text-[var(--text-secondary)]">+{{ team.member_count - 3 }}</div>
+                                            </template>
+                                            <span v-else class="text-xs text-[var(--text-muted)]">No members</span>
+                                        </div>
+                                        <span class="text-sm font-medium text-[var(--text-secondary)] ml-1">{{ team.member_count }} Members</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold shadow-sm border" :class="{'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20': team.status === 'active', 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20': team.status === 'inactive'}">
+                                        <span class="relative flex h-2 w-2"><span v-if="team.status === 'active'" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2" :class="team.status === 'active' ? 'bg-emerald-500' : 'bg-gray-500'"></span></span>
+                                        {{ team.status }}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <button @click="router.push({ name: 'team-profile', params: { public_id: team.public_id } })" class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--interactive-primary)] hover:bg-[var(--interactive-primary)]/10 transition-colors" title="View Dashboard"><LayoutGrid class="w-4 h-4" /></button>
+                                        <button v-if="team.can?.update" @click="openEditModal(team)" class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--interactive-primary)] hover:bg-[var(--interactive-primary)]/10 transition-colors" title="Edit Team"><Edit2 class="w-4 h-4" /></button>
+                                        <button v-if="team.can?.delete" @click="deleteTeam(team)" class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors" title="Delete Team"><Trash2 class="w-4 h-4" /></button>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- Joined Teams Section -->
+                            <tr v-if="joinedTeams.length > 0" class="bg-[var(--surface-tertiary)]/30">
+                                <td colspan="6" class="px-6 py-2 text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Joined Teams</td>
+                            </tr>
+                            <tr v-for="team in joinedTeams" :key="'joined-' + team.public_id" class="group hover:bg-[var(--surface-secondary)]/60 transition-colors duration-200">
+                                <td class="px-6 py-4 text-center">
+                                    <input type="checkbox" :value="team.public_id" v-model="selectedTeams" @change="toggleSelection" class="rounded border-[var(--border-strong)] text-[var(--interactive-primary)] focus:ring-[var(--interactive-primary)] bg-[var(--surface-elevated)] w-4 h-4 cursor-pointer opacity-50 group-hover:opacity-100 transition-opacity">
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-4">
+                                        <div class="relative group-hover:scale-105 transition-transform duration-300">
+                                            <Avatar :src="team.avatar_url" size="md" class="ring-1 ring-[var(--border-default)] shadow-sm" />
+                                        </div>
+                                        <div>
+                                            <div class="font-semibold text-[var(--text-primary)] group-hover:text-[var(--interactive-primary)] transition-colors text-base">{{ team.name }}</div>
+                                            <div class="text-xs text-[var(--text-secondary)] font-mono">/{{ team.slug }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div v-if="team.owner" class="flex items-center gap-3 p-1 rounded-full group-hover:bg-[var(--surface-tertiary)]/50 transition-colors w-fit pr-3">
+                                        <Avatar :src="team.owner.avatar_url" size="sm" class="ring-1 ring-white dark:ring-gray-800" />
+                                        <span class="text-sm text-[var(--text-primary)] font-medium">{{ team.owner.name }}</span>
+                                    </div>
+                                    <span v-else class="text-[var(--text-muted)] italic text-sm pl-2">Unassigned</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="flex -space-x-2 overflow-hidden items-center h-8">
+                                            <template v-if="team.members && team.members.length > 0">
+                                                <Avatar v-for="member in team.members.slice(0, 3)" :key="member.id" :src="member.avatar_url" size="xs" class="ring-2 ring-[var(--surface-primary)] hover:scale-110 transition-transform bg-[var(--surface-tertiary)]" />
+                                                <div v-if="team.member_count > 3" class="flex h-6 w-6 items-center justify-center rounded-full ring-2 ring-[var(--surface-primary)] bg-[var(--surface-tertiary)] text-[10px] font-medium text-[var(--text-secondary)]">+{{ team.member_count - 3 }}</div>
+                                            </template>
+                                            <span v-else class="text-xs text-[var(--text-muted)]">No members</span>
+                                        </div>
+                                        <span class="text-sm font-medium text-[var(--text-secondary)] ml-1">{{ team.member_count }} Members</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold shadow-sm border" :class="{'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20': team.status === 'active', 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20': team.status === 'inactive'}">
+                                        <span class="relative flex h-2 w-2"><span v-if="team.status === 'active'" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2" :class="team.status === 'active' ? 'bg-emerald-500' : 'bg-gray-500'"></span></span>
+                                        {{ team.status }}
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <button @click="router.push({ name: 'team-profile', params: { public_id: team.public_id } })" class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--interactive-primary)] hover:bg-[var(--interactive-primary)]/10 transition-colors" title="View Dashboard"><LayoutGrid class="w-4 h-4" /></button>
+                                        <button v-if="team.can?.update" @click="openEditModal(team)" class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--interactive-primary)] hover:bg-[var(--interactive-primary)]/10 transition-colors" title="Edit Team"><Edit2 class="w-4 h-4" /></button>
+                                        <button v-if="team.can?.delete" @click="deleteTeam(team)" class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors" title="Delete Team"><Trash2 class="w-4 h-4" /></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
                         <TransitionGroup v-else tag="tbody" name="list-stagger" appear class="divide-y divide-[var(--border-default)]">
                             <tr v-for="team in teams" :key="team.public_id" class="group hover:bg-[var(--surface-secondary)]/60 transition-colors duration-200">
                                 <td class="px-6 py-4 text-center">
@@ -484,6 +595,7 @@ onMounted(() => {
                                             <LayoutGrid class="w-4 h-4" />
                                         </button>
                                         <button 
+                                            v-if="team.can?.update"
                                             @click="openEditModal(team)" 
                                             class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--interactive-primary)] hover:bg-[var(--interactive-primary)]/10 transition-colors"
                                             title="Edit Team"
@@ -491,6 +603,7 @@ onMounted(() => {
                                             <Edit2 class="w-4 h-4" />
                                         </button>
                                         <button 
+                                            v-if="team.can?.delete"
                                             @click="deleteTeam(team)" 
                                             class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors"
                                             title="Delete Team"
@@ -517,6 +630,79 @@ onMounted(() => {
                         <span class="text-xl font-medium">No teams found.</span>
                          <button @click="openCreateModal" class="btn btn-primary mt-4">Create Team</button>
                     </div>
+                    <div v-else-if="isPersonalScope" class="space-y-12">
+                        <!-- Owned Teams Grid -->
+                        <section v-if="ownedTeams.length > 0">
+                            <h2 class="text-lg font-bold text-[var(--text-primary)] mb-6 flex items-center gap-2">
+                                <Sparkles class="w-5 h-5 text-purple-500" />
+                                Owned Teams
+                            </h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                <div v-for="team in ownedTeams" :key="'owned-grid-' + team.public_id" class="group bg-[var(--surface-elevated)] border border-[var(--border-default)] rounded-2xl p-6 hover:shadow-xl hover:shadow-purple-500/5 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden backdrop-blur-sm">
+                                    <!-- Card Content -->
+                                    <div class="absolute top-4 left-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                        <input type="checkbox" :value="team.public_id" v-model="selectedTeams" @change="toggleSelection" class="rounded border-[var(--border-strong)] text-[var(--interactive-primary)] focus:ring-[var(--interactive-primary)] bg-[var(--surface-elevated)] w-5 h-5 cursor-pointer shadow-sm">
+                                    </div>
+                                    <div class="flex items-start justify-between mb-6">
+                                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--surface-tertiary)] to-[var(--surface-secondary)] flex items-center justify-center text-[var(--interactive-primary)] text-xl font-bold shadow-inner ring-1 ring-[var(--border-default)] group-hover:rotate-3 transition-transform duration-300">{{ team.initials }}</div>
+                                        <div class="flex gap-1 opacity-100 transition-opacity duration-200">
+                                             <button v-if="team.can?.update" @click="openEditModal(team)" class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--interactive-primary)] hover:bg-[var(--interactive-primary)]/10 transition-colors"><Edit2 class="w-4 h-4" /></button>
+                                             <button v-if="team.can?.delete" @click="deleteTeam(team)" class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors"><Trash2 class="w-4 h-4" /></button>
+                                        </div>
+                                    </div>
+                                    <div class="mb-6">
+                                        <h3 class="font-bold text-lg text-[var(--text-primary)] mb-1 truncate">{{ team.name }}</h3>
+                                        <p class="text-xs font-mono text-[var(--text-secondary)] truncate bg-[var(--surface-tertiary)]/50 w-fit px-2 py-0.5 rounded-md">/{{ team.slug }}</p>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2 mb-6">
+                                        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--surface-tertiary)]/50 text-xs font-medium text-[var(--text-secondary)] border border-[var(--border-default)]"><UsersIcon class="w-3.5 h-3.5" />{{ team.member_count }}</div>
+                                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border" :class="{'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20': team.status === 'active', 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20': team.status === 'inactive'}"><span class="w-1.5 h-1.5 rounded-full" :class="team.status === 'active' ? 'bg-emerald-500' : 'bg-gray-500'"></span>{{ team.status }}</div>
+                                    </div>
+                                    <div class="pt-4 border-t border-[var(--border-default)] flex justify-between items-center">
+                                        <span class="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Owner</span>
+                                        <div v-if="team.owner" class="flex items-center gap-2"><span class="text-xs font-semibold text-[var(--text-primary)]">{{ team.owner.name }}</span><div class="w-6 h-6 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-[10px] text-white font-bold shadow-sm">{{ team.owner.initials }}</div></div>
+                                        <span v-else class="text-xs text(--text-muted)] italic">Unassigned</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Joined Teams Grid -->
+                        <section v-if="joinedTeams.length > 0">
+                            <h2 class="text-lg font-bold text-[var(--text-primary)] mb-6 flex items-center gap-2">
+                                <UsersIcon class="w-5 h-5 text-blue-500" />
+                                Joined Teams
+                            </h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                <div v-for="team in joinedTeams" :key="'joined-grid-' + team.public_id" class="group bg-[var(--surface-elevated)] border border-[var(--border-default)] rounded-2xl p-6 hover:shadow-xl hover:shadow-purple-500/5 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden backdrop-blur-sm">
+                                    <!-- Card Content -->
+                                    <div class="absolute top-4 left-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                        <input type="checkbox" :value="team.public_id" v-model="selectedTeams" @change="toggleSelection" class="rounded border-[var(--border-strong)] text-[var(--interactive-primary)] focus:ring-[var(--interactive-primary)] bg-[var(--surface-elevated)] w-5 h-5 cursor-pointer shadow-sm">
+                                    </div>
+                                    <div class="flex items-start justify-between mb-6">
+                                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--surface-tertiary)] to-[var(--surface-secondary)] flex items-center justify-center text-[var(--interactive-primary)] text-xl font-bold shadow-inner ring-1 ring-[var(--border-default)] group-hover:rotate-3 transition-transform duration-300">{{ team.initials }}</div>
+                                        <div class="flex gap-1 opacity-100 transition-opacity duration-200">
+                                             <button v-if="team.can?.update" @click="openEditModal(team)" class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--interactive-primary)] hover:bg-[var(--interactive-primary)]/10 transition-colors"><Edit2 class="w-4 h-4" /></button>
+                                             <button v-if="team.can?.delete" @click="deleteTeam(team)" class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors"><Trash2 class="w-4 h-4" /></button>
+                                        </div>
+                                    </div>
+                                    <div class="mb-6">
+                                        <h3 class="font-bold text-lg text-[var(--text-primary)] mb-1 truncate">{{ team.name }}</h3>
+                                        <p class="text-xs font-mono text-[var(--text-secondary)] truncate bg-[var(--surface-tertiary)]/50 w-fit px-2 py-0.5 rounded-md">/{{ team.slug }}</p>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2 mb-6">
+                                        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--surface-tertiary)]/50 text-xs font-medium text-[var(--text-secondary)] border border-[var(--border-default)]"><UsersIcon class="w-3.5 h-3.5" />{{ team.member_count }}</div>
+                                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border" :class="{'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20': team.status === 'active', 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20': team.status === 'inactive'}"><span class="w-1.5 h-1.5 rounded-full" :class="team.status === 'active' ? 'bg-emerald-500' : 'bg-gray-500'"></span>{{ team.status }}</div>
+                                    </div>
+                                    <div class="pt-4 border-t border-[var(--border-default)] flex justify-between items-center">
+                                        <span class="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Owner</span>
+                                        <div v-if="team.owner" class="flex items-center gap-2"><span class="text-xs font-semibold text-[var(--text-primary)]">{{ team.owner.name }}</span><div class="w-6 h-6 rounded-full bg-gradient-to-tr from-purple-500 to-blue-500 flex items-center justify-center text-[10px] text-white font-bold shadow-sm">{{ team.owner.initials }}</div></div>
+                                        <span v-else class="text-xs text-[var(--text-muted)] italic">Unassigned</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
                     <TransitionGroup v-else tag="div" name="list-stagger" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         <div v-for="team in teams" :key="team.public_id" class="group bg-[var(--surface-elevated)] border border-[var(--border-default)] rounded-2xl p-6 hover:shadow-xl hover:shadow-purple-500/5 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden backdrop-blur-sm">
                              <!-- Selection Overlay on Hover -->
@@ -531,15 +717,19 @@ onMounted(() => {
                                 </div>
                                 <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 translate-x-2 group-hover:translate-x-0">
                                      <button 
+                                        v-if="team.can?.update"
                                         @click="openEditModal(team)" 
                                         class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--interactive-primary)] hover:bg-[var(--interactive-primary)]/10 transition-colors"
                                     >
+                                        <span class="sr-only">Edit Team</span>
                                         <Edit2 class="w-4 h-4" />
                                     </button>
                                     <button 
+                                        v-if="team.can?.delete"
                                         @click="deleteTeam(team)" 
                                         class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors"
                                     >
+                                        <span class="sr-only">Delete Team</span>
                                         <Trash2 class="w-4 h-4" />
                                     </button>
                                 </div>

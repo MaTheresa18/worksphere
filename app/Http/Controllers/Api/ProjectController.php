@@ -328,6 +328,8 @@ class ProjectController extends Controller
         $project->load(['creator', 'client', 'members']);
         $project->loadCount(['tasks', 'members']);
 
+        \App\Events\ProjectCreated::dispatch($project);
+
         return (new ProjectResource($project))->response()->setStatusCode(201);
     }
 
@@ -403,6 +405,8 @@ class ProjectController extends Controller
         $project->load(['creator', 'client', 'members']);
         $project->loadCount(['tasks', 'members']);
 
+        \App\Events\ProjectUpdated::dispatch($project);
+
         return new ProjectResource($project);
     }
 
@@ -454,6 +458,8 @@ class ProjectController extends Controller
 
         $project->load(['creator', 'client', 'members', 'archiver']);
 
+        \App\Events\ProjectUpdated::dispatch($project);
+
         return response()->json([
             'message' => 'Project archived successfully.',
             'project' => new ProjectResource($project),
@@ -481,6 +487,8 @@ class ProjectController extends Controller
         );
 
         $project->load(['creator', 'client', 'members']);
+
+        \App\Events\ProjectUpdated::dispatch($project);
 
         return response()->json([
             'message' => 'Project unarchived successfully.',

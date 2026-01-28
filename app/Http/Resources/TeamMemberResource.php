@@ -26,9 +26,19 @@ class TeamMemberResource extends JsonResource
             'role' => $this->whenPivotLoaded('team_user', function () {
                 return $this->pivot->role;
             }),
+            'role_label' => $this->whenPivotLoaded('team_user', function () {
+                return ucwords(str_replace(['_', '-'], ' ', $this->pivot->role));
+            }),
+            'is_qa_eligible' => $this->whenPivotLoaded('team_user', function () {
+                $rolePermissions = config("roles.team_role_permissions.{$this->pivot->role}", []);
+                return in_array('tasks.qa_review', $rolePermissions);
+            }),
             'joined_at' => $this->whenPivotLoaded('team_user', function () {
                 return $this->pivot->created_at;
             }),
+            'can' => [
+                'manage' => $request->user()?->can('update', $this->resource instanceof \App\Models\Team ? $this->resource : (isset($this->pivot->team_id) ? \App\Models\Team::find($this->pivot->team_id) : null)),
+            ],
         ];
     }
 }

@@ -80,3 +80,43 @@ Broadcast::channel('email-account.{publicId}', ChannelAuthLogger::wrap('email-ac
 Broadcast::channel('personal-notes.{publicId}', ChannelAuthLogger::wrap('personal-notes.{publicId}', function ($user, $publicId) {
     return $user->public_id === $publicId;
 }));
+
+// Team Projects Channel - Tiered Access
+// Team Leads/SMEs/QAs (view) - See all projects
+// Operators (view_assigned) - See only assigned projects (technically can see channel events, filtered by frontend)
+Broadcast::channel('teams.{teamId}.projects', ChannelAuthLogger::wrap('teams.{teamId}.projects', function ($user, $teamId) {
+    $team = \App\Models\Team::find($teamId);
+    
+    if (! $team) {
+        return false;
+    }
+
+    $permissionService = app(\App\Services\PermissionService::class);
+
+    // Must be a team member
+    if (! $permissionService->isTeamMember($user, $team)) {
+        return false;
+    }
+
+    // Check permissions
+    return $permissionService->hasTeamPermission($user, $team, 'projects.view')
+        || $permissionService->hasTeamPermission($user, $team, 'projects.view_assigned');
+}));
+
+// Project Tasks Channel - Tiered Access
+// Team Leads/SMEs/QAs (view) - See all tasks
+// Operators (view_assigned) - See only assigned tasks (technically can see channel events, filtered by frontend)
+Broadcast::channel('projects.{projectId}.tasks', ChannelAuthLogger::wrap('projects.{projectId}.tasks', function ($user, $projectId) {
+    $project = \App\Models\Project::find($projectId);
+
+    if (! $project) {
+        return false;
+    }
+
+    $permissionService = app(\App\Services\PermissionService::class);
+    $team = $project->team;
+
+    // Check permissions
+    return $permissionService->hasTeamPermission($user, $team, 'tasks.view')
+        || $permissionService->hasTeamPermission($user, $team, 'tasks.view_assigned');
+}));

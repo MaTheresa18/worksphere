@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\TaskChecklistItemStatus;
+use App\Enums\TaskStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreTaskChecklistItemRequest;
 use App\Http\Requests\UpdateTaskChecklistItemRequest;
@@ -66,10 +67,21 @@ class TaskChecklistItemController extends Controller
      */
     public function store(StoreTaskChecklistItemRequest $request, Team $team, Project $project, Task $task): JsonResponse
     {
-        // Allow if user has team permission OR is the assignee
-        if (! $this->permissionService->hasTeamPermission($request->user(), $team, 'tasks.update') &&
-            $task->assigned_to !== $request->user()->id) {
-            abort(403, 'You do not have permission to update this task checklist.');
+        $user = $request->user();
+        $this->ensureProjectBelongsToTeam($team, $project);
+        $this->ensureTaskBelongsToProject($project, $task);
+
+        // Read-only logic: If in QA, only QA review can modify structure
+        $isInReview = in_array($task->status, [TaskStatus::Submitted, TaskStatus::InQa, TaskStatus::PmReview]);
+        $hasQaPermission = $this->permissionService->hasTeamPermission($user, $team, 'tasks.qa_review');
+        
+        if ($isInReview && ! $hasQaPermission) {
+            abort(403, 'Task checklist is locked while in review.');
+        }
+
+        // Structure modification requires manage_checklist
+        if (! $this->permissionService->hasTeamPermission($user, $team, 'tasks.manage_checklist')) {
+            abort(403, 'You do not have permission to add items to this checklist.');
         }
 
         $validated = $request->validated();
@@ -129,11 +141,27 @@ class TaskChecklistItemController extends Controller
      */
     public function update(UpdateTaskChecklistItemRequest $request, Team $team, Project $project, Task $task, TaskChecklistItem $checklistItem): JsonResponse
     {
-        // Allow if user has team permission OR is the assignee
-        if (! $this->permissionService->hasTeamPermission($request->user(), $team, 'tasks.update') &&
-            $task->assigned_to !== $request->user()->id) {
-            abort(403, 'You do not have permission to update this task checklist.');
+        $user = $request->user();
+        
+        // Read-only logic: If in QA, only QA review can modify
+        $isInReview = in_array($task->status, [TaskStatus::Submitted, TaskStatus::InQa, TaskStatus::PmReview]);
+        $hasQaPermission = $this->permissionService->hasTeamPermission($user, $team, 'tasks.qa_review');
+        
+        if ($isInReview && ! $hasQaPermission) {
+            abort(403, 'Task checklist is locked while in review.');
         }
+
+        // Completion requires tasks.complete_items
+        if (! $this->permissionService->hasTeamPermission($user, $team, 'tasks.complete_items') &&
+            $task->assigned_to !== $user->id) {
+            abort(403, 'You do not have permission to update this checklist item.');
+        }
+
+        // Text modification requires manage_checklist
+        if (isset($request->text) && ! $this->permissionService->hasTeamPermission($user, $team, 'tasks.manage_checklist')) {
+            abort(403, 'You do not have permission to modify the text of this checklist item.');
+        }
+
         // Ensure item belongs to task
         if ($checklistItem->task_id !== $task->id) {
             abort(404);
@@ -178,10 +206,17 @@ class TaskChecklistItemController extends Controller
     {
         $user = request()->user();
         
-        // Allow if user has team permission OR is the assignee
-        if (! $this->permissionService->hasTeamPermission($user, $team, 'tasks.update') &&
-            $task->assigned_to !== $user->id) {
-            abort(403, 'You do not have permission to update this task checklist.');
+        // Read-only logic
+        $isInReview = in_array($task->status, [TaskStatus::Submitted, TaskStatus::InQa, TaskStatus::PmReview]);
+        $hasQaPermission = $this->permissionService->hasTeamPermission($user, $team, 'tasks.qa_review');
+        
+        if ($isInReview && ! $hasQaPermission) {
+            abort(403, 'Task checklist is locked while in review.');
+        }
+
+        // Deletion requires manage_checklist
+        if (! $this->permissionService->hasTeamPermission($user, $team, 'tasks.manage_checklist')) {
+            abort(403, 'You do not have permission to remove items from this checklist.');
         }
 
         // Ensure item belongs to task
@@ -201,10 +236,19 @@ class TaskChecklistItemController extends Controller
      */
     public function reorder(Request $request, Team $team, Project $project, Task $task): JsonResponse
     {
-        // Allow if user has team permission OR is the assignee
-        if (! $this->permissionService->hasTeamPermission($request->user(), $team, 'tasks.update') &&
-            $task->assigned_to !== $request->user()->id) {
-            abort(403, 'You do not have permission to update this task checklist.');
+        $user = $request->user();
+
+        // Read-only logic
+        $isInReview = in_array($task->status, [TaskStatus::Submitted, TaskStatus::InQa, TaskStatus::PmReview]);
+        $hasQaPermission = $this->permissionService->hasTeamPermission($user, $team, 'tasks.qa_review');
+        
+        if ($isInReview && ! $hasQaPermission) {
+            abort(403, 'Task checklist is locked while in review.');
+        }
+
+        // Reordering requires manage_checklist
+        if (! $this->permissionService->hasTeamPermission($user, $team, 'tasks.manage_checklist')) {
+            abort(403, 'You do not have permission to reorder this checklist.');
         }
 
         $validated = $request->validate([

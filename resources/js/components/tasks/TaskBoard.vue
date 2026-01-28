@@ -150,13 +150,14 @@ const onDragOver = (event: DragEvent) => {
                     <div
                         v-for="task in getTasksByStatus(status.value)"
                         :key="task.public_id"
-                        :draggable="!readOnly"
-                        @dragstart="!readOnly && onDragStart($event, task)"
+                        :draggable="!readOnly && (task as any).can?.edit"
+                        @dragstart="!readOnly && (task as any).can?.edit && onDragStart($event, (task as any))"
                         @click="emit('task-click', task)"
                         class="group relative bg-[var(--surface-primary)] p-4 rounded-xl shadow-sm border border-[var(--border-subtle)] hover:shadow-md hover:border-[var(--brand-primary)]/50 transition-all duration-200 cursor-pointer select-none"
                         :class="{
                             'opacity-50 rotate-2 scale-95 ring-2 ring-[var(--brand-primary)]':
                                 draggingTask?.public_id === task.public_id,
+                            'cursor-default': readOnly || !(task as any).can?.edit
                         }"
                     >
                         <!-- Card Header -->
@@ -194,9 +195,10 @@ const onDragOver = (event: DragEvent) => {
                             <div class="flex items-center -space-x-2">
                                 <!-- Operator -->
                                 <div
-                                    @click.stop="emit('quick-assign', task)"
-                                    class="cursor-pointer hover:scale-110 transition-transform relative z-10"
-                                    title="Assign Operator"
+                                    @click.stop="(task as any).can?.assign && emit('quick-assign', (task as any))"
+                                    class="relative z-10"
+                                    :class="(task as any).can?.assign ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-default'"
+                                    :title="(task as any).can?.assign ? 'Assign Operator' : ''"
                                 >
                                     <Avatar
                                         v-if="task.assignee"
