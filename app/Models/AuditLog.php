@@ -113,9 +113,6 @@ class AuditLog extends Model
     /**
      * Get a human-readable description of the audit log.
      */
-    /**
-     * Get a human-readable description of the audit log.
-     */
     public function getDescriptionAttribute(): string
     {
         $userName = $this->user_name ?? 'System';
@@ -146,17 +143,6 @@ class AuditLog extends Model
         if ($this->action === AuditAction::Updated && $this->new_values) {
             $changes = [];
             foreach ($this->new_values as $key => $value) {
-                // ... (loop content remains same)
-            }
-
-            if (! empty($changes)) {
-                return "Updated " . implode(', ', $changes);
-            }
-        }
-
-        return $this->action->label() . " {$modelName}";
-            $changes = [];
-            foreach ($this->new_values as $key => $value) {
                 // Skip internal or non-human useful fields
                 if (in_array($key, ['updated_at', 'created_at', 'id', 'public_id', 'sort_order'])) {
                     continue;
@@ -183,7 +169,7 @@ class AuditLog extends Model
             }
 
             if (! empty($changes)) {
-                return "updated " . implode(', ', $changes);
+                return "Updated " . implode(', ', $changes);
             }
         }
 

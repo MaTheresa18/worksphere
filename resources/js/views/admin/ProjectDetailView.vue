@@ -270,7 +270,7 @@ const fetchProject = async () => {
                 "[ProjectDetail] Switching team context to:",
                 projectData.team.name,
             );
-            authStore.setTeam(projectData.team);
+            authStore.switchTeam(projectData.team.public_id);
         }
 
         // 3. Fetch Stats (scoped or global)

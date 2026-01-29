@@ -325,9 +325,9 @@ const mergedActivity = computed(() => {
             user: s.changed_by || { name: "System" },
             // Format to match audit log descriptions for consistency if possible
             description: `${s.changed_by?.name || "System"} changed status from ${s.from_status || "open"} to ${s.to_status}`,
-            description_body: `changed status from ${getStatus(s.from_status || "open",).label} to ${getStatus(s.to_status).label}`,
+            description_body: `Changed status from ${getStatus(s.from_status || "open").label} to ${getStatus(s.to_status).label}`,
             from_status: s.from_status,
-        to_status: s.to_status,
+            to_status: s.to_status,
             created_at: s.created_at,
             type: "status",
         }))
@@ -1390,9 +1390,11 @@ watch(
                                 class="mb-8 last:mb-0"
                             >
                                 <div
-                                    class="sticky top-0 z-10 bg-[var(--surface-primary)] py-2 mb-4 border-b border-[var(--border-subtle)] flex items-center gap-2"
+                                    class="sticky top-0 z-10 bg-[var(--surface-primary)] py-2 mb-4 border-b border-[var(--border-subtle)] flex items-center gap-3"
                                 >
-                                    <Clock class="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                                    <Clock
+                                        class="w-3.5 h-3.5 text-[var(--text-muted)] ml-1"
+                                    />
                                     <span
                                         class="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider"
                                         >{{ group.date }}</span
@@ -1400,7 +1402,7 @@ watch(
                                 </div>
 
                                 <div
-                                    class="space-y-6 ml-3 border-l border-[var(--border-default)] pl-6 pb-2"
+                                    class="space-y-4 ml-3 border-l border-[var(--border-default)] pl-6 pb-2"
                                 >
                                     <div
                                         v-for="entry in group.items"
@@ -1409,13 +1411,13 @@ watch(
                                     >
                                         <!-- Avatar on line -->
                                         <div
-                                            class="absolute -left-[33px] top-0 rounded-full bg-[var(--surface-primary)] p-1"
+                                            class="absolute -left-[36px] top-0.5 z-10 w-6 h-6 flex items-center justify-center rounded-full bg-[var(--surface-primary)]"
                                         >
                                             <Avatar
                                                 :name="entry.user?.name"
                                                 :src="entry.user?.avatar_url"
                                                 size="xs"
-                                                class="w-6 h-6 border border-[var(--border-default)] shadow-sm"
+                                                class="w-6 h-6 border-2 border-[var(--surface-primary)]"
                                             />
                                         </div>
 
@@ -1424,7 +1426,9 @@ watch(
                                                 class="text-sm text-[var(--text-secondary)] leading-relaxed"
                                             >
                                                 <template
-                                                    v-if="entry.type === 'status'"
+                                                    v-if="
+                                                        entry.type === 'status'
+                                                    "
                                                 >
                                                     <span
                                                         class="font-semibold text-[var(--text-primary)]"
@@ -1433,7 +1437,7 @@ watch(
                                                             "System"
                                                         }}</span
                                                     >
-                                                    changed status from
+                                                    Changed status from
                                                     <Badge
                                                         :class="[
                                                             getStatus(
@@ -1529,7 +1533,9 @@ watch(
                                 >
                                     No activity yet
                                 </h4>
-                                <p class="text-xs text-[var(--text-muted)] mt-1">
+                                <p
+                                    class="text-xs text-[var(--text-muted)] mt-1"
+                                >
                                     Activity logs will appear here when changes
                                     are made.
                                 </p>
