@@ -83,7 +83,7 @@ function getColorClass(color) {
                     Manage and track your team's projects.
                 </p>
             </div>
-            <Tooltip v-if="!hasTeams">
+            <Tooltip v-if="!hasTeams || !authStore.hasAnyTeamPermission('projects.create')">
                 <template #trigger>
                     <Button disabled class="opacity-60 cursor-not-allowed">
                         <Plus class="h-4 w-4" />
@@ -92,7 +92,7 @@ function getColorClass(color) {
                 </template>
                 <div class="flex items-center gap-2">
                     <Info class="h-4 w-4" />
-                    <span>Join a team to create projects</span>
+                    <span>{{ !hasTeams ? 'Join a team to create projects' : 'You do not have permission to create projects in any team' }}</span>
                 </div>
             </Tooltip>
             <Button v-else @click="showNewProjectModal = true">

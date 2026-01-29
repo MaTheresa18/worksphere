@@ -100,6 +100,14 @@ class AuditService
     }
 
     /**
+     * Clear captured changes.
+     */
+    public function clearCapturedChanges(): void
+    {
+        $this->capturedChanges = [];
+    }
+
+    /**
      * Log an audit event.
      *
      * @param  array<string, mixed>|null  $oldValues
@@ -126,9 +134,27 @@ class AuditService
                 $context
             );
 
+            \Illuminate\Support\Facades\Log::debug('AuditService: Prepared log data', [
+                'public_id' => $data['public_id'],
+                'action' => $action->value,
+                'category' => $category->value,
+                'auditable' => $auditable ? get_class($auditable) . ':' . $auditable->getKey() : 'none'
+            ]);
+
             if (config('audit.async', true) && $this->shouldQueueLog($action)) {
-                dispatch(function () use ($data): void {
-                    AuditLog::create($data);
+                dispatch(function () use ($data, $action): void {
+                    try {
+                         \Illuminate\Support\Facades\Log::info('AuditService: Attempting async log create', ['public_id' => $data['public_id'], 'action' => $action->value]);
+                        AuditLog::create($data);
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::error('AuditService: Async logging failed', [
+                            'public_id' => $data['public_id'],
+                            'action' => $action->value,
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString()
+                        ]);
+                        throw $e; // Re-throw to make sure we see it if needed
+                    }
                 })->afterResponse();
 
                 return null;
@@ -176,7 +202,8 @@ class AuditService
         AuditAction $action,
         Model $model,
         ?array $oldValues = null,
-        ?array $newValues = null
+        ?array $newValues = null,
+        array $metadata = []
     ): ?AuditLog {
         $category = $this->getCategoryForModel($model);
 
@@ -186,7 +213,8 @@ class AuditService
             auditable: $model,
             user: auth()->user(),
             oldValues: $this->sanitizeValues($oldValues),
-            newValues: $this->sanitizeValues($newValues)
+            newValues: $this->sanitizeValues($newValues),
+            context: $metadata
         );
     }
 

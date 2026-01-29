@@ -113,18 +113,81 @@ class AuditLog extends Model
     /**
      * Get a human-readable description of the audit log.
      */
+    /**
+     * Get a human-readable description of the audit log.
+     */
     public function getDescriptionAttribute(): string
     {
         $userName = $this->user_name ?? 'System';
-        $action = $this->action->label();
 
-        if ($this->auditable_type) {
-            $modelName = class_basename($this->auditable_type);
+        return "{$userName} " . $this->description_body;
+    }
 
-            return "{$userName} {$action} {$modelName}";
+    /**
+     * Get the body of the description without the user name.
+     */
+    public function getDescriptionBodyAttribute(): string
+    {
+        // Handle generic labels for non-CRUD actions
+        if (! in_array($this->action, [AuditAction::Updated, AuditAction::Created, AuditAction::Deleted])) {
+            return $this->action->label();
         }
 
-        return "{$userName} {$action}";
+        $modelName = $this->auditable_type ? class_basename($this->auditable_type) : 'record';
+
+        if ($this->action === AuditAction::Created) {
+            return "Created {$modelName}";
+        }
+
+        if ($this->action === AuditAction::Deleted) {
+            return "Deleted {$modelName}";
+        }
+
+        if ($this->action === AuditAction::Updated && $this->new_values) {
+            $changes = [];
+            foreach ($this->new_values as $key => $value) {
+                // ... (loop content remains same)
+            }
+
+            if (! empty($changes)) {
+                return "Updated " . implode(', ', $changes);
+            }
+        }
+
+        return $this->action->label() . " {$modelName}";
+            $changes = [];
+            foreach ($this->new_values as $key => $value) {
+                // Skip internal or non-human useful fields
+                if (in_array($key, ['updated_at', 'created_at', 'id', 'public_id', 'sort_order'])) {
+                    continue;
+                }
+
+                $oldValue = $this->old_values[$key] ?? null;
+
+                if ($key === 'status') {
+                    $from = $oldValue ? ucwords(str_replace('_', ' ', is_string($oldValue) ? $oldValue : '')) : null;
+                    $to = ucwords(str_replace('_', ' ', is_string($value) ? $value : ''));
+                    $changes[] = "status from " . ($from ?: 'Open') . " to " . $to;
+                } elseif ($key === 'priority') {
+                    $changes[] = "priority to " . (is_string($value) ? ucwords($value) : $value);
+                } elseif ($key === 'assigned_to') {
+                    $name = $this->metadata['assignee_name'] ?? 'someone';
+                    $changes[] = "assignee to {$name}";
+                } elseif ($key === 'qa_user_id') {
+                    $name = $this->metadata['qa_name'] ?? 'someone';
+                    $changes[] = "QA reviewer to {$name}";
+                } else {
+                    $label = str_replace('_', ' ', $key);
+                    $changes[] = "{$label}";
+                }
+            }
+
+            if (! empty($changes)) {
+                return "updated " . implode(', ', $changes);
+            }
+        }
+
+        return $this->action->label() . " {$modelName}";
     }
 
     /**

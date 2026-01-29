@@ -82,6 +82,21 @@ class UserResource extends JsonResource
                         });
                     }
                 ),
+                'team_permissions' => $this->when(
+                    $request->routeIs('api.user') || $request->routeIs('users.show') || $isOwner,
+                    function () {
+                        $permissionService = app(\App\Services\PermissionService::class);
+                        $persona = $permissionService->getPersona($this->resource);
+                        
+                        $teamPermissions = [];
+                        foreach ($this->resource->teams as $team) {
+                            if (isset($persona->teamPermissions[$team->id])) {
+                                $teamPermissions[$team->public_id] = $persona->teamPermissions[$team->id];
+                            }
+                        }
+                        return $teamPermissions;
+                    }
+                ),
                 'last_login_at' => $this->last_login_at?->toISOString(),
                 'is_password_set' => $this->is_password_set,
                 'password_last_updated_at' => $this->password_last_updated_at?->toISOString(),

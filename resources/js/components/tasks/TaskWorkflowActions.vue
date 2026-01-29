@@ -44,17 +44,13 @@ const canClientReview = computed(() => {
     return props.task.status === "sent_to_client";
 });
 
-// Computed list of actions based on status
+// Computed list of actions based on permissions from backend
 const availableActions = computed(() => {
     const actions = [];
-    // Status can be a string OR an object with {value, label, color}
-    const rawStatus =
-        typeof props.task.status === "object" && props.task.status?.value
-            ? props.task.status.value
-            : props.task.status;
+    const can = props.task.can || {};
 
-    // Operator Actions
-    if (rawStatus === "open" || rawStatus === "draft") {
+    // Start Task
+    if (can.start_task) {
         actions.push({
             id: "start",
             label: "Start Task",
@@ -63,7 +59,8 @@ const availableActions = computed(() => {
         });
     }
 
-    if (rawStatus === "in_progress") {
+    // Submit for QA
+    if (can.submit_qa) {
         // Check if checklist is complete
         const checklist = props.task?.checklist || [];
         const checklistComplete =
@@ -85,25 +82,23 @@ const availableActions = computed(() => {
                 ? "Complete all checklist items first"
                 : undefined,
         });
+    }
+
+    // Toggle Hold
+    if (can.hold) {
+        const isHold =
+            props.task.status === "on_hold" ||
+            props.task.status?.value === "on_hold";
         actions.push({
             id: "hold",
-            label: "Put on Hold",
-            icon: Pause,
-            variant: "secondary",
+            label: isHold ? "Resume" : "Put on Hold",
+            icon: isHold ? Play : Pause,
+            variant: isHold ? "primary" : "secondary",
         });
     }
 
-    if (rawStatus === "on_hold") {
-        actions.push({
-            id: "start",
-            label: "Resume",
-            icon: Play,
-            variant: "primary",
-        });
-    }
-
-    // QA Actions
-    if (rawStatus === "submitted") {
+    // Start QA Review
+    if (can.start_qa_review) {
         actions.push({
             id: "start_qa",
             label: "Start QA Review",
@@ -112,7 +107,8 @@ const availableActions = computed(() => {
         });
     }
 
-    if (rawStatus === "in_qa") {
+    // QA Decision
+    if (can.complete_qa_review) {
         actions.push({
             id: "qa_approve",
             label: "Approve (To PM)",
@@ -127,8 +123,8 @@ const availableActions = computed(() => {
         });
     }
 
-    // PM Actions
-    if (rawStatus === "pm_review" || rawStatus === "approved") {
+    // PM Review
+    if (can.pm_review) {
         actions.push({
             id: "pm_approve",
             label: "Approve (To Client)",
@@ -143,8 +139,8 @@ const availableActions = computed(() => {
         });
     }
 
-    // Client/Final Actions
-    if (rawStatus === "sent_to_client") {
+    // Client Review
+    if (can.client_review) {
         actions.push({
             id: "client_approve",
             label: "Client Approved",
@@ -159,7 +155,8 @@ const availableActions = computed(() => {
         });
     }
 
-    if (rawStatus === "client_approved") {
+    // Complete Task
+    if (can.complete_task) {
         actions.push({
             id: "complete",
             label: "Mark Completed",
@@ -168,7 +165,8 @@ const availableActions = computed(() => {
         });
     }
 
-    if (rawStatus === "rejected" || rawStatus === "client_rejected") {
+    // Restart Rejected Task
+    if (can.restart_task) {
         actions.push({
             id: "restart",
             label: "Restart Task",

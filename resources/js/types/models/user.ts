@@ -19,6 +19,7 @@ export interface User {
   two_factor_allowed_methods?: string[];
   has_2fa_enabled?: boolean;
   requires_2fa_setup?: boolean;
+  team_permissions?: Record<string, string[]>;
 }
 
 export interface Role {

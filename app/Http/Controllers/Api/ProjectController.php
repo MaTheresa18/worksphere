@@ -138,9 +138,7 @@ class ProjectController extends Controller
      */
     public function showGlobal(Request $request, Project $project): JsonResponse
     {
-        if (! $request->user()->hasRole('administrator')) {
-            abort(403, 'Unauthorized access to global project details.');
-        }
+        $this->authorizeGlobalProjectAccess($request->user(), $project);
 
         $project->load(['creator', 'client', 'members', 'archiver', 'team']);
         $project->loadCount(['tasks', 'members']);
@@ -153,9 +151,7 @@ class ProjectController extends Controller
      */
     public function statsGlobal(Request $request, Project $project): JsonResponse
     {
-        if (! $request->user()->hasRole('administrator')) {
-            abort(403, 'Unauthorized access to global project stats.');
-        }
+        $this->authorizeGlobalProjectAccess($request->user(), $project);
 
         $stats = [
             'total_tasks' => $project->tasks()->count(),
@@ -182,9 +178,7 @@ class ProjectController extends Controller
      */
     public function filesGlobal(Request $request, Project $project): JsonResponse
     {
-        if (! $request->user()->hasRole('administrator')) {
-            abort(403, 'Unauthorized access to global project files.');
-        }
+        $this->authorizeGlobalProjectAccess($request->user(), $project);
 
         $collection = $request->input('collection', 'attachments');
         $media = $project->getMedia($collection);
@@ -216,6 +210,46 @@ class ProjectController extends Controller
 
         return response()->json($files);
     }
+
+    /**
+     * Authorize access to global project endpoints for non-admins based on team permissions.
+     *
+     * @param  \App\Models\User  $user
+     * @param  \App\Models\Project  $project
+     * @return void
+     *
+     * @throws \Symfony\Component\HttpKernel\Exception\HttpException
+     */
+    private function authorizeGlobalProjectAccess($user, Project $project): void
+    {
+        $team = $project->team;
+        $isAdmin = $user->hasRole('administrator');
+
+        if ($isAdmin) {
+            return;
+        }
+
+        $hasView = $this->permissionService->hasTeamPermission($user, $team, 'projects.view');
+        $hasViewAssigned = $this->permissionService->hasTeamPermission($user, $team, 'projects.view_assigned');
+
+        \Illuminate\Support\Facades\Log::debug('ProjectController: authorizeGlobalProjectAccess', [
+            'user_id' => $user->id,
+            'team_id' => $team->id,
+            'hasView' => $hasView,
+            'hasViewAssigned' => $hasViewAssigned,
+            'isMember' => $project->hasMember($user)
+        ]);
+
+        if (!$hasView && !$hasViewAssigned) {
+            abort(403, 'Unauthorized access to project resources.');
+        }
+
+        // For view_assigned, ensure user is a project member
+        if (!$hasView && $hasViewAssigned && !$project->hasMember($user)) {
+            abort(403, 'You do not have permission to view this specific project.');
+        }
+    }
+
 
     /**
      * Build the base project query with filters.

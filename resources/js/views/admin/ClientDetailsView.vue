@@ -1,11 +1,11 @@
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import api from '@/lib/api';
-import { Button } from '@/components/ui';
-import { useAuthStore } from '@/stores/auth';
-import { toast } from 'vue-sonner';
-import ClientFormModal from '@/components/clients/ClientFormModal.vue';
+import { ref, onMounted, computed, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import api from "@/lib/api";
+import { Button } from "@/components/ui";
+import { useAuthStore } from "@/stores/auth";
+import { toast } from "vue-sonner";
+import ClientFormModal from "@/components/clients/ClientFormModal.vue";
 import {
     Briefcase,
     FileText,
@@ -23,9 +23,9 @@ import {
     AlertTriangle,
     TrendingUp,
     Clock,
-    DollarSign
-} from 'lucide-vue-next';
-import ClientContactModal from '@/components/clients/ClientContactModal.vue';
+    DollarSign,
+} from "lucide-vue-next";
+import ClientContactModal from "@/components/clients/ClientContactModal.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -33,7 +33,7 @@ const authStore = useAuthStore();
 
 const client = ref(null);
 const isLoading = ref(true);
-const activeTab = ref('overview');
+const activeTab = ref("overview");
 const showEditModal = ref(false);
 const showContactModal = ref(false);
 const contactToEdit = ref(null);
@@ -44,50 +44,75 @@ const openContactModal = (contact = null) => {
 };
 
 const deleteContact = async (contactId) => {
-    if (!confirm('Are you sure you want to delete this contact?')) return;
+    if (!confirm("Are you sure you want to delete this contact?")) return;
     try {
-        await api.delete(`/api/clients/${route.params.public_id}/contacts/${contactId}`);
+        await api.delete(
+            `/api/clients/${route.params.public_id}/contacts/${contactId}`,
+        );
         fetchClient();
     } catch (e) {
-        console.error('Failed to delete contact', e);
+        console.error("Failed to delete contact", e);
     }
 };
 
 const backRoute = computed(() => {
-    return route.name === 'admin-client-detail' ? { name: 'admin-clients' } : { name: 'clients' };
+    return route.name === "admin-client-detail"
+        ? { name: "admin-clients" }
+        : { name: "clients" };
 });
 
 const projectsRoute = computed(() => {
-    return route.name === 'admin-client-detail' ? { name: 'admin-projects' } : { name: 'projects' };
+    return route.name === "admin-client-detail"
+        ? { name: "admin-projects" }
+        : { name: "projects" };
 });
 
 const invoicesRoute = computed(() => {
-    return route.name === 'admin-client-detail' ? { name: 'admin-invoices' } : { name: 'invoices' };
+    return route.name === "admin-client-detail"
+        ? { name: "admin-invoices" }
+        : { name: "invoices" };
 });
 
 const breadcrumbs = computed(() => {
     return [
-        { label: 'Clients', to: backRoute.value },
-        { label: client.value?.name || 'Loading...', active: true }
+        { label: "Clients", to: backRoute.value },
+        { label: client.value?.name || "Loading...", active: true },
     ];
 });
 
 // Permissions
 const canEdit = computed(() => {
-    return authStore.user?.roles?.some(r => r.name === 'administrator') || 
-           authStore.user?.permissions?.some(p => p.name === 'clients.update');
+    return (
+        authStore.user?.roles?.some((r) => r.name === "administrator") ||
+        authStore.user?.permissions?.some((p) => p.name === "clients.update")
+    );
 });
 
 const fetchClient = async () => {
     isLoading.value = true;
     try {
-        const response = await api.get(`/api/clients/${route.params.public_id}`);
-        client.value = response.data;
+        const response = await api.get(
+            `/api/clients/${route.params.public_id}`,
+        );
+        const clientData = response.data;
+        client.value = clientData;
+
+        // Context Sync: Ensure the active team matches the client's team
+        if (
+            clientData.team &&
+            authStore.currentTeam?.public_id !== clientData.team.public_id
+        ) {
+            console.log(
+                "[ClientDetail] Switching team context to:",
+                clientData.team.name,
+            );
+            authStore.setTeam(clientData.team);
+        }
     } catch (e) {
-        console.error('Failed to fetch client', e);
+        console.error("Failed to fetch client", e);
         // Handle 404 or permission error
         if (e.response?.status === 404) {
-            router.push({ name: 'admin-clients' });
+            router.push({ name: "admin-clients" });
         }
     } finally {
         isLoading.value = false;
@@ -99,38 +124,48 @@ const handleSaved = () => {
 };
 
 const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
     });
 };
 
-const formatCurrency = (amount, currency = 'USD') => {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: currency || 'USD',
+const formatCurrency = (amount, currency = "USD") => {
+    return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: currency || "USD",
     }).format(amount);
 };
 
 const getStatusColor = (status) => {
-    switch(status) {
-        case 'active': return 'bg-green-100 text-green-700 border-green-200';
-        case 'inactive': return 'bg-gray-100 text-gray-700 border-gray-200';
-        default: return 'bg-gray-100 text-gray-700 border-gray-200';
+    switch (status) {
+        case "active":
+            return "bg-green-100 text-green-700 border-green-200";
+        case "inactive":
+            return "bg-gray-100 text-gray-700 border-gray-200";
+        default:
+            return "bg-gray-100 text-gray-700 border-gray-200";
     }
 };
 
 const getInvoiceStatusColor = (status) => {
-    switch(String(status).toLowerCase()) {
-        case 'paid': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-        case 'sent': return 'bg-blue-100 text-blue-700 border-blue-200';
-        case 'viewed': return 'bg-blue-50 text-blue-600 border-blue-200';
-        case 'overdue': return 'bg-red-100 text-red-700 border-red-200';
-        case 'draft': return 'bg-gray-100 text-gray-700 border-gray-200';
-        case 'cancelled': return 'bg-gray-50 text-gray-500 border-gray-200';
-        default: return 'bg-gray-100 text-gray-700 border-gray-200';
+    switch (String(status).toLowerCase()) {
+        case "paid":
+            return "bg-emerald-100 text-emerald-700 border-emerald-200";
+        case "sent":
+            return "bg-blue-100 text-blue-700 border-blue-200";
+        case "viewed":
+            return "bg-blue-50 text-blue-600 border-blue-200";
+        case "overdue":
+            return "bg-red-100 text-red-700 border-red-200";
+        case "draft":
+            return "bg-gray-100 text-gray-700 border-gray-200";
+        case "cancelled":
+            return "bg-gray-50 text-gray-500 border-gray-200";
+        default:
+            return "bg-gray-100 text-gray-700 border-gray-200";
     }
 };
 
@@ -141,64 +176,112 @@ onMounted(() => {
 const copyToClipboard = (text) => {
     if (!text) return;
     navigator.clipboard.writeText(text);
-    toast.success('Email copied to clipboard');
+    toast.success("Email copied to clipboard");
 };
 
-watch(() => route.params.public_id, () => {
-    fetchClient();
-});
+watch(
+    () => route.params.public_id,
+    () => {
+        fetchClient();
+    },
+);
 </script>
 
 <template>
-    <div v-if="isLoading" class="p-6 flex items-center justify-center min-h-[400px]">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary-500)]"></div>
+    <div
+        v-if="isLoading"
+        class="p-6 flex items-center justify-center min-h-[400px]"
+    >
+        <div
+            class="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary-500)]"
+        ></div>
     </div>
 
-    <div v-else-if="client" class="flex flex-col h-full bg-[var(--surface-subtle)]">
+    <div
+        v-else-if="client"
+        class="flex flex-col h-full bg-[var(--surface-subtle)]"
+    >
         <!-- Header -->
-        <div class="bg-[var(--surface-primary)]  border-[var(--border-muted)] px-6 py-4">
+        <div
+            class="bg-[var(--surface-primary)] border-[var(--border-muted)] px-6 py-4"
+        >
             <div class="mx-auto w-full">
                 <div class="mb-4">
-                    <button @click="router.push(backRoute)" class="flex items-center text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
+                    <button
+                        @click="router.push(backRoute)"
+                        class="flex items-center text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                    >
                         <ArrowLeft class="w-4 h-4 mr-1" />
                         Back to Clients
                     </button>
                 </div>
-                
-                <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
+
+                <div
+                    class="flex flex-col md:flex-row md:items-start justify-between gap-4"
+                >
                     <div class="flex items-start gap-4">
-                        <div class="h-16 w-16 rounded-xl bg-[var(--surface-brand-subtle)] flex items-center justify-center shrink-0 border border-[var(--border-subtle)]">
-                            <Building2 class="h-8 w-8 text-[var(--text-brand)]" />
+                        <div
+                            class="h-16 w-16 rounded-xl bg-[var(--surface-brand-subtle)] flex items-center justify-center shrink-0 border border-[var(--border-subtle)]"
+                        >
+                            <Building2
+                                class="h-8 w-8 text-[var(--text-brand)]"
+                            />
                         </div>
                         <div>
                             <div class="flex items-center gap-3">
-                                <h1 class="text-2xl font-bold text-[var(--text-primary)]">{{ client.name }}</h1>
-                                <span 
+                                <h1
+                                    class="text-2xl font-bold text-[var(--text-primary)]"
+                                >
+                                    {{ client.name }}
+                                </h1>
+                                <span
                                     class="px-2.5 py-0.5 rounded-full text-xs font-medium border"
                                     :class="getStatusColor(client.status)"
                                 >
                                     {{ client.status }}
                                 </span>
                             </div>
-                            <div class="flex flex-wrap items-center gap-4 mt-2 text-sm text-[var(--text-secondary)]">
+                            <div
+                                class="flex flex-wrap items-center gap-4 mt-2 text-sm text-[var(--text-secondary)]"
+                            >
                                 <div class="flex items-center gap-1.5">
                                     <Users class="w-4 h-4" />
-                                    <span>{{ client.contact_person || 'No contact person' }}</span>
+                                    <span>{{
+                                        client.contact_person ||
+                                        "No contact person"
+                                    }}</span>
                                 </div>
-                                <div v-if="client.email" class="flex items-center gap-1.5">
+                                <div
+                                    v-if="client.email"
+                                    class="flex items-center gap-1.5"
+                                >
                                     <Mail class="w-4 h-4" />
-                                    <a :href="'mailto:' + client.email" class="hover:underline">{{ client.email }}</a>
+                                    <a
+                                        :href="'mailto:' + client.email"
+                                        class="hover:underline"
+                                        >{{ client.email }}</a
+                                    >
                                 </div>
                                 <div class="flex items-center gap-1.5">
                                     <Calendar class="w-4 h-4" />
-                                    <span>Joined {{ formatDate(client.created_at) }}</span>
+                                    <span
+                                        >Joined
+                                        {{
+                                            formatDate(client.created_at)
+                                        }}</span
+                                    >
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <div class="flex items-center gap-3">
-                        <Button v-if="canEdit" variant="outline" @click="showEditModal = true" class="gap-2">
+                        <Button
+                            v-if="canEdit"
+                            variant="outline"
+                            @click="showEditModal = true"
+                            class="gap-2"
+                        >
                             <Pencil class="w-4 h-4" />
                             Edit Client
                         </Button>
@@ -206,41 +289,65 @@ watch(() => route.params.public_id, () => {
                 </div>
 
                 <!-- Tabs Navigation -->
-                <div class="flex items-center gap-6 mt-8 border-b border-[var(--border-muted)]">
-                    <button 
+                <div
+                    class="flex items-center gap-6 mt-8 border-b border-[var(--border-muted)]"
+                >
+                    <button
                         @click="activeTab = 'overview'"
                         class="pb-3 text-sm font-medium border-b-2 transition-colors"
-                        :class="activeTab === 'overview' ? 'border-[var(--color-primary-500)] text-[var(--color-primary-500)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)]'"
+                        :class="
+                            activeTab === 'overview'
+                                ? 'border-[var(--color-primary-500)] text-[var(--color-primary-500)]'
+                                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)]'
+                        "
                     >
                         Overview
                     </button>
-                    <button 
+                    <button
                         @click="activeTab = 'projects'"
                         class="pb-3 text-sm font-medium border-b-2 transition-colors"
-                        :class="activeTab === 'projects' ? 'border-[var(--color-primary-500)] text-[var(--color-primary-500)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)]'"
+                        :class="
+                            activeTab === 'projects'
+                                ? 'border-[var(--color-primary-500)] text-[var(--color-primary-500)]'
+                                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)]'
+                        "
                     >
                         Projects
-                        <span class="ml-1.5 px-1.5 py-0.5 rounded-md bg-[var(--surface-tertiary)] text-xs text-[var(--text-secondary)]">
+                        <span
+                            class="ml-1.5 px-1.5 py-0.5 rounded-md bg-[var(--surface-tertiary)] text-xs text-[var(--text-secondary)]"
+                        >
                             {{ client.projects_count || 0 }}
                         </span>
                     </button>
-                    <button 
+                    <button
                         @click="activeTab = 'invoices'"
                         class="pb-3 text-sm font-medium border-b-2 transition-colors"
-                        :class="activeTab === 'invoices' ? 'border-[var(--color-primary-500)] text-[var(--color-primary-500)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)]'"
+                        :class="
+                            activeTab === 'invoices'
+                                ? 'border-[var(--color-primary-500)] text-[var(--color-primary-500)]'
+                                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)]'
+                        "
                     >
                         Invoices
-                        <span class="ml-1.5 px-1.5 py-0.5 rounded-md bg-[var(--surface-tertiary)] text-xs text-[var(--text-secondary)]">
+                        <span
+                            class="ml-1.5 px-1.5 py-0.5 rounded-md bg-[var(--surface-tertiary)] text-xs text-[var(--text-secondary)]"
+                        >
                             {{ client.invoices_count || 0 }}
                         </span>
                     </button>
-                    <button 
+                    <button
                         @click="activeTab = 'contacts'"
                         class="pb-3 text-sm font-medium border-b-2 transition-colors"
-                        :class="activeTab === 'contacts' ? 'border-[var(--color-primary-500)] text-[var(--color-primary-500)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)]'"
+                        :class="
+                            activeTab === 'contacts'
+                                ? 'border-[var(--color-primary-500)] text-[var(--color-primary-500)]'
+                                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-default)]'
+                        "
                     >
                         Contacts
-                        <span class="ml-1.5 px-1.5 py-0.5 rounded-md bg-[var(--surface-tertiary)] text-xs text-[var(--text-secondary)]">
+                        <span
+                            class="ml-1.5 px-1.5 py-0.5 rounded-md bg-[var(--surface-tertiary)] text-xs text-[var(--text-secondary)]"
+                        >
                             {{ client.contacts_count || 0 }}
                         </span>
                     </button>
@@ -252,55 +359,151 @@ watch(() => route.params.public_id, () => {
         <!-- Content -->
         <div class="flex-1 overflow-y-auto bg-[var(--surface-subtle)] p-6">
             <div class="mx-auto w-full">
-                
                 <!-- Overview Tab -->
                 <div v-show="activeTab === 'overview'" class="space-y-6">
                     <!-- Financial Overview -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div class="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl p-4 flex items-center gap-4">
-                            <div class="h-10 w-10 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                    <div
+                        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+                    >
+                        <div
+                            class="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl p-4 flex items-center gap-4"
+                        >
+                            <div
+                                class="h-10 w-10 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-amber-600 dark:text-amber-400"
+                            >
                                 <Clock class="h-6 w-6" />
                             </div>
                             <div>
-                                <p class="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">Pending Payments</p>
-                                <p class="text-xl font-bold text-amber-900 dark:text-amber-100">{{ formatCurrency(client.total_pending) }}</p>
+                                <p
+                                    class="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider"
+                                >
+                                    Pending Payments
+                                </p>
+                                <p
+                                    class="text-xl font-bold text-amber-900 dark:text-amber-100"
+                                >
+                                    {{ formatCurrency(client.total_pending) }}
+                                </p>
                             </div>
                         </div>
 
-                        <div class="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-900/30 rounded-xl p-4 flex items-center gap-4">
-                            <div class="h-10 w-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                        <div
+                            class="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-900/30 rounded-xl p-4 flex items-center gap-4"
+                        >
+                            <div
+                                class="h-10 w-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400"
+                            >
                                 <TrendingUp class="h-6 w-6" />
                             </div>
                             <div>
-                                <p class="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Completed Payments</p>
-                                <p class="text-xl font-bold text-emerald-900 dark:text-emerald-100">{{ formatCurrency(client.total_paid) }}</p>
+                                <p
+                                    class="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider"
+                                >
+                                    Completed Payments
+                                </p>
+                                <p
+                                    class="text-xl font-bold text-emerald-900 dark:text-emerald-100"
+                                >
+                                    {{ formatCurrency(client.total_paid) }}
+                                </p>
                             </div>
                         </div>
                     </div>
 
-                    <div v-if="client.overdue_invoices && client.overdue_invoices.length > 0" class="bg-[var(--surface-primary)] rounded-xl border border-red-200 dark:border-red-900/30 overflow-hidden shadow-sm shadow-red-100/50">
-                        <div class="p-4 bg-red-50 dark:bg-red-900/10 border-b border-red-200 dark:border-red-900/30 flex items-center gap-2">
-                            <AlertTriangle class="h-5 w-5 text-red-600 dark:text-red-400" />
-                            <h3 class="text-sm font-bold text-red-900 dark:text-red-100 uppercase tracking-wide">Long Overdue Payments</h3>
+                    <div
+                        v-if="
+                            client.overdue_invoices &&
+                            client.overdue_invoices.length > 0
+                        "
+                        class="bg-[var(--surface-primary)] rounded-xl border border-red-200 dark:border-red-900/30 overflow-hidden shadow-sm shadow-red-100/50"
+                    >
+                        <div
+                            class="p-4 bg-red-50 dark:bg-red-900/10 border-b border-red-200 dark:border-red-900/30 flex items-center gap-2"
+                        >
+                            <AlertTriangle
+                                class="h-5 w-5 text-red-600 dark:text-red-400"
+                            />
+                            <h3
+                                class="text-sm font-bold text-red-900 dark:text-red-100 uppercase tracking-wide"
+                            >
+                                Long Overdue Payments
+                            </h3>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse">
                                 <thead>
-                                    <tr class="bg-red-50/50 dark:bg-red-900/5 border-b border-red-100 dark:border-red-900/20">
-                                        <th class="px-6 py-2 text-xs font-bold text-red-800 dark:text-red-300 uppercase tracking-wider">Invoice #</th>
-                                        <th class="px-6 py-2 text-xs font-bold text-red-800 dark:text-red-300 uppercase tracking-wider">Due Date</th>
-                                        <th class="px-6 py-2 text-xs font-bold text-red-800 dark:text-red-300 uppercase tracking-wider">Days Overdue</th>
-                                        <th class="px-6 py-2 text-xs font-bold text-red-800 dark:text-red-300 uppercase tracking-wider text-right">Amount</th>
+                                    <tr
+                                        class="bg-red-50/50 dark:bg-red-900/5 border-b border-red-100 dark:border-red-900/20"
+                                    >
+                                        <th
+                                            class="px-6 py-2 text-xs font-bold text-red-800 dark:text-red-300 uppercase tracking-wider"
+                                        >
+                                            Invoice #
+                                        </th>
+                                        <th
+                                            class="px-6 py-2 text-xs font-bold text-red-800 dark:text-red-300 uppercase tracking-wider"
+                                        >
+                                            Due Date
+                                        </th>
+                                        <th
+                                            class="px-6 py-2 text-xs font-bold text-red-800 dark:text-red-300 uppercase tracking-wider"
+                                        >
+                                            Days Overdue
+                                        </th>
+                                        <th
+                                            class="px-6 py-2 text-xs font-bold text-red-800 dark:text-red-300 uppercase tracking-wider text-right"
+                                        >
+                                            Amount
+                                        </th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-red-100 dark:divide-red-900/20">
-                                    <tr v-for="invoice in client.overdue_invoices" :key="invoice.id" class="hover:bg-red-50/80 dark:hover:bg-red-900/20 transition-colors">
-                                        <td class="px-6 py-3 font-medium text-red-900 dark:text-red-100">{{ invoice.invoice_number }}</td>
-                                        <td class="px-6 py-3 text-sm text-red-800 dark:text-red-300">{{ formatDate(invoice.due_date) }}</td>
-                                        <td class="px-6 py-3 text-sm font-bold text-red-600 dark:text-red-400">
-                                            {{ Math.abs(Math.floor((new Date() - new Date(invoice.due_date)) / (1000 * 60 * 60 * 24))) }} days
+                                <tbody
+                                    class="divide-y divide-red-100 dark:divide-red-900/20"
+                                >
+                                    <tr
+                                        v-for="invoice in client.overdue_invoices"
+                                        :key="invoice.id"
+                                        class="hover:bg-red-50/80 dark:hover:bg-red-900/20 transition-colors"
+                                    >
+                                        <td
+                                            class="px-6 py-3 font-medium text-red-900 dark:text-red-100"
+                                        >
+                                            {{ invoice.invoice_number }}
                                         </td>
-                                        <td class="px-6 py-3 text-sm font-bold text-red-900 dark:text-red-100 text-right">{{ formatCurrency(invoice.total, invoice.currency) }}</td>
+                                        <td
+                                            class="px-6 py-3 text-sm text-red-800 dark:text-red-300"
+                                        >
+                                            {{ formatDate(invoice.due_date) }}
+                                        </td>
+                                        <td
+                                            class="px-6 py-3 text-sm font-bold text-red-600 dark:text-red-400"
+                                        >
+                                            {{
+                                                Math.abs(
+                                                    Math.floor(
+                                                        (new Date() -
+                                                            new Date(
+                                                                invoice.due_date,
+                                                            )) /
+                                                            (1000 *
+                                                                60 *
+                                                                60 *
+                                                                24),
+                                                    ),
+                                                )
+                                            }}
+                                            days
+                                        </td>
+                                        <td
+                                            class="px-6 py-3 text-sm font-bold text-red-900 dark:text-red-100 text-right"
+                                        >
+                                            {{
+                                                formatCurrency(
+                                                    invoice.total,
+                                                    invoice.currency,
+                                                )
+                                            }}
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -308,132 +511,298 @@ watch(() => route.params.public_id, () => {
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <!-- Contact Info -->
-                    <div class="md:col-span-2 space-y-6">
-                        <div class="bg-[var(--surface-primary)] rounded-xl border border-[var(--border-muted)] p-6 shadow-sm">
-                            <h3 class="text-base font-semibold text-[var(--text-primary)] mb-4">Contact Information</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-8">
-                                <div>
-                                    <label class="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider block mb-1">Company Name</label>
-                                    <p class="text-[var(--text-primary)]">{{ client.name }}</p>
-                                </div>
-                                <div>
-                                    <label class="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider block mb-1">Status</label>
-                                    <span class="text-[var(--text-primary)] capitalize">{{ client.status }}</span>
-                                </div>
-                                <div>
-                                    <label class="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider block mb-1">Contact Person</label>
-                                    <div class="flex items-center gap-2">
-                                        <Users class="w-4 h-4 text-[var(--text-muted)]" />
-                                        <p class="text-[var(--text-primary)]">{{ client.contact_person || 'N/A' }}</p>
+                        <!-- Contact Info -->
+                        <div class="md:col-span-2 space-y-6">
+                            <div
+                                class="bg-[var(--surface-primary)] rounded-xl border border-[var(--border-muted)] p-6 shadow-sm"
+                            >
+                                <h3
+                                    class="text-base font-semibold text-[var(--text-primary)] mb-4"
+                                >
+                                    Contact Information
+                                </h3>
+                                <div
+                                    class="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-8"
+                                >
+                                    <div>
+                                        <label
+                                            class="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider block mb-1"
+                                            >Company Name</label
+                                        >
+                                        <p class="text-[var(--text-primary)]">
+                                            {{ client.name }}
+                                        </p>
                                     </div>
-                                </div>
-                                <div>
-                                    <label class="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider block mb-1">Email Address</label>
-                                    <div class="flex items-center gap-2">
-                                        <Mail class="w-4 h-4 text-[var(--text-muted)]" />
-                                        <a v-if="client.email" :href="'mailto:' + client.email" class="text-[var(--color-primary-600)] hover:underline">{{ client.email }}</a>
-                                        <button v-if="client.email" @click="copyToClipboard(client.email)" class="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1" title="Copy email">
-                                            <Copy class="w-3.5 h-3.5" />
-                                        </button>
-                                        <span v-else class="text-[var(--text-muted)]">N/A</span>
+                                    <div>
+                                        <label
+                                            class="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider block mb-1"
+                                            >Status</label
+                                        >
+                                        <span
+                                            class="text-[var(--text-primary)] capitalize"
+                                            >{{ client.status }}</span
+                                        >
                                     </div>
-                                </div>
-                                <div>
-                                    <label class="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider block mb-1">Phone Number</label>
-                                    <div class="flex items-center gap-2">
-                                        <Phone class="w-4 h-4 text-[var(--text-muted)]" />
-                                        <p class="text-[var(--text-primary)]">{{ client.phone || 'N/A' }}</p>
+                                    <div>
+                                        <label
+                                            class="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider block mb-1"
+                                            >Contact Person</label
+                                        >
+                                        <div class="flex items-center gap-2">
+                                            <Users
+                                                class="w-4 h-4 text-[var(--text-muted)]"
+                                            />
+                                            <p
+                                                class="text-[var(--text-primary)]"
+                                            >
+                                                {{
+                                                    client.contact_person ||
+                                                    "N/A"
+                                                }}
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
-                                <div>
-                                    <label class="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider block mb-1">Address</label>
-                                    <div class="flex items-start gap-2">
-                                        <MapPin class="w-4 h-4 text-[var(--text-muted)] mt-0.5" />
-                                        <p class="text-[var(--text-primary)] whitespace-pre-line">{{ client.address || 'N/A' }}</p>
+                                    <div>
+                                        <label
+                                            class="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider block mb-1"
+                                            >Email Address</label
+                                        >
+                                        <div class="flex items-center gap-2">
+                                            <Mail
+                                                class="w-4 h-4 text-[var(--text-muted)]"
+                                            />
+                                            <a
+                                                v-if="client.email"
+                                                :href="'mailto:' + client.email"
+                                                class="text-[var(--color-primary-600)] hover:underline"
+                                                >{{ client.email }}</a
+                                            >
+                                            <button
+                                                v-if="client.email"
+                                                @click="
+                                                    copyToClipboard(
+                                                        client.email,
+                                                    )
+                                                "
+                                                class="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1"
+                                                title="Copy email"
+                                            >
+                                                <Copy class="w-3.5 h-3.5" />
+                                            </button>
+                                            <span
+                                                v-else
+                                                class="text-[var(--text-muted)]"
+                                                >N/A</span
+                                            >
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label
+                                            class="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider block mb-1"
+                                            >Phone Number</label
+                                        >
+                                        <div class="flex items-center gap-2">
+                                            <Phone
+                                                class="w-4 h-4 text-[var(--text-muted)]"
+                                            />
+                                            <p
+                                                class="text-[var(--text-primary)]"
+                                            >
+                                                {{ client.phone || "N/A" }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label
+                                            class="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider block mb-1"
+                                            >Address</label
+                                        >
+                                        <div class="flex items-start gap-2">
+                                            <MapPin
+                                                class="w-4 h-4 text-[var(--text-muted)] mt-0.5"
+                                            />
+                                            <p
+                                                class="text-[var(--text-primary)] whitespace-pre-line"
+                                            >
+                                                {{ client.address || "N/A" }}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Stats / Sidebar -->
-                    <div class="space-y-6">
-                        <div class="bg-[var(--surface-primary)] rounded-xl border border-[var(--border-muted)] p-6 shadow-sm">
-                            <h3 class="text-base font-semibold text-[var(--text-primary)] mb-4">Quick Stats</h3>
-                            <div class="space-y-4">
-                                <div class="flex items-center justify-between p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]">
-                                    <div class="flex items-center gap-3">
-                                        <div class="p-2 rounded-md bg-blue-100 text-blue-600">
-                                            <Briefcase class="w-5 h-5" />
+                        <!-- Stats / Sidebar -->
+                        <div class="space-y-6">
+                            <div
+                                class="bg-[var(--surface-primary)] rounded-xl border border-[var(--border-muted)] p-6 shadow-sm"
+                            >
+                                <h3
+                                    class="text-base font-semibold text-[var(--text-primary)] mb-4"
+                                >
+                                    Quick Stats
+                                </h3>
+                                <div class="space-y-4">
+                                    <div
+                                        class="flex items-center justify-between p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
+                                    >
+                                        <div class="flex items-center gap-3">
+                                            <div
+                                                class="p-2 rounded-md bg-blue-100 text-blue-600"
+                                            >
+                                                <Briefcase class="w-5 h-5" />
+                                            </div>
+                                            <span
+                                                class="text-sm font-medium text-[var(--text-secondary)]"
+                                                >Total Projects</span
+                                            >
                                         </div>
-                                        <span class="text-sm font-medium text-[var(--text-secondary)]">Total Projects</span>
+                                        <span
+                                            class="text-lg font-bold text-[var(--text-primary)]"
+                                            >{{
+                                                client.projects_count || 0
+                                            }}</span
+                                        >
                                     </div>
-                                    <span class="text-lg font-bold text-[var(--text-primary)]">{{ client.projects_count || 0 }}</span>
-                                </div>
-                                <div class="flex items-center justify-between p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]">
-                                    <div class="flex items-center gap-3">
-                                        <div class="p-2 rounded-md bg-emerald-100 text-emerald-600">
-                                            <FileText class="w-5 h-5" />
+                                    <div
+                                        class="flex items-center justify-between p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-subtle)]"
+                                    >
+                                        <div class="flex items-center gap-3">
+                                            <div
+                                                class="p-2 rounded-md bg-emerald-100 text-emerald-600"
+                                            >
+                                                <FileText class="w-5 h-5" />
+                                            </div>
+                                            <span
+                                                class="text-sm font-medium text-[var(--text-secondary)]"
+                                                >Total Invoices</span
+                                            >
                                         </div>
-                                        <span class="text-sm font-medium text-[var(--text-secondary)]">Total Invoices</span>
+                                        <span
+                                            class="text-lg font-bold text-[var(--text-primary)]"
+                                            >{{
+                                                client.invoices_count || 0
+                                            }}</span
+                                        >
                                     </div>
-                                    <span class="text-lg font-bold text-[var(--text-primary)]">{{ client.invoices_count || 0 }}</span>
                                 </div>
                             </div>
                         </div>
-                    </div>
                     </div>
                 </div>
 
                 <!-- Projects Tab -->
-                <div v-show="activeTab === 'projects'" class="bg-[var(--surface-primary)] rounded-xl border border-[var(--border-muted)] overflow-hidden shadow-sm">
+                <div
+                    v-show="activeTab === 'projects'"
+                    class="bg-[var(--surface-primary)] rounded-xl border border-[var(--border-muted)] overflow-hidden shadow-sm"
+                >
                     <div v-if="client.projects && client.projects.length > 0">
                         <table class="w-full text-left border-collapse">
                             <thead>
-                                <tr class="border-b border-[var(--border-muted)] bg-[var(--surface-secondary)]">
-                                    <th class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Project Name</th>
-                                    <th class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Status</th>
-                                    <th class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Last Updated</th>
+                                <tr
+                                    class="border-b border-[var(--border-muted)] bg-[var(--surface-secondary)]"
+                                >
+                                    <th
+                                        class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider"
+                                    >
+                                        Project Name
+                                    </th>
+                                    <th
+                                        class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider"
+                                    >
+                                        Status
+                                    </th>
+                                    <th
+                                        class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider"
+                                    >
+                                        Last Updated
+                                    </th>
                                     <th class="px-6 py-3 text-right"></th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-[var(--border-muted)]">
-                                <tr v-for="project in client.projects" :key="project.id" class="hover:bg-[var(--surface-secondary)]/50 transition-colors">
+                            <tbody
+                                class="divide-y divide-[var(--border-muted)]"
+                            >
+                                <tr
+                                    v-for="project in client.projects"
+                                    :key="project.id"
+                                    class="hover:bg-[var(--surface-secondary)]/50 transition-colors"
+                                >
                                     <td class="px-6 py-4">
-                                        <div class="font-medium text-[var(--text-primary)]">{{ project.name }}</div>
-                                        <div class="text-xs text-[var(--text-muted)]">{{ project.team?.name }}</div>
+                                        <div
+                                            class="font-medium text-[var(--text-primary)]"
+                                        >
+                                            {{ project.name }}
+                                        </div>
+                                        <div
+                                            class="text-xs text-[var(--text-muted)]"
+                                        >
+                                            {{ project.team?.name }}
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700 capitalize">
+                                        <span
+                                            class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700 capitalize"
+                                        >
                                             {{ project.status }}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                                    <td
+                                        class="px-6 py-4 text-sm text-[var(--text-secondary)]"
+                                    >
                                         {{ formatDate(project.updated_at) }}
                                     </td>
                                     <td class="px-6 py-4 text-right">
-                                        <Button variant="ghost" size="sm" @click="router.push({ name: 'admin-project-detail', params: { id: project.public_id } })">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            @click="
+                                                router.push({
+                                                    name: 'admin-project-detail',
+                                                    params: {
+                                                        id: project.public_id,
+                                                    },
+                                                })
+                                            "
+                                        >
                                             View
                                         </Button>
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
-                        
+
                         <!-- If we have limited projects in show, maybe link to view all -->
-                        <div class="p-4 border-t border-[var(--border-muted)] text-center">
-                            <Button variant="ghost" @click="router.push({ name: projectsRoute.name, query: { client: client.id } })">
+                        <div
+                            class="p-4 border-t border-[var(--border-muted)] text-center"
+                        >
+                            <Button
+                                variant="ghost"
+                                @click="
+                                    router.push({
+                                        name: projectsRoute.name,
+                                        query: { client: client.id },
+                                    })
+                                "
+                            >
                                 View All Projects
                             </Button>
                         </div>
                     </div>
                     <div v-else class="p-12 text-center">
-                        <div class="mx-auto h-12 w-12 text-[var(--text-muted)] bg-[var(--surface-secondary)] rounded-full flex items-center justify-center mb-3">
+                        <div
+                            class="mx-auto h-12 w-12 text-[var(--text-muted)] bg-[var(--surface-secondary)] rounded-full flex items-center justify-center mb-3"
+                        >
                             <Briefcase class="h-6 w-6" />
                         </div>
-                        <h3 class="text-sm font-medium text-[var(--text-primary)]">No projects found</h3>
-                        <p class="text-sm text-[var(--text-secondary)] mt-1">This client doesn't have any projects yet.</p>
+                        <h3
+                            class="text-sm font-medium text-[var(--text-primary)]"
+                        >
+                            No projects found
+                        </h3>
+                        <p class="text-sm text-[var(--text-secondary)] mt-1">
+                            This client doesn't have any projects yet.
+                        </p>
                         <Button variant="outline" class="mt-4">
                             Create Project
                         </Button>
@@ -441,81 +810,171 @@ watch(() => route.params.public_id, () => {
                 </div>
 
                 <!-- Invoices Tab -->
-                <div v-show="activeTab === 'invoices'" class="bg-[var(--surface-primary)] rounded-xl border border-[var(--border-muted)] overflow-hidden shadow-sm">
-                     <div v-if="client.invoices && client.invoices.length > 0">
+                <div
+                    v-show="activeTab === 'invoices'"
+                    class="bg-[var(--surface-primary)] rounded-xl border border-[var(--border-muted)] overflow-hidden shadow-sm"
+                >
+                    <div v-if="client.invoices && client.invoices.length > 0">
                         <table class="w-full text-left border-collapse">
                             <thead>
-                                <tr class="border-b border-[var(--border-muted)] bg-[var(--surface-secondary)]">
-                                    <th class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Invoice #</th>
-                                    <th class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Amount</th>
-                                    <th class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Status</th>
-                                    <th class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Date</th>
+                                <tr
+                                    class="border-b border-[var(--border-muted)] bg-[var(--surface-secondary)]"
+                                >
+                                    <th
+                                        class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider"
+                                    >
+                                        Invoice #
+                                    </th>
+                                    <th
+                                        class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider"
+                                    >
+                                        Amount
+                                    </th>
+                                    <th
+                                        class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider"
+                                    >
+                                        Status
+                                    </th>
+                                    <th
+                                        class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider"
+                                    >
+                                        Date
+                                    </th>
                                     <th class="px-6 py-3 text-right"></th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-[var(--border-muted)]">
-                                <tr v-for="invoice in client.invoices" :key="invoice.public_id" class="hover:bg-[var(--surface-secondary)]/50 transition-colors">
-                                    <td class="px-6 py-4 font-medium text-[var(--text-primary)]">
+                            <tbody
+                                class="divide-y divide-[var(--border-muted)]"
+                            >
+                                <tr
+                                    v-for="invoice in client.invoices"
+                                    :key="invoice.public_id"
+                                    class="hover:bg-[var(--surface-secondary)]/50 transition-colors"
+                                >
+                                    <td
+                                        class="px-6 py-4 font-medium text-[var(--text-primary)]"
+                                    >
                                         {{ invoice.invoice_number }}
                                     </td>
-                                    <td class="px-6 py-4 text-[var(--text-primary)]">
-                                        {{ formatCurrency(invoice.total, invoice.currency) }}
+                                    <td
+                                        class="px-6 py-4 text-[var(--text-primary)]"
+                                    >
+                                        {{
+                                            formatCurrency(
+                                                invoice.total,
+                                                invoice.currency,
+                                            )
+                                        }}
                                     </td>
                                     <td class="px-6 py-4">
-                                        <span 
+                                        <span
                                             class="px-2 py-1 text-xs font-medium rounded-full capitalize border"
-                                            :class="getInvoiceStatusColor(invoice.status)"
+                                            :class="
+                                                getInvoiceStatusColor(
+                                                    invoice.status,
+                                                )
+                                            "
                                         >
                                             {{ invoice.status }}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                                    <td
+                                        class="px-6 py-4 text-sm text-[var(--text-secondary)]"
+                                    >
                                         {{ formatDate(invoice.issue_date) }}
                                     </td>
                                     <td class="px-6 py-4 text-right">
-                                        <Button variant="ghost" size="sm" @click="router.push({ name: 'admin-invoice-detail', params: { id: invoice.public_id } })">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            @click="
+                                                router.push({
+                                                    name: 'admin-invoice-detail',
+                                                    params: {
+                                                        id: invoice.public_id,
+                                                    },
+                                                })
+                                            "
+                                        >
                                             View
                                         </Button>
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
-                          <div class="p-4 border-t border-[var(--border-muted)] text-center">
-                            <Button variant="ghost" @click="router.push({ name: invoicesRoute.name, query: { client: client.id } })">
+                        <div
+                            class="p-4 border-t border-[var(--border-muted)] text-center"
+                        >
+                            <Button
+                                variant="ghost"
+                                @click="
+                                    router.push({
+                                        name: invoicesRoute.name,
+                                        query: { client: client.id },
+                                    })
+                                "
+                            >
                                 View All Invoices
                             </Button>
                         </div>
                     </div>
-                     <div v-else class="p-12 text-center">
-                        <div class="mx-auto h-12 w-12 text-[var(--text-muted)] bg-[var(--surface-secondary)] rounded-full flex items-center justify-center mb-3">
+                    <div v-else class="p-12 text-center">
+                        <div
+                            class="mx-auto h-12 w-12 text-[var(--text-muted)] bg-[var(--surface-secondary)] rounded-full flex items-center justify-center mb-3"
+                        >
                             <FileText class="h-6 w-6" />
                         </div>
-                        <h3 class="text-sm font-medium text-[var(--text-primary)]">No invoices found</h3>
-                        <p class="text-sm text-[var(--text-secondary)] mt-1">This client doesn't have any invoices yet.</p>
-                         <Button variant="outline" class="mt-4">
+                        <h3
+                            class="text-sm font-medium text-[var(--text-primary)]"
+                        >
+                            No invoices found
+                        </h3>
+                        <p class="text-sm text-[var(--text-secondary)] mt-1">
+                            This client doesn't have any invoices yet.
+                        </p>
+                        <Button variant="outline" class="mt-4">
                             Create Invoice
                         </Button>
                     </div>
                 </div>
-                 
-                 <!-- Members Tab (Placeholder) -->
-                 <div v-show="activeTab === 'members'" class="bg-[var(--surface-primary)] rounded-xl border border-[var(--border-muted)] p-12 text-center shadow-sm">
-                    <div class="mx-auto h-12 w-12 text-[var(--text-muted)] bg-[var(--surface-secondary)] rounded-full flex items-center justify-center mb-3">
+
+                <!-- Members Tab (Placeholder) -->
+                <div
+                    v-show="activeTab === 'members'"
+                    class="bg-[var(--surface-primary)] rounded-xl border border-[var(--border-muted)] p-12 text-center shadow-sm"
+                >
+                    <div
+                        class="mx-auto h-12 w-12 text-[var(--text-muted)] bg-[var(--surface-secondary)] rounded-full flex items-center justify-center mb-3"
+                    >
                         <Users class="h-6 w-6" />
                     </div>
-                    <h3 class="text-sm font-medium text-[var(--text-primary)]">Portal Users</h3>
-                    <p class="text-sm text-[var(--text-secondary)] mt-1">Client portal user management coming soon.</p>
-                 </div>
-
+                    <h3 class="text-sm font-medium text-[var(--text-primary)]">
+                        Portal Users
+                    </h3>
+                    <p class="text-sm text-[var(--text-secondary)] mt-1">
+                        Client portal user management coming soon.
+                    </p>
+                </div>
             </div>
         </div>
 
         <!-- Contacts Tab -->
-        <div v-show="activeTab === 'contacts'" class="flex-1 overflow-y-auto bg-[var(--surface-subtle)] p-6">
+        <div
+            v-show="activeTab === 'contacts'"
+            class="flex-1 overflow-y-auto bg-[var(--surface-subtle)] p-6"
+        >
             <div class="mx-auto w-full">
-                <div class="bg-[var(--surface-primary)] rounded-xl border border-[var(--border-muted)] overflow-hidden shadow-sm">
-                    <div class="p-4 border-b border-[var(--border-muted)] flex justify-between items-center">
-                        <h3 class="text-sm font-medium text-[var(--text-primary)]">Additional Contacts</h3>
+                <div
+                    class="bg-[var(--surface-primary)] rounded-xl border border-[var(--border-muted)] overflow-hidden shadow-sm"
+                >
+                    <div
+                        class="p-4 border-b border-[var(--border-muted)] flex justify-between items-center"
+                    >
+                        <h3
+                            class="text-sm font-medium text-[var(--text-primary)]"
+                        >
+                            Additional Contacts
+                        </h3>
                         <Button size="sm" @click="openContactModal()">
                             <Plus class="w-4 h-4 mr-2" />
                             Add Contact
@@ -524,36 +983,96 @@ watch(() => route.params.public_id, () => {
                     <div v-if="client.contacts && client.contacts.length > 0">
                         <table class="w-full text-left border-collapse">
                             <thead>
-                                <tr class="bg-[var(--surface-secondary)] border-b border-[var(--border-muted)]">
-                                    <th class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Name</th>
-                                    <th class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Role</th>
-                                    <th class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Email</th>
-                                    <th class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">Phone</th>
+                                <tr
+                                    class="bg-[var(--surface-secondary)] border-b border-[var(--border-muted)]"
+                                >
+                                    <th
+                                        class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider"
+                                    >
+                                        Name
+                                    </th>
+                                    <th
+                                        class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider"
+                                    >
+                                        Role
+                                    </th>
+                                    <th
+                                        class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider"
+                                    >
+                                        Email
+                                    </th>
+                                    <th
+                                        class="px-6 py-3 text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider"
+                                    >
+                                        Phone
+                                    </th>
                                     <th class="px-6 py-3 text-right"></th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-[var(--border-muted)]">
-                                <tr v-for="contact in client.contacts" :key="contact.id">
-                                    <td class="px-6 py-4 text-sm font-medium text-[var(--text-primary)]">
+                            <tbody
+                                class="divide-y divide-[var(--border-muted)]"
+                            >
+                                <tr
+                                    v-for="contact in client.contacts"
+                                    :key="contact.id"
+                                >
+                                    <td
+                                        class="px-6 py-4 text-sm font-medium text-[var(--text-primary)]"
+                                    >
                                         {{ contact.name }}
-                                        <span v-if="contact.is_primary" class="ml-2 px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-700 rounded-full">Primary</span>
+                                        <span
+                                            v-if="contact.is_primary"
+                                            class="ml-2 px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-700 rounded-full"
+                                            >Primary</span
+                                        >
                                     </td>
-                                    <td class="px-6 py-4 text-sm text-[var(--text-secondary)]">{{ contact.role || '-' }}</td>
-                                    <td class="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                                    <td
+                                        class="px-6 py-4 text-sm text-[var(--text-secondary)]"
+                                    >
+                                        {{ contact.role || "-" }}
+                                    </td>
+                                    <td
+                                        class="px-6 py-4 text-sm text-[var(--text-secondary)]"
+                                    >
                                         <div class="flex items-center gap-2">
-                                            {{ contact.email || '-' }}
-                                            <button v-if="contact.email" @click="copyToClipboard(contact.email)" class="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1 opacity-0 group-hover:opacity-100" title="Copy email">
+                                            {{ contact.email || "-" }}
+                                            <button
+                                                v-if="contact.email"
+                                                @click="
+                                                    copyToClipboard(
+                                                        contact.email,
+                                                    )
+                                                "
+                                                class="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1 opacity-0 group-hover:opacity-100"
+                                                title="Copy email"
+                                            >
                                                 <Copy class="w-3.5 h-3.5" />
                                             </button>
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 text-sm text-[var(--text-secondary)]">{{ contact.phone || '-' }}</td>
+                                    <td
+                                        class="px-6 py-4 text-sm text-[var(--text-secondary)]"
+                                    >
+                                        {{ contact.phone || "-" }}
+                                    </td>
                                     <td class="px-6 py-4 text-right">
-                                        <div class="flex items-center justify-end gap-2">
-                                            <button @click="openContactModal(contact)" class="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                                        <div
+                                            class="flex items-center justify-end gap-2"
+                                        >
+                                            <button
+                                                @click="
+                                                    openContactModal(contact)
+                                                "
+                                                class="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                                            >
                                                 <Pencil class="w-4 h-4" />
                                             </button>
-                                            <button @click="deleteContact(contact.id)" class="p-1 text-[var(--text-muted)] hover:text-[var(--color-error)]">
+                                            <button
+                                                @click="
+                                                    deleteContact(contact.id)
+                                                "
+                                                class="p-1 text-[var(--text-muted)] hover:text-[var(--color-error)]"
+                                            >
                                                 <Trash2 class="w-4 h-4" />
                                             </button>
                                         </div>
@@ -562,7 +1081,10 @@ watch(() => route.params.public_id, () => {
                             </tbody>
                         </table>
                     </div>
-                    <div v-else class="p-12 text-center text-[var(--text-secondary)]">
+                    <div
+                        v-else
+                        class="p-12 text-center text-[var(--text-secondary)]"
+                    >
                         <Users class="w-8 h-8 mx-auto mb-2 opacity-50" />
                         <p>No additional contacts added.</p>
                     </div>

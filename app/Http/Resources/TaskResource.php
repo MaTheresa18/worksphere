@@ -14,6 +14,10 @@ class TaskResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $user = $request->user();
+        $team = $this->project->team;
+        $permService = app(\App\Services\PermissionService::class);
+
         return [
             'id' => $this->public_id,
             'public_id' => $this->public_id,
@@ -170,15 +174,61 @@ class TaskResource extends JsonResource
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
             'can' => [
-                'edit' => $request->user()->can('update', $this->resource), // Fallback to policy or service
-                'edit_metadata' => app(\App\Services\PermissionService::class)->hasTeamPermission($request->user(), $this->project->team, 'tasks.edit_all'),
-                'manage_checklist' => app(\App\Services\PermissionService::class)->hasTeamPermission($request->user(), $this->project->team, 'tasks.manage_checklist'),
-                'complete_items' => app(\App\Services\PermissionService::class)->hasTeamPermission($request->user(), $this->project->team, 'tasks.complete_items') || $this->assigned_to === $request->user()->id,
-                'assign' => app(\App\Services\PermissionService::class)->hasTeamPermission($request->user(), $this->project->team, 'tasks.assign'),
-                'qa_review' => app(\App\Services\PermissionService::class)->hasTeamPermission($request->user(), $this->project->team, 'tasks.qa_review'),
-                'add_comment' => app(\App\Services\PermissionService::class)->hasTeamPermission($request->user(), $this->project->team, 'tasks.comment'),
+                'edit' => $request->user()->can('update', $this->resource),
+                'edit_metadata' => $permService->hasTeamPermission($user, $team, 'tasks.edit_all'),
+                'manage_checklist' => $permService->hasTeamPermission($user, $team, 'tasks.manage_checklist'),
+                'complete_items' => $permService->hasTeamPermission($user, $team, 'tasks.complete_items') || $this->assigned_to === $user->id,
+                'assign' => $permService->hasTeamPermission($user, $team, 'tasks.assign'),
+                'qa_review' => $permService->hasTeamPermission($user, $team, 'tasks.qa_review'),
+                'add_comment' => $permService->hasTeamPermission($user, $team, 'tasks.comment'),
                 'is_read_only' => in_array($this->status, [\App\Enums\TaskStatus::Submitted, \App\Enums\TaskStatus::InQa, \App\Enums\TaskStatus::PmReview]) && 
-                                  !app(\App\Services\PermissionService::class)->hasTeamPermission($request->user(), $this->project->team, 'tasks.qa_review'),
+                                  !$permService->hasTeamPermission($user, $team, 'tasks.qa_review'),
+                
+                // Workflow Actions
+                'start_task' => in_array($this->status, [\App\Enums\TaskStatus::Open, \App\Enums\TaskStatus::Draft]) && 
+                                ($this->assigned_to === $user->id || $permService->hasTeamPermission($user, $team, 'tasks.update')),
+                
+                'submit_qa' => $this->status === \App\Enums\TaskStatus::InProgress && 
+                               ($this->assigned_to === $user->id || $permService->hasTeamPermission($user, $team, 'tasks.update')),
+                               
+                'hold' => match(true) {
+                    // Initial Stage: Operator or Lead can hold
+                    $this->status === \App\Enums\TaskStatus::InProgress => 
+                        ($this->assigned_to === $user->id || $permService->hasTeamPermission($user, $team, 'tasks.update')),
+                    
+                    // QA Stage: Only QA/Lead can hold
+                    in_array($this->status, [\App\Enums\TaskStatus::Submitted, \App\Enums\TaskStatus::InQa]) => 
+                        $permService->hasTeamPermission($user, $team, 'tasks.qa_review'),
+                    
+                    default => false,
+                },
+
+                'start_qa_review' => $this->status === \App\Enums\TaskStatus::Submitted && 
+                                     $permService->hasTeamPermission($user, $team, 'tasks.qa_review'),
+                                     
+                'complete_qa_review' => $this->status === \App\Enums\TaskStatus::InQa && 
+                                        $permService->hasTeamPermission($user, $team, 'tasks.qa_review'),
+                                        
+                'pm_review' => ($this->status === \App\Enums\TaskStatus::PmReview || $this->status === \App\Enums\TaskStatus::Approved) && 
+                               $permService->hasTeamPermission($user, $team, 'tasks.approve'),
+                               
+                'client_review' => $this->status === \App\Enums\TaskStatus::SentToClient && 
+                                   (
+                                        // Is Client
+                                        ($user->isClient() && $this->project->client_id === $user->linked_client?->id) ||
+                                        // Or Internal Proxy
+                                        $permService->hasTeamPermission($user, $team, 'tasks.client_response')
+                                   ),
+                
+                'manage_media' => (in_array($this->status, [\App\Enums\TaskStatus::Draft, \App\Enums\TaskStatus::Open, \App\Enums\TaskStatus::InProgress, \App\Enums\TaskStatus::Rejected]) &&
+                                  ($this->assigned_to === $user->id || $permService->hasTeamPermission($user, $team, 'tasks.update'))) ||
+                                  $permService->hasTeamPermission($user, $team, 'tasks.manage_files'),
+
+                'complete_task' => $this->status === \App\Enums\TaskStatus::ClientApproved && 
+                                   ($permService->hasTeamPermission($user, $team, 'tasks.complete') || $this->assigned_to === $user->id),
+                                   
+                'restart_task' => ($this->status->isRejected()) && 
+                                  ($this->assigned_to === $user->id || $permService->hasTeamPermission($user, $team, 'tasks.update')),
             ],
         ];
     }

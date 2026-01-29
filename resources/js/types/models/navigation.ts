@@ -14,8 +14,11 @@ export interface NavigationItem {
 export interface NavigationChild {
   id: string;
   label: string;
-  route: string;
+  route?: string;
+  type?: 'item' | 'divider' | 'header';
+  icon?: string;
   badge?: number | string;
+  team_badge?: string;
 }
 
 export interface NavigationPreferences {

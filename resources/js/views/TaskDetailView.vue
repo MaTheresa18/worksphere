@@ -75,6 +75,7 @@ const activeTab = ref<"checklist" | "comments" | "history" | "attachments">(
 // Comments
 const comments = ref<any[]>([]);
 const statusHistory = ref<any[]>([]);
+const activityLogs = ref<any[]>([]);
 const newComment = ref("");
 const isSubmittingComment = ref(false);
 
@@ -237,6 +238,7 @@ const priorityConfig: Record<
 const workflowStatuses = [
     "open",
     "in_progress",
+    "submitted",
     "in_qa",
     "pm_review",
     "sent_to_client",
@@ -248,7 +250,7 @@ const getStatus = (s: string) => statusConfig[s] || statusConfig["open"];
 // Treat 'approved' (legacy) as 'pm_review' for stepper/UI purposes
 const getStatusValue = (t: any) => {
     let val = t?.status?.value || t?.status || "open";
-    if (val === 'approved') return 'pm_review';
+    if (val === "approved") return "pm_review";
     return val;
 };
 const getPriority = (p: number) => priorityConfig[p] || priorityConfig[2];
@@ -263,14 +265,124 @@ const isAssignee = computed(() => {
 
 // Permission-based computed properties
 const canEditMetadata = computed(() => task.value?.can?.edit_metadata);
-const canManageChecklist = computed(() => task.value?.can?.manage_checklist && !task.value?.can?.is_read_only);
-const canCompleteItems = computed(() => task.value?.can?.complete_items && !task.value?.can?.is_read_only);
+const canManageChecklist = computed(() => {
+    if (!task.value) return false;
+    if (task.value.can?.is_read_only) return false;
+    if (!task.value.can?.manage_checklist) return false;
+
+    // Feature: Disable structure changes if task is started, unless Creator or Lead/SME
+    // "Started" = not draft/open
+    const status = getStatusValue(task.value);
+    const isStarted = !["draft", "open"].includes(status);
+
+    if (isStarted) {
+        // Check if Creator or has Edit Metadata permission (Lead/SME)
+        const isCreator = task.value.creator?.id === authStore.user?.id;
+        if (!isCreator && !task.value.can?.edit_metadata) {
+            return false;
+        }
+    }
+
+    return true;
+});
+const canCompleteItems = computed(() => {
+    if (!task.value) return false;
+    if (task.value.can?.is_read_only) return false;
+
+    // Feature: Checklist actions disabled unless start task is pressed
+    const status = getStatusValue(task.value);
+    if (status !== "in_progress") return false;
+
+    return task.value.can?.complete_items;
+});
 const canAssign = computed(() => task.value?.can?.assign);
 const canAddComment = computed(() => task.value?.can?.add_comment);
 const isReadOnly = computed(() => task.value?.can?.is_read_only);
 
 const completedItemsCount = computed(() => {
     return checklistItems.value.filter((i: any) => i.status === "done").length;
+});
+
+const mergedActivity = computed(() => {
+    // Activity logs are the primary source now as they are comprehensive
+    const activityItems = activityLogs.value.map((a: any) => ({
+        id: a.id,
+        user: a.user || { name: a.user_name || "System" },
+        description: a.description,
+        description_body: a.description_body,
+        created_at: a.created_at,
+        action: a.action,
+        icon: a.action_icon,
+        category: a.category,
+        changes: a.changes,
+        type: "audit",
+    }));
+
+    // Status history items for backward compatibility
+    const statusItems = statusHistory.value
+        .map((s: any) => ({
+            id: s.id,
+            user: s.changed_by || { name: "System" },
+            // Format to match audit log descriptions for consistency if possible
+            description: `${s.changed_by?.name || "System"} changed status from ${s.from_status || "open"} to ${s.to_status}`,
+            description_body: `changed status from ${getStatus(s.from_status || "open",).label} to ${getStatus(s.to_status).label}`,
+            from_status: s.from_status,
+        to_status: s.to_status,
+            created_at: s.created_at,
+            type: "status",
+        }))
+        .filter((s: any) => {
+            // Deduplicate: if an audit log exists for status at the same time, skip this
+            return !activityItems.find(
+                (a: any) =>
+                    a.action === "updated" &&
+                    a.description.includes("status") &&
+                    Math.abs(
+                        new Date(a.created_at).getTime() -
+                            new Date(s.created_at).getTime(),
+                    ) < 2000,
+            );
+        });
+
+    return [...activityItems, ...statusItems].sort(
+        (a: any, b: any) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+});
+
+const groupedActivity = computed(() => {
+    const activities = mergedActivity.value;
+    const groups: { date: string; items: any[] }[] = [];
+    let lastDate = "";
+
+    activities.forEach((item: any) => {
+        const date = new Date(item.created_at);
+        const today = new Date();
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        let dateLabel = "";
+        if (date.toDateString() === today.toDateString()) {
+            dateLabel = "Today";
+        } else if (date.toDateString() === yesterday.toDateString()) {
+            dateLabel = "Yesterday";
+        } else {
+            dateLabel = date.toLocaleDateString("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+            });
+        }
+
+        if (dateLabel !== lastDate) {
+            groups.push({ date: dateLabel, items: [] });
+            lastDate = dateLabel;
+        }
+
+        groups[groups.length - 1].items.push(item);
+    });
+
+    return groups;
 });
 
 // Navigation
@@ -291,6 +403,7 @@ const fetchTask = async () => {
         await Promise.all([
             fetchComments(),
             fetchStatusHistory(),
+            fetchActivityLogs(),
             fetchChecklistItems(),
             fetchTaskFiles(),
         ]);
@@ -320,9 +433,24 @@ const fetchStatusHistory = async () => {
         const response = await axios.get(
             `/api/teams/${currentTeamId.value}/projects/${projectId.value}/tasks/${taskId.value}/status-history`,
         );
-        statusHistory.value = response.data.data || [];
+        // TaskController returns raw array, not wrapped in data
+        statusHistory.value = Array.isArray(response.data)
+            ? response.data
+            : response.data.data || [];
     } catch (err) {
         console.error("Failed to fetch history", err);
+    }
+};
+
+const fetchActivityLogs = async () => {
+    if (!task.value) return;
+    try {
+        const response = await axios.get(
+            `/api/teams/${currentTeamId.value}/projects/${projectId.value}/tasks/${taskId.value}/activity`,
+        );
+        activityLogs.value = response.data.data || [];
+    } catch (err) {
+        console.error("Failed to fetch activity logs", err);
     }
 };
 
@@ -741,7 +869,10 @@ watch(
                                     >
                                 </div>
                             </div>
-                            <div v-if="canEditMetadata" class="flex items-center gap-2">
+                            <div
+                                v-if="canEditMetadata"
+                                class="flex items-center gap-2"
+                            >
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -1073,9 +1204,16 @@ watch(
                         </div>
 
                         <!-- Read Only Warning -->
-                        <div v-else-if="isReadOnly" class="bg-[var(--surface-secondary)] rounded-lg p-3 border border-[var(--border-default)] flex items-center gap-3">
-                             <Lock class="w-4 h-4 text-[var(--text-muted)]" />
-                             <span class="text-xs text-[var(--text-muted)] italic">Checklist is locked while task is in review.</span>
+                        <div
+                            v-else-if="isReadOnly"
+                            class="bg-[var(--surface-secondary)] rounded-lg p-3 border border-[var(--border-default)] flex items-center gap-3"
+                        >
+                            <Lock class="w-4 h-4 text-[var(--text-muted)]" />
+                            <span
+                                class="text-xs text-[var(--text-muted)] italic"
+                                >Checklist is locked while task is in
+                                review.</span
+                            >
                         </div>
                     </Card>
 
@@ -1145,8 +1283,8 @@ watch(
                                 :current-page="1"
                                 :per-page="20"
                                 :loading="filesLoading"
-                                :can-upload="true"
-                                :can-delete="true"
+                                :can-upload="task.can?.manage_media"
+                                :can-delete="task.can?.manage_media"
                                 :uploading="isUploading"
                                 :upload-queue="uploadQueue"
                                 @upload="handleUpload"
@@ -1180,7 +1318,9 @@ watch(
                                         <Button
                                             size="sm"
                                             :loading="isSubmittingComment"
-                                            :disabled="!newComment.trim() || isReadOnly"
+                                            :disabled="
+                                                !newComment.trim() || isReadOnly
+                                            "
                                             @click="submitComment"
                                         >
                                             <Send class="w-3.5 h-3.5 mr-1.5" />
@@ -1189,8 +1329,13 @@ watch(
                                     </div>
                                 </div>
                             </div>
-                            <div v-else class="bg-[var(--surface-secondary)]/50 rounded-lg p-4 text-center border border-dashed border-[var(--border-subtle)]">
-                                <p class="text-xs text-[var(--text-muted)]">You do not have permission to add comments.</p>
+                            <div
+                                v-else
+                                class="bg-[var(--surface-secondary)]/50 rounded-lg p-4 text-center border border-dashed border-[var(--border-subtle)]"
+                            >
+                                <p class="text-xs text-[var(--text-muted)]">
+                                    You do not have permission to add comments.
+                                </p>
                             </div>
 
                             <div class="space-y-3 mt-4">
@@ -1238,76 +1383,157 @@ watch(
                         </div>
 
                         <!-- History Tab -->
-                        <div v-if="activeTab === 'history'" class="space-y-1">
+                        <div v-if="activeTab === 'history'" class="px-2">
                             <div
-                                v-for="(entry, index) in statusHistory"
-                                :key="entry.id"
-                                class="flex gap-3 py-3"
+                                v-for="group in groupedActivity"
+                                :key="group.date"
+                                class="mb-8 last:mb-0"
                             >
-                                <div class="flex flex-col items-center">
-                                    <div
-                                        class="w-2 h-2 rounded-full bg-[var(--interactive-primary)]"
-                                    ></div>
-                                    <div
-                                        v-if="index < statusHistory.length - 1"
-                                        class="w-0.5 flex-1 bg-[var(--border-default)] mt-1"
-                                    ></div>
+                                <div
+                                    class="sticky top-0 z-10 bg-[var(--surface-primary)] py-2 mb-4 border-b border-[var(--border-subtle)] flex items-center gap-2"
+                                >
+                                    <Clock class="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                                    <span
+                                        class="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider"
+                                        >{{ group.date }}</span
+                                    >
                                 </div>
-                                <div class="flex-1 pb-2">
-                                    <p
-                                        class="text-sm text-[var(--text-secondary)]"
+
+                                <div
+                                    class="space-y-6 ml-3 border-l border-[var(--border-default)] pl-6 pb-2"
+                                >
+                                    <div
+                                        v-for="entry in group.items"
+                                        :key="entry.id"
+                                        class="relative"
                                     >
-                                        <span
-                                            class="font-medium text-[var(--text-primary)]"
-                                            >{{
-                                                entry.user?.name || "System"
-                                            }}</span
+                                        <!-- Avatar on line -->
+                                        <div
+                                            class="absolute -left-[33px] top-0 rounded-full bg-[var(--surface-primary)] p-1"
                                         >
-                                        changed status from
-                                        <span
-                                            :class="[
-                                                getStatus(
-                                                    entry.from_status || 'open',
-                                                ).bg,
-                                                getStatus(
-                                                    entry.from_status || 'open',
-                                                ).color,
-                                                'px-1.5 py-0.5 rounded text-xs font-medium mx-1',
-                                            ]"
-                                        >
-                                            {{
-                                                getStatus(
-                                                    entry.from_status || "open",
-                                                ).label
-                                            }}
-                                        </span>
-                                        to
-                                        <span
-                                            :class="[
-                                                getStatus(entry.to_status).bg,
-                                                getStatus(entry.to_status)
-                                                    .color,
-                                                'px-1.5 py-0.5 rounded text-xs font-medium ml-1',
-                                            ]"
-                                        >
-                                            {{
-                                                getStatus(entry.to_status).label
-                                            }}
-                                        </span>
-                                    </p>
-                                    <p
-                                        class="text-xs text-[var(--text-muted)] mt-1"
-                                    >
-                                        {{ timeAgo(entry.created_at) }}
-                                    </p>
+                                            <Avatar
+                                                :name="entry.user?.name"
+                                                :src="entry.user?.avatar_url"
+                                                size="xs"
+                                                class="w-6 h-6 border border-[var(--border-default)] shadow-sm"
+                                            />
+                                        </div>
+
+                                        <div class="flex flex-col gap-1">
+                                            <div
+                                                class="text-sm text-[var(--text-secondary)] leading-relaxed"
+                                            >
+                                                <template
+                                                    v-if="entry.type === 'status'"
+                                                >
+                                                    <span
+                                                        class="font-semibold text-[var(--text-primary)]"
+                                                        >{{
+                                                            entry.user?.name ||
+                                                            "System"
+                                                        }}</span
+                                                    >
+                                                    changed status from
+                                                    <Badge
+                                                        :class="[
+                                                            getStatus(
+                                                                entry.from_status ||
+                                                                    'open',
+                                                            ).bg,
+                                                            getStatus(
+                                                                entry.from_status ||
+                                                                    'open',
+                                                            ).color,
+                                                            'mx-1 align-middle',
+                                                        ]"
+                                                    >
+                                                        {{
+                                                            getStatus(
+                                                                entry.from_status ||
+                                                                    "open",
+                                                            ).label
+                                                        }}
+                                                    </Badge>
+                                                    to
+                                                    <Badge
+                                                        :class="[
+                                                            getStatus(
+                                                                entry.to_status,
+                                                            ).bg,
+                                                            getStatus(
+                                                                entry.to_status,
+                                                            ).color,
+                                                            'ml-1 align-middle',
+                                                        ]"
+                                                    >
+                                                        {{
+                                                            getStatus(
+                                                                entry.to_status,
+                                                            ).label
+                                                        }}
+                                                    </Badge>
+                                                </template>
+                                                <template v-else>
+                                                    <span
+                                                        class="font-semibold text-[var(--text-primary)]"
+                                                        >{{
+                                                            entry.user?.name ||
+                                                            "System"
+                                                        }}</span
+                                                    >
+                                                    <span
+                                                        class="ml-1 text-[var(--text-primary)]"
+                                                        >{{
+                                                            entry.description_body ||
+                                                            entry.description.replace(
+                                                                entry.user
+                                                                    ?.name ||
+                                                                    "System",
+                                                                "",
+                                                            )
+                                                        }}</span
+                                                    >
+                                                </template>
+                                            </div>
+                                            <p
+                                                class="text-xs text-[var(--text-muted)] flex items-center gap-1"
+                                            >
+                                                {{
+                                                    new Date(
+                                                        entry.created_at,
+                                                    ).toLocaleTimeString([], {
+                                                        hour: "2-digit",
+                                                        minute: "2-digit",
+                                                    })
+                                                }}
+                                                &middot;
+                                                {{ timeAgo(entry.created_at) }}
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <p
-                                v-if="statusHistory.length === 0"
-                                class="text-center text-sm text-[var(--text-muted)] py-8"
+                            <div
+                                v-if="mergedActivity.length === 0"
+                                class="flex flex-col items-center justify-center py-12 text-center"
                             >
-                                No activity recorded yet
-                            </p>
+                                <div
+                                    class="w-12 h-12 rounded-full bg-[var(--surface-secondary)] flex items-center justify-center mb-3"
+                                >
+                                    <History
+                                        class="w-5 h-5 text-[var(--text-muted)]"
+                                    />
+                                </div>
+                                <h4
+                                    class="text-sm font-medium text-[var(--text-primary)]"
+                                >
+                                    No activity yet
+                                </h4>
+                                <p class="text-xs text-[var(--text-muted)] mt-1">
+                                    Activity logs will appear here when changes
+                                    are made.
+                                </p>
+                            </div>
                         </div>
                     </Card>
                 </div>
@@ -1418,8 +1644,7 @@ watch(
                                         <span
                                             class="text-sm font-medium text-[var(--text-primary)]"
                                             >{{
-                                                task.project?.name ||
-                                                "Project"
+                                                task.project?.name || "Project"
                                             }}</span
                                         >
                                     </div>
@@ -1432,10 +1657,16 @@ watch(
                                 >
                                     Operator
                                 </dt>
-                                <dd 
-                                    class="flex items-center gap-2 p-1 -ml-1 rounded transition-all" 
-                                    :class="canAssign ? 'cursor-pointer hover:bg-[var(--surface-secondary)] hover:opacity-80' : 'cursor-default'"
-                                    @click="canAssign && onQuickAssign('operator')"
+                                <dd
+                                    class="flex items-center gap-2 p-1 -ml-1 rounded transition-all"
+                                    :class="
+                                        canAssign
+                                            ? 'cursor-pointer hover:bg-[var(--surface-secondary)] hover:opacity-80'
+                                            : 'cursor-default'
+                                    "
+                                    @click="
+                                        canAssign && onQuickAssign('operator')
+                                    "
                                     :title="canAssign ? 'Click to assign' : ''"
                                 >
                                     <Avatar
@@ -1474,11 +1705,19 @@ watch(
                                 >
                                     QA
                                 </dt>
-                                <dd 
-                                    class="flex items-center gap-2 p-1 -ml-1 rounded transition-all" 
-                                    :class="canAssign ? 'cursor-pointer hover:bg-[var(--surface-secondary)] hover:opacity-80' : 'cursor-default'"
+                                <dd
+                                    class="flex items-center gap-2 p-1 -ml-1 rounded transition-all"
+                                    :class="
+                                        canAssign
+                                            ? 'cursor-pointer hover:bg-[var(--surface-secondary)] hover:opacity-80'
+                                            : 'cursor-default'
+                                    "
                                     @click="canAssign && onQuickAssign('qa')"
-                                    :title="canAssign ? 'Click to assign QA owner' : ''"
+                                    :title="
+                                        canAssign
+                                            ? 'Click to assign QA owner'
+                                            : ''
+                                    "
                                 >
                                     <Avatar
                                         v-if="task.qa_user"

@@ -132,3 +132,10 @@ Schedule::job(new \App\Jobs\RenewGoogleWatchChannelsJob)
     ->name('renew-google-calendar-channels')
     ->withoutOverlapping()
     ->onOneServer();
+
+// Re-establish all Google Calendar Watch Channels (Daily)
+Schedule::command('google:watch-all')
+    ->dailyAt('04:00')
+    ->name('google-watch-all')
+    ->withoutOverlapping()
+    ->onOneServer();

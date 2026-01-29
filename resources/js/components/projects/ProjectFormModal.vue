@@ -121,7 +121,15 @@ const clientOptions = computed(() => {
 });
 
 const teamOptions = computed(() => {
-    return authStore.user?.teams?.map(t => ({ value: t.public_id, label: t.name })) || [];
+    if (!authStore.user?.teams) return [];
+
+    return authStore.user.teams.filter(t => {
+        // Super admin check
+        if (authStore.isSuperAdmin) return true; // Assuming isSuperAdmin is exposed
+
+        const perms = authStore.user?.team_permissions?.[t.public_id] || [];
+        return perms.includes('projects.create');
+    }).map(t => ({ value: t.public_id, label: t.name }));
 });
 
 watch(() => props.project, (newProject) => {

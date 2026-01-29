@@ -196,6 +196,13 @@ class PermissionService
                 $teamRole = $this->getUserTeamRole($user, $team);
                 $rolePermissions = $this->getPermissionsForTeamRole($teamRole);
 
+                \Illuminate\Support\Facades\Log::debug('PermissionService: getTeamPermissions', [
+                    'user_id' => $user->id,
+                    'team_id' => $team->id,
+                    'team_role' => $teamRole?->value,
+                    'permissions_count' => $teamPermissions->merge($rolePermissions)->unique()->count()
+                ]);
+
                 return $teamPermissions->merge($rolePermissions)->unique()->values();
             },
             'team_permissions'

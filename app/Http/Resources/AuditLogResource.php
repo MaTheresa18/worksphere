@@ -47,6 +47,7 @@ class AuditLogResource extends JsonResource
 
             // Description
             'description' => $this->description,
+            'description_body' => $this->description_body,
 
             // Auditable entity
             'entity' => $this->when($this->auditable_type, fn () => [

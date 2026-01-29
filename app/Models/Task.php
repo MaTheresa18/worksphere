@@ -508,6 +508,32 @@ class Task extends Model implements HasMedia
     }
 
     /**
+     * Get metadata for auditing.
+     *
+     * @return array<string, mixed>
+     */
+    public function getAuditMetadata(): array
+    {
+        $metadata = [];
+
+        if ($this->assigned_to) {
+            $assignee = User::find($this->assigned_to);
+            if ($assignee) {
+                $metadata['assignee_name'] = $assignee->name;
+            }
+        }
+
+        if ($this->qa_user_id) {
+            $qaUser = User::find($this->qa_user_id);
+            if ($qaUser) {
+                $metadata['qa_name'] = $qaUser->name;
+            }
+        }
+
+        return $metadata;
+    }
+
+    /**
      * Scope: By status.
      *
      * @param  Builder<Task>  $query

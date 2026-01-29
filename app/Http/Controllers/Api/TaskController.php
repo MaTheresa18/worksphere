@@ -121,8 +121,18 @@ class TaskController extends Controller
      */
     public function indexGlobal(Request $request, Project $project): AnonymousResourceCollection
     {
-        if (! $request->user()->hasRole('administrator')) {
-            abort(403, 'Unauthorized access to global task list.');
+        $user = $request->user();
+        $team = $project->team;
+
+        // Check if user is admin or has team-level permissions
+        $isAdmin = $user->hasRole('administrator');
+        $hasView = $this->permissionService->hasTeamPermission($user, $team, 'tasks.view');
+        $hasViewAssigned = $this->permissionService->hasTeamPermission($user, $team, 'tasks.view_assigned');
+
+        if (!$isAdmin) {
+            if (!$hasView && !$hasViewAssigned) {
+                abort(403, 'Unauthorized access to task list.');
+            }
         }
 
         // Reuse query logic - can refactor later if needed to dry up
@@ -137,6 +147,13 @@ class TaskController extends Controller
                 $query->where(function ($q) use ($search) {
                     $q->where('title', 'like', "%{$search}%")
                         ->orWhere('description', 'like', "%{$search}%");
+                });
+            })
+            ->when(!$isAdmin && !$hasView && $hasViewAssigned, function ($query) use ($user) {
+                $query->where(function ($q) use ($user) {
+                    $q->where('assigned_to', $user->id)
+                        ->orWhere('qa_user_id', $user->id)
+                        ->orWhere('created_by', $user->id);
                 });
             })
             ->when($request->status, function ($query, $status) {
@@ -605,10 +622,20 @@ class TaskController extends Controller
      */
     public function toggleHold(Request $request, Team $team, Project $project, Task $task): JsonResponse
     {
-        // Allow if user has team permission OR is the assignee
-        if (! $this->permissionService->hasTeamPermission($request->user(), $team, 'tasks.update') &&
-            $task->assigned_to !== $request->user()->id) {
-            abort(403, 'You do not have permission to toggle hold status on this task.');
+        // Check permissions based on stage (Bucket Logic)
+        $canToggle = false;
+
+        if ($task->status === \App\Enums\TaskStatus::InProgress) {
+            // Initial Stage: Operator (Assignee) or Lead (tasks.update)
+            $canToggle = $task->assigned_to === $request->user()->id || 
+                         $this->permissionService->hasTeamPermission($request->user(), $team, 'tasks.update');
+        } elseif (in_array($task->status, [\App\Enums\TaskStatus::Submitted, \App\Enums\TaskStatus::InQa])) {
+            // QA Stage: Only QA/Lead (tasks.qa_review)
+            $canToggle = $this->permissionService->hasTeamPermission($request->user(), $team, 'tasks.qa_review');
+        }
+
+        if (! $canToggle) {
+            abort(403, 'You do not have permission to toggle hold status on this task in its current stage.');
         }
 
         $this->ensureProjectBelongsToTeam($team, $project);
@@ -733,13 +760,24 @@ class TaskController extends Controller
      */
     public function clientApprove(Request $request, Team $team, Project $project, Task $task): JsonResponse
     {
-        $this->authorizeTeamPermission($team, 'tasks.client_response');
+        $user = $request->user();
+        Log::info('Client Approve Request', [
+            'user_id' => $user->id,
+            'is_client' => $user->isClient(),
+            'is_client_for_project' => $this->isClientForProject($user, $project),
+            'has_permission' => $this->permissionService->hasTeamPermission($user, $team, 'tasks.client_response'),
+            'team_permissions' => $this->permissionService->getTeamPermissions($user, $team),
+        ]);
+
+        if (! $this->isClientForProject($user, $project)) {
+             $this->authorizeTeamPermission($team, 'tasks.client_response');
+        }
         $this->ensureProjectBelongsToTeam($team, $project);
         $this->ensureTaskBelongsToProject($project, $task);
 
         $notes = $request->input('notes');
 
-        if (! $this->workflowService->clientApprove($task, $request->user(), $notes)) {
+        if (! $this->workflowService->clientApprove($task, $user, $notes)) {
             return response()->json([
                 'message' => 'Cannot record client approval. Invalid status transition.',
             ], 422);
@@ -758,7 +796,10 @@ class TaskController extends Controller
      */
     public function clientReject(Request $request, Team $team, Project $project, Task $task): JsonResponse
     {
-        $this->authorizeTeamPermission($team, 'tasks.client_response');
+        $user = $request->user();
+        if (! $this->isClientForProject($user, $project)) {
+             $this->authorizeTeamPermission($team, 'tasks.client_response');
+        }
         $this->ensureProjectBelongsToTeam($team, $project);
         $this->ensureTaskBelongsToProject($project, $task);
 
@@ -766,7 +807,7 @@ class TaskController extends Controller
             'reason' => 'required|string|max:1000',
         ]);
 
-        if (! $this->workflowService->clientReject($task, $request->user(), $request->input('reason'))) {
+        if (! $this->workflowService->clientReject($task, $user, $request->input('reason'))) {
             return response()->json([
                 'message' => 'Cannot record client rejection. Invalid status transition.',
             ], 422);
@@ -785,7 +826,12 @@ class TaskController extends Controller
      */
     public function returnToProgress(Request $request, Team $team, Project $project, Task $task): JsonResponse
     {
-        $this->authorizeTeamPermission($team, 'tasks.update');
+        // Allow if user has update permission OR is the assignee
+        if (! $this->permissionService->hasTeamPermission($request->user(), $team, 'tasks.update') &&
+            $task->assigned_to !== $request->user()->id) {
+            abort(403, 'You do not have permission to return this task to in progress.');
+        }
+
         $this->ensureProjectBelongsToTeam($team, $project);
         $this->ensureTaskBelongsToProject($project, $task);
 
@@ -944,6 +990,24 @@ class TaskController extends Controller
     }
 
     /**
+     * Get task activity logs.
+     */
+    public function activity(Request $request, Team $team, Project $project, Task $task): AnonymousResourceCollection
+    {
+        $this->authorizeTaskView($request->user(), $team, $task);
+        $this->ensureProjectBelongsToTeam($team, $project);
+        $this->ensureTaskBelongsToProject($project, $task);
+
+        $logs = \App\Models\AuditLog::query()
+            ->forModel($task)
+            ->with(['user'])
+            ->latest()
+            ->get();
+
+        return \App\Http\Resources\AuditLogResource::collection($logs);
+    }
+
+    /**
      * Get files attached to a task.
      */
     public function getFiles(Request $request, Team $team, Project $project, Task $task): JsonResponse
@@ -984,9 +1048,28 @@ class TaskController extends Controller
      */
     public function uploadFile(Request $request, Team $team, Project $project, Task $task): JsonResponse
     {
-        $this->authorizeTeamPermission($team, 'tasks.manage_files');
         $this->ensureProjectBelongsToTeam($team, $project);
         $this->ensureTaskBelongsToProject($project, $task);
+
+        // Check if task is in an editable state for files
+        $editableStatuses = [\App\Enums\TaskStatus::Draft, \App\Enums\TaskStatus::Open, \App\Enums\TaskStatus::InProgress, \App\Enums\TaskStatus::Rejected];
+        
+        // Strict check: Must be in editable status AND (Assignee OR tasks.update)
+        $canUpload = false;
+        
+        if (in_array($task->status, $editableStatuses)) {
+            $canUpload = $task->assigned_to === $request->user()->id || 
+                         $this->permissionService->hasTeamPermission($request->user(), $team, 'tasks.update');
+        }
+        
+        // Admin/Lead override regardless of status if they have explicit file management
+        if (!$canUpload && $this->permissionService->hasTeamPermission($request->user(), $team, 'tasks.manage_files')) {
+             $canUpload = true;
+        }
+
+        if (! $canUpload) {
+             abort(403, 'You cannot upload files to this task in its current status.');
+        }
 
         $request->validate([
             'file' => 'required|file|max:51200', // 50MB
@@ -1026,9 +1109,26 @@ class TaskController extends Controller
      */
     public function deleteFile(Request $request, Team $team, Project $project, Task $task, mixed $mediaId): JsonResponse
     {
-        $this->authorizeTeamPermission($team, 'tasks.manage_files');
         $this->ensureProjectBelongsToTeam($team, $project);
         $this->ensureTaskBelongsToProject($project, $task);
+
+        // Check if task is in an editable state for files
+        $editableStatuses = [\App\Enums\TaskStatus::Draft, \App\Enums\TaskStatus::Open, \App\Enums\TaskStatus::InProgress, \App\Enums\TaskStatus::Rejected];
+        
+        $canDelete = false;
+        
+        if (in_array($task->status, $editableStatuses)) {
+            $canDelete = $task->assigned_to === $request->user()->id || 
+                         $this->permissionService->hasTeamPermission($request->user(), $team, 'tasks.update');
+        }
+
+        if (!$canDelete && $this->permissionService->hasTeamPermission($request->user(), $team, 'tasks.manage_files')) {
+             $canDelete = true;
+        }
+
+        if (! $canDelete) {
+             abort(403, 'You cannot delete files from this task in its current status.');
+        }
 
         $media = $task->media()->where('id', $mediaId)->where('collection_name', 'attachments')->first();
 
@@ -1141,5 +1241,26 @@ class TaskController extends Controller
                 abort(403, 'You do not have permission to view this task.');
             }
         }
+    }
+
+    /**
+     * Check if the user is the client contact for the project.
+     */
+    protected function isClientForProject(User $user, Project $project): bool
+    {
+        // First check if user has the global client role
+        if (! $user->isClient()) {
+            return false;
+        }
+
+        // Check if the user is linked to the client organization of the project
+        // Assuming user->linked_client is resolved via email or other means as per User model
+        $userClient = $user->linked_client;
+        
+        if (! $userClient) {
+            return false;
+        }
+
+        return $project->client_id === $userClient->id;
     }
 }

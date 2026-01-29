@@ -226,6 +226,7 @@ return [
             'tasks.send_to_client' => 'Send tasks to client',
             'tasks.archive' => 'Archive tasks',
             'tasks.comment' => 'Add comments to tasks',
+            'tasks.client_response' => 'Record client approval/rejection',
         ],
 
         // Ticket Management (Team context)
@@ -371,6 +372,7 @@ return [
             'tasks.view',
             'tasks.create',
             'tasks.update',
+            'tasks.edit_all',
             'tasks.delete',
             'tasks.assign',
             'tasks.submit',
@@ -380,6 +382,7 @@ return [
             'tasks.send_to_client',
             'tasks.archive',
             'tasks.comment',
+            'tasks.client_response',
 
             // Task templates
             'task_templates.view',
@@ -437,17 +440,17 @@ return [
 
             // Projects within team
             'projects.view',
-            'projects.create',
-            'projects.update',
+            'projects.update', // Can update details but NOT create/delete
             'projects.archive',
             'projects.assign',
-            'projects.manage_members',
+            // Removed projects.create and projects.manage_members per scoping requirements
             'projects.manage_files',
 
             // Tasks within team
             'tasks.view',
             'tasks.create',
             'tasks.update',
+            'tasks.edit_all',
             'tasks.delete',
             'tasks.assign',
             'tasks.submit',
@@ -457,6 +460,7 @@ return [
             'tasks.send_to_client',
             'tasks.archive',
             'tasks.comment',
+            'tasks.client_response',
 
             // Task templates
             'task_templates.view',
@@ -500,13 +504,17 @@ return [
 
             // Tasks - QA focus
             'tasks.view',
+            'tasks.create',    // Added per scoping requirements
+            'tasks.update',    // Added per scoping requirements
+            'tasks.edit_all',
+            'tasks.assign',    // Added per scoping requirements
             'tasks.qa_review', // Can review
             'tasks.approve',   // Can approve
             'tasks.reject',    // Can reject
             'tasks.comment',
             'tasks.complete_items', // Occasionally need to fix/complete something in QA context?
 
-            // Cannot create/delete tasks, but can see them
+            // Cannot delete tasks (reserved for Lead/SME)
         ],
         'operator' => [
             // Assigned work only

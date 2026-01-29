@@ -25,7 +25,12 @@ const authStore = useAuthStore();
 const hasTeams = computed(() => authStore.hasTeams);
 
 // Helper to check permissions
-const can = (permission: string) => authStore.hasPermission(permission);
+const can = (permission: string) => {
+    if (permission === 'tasks.create') {
+        return authStore.hasAnyTeamPermission(permission);
+    }
+    return authStore.hasPermission(permission);
+};
 
 // Role Logic - DEPRECATED: Use permissions via can() helper instead
 const userRole = computed(() => {
@@ -432,7 +437,7 @@ const onTaskMoved = async (taskId: string, newStatus: string) => {
                     />
                 </Button>
 
-                <Tooltip v-if="!hasTeams">
+                <Tooltip v-if="!hasTeams || !can('tasks.create')">
                     <template #trigger>
                         <Button disabled class="opacity-60 cursor-not-allowed">
                             <Plus class="h-4 w-4" />
@@ -441,7 +446,7 @@ const onTaskMoved = async (taskId: string, newStatus: string) => {
                     </template>
                     <div class="flex items-center gap-2">
                         <Info class="h-4 w-4" />
-                        <span>Join a team to create tasks</span>
+                        <span>{{ !hasTeams ? 'Join a team to create tasks' : 'You do not have permission to create tasks in any team' }}</span>
                     </div>
                 </Tooltip>
                 <Button v-else-if="can('tasks.create')" @click="onCreateTask">

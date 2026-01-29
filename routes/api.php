@@ -210,14 +210,12 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
     Route::get('clients/stats', [\App\Http\Controllers\Api\ClientController::class, 'stats']);
     Route::get('projects/stats', [\App\Http\Controllers\Api\ProjectController::class, 'globalStats']);
 
-    // Admin Project Management (Global Access)
-    Route::middleware('permission:projects.view')->group(function () {
-        Route::get('/projects', [\App\Http\Controllers\Api\ProjectController::class, 'indexGlobal']);
-        Route::get('/projects/{project}', [\App\Http\Controllers\Api\ProjectController::class, 'showGlobal']);
-        Route::get('/projects/{project}/tasks', [\App\Http\Controllers\Api\TaskController::class, 'indexGlobal']);
-        Route::get('/projects/{project}/stats', [\App\Http\Controllers\Api\ProjectController::class, 'statsGlobal']);
-        Route::get('/projects/{project}/files', [\App\Http\Controllers\Api\ProjectController::class, 'filesGlobal']);
-    });
+    // Project Management (Global Access)
+    Route::get('/projects', [\App\Http\Controllers\Api\ProjectController::class, 'indexGlobal']);
+    Route::get('/projects/{project}', [\App\Http\Controllers\Api\ProjectController::class, 'showGlobal']);
+    Route::get('/projects/{project}/tasks', [\App\Http\Controllers\Api\TaskController::class, 'indexGlobal']);
+    Route::get('/projects/{project}/stats', [\App\Http\Controllers\Api\ProjectController::class, 'statsGlobal']);
+    Route::get('/projects/{project}/files', [\App\Http\Controllers\Api\ProjectController::class, 'filesGlobal']);
 
     // User Management
     Route::apiResource('teams', \App\Http\Controllers\Api\TeamController::class);
@@ -320,8 +318,9 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
                 Route::get('/{task}/comments', [\App\Http\Controllers\Api\TaskController::class, 'comments']);
                 Route::post('/{task}/comments', [\App\Http\Controllers\Api\TaskController::class, 'addComment']);
 
-                // Task Status History
+                // Task Status History & Activity
                 Route::get('/{task}/status-history', [\App\Http\Controllers\Api\TaskController::class, 'statusHistory']);
+                Route::get('/{task}/activity', [\App\Http\Controllers\Api\TaskController::class, 'activity']);
 
                 // Task Files
                 Route::get('/{task}/files', [\App\Http\Controllers\Api\TaskController::class, 'getFiles']);

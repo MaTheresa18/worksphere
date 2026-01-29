@@ -132,10 +132,28 @@ const priorityOptions = [
 
 const localMembers = ref<any[]>([]);
 
-const canEditMetadata = computed(() => !props.task || (props.task as any).can?.edit_metadata);
-const canManageChecklist = computed(() => !props.task || (props.task as any).can?.manage_checklist);
-const canAssign = computed(() => !props.task || (props.task as any).can?.assign);
-const isReadOnly = computed(() => (props.task as any)?.can?.is_read_only);
+const canEditMetadata = computed(() => {
+    if (props.task) return (props.task as any).can?.edit_metadata;
+    if (!selectedTeamId.value) return true; // Default to true if creating and team not yet selected (entry gated by teamOptions)
+    return authStore.hasTeamPermission(selectedTeamId.value, 'tasks.edit_all');
+});
+
+const canManageChecklist = computed(() => {
+    if (props.task) return (props.task as any).can?.manage_checklist;
+    if (!selectedTeamId.value) return true;
+    return authStore.hasTeamPermission(selectedTeamId.value, 'tasks.manage_checklist');
+});
+
+const canAssign = computed(() => {
+    if (props.task) return (props.task as any).can?.assign;
+    if (!selectedTeamId.value) return true;
+    return authStore.hasTeamPermission(selectedTeamId.value, 'tasks.assign');
+});
+
+const isReadOnly = computed(() => {
+    if (props.task) return (props.task as any).can?.is_read_only;
+    return false;
+});
 
 
 const operatorMemberOptions = computed(() => {
@@ -172,12 +190,18 @@ const selectedProjectId = ref("");
 const projectOptions = ref<any[]>([]);
 
 const teamOptions = computed(() => {
-    return (
-        authStore.user?.teams?.map((team) => ({
-            value: team.public_id,
-            label: team.name,
-        })) || []
-    );
+    if (!authStore.user?.teams) return [];
+
+    return authStore.user.teams.filter((team) => {
+        // Super admin check
+        if (authStore.isSuperAdmin) return true; 
+
+        const perms = authStore.user?.team_permissions?.[team.public_id] || [];
+        return perms.includes('tasks.create');
+    }).map((team) => ({
+        value: team.public_id,
+        label: team.name,
+    }));
 });
 
 // Fetch projects when team changes

@@ -246,65 +246,36 @@ const fetchProject = async () => {
     try {
         isLoading.value = true;
 
-        // Fetch project details
-        // Fetch project details
-        let projectRes;
-
-        const isAdmin =
-            authStore.user?.roles?.find(
-                (r: any) => r.name === "administrator",
-            ) || authStore.user?.is_admin;
-
-        if (isAdmin) {
-            // Admin optimization: Try global fetch directly to avoid 404s on cross-team projects
-            try {
-                console.log(
-                    "[ProjectDetail] Admin detected, attempting global fetch first...",
-                );
-                const globalUrl = `/api/projects/${projectId.value}`;
-                projectRes = await axios.get(globalUrl);
-            } catch (globalErr: any) {
-                // If global fetch fails (e.g. not found), we could try team fetch but likely it won't work either.
-                // However, let's allow fallback just in case or throw.
-                console.warn(
-                    "[ProjectDetail] Global fetch failed for admin, falling back to team scope (unlikely to succeed if global failed)",
-                    globalErr,
-                );
-                const url = `/api/teams/${currentTeamId.value}/projects/${projectId.value}`;
-                projectRes = await axios.get(url);
-            }
-        } else {
-            // Standard User: Team Scoped
-            try {
-                const url = `/api/teams/${currentTeamId.value}/projects/${projectId.value}`;
-                projectRes = await axios.get(url);
-            } catch (err) {
-                throw err;
-            }
-        }
+        // 1. Attempt Global Fetch First (Smart Lookup)
+        // This endpoint is now permission-aware and works regardless of current context
+        const globalUrl = `/api/projects/${projectId.value}`;
+        const projectRes = await axios.get(globalUrl);
 
         console.log(
             "[ProjectDetail] API Response:",
             projectRes.status,
             projectRes.data,
         );
+
         // Handle both wrapped {data: project} and unwrapped {project} responses
-        project.value = projectRes.data.data || projectRes.data;
+        const projectData = projectRes.data.data || projectRes.data;
+        project.value = projectData;
 
-        // Fetch stats
+        // 2. Context Sync: Ensure the active team matches the project's team
+        if (
+            projectData.team &&
+            authStore.currentTeam?.public_id !== projectData.team.public_id
+        ) {
+            console.log(
+                "[ProjectDetail] Switching team context to:",
+                projectData.team.name,
+            );
+            authStore.setTeam(projectData.team);
+        }
+
+        // 3. Fetch Stats (scoped or global)
         try {
-            let statsUrl = `/api/teams/${currentTeamId.value}/projects/${projectId.value}/stats`;
-
-            // Check if we are in global mode (project team ID != current team ID)
-            const isGlobalMode =
-                project.value &&
-                project.value.team_id !== authStore.currentTeam?.id;
-
-            if (isGlobalMode) {
-                console.log("[ProjectDetail] Fetching Global Stats");
-                statsUrl = `/api/projects/${projectId.value}/stats`;
-            }
-
+            const statsUrl = `/api/projects/${projectId.value}/stats`;
             const statsRes = await axios.get(statsUrl);
             stats.value = statsRes.data;
         } catch (e) {
@@ -337,17 +308,7 @@ const fetchTasks = async () => {
             assignee: taskFilters.value.assignee,
         };
 
-        let tasksUrl = `/api/teams/${currentTeamId.value}/projects/${projectId.value}/tasks`;
-
-        // Check if we are in global mode (project team ID != current team ID)
-        const isGlobalMode =
-            project.value &&
-            project.value.team_id !== authStore.currentTeam?.id;
-
-        if (isGlobalMode) {
-            console.log("[ProjectDetail] Fetching Global Tasks");
-            tasksUrl = `/api/projects/${projectId.value}/tasks`;
-        }
+        const tasksUrl = `/api/projects/${projectId.value}/tasks`;
 
         const tasksRes = await axios.get(tasksUrl, { params });
         tasks.value = tasksRes.data.data;

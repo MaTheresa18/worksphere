@@ -110,17 +110,9 @@ class NavigationController extends Controller
 
             // Enrich Projects - show actual projects from user's teams
             if (isset($item['id']) && $item['id'] === 'projects') {
-                $userTeamIds = $user->teams()->pluck('teams.id');
+                $userTeams = $user->teams;
 
-                if ($userTeamIds->isNotEmpty()) {
-                    $projects = \App\Models\Project::whereIn('team_id', $userTeamIds)
-                        ->active()
-                        ->orderByDesc('updated_at')
-                        ->limit(10)
-                        ->with('team:id,name,public_id')
-                        ->get(['id', 'public_id', 'name', 'team_id']);
-
-                    // Start with "View All Projects"
+                if ($userTeams->isNotEmpty()) {
                     $projectChildren = [
                         [
                             'id' => 'projects-all',
@@ -128,25 +120,62 @@ class NavigationController extends Controller
                             'route' => '/projects',
                             'icon' => 'folder',
                         ],
+                        ['id' => 'projects-sep-1', 'type' => 'divider'],
                     ];
 
-                    // Add actual projects
-                    foreach ($projects as $project) {
-                        $projectChildren[] = [
-                            'id' => 'project-'.$project->public_id,
-                            'label' => $project->name,
-                            'route' => '/projects/'.$project->public_id,
-                            'team_badge' => $project->team->name ?? null,
-                        ];
+                    $hasCreatePermission = false;
+
+                    foreach ($userTeams as $team) {
+                        $canViewAll = $this->permissionService->hasTeamPermission($user, $team, 'projects.view');
+                        $canViewAssigned = $this->permissionService->hasTeamPermission($user, $team, 'projects.view_assigned');
+                        
+                        if (!$canViewAll && !$canViewAssigned) {
+                            continue;
+                        }
+
+                        if (!$hasCreatePermission && $this->permissionService->hasTeamPermission($user, $team, 'projects.create')) {
+                            $hasCreatePermission = true;
+                        }
+
+                        $query = \App\Models\Project::where('team_id', $team->id)->active();
+
+                        if (!$canViewAll && $canViewAssigned) {
+                            $query->whereHas('members', function ($q) use ($user) {
+                                $q->where('user_id', $user->id);
+                            });
+                        }
+
+                        $projects = $query->orderByDesc('updated_at')
+                            ->limit(5)
+                            ->get(['id', 'public_id', 'name']);
+
+                        if ($projects->isNotEmpty()) {
+                            $projectChildren[] = [
+                                'id' => 'team-projects-header-' . $team->public_id,
+                                'label' => $team->name,
+                                'type' => 'header',
+                            ];
+
+                            foreach ($projects as $project) {
+                                $projectChildren[] = [
+                                    'id' => 'project-' . $project->public_id,
+                                    'label' => $project->name,
+                                    'route' => "/projects/{$project->public_id}?team_id={$team->public_id}",
+                                ];
+                            }
+                        }
                     }
 
-                    // Add "New Project" at the end
-                    $projectChildren[] = [
-                        'id' => 'project-new',
-                        'label' => 'New Project',
-                        'route' => '/projects?create=true',
-                        'icon' => 'plus',
-                    ];
+                    // Add "New Project" if user has create permission in any team
+                    if ($hasCreatePermission || $user->hasRole('administrator')) {
+                        $projectChildren[] = ['id' => 'projects-sep-2', 'type' => 'divider'];
+                        $projectChildren[] = [
+                            'id' => 'project-new',
+                            'label' => 'New Project',
+                            'route' => '/projects?create=true',
+                            'icon' => 'plus',
+                        ];
+                    }
 
                     $item['children'] = $projectChildren;
                 }
@@ -154,49 +183,45 @@ class NavigationController extends Controller
 
             // Enrich Clients - show recent clients from user's teams
             if (isset($item['id']) && $item['id'] === 'clients') {
-                $userTeamIds = $user->teams()->pluck('teams.id');
+                $userTeams = $user->teams;
 
-                $baseRoute = '/clients';
-                $item['route'] = $baseRoute;
-
-                if ($userTeamIds->isNotEmpty()) {
-                    // Fetch recent clients for user's teams with diverse scoping
-                    // We want 1-2 clients per team, max 10 total
-                    $recentClients = collect();
-                    $userTeams = $user->teams;
-
-                    foreach ($userTeams as $team) {
-                        $teamClients = \App\Models\Client::where('team_id', $team->id)
-                            ->where('status', 'active')
-                            ->orderByDesc('updated_at')
-                            ->limit(2)
-                            ->with('team:id,name,public_id')
-                            ->get(['id', 'public_id', 'name', 'team_id']);
-
-                        $recentClients = $recentClients->concat($teamClients);
-                    }
-
-                    // Sort combined list and limit to 10
-                    $clients = $recentClients->sortByDesc('updated_at')->take(10);
-
-                    $clientChildren = [];
-
-                    // 1. View All
-                    $clientChildren[] = [
-                        'id' => 'clients-all',
-                        'label' => 'View All Clients',
-                        'route' => $baseRoute,
-                        'icon' => 'users',
+                if ($userTeams->isNotEmpty()) {
+                    $clientChildren = [
+                        [
+                            'id' => 'clients-all',
+                            'label' => 'View All Clients',
+                            'route' => '/clients',
+                            'icon' => 'users',
+                        ],
+                        ['id' => 'clients-sep-1', 'type' => 'divider'],
                     ];
 
-                    // 2. Recent Clients
-                    foreach ($clients as $client) {
-                        $clientChildren[] = [
-                            'id' => 'client-'.$client->public_id,
-                            'label' => $client->name,
-                            'route' => $baseRoute.'/'.$client->public_id,
-                            'team_badge' => $client->team->name ?? null,
-                        ];
+                    foreach ($userTeams as $team) {
+                        if (!$this->permissionService->hasTeamPermission($user, $team, 'clients.view')) {
+                            continue;
+                        }
+
+                        $clients = \App\Models\Client::where('team_id', $team->id)
+                            ->where('status', 'active')
+                            ->orderByDesc('updated_at')
+                            ->limit(3)
+                            ->get(['id', 'public_id', 'name']);
+
+                        if ($clients->isNotEmpty()) {
+                            $clientChildren[] = [
+                                'id' => 'team-clients-header-' . $team->public_id,
+                                'label' => $team->name,
+                                'type' => 'header',
+                            ];
+
+                            foreach ($clients as $client) {
+                                $clientChildren[] = [
+                                    'id' => 'client-' . $client->public_id,
+                                    'label' => $client->name,
+                                    'route' => "/clients/{$client->public_id}?team_id={$team->public_id}",
+                                ];
+                            }
+                        }
                     }
 
                     $item['children'] = $clientChildren;

@@ -40,6 +40,8 @@ return [
         \App\Models\User::class,
         \App\Models\Team::class,
         \App\Models\Client::class,
+        \App\Models\Project::class,
+        \App\Models\Task::class,
     ],
 
     /*

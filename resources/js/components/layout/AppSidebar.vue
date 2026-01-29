@@ -308,33 +308,38 @@ onMounted(() => {
                     >
                         <div class="overflow-hidden">
                             <div class="ml-[1.1rem] pl-3 border-l border-[var(--border-muted)] space-y-0.5 pt-0.5">
-                                <button
-                                    v-for="child in item.children"
-                                    :key="child.id"
-                                    :class="
-                                        cn(
-                                            'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] transition-colors duration-200 border border-transparent font-medium',
-                                            isActive(child.route)
-                                                ? 'text-[var(--text-primary)] bg-[var(--surface-secondary)]'
-                                                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]/50',
-                                            'cursor-pointer'
-                                        )
-                                    "
-                                    @click="navigate(child.route)"
-                                >
-                                    <component
-                                        v-if="child.icon"
-                                        :is="getIcon(child.icon)"
-                                        class="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]"
-                                    />
-                                    <span class="truncate">{{ child.label }}</span>
-                                    <span
-                                        v-if="child.team_badge"
-                                        class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-tertiary)] text-[var(--text-muted)] border border-[var(--border-subtle)] shrink-0"
+                                <template v-for="child in item.children" :key="child.id">
+                                    <div v-if="child.type === 'divider'" class="my-1.5 h-px bg-[var(--border-muted)]/50 mx-2"></div>
+                                    <div v-else-if="child.type === 'header'" class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] opacity-80 mt-1">
+                                        {{ child.label }}
+                                    </div>
+                                    <button
+                                        v-else
+                                        :class="
+                                            cn(
+                                                'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] transition-colors duration-200 border border-transparent font-medium',
+                                                isActive(child.route)
+                                                    ? 'text-[var(--text-primary)] bg-[var(--surface-secondary)]'
+                                                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]/50',
+                                                'cursor-pointer'
+                                            )
+                                        "
+                                        @click="child.route && navigate(child.route)"
                                     >
-                                        {{ child.team_badge }}
-                                    </span>
-                                </button>
+                                        <component
+                                            v-if="child.icon"
+                                            :is="getIcon(child.icon)"
+                                            class="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]"
+                                        />
+                                        <span class="truncate">{{ child.label }}</span>
+                                        <span
+                                            v-if="child.team_badge"
+                                            class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-tertiary)] text-[var(--text-muted)] border border-[var(--border-subtle)] shrink-0"
+                                        >
+                                            {{ child.team_badge }}
+                                        </span>
+                                    </button>
+                                </template>
                                 <!-- Static Team Actions -->
                                 <template v-if="item.id === 'teams'">
                                     <div class="my-1.5 h-px bg-[var(--border-muted)]/50 mx-2"></div>
@@ -463,33 +468,38 @@ onMounted(() => {
                     >
                          <div class="overflow-hidden">
                             <div class="ml-[1.1rem] pl-3 border-l border-[var(--border-muted)] space-y-0.5 pt-0.5">
-                                <button
-                                    v-for="child in item.children"
-                                    :key="child.id"
-                                    :class="
-                                        cn(
-                                            'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] transition-colors duration-200 border border-transparent font-medium',
-                                            isActive(child.route)
-                                                ? 'text-[var(--text-primary)] bg-[var(--surface-secondary)]'
-                                                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]/50',
-                                            'cursor-pointer'
-                                        )
-                                    "
-                                    @click="navigate(child.route)"
-                                >
-                                    <component
-                                        v-if="child.icon"
-                                        :is="getIcon(child.icon)"
-                                        class="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]"
-                                    />
-                                    <span class="truncate">{{ child.label }}</span>
-                                    <span
-                                        v-if="child.team_badge"
-                                        class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-tertiary)] text-[var(--text-muted)] border border-[var(--border-subtle)] shrink-0"
+                                <template v-for="child in item.children" :key="child.id">
+                                    <div v-if="child.type === 'divider'" class="my-1.5 h-px bg-[var(--border-muted)]/50 mx-2"></div>
+                                    <div v-else-if="child.type === 'header'" class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] opacity-80 mt-1">
+                                        {{ child.label }}
+                                    </div>
+                                    <button
+                                        v-else
+                                        :class="
+                                            cn(
+                                                'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] transition-colors duration-200 border border-transparent font-medium',
+                                                isActive(child.route)
+                                                    ? 'text-[var(--text-primary)] bg-[var(--surface-secondary)]'
+                                                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]/50',
+                                                'cursor-pointer'
+                                            )
+                                        "
+                                        @click="child.route && navigate(child.route)"
                                     >
-                                        {{ child.team_badge }}
-                                    </span>
-                                </button>
+                                        <component
+                                            v-if="child.icon"
+                                            :is="getIcon(child.icon)"
+                                            class="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]"
+                                        />
+                                        <span class="truncate">{{ child.label }}</span>
+                                        <span
+                                            v-if="child.team_badge"
+                                            class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-tertiary)] text-[var(--text-muted)] border border-[var(--border-subtle)] shrink-0"
+                                        >
+                                            {{ child.team_badge }}
+                                        </span>
+                                    </button>
+                                </template>
                                 <!-- Static Team Actions -->
                                 <template v-if="item.id === 'teams'">
                                     <div class="my-1.5 h-px bg-[var(--border-muted)]/50 mx-2"></div>

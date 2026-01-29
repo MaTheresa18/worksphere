@@ -1724,12 +1724,7 @@ const canRemoveMember = (member) => {
                                                     : 'bg-gray-100 text-gray-800'
                                             "
                                         >
-                                            {{
-                                                member.role?.replace(
-                                                    "_",
-                                                    " ",
-                                                ) || "operator"
-                                            }}
+                                            {{ member.role_label || member.role?.replace(/_/g, " ") || "operator" }}
                                         </span>
                                     </td>
                                     <td

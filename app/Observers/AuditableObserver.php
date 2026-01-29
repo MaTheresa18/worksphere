@@ -24,7 +24,8 @@ class AuditableObserver
         $this->auditService->logModelChange(
             action: AuditAction::Created,
             model: $model,
-            newValues: $this->getAuditableAttributes($model)
+            newValues: $this->getAuditableAttributes($model),
+            metadata: method_exists($model, 'getAuditMetadata') ? $model->getAuditMetadata() : []
         );
     }
 
@@ -57,7 +58,8 @@ class AuditableObserver
             action: AuditAction::Updated,
             model: $model,
             oldValues: $this->filterAuditableAttributes($model, $original),
-            newValues: $this->filterAuditableAttributes($model, $changes)
+            newValues: $this->filterAuditableAttributes($model, $changes),
+            metadata: method_exists($model, 'getAuditMetadata') ? $model->getAuditMetadata() : []
         );
     }
 
@@ -73,7 +75,8 @@ class AuditableObserver
         $this->auditService->logModelChange(
             action: AuditAction::Deleted,
             model: $model,
-            oldValues: $this->getAuditableAttributes($model)
+            oldValues: $this->getAuditableAttributes($model),
+            metadata: method_exists($model, 'getAuditMetadata') ? $model->getAuditMetadata() : []
         );
     }
 

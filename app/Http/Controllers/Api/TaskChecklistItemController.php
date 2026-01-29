@@ -79,6 +79,15 @@ class TaskChecklistItemController extends Controller
             abort(403, 'Task checklist is locked while in review.');
         }
 
+        // New Requirement: Only Creator or TeamLead/SME can add items if task is started (InProgress or later)
+        // We consider "Started" as anything not Open or Draft.
+        $isStarted = ! in_array($task->status, [TaskStatus::Open, TaskStatus::Draft]);
+        $canManageStarted = $task->created_by === $user->id || $this->permissionService->hasTeamPermission($user, $team, 'tasks.update');
+        
+        if ($isStarted && ! $canManageStarted) {
+            abort(403, 'Cannot add checklist items after task has started.');
+        }
+
         // Structure modification requires manage_checklist
         if (! $this->permissionService->hasTeamPermission($user, $team, 'tasks.manage_checklist')) {
             abort(403, 'You do not have permission to add items to this checklist.');
@@ -157,9 +166,29 @@ class TaskChecklistItemController extends Controller
             abort(403, 'You do not have permission to update this checklist item.');
         }
 
+        // Feature: Checklist actions disabled unless start task is pressed (In Progress)
+        // This applies to changing status (completion)
+        if (isset($request->status) && $task->status !== TaskStatus::InProgress) {
+             // Exception: Allow if simple text update? No, `status` set means completion toggle.
+             // Maybe allow PM/QA/Lead to toggle anytime? Req says "disabled unless start task is pressed".
+             // We can allow if user has 'tasks.update' (Admin/Lead override).
+             if (! $this->permissionService->hasTeamPermission($user, $team, 'tasks.update')) {
+                 abort(403, 'Task must be In Progress to complete checklist items.');
+             }
+        }
+
         // Text modification requires manage_checklist
-        if (isset($request->text) && ! $this->permissionService->hasTeamPermission($user, $team, 'tasks.manage_checklist')) {
-            abort(403, 'You do not have permission to modify the text of this checklist item.');
+        if (isset($request->text)) {
+            if (! $this->permissionService->hasTeamPermission($user, $team, 'tasks.manage_checklist')) {
+                 abort(403, 'You do not have permission to modify the text of this checklist item.');
+            }
+             // Also enforce "Started" rule for text editing
+             $isStarted = ! in_array($task->status, [TaskStatus::Open, TaskStatus::Draft]);
+             $canManageStarted = $task->created_by === $user->id || $this->permissionService->hasTeamPermission($user, $team, 'tasks.update');
+
+             if ($isStarted && ! $canManageStarted) {
+                 abort(403, 'Cannot edit checklist items after task has started.');
+             }
         }
 
         // Ensure item belongs to task
@@ -212,6 +241,14 @@ class TaskChecklistItemController extends Controller
         
         if ($isInReview && ! $hasQaPermission) {
             abort(403, 'Task checklist is locked while in review.');
+        }
+
+        // New Requirement: Only Creator or TeamLead/SME can remove items if task is started
+        $isStarted = ! in_array($task->status, [TaskStatus::Open, TaskStatus::Draft]);
+        $canManageStarted = $task->created_by === $user->id || $this->permissionService->hasTeamPermission($user, $team, 'tasks.update');
+        
+        if ($isStarted && ! $canManageStarted) {
+            abort(403, 'Cannot remove checklist items after task has started.');
         }
 
         // Deletion requires manage_checklist
@@ -278,6 +315,25 @@ class TaskChecklistItemController extends Controller
 
         if (! $this->permissionService->hasTeamPermission($user, $team, $permission)) {
             abort(403, 'You do not have permission to perform this action.');
+        }
+    }
+    /**
+     * Ensure project belongs to the team.
+     */
+    protected function ensureProjectBelongsToTeam(Team $team, Project $project): void
+    {
+        if ($project->team_id !== $team->id) {
+            abort(404, 'Project not found in this team.');
+        }
+    }
+
+    /**
+     * Ensure task belongs to the project.
+     */
+    protected function ensureTaskBelongsToProject(Project $project, Task $task): void
+    {
+        if ($task->project_id !== $project->id) {
+            abort(404, 'Task not found in this project.');
         }
     }
 }

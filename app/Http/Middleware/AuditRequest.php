@@ -77,6 +77,9 @@ class AuditRequest
                     'request_params' => $this->sanitizeRequestData($request),
                 ]
             );
+
+            // Clear changes so they aren't logged again in a multi-request scenario (like tests)
+            $this->auditService->clearCapturedChanges();
         });
 
         return $response;

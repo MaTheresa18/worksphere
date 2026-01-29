@@ -61,6 +61,18 @@ const perPageOptions = [20, 50, 100, 200];
 // Stats State
 const stats = ref(null);
 
+const satisfactionRate = computed(() => {
+    if (!stats.value?.helpful_rate) return 0;
+
+    // Ensure numbers
+    const helper = Number(stats.value.helpful_rate.helper) || 0;
+    const total = Number(stats.value.helpful_rate.total) || 0;
+
+    if (total === 0) return 0;
+
+    return Math.round((helper / total) * 100);
+});
+
 // Categories State
 const categories = ref([]);
 const categoryPagination = ref({ current_page: 1, last_page: 1, total: 0 });
@@ -244,8 +256,11 @@ const bulkDelete = (type) => {
 
 // Bulk publish articles - Open confirmation modal
 // Bulk publish articles - Open confirmation modal
-const bulkPublish = (publish, target = 'articles') => {
-    const set = target === 'categories' ? selectedCategories.value : selectedArticles.value;
+const bulkPublish = (publish, target = "articles") => {
+    const set =
+        target === "categories"
+            ? selectedCategories.value
+            : selectedArticles.value;
     if (set.size === 0) return;
 
     confirmAction.value = {
@@ -254,7 +269,7 @@ const bulkPublish = (publish, target = 'articles') => {
         ids: Array.from(set),
         single: false,
     };
-    
+
     if (!publish) {
         confirmReason.value = "";
         passwordError.value = "";
@@ -313,7 +328,9 @@ const performAction = async () => {
                     : faqService.deleteArticle.bind(faqService);
 
             // Pass the reason to the delete method
-            await Promise.all(ids.map((id) => deleteMethod(id, confirmReason.value)));
+            await Promise.all(
+                ids.map((id) => deleteMethod(id, confirmReason.value)),
+            );
 
             if (target === "categories") {
                 selectedCategories.value.clear();
@@ -328,24 +345,31 @@ const performAction = async () => {
             fetchArticles(articlePagination.value.current_page);
             fetchArticles(articlePagination.value.current_page);
         } else if (type === "unpublish") {
-             if (target === 'categories') {
-                await faqService.bulkPublishCategories(ids, false, confirmReason.value);
+            if (target === "categories") {
+                await faqService.bulkPublishCategories(
+                    ids,
+                    false,
+                    confirmReason.value,
+                );
                 selectedCategories.value.clear();
                 fetchCategories(categoryPagination.value.current_page);
-             } else {
+            } else {
                 await faqService.bulkPublish(ids, false, confirmReason.value);
                 selectedArticles.value.clear();
                 fetchArticles(articlePagination.value.current_page);
-             }
-        } else if (type === 'save_unpublish') {
+            }
+        } else if (type === "save_unpublish") {
             // Handle intercepted save with unpublish
-            const data = { ...confirmAction.value.data, reason: confirmReason.value };
-            if (target === 'categories') {
+            const data = {
+                ...confirmAction.value.data,
+                reason: confirmReason.value,
+            };
+            if (target === "categories") {
                 await faqService.updateCategory(ids[0], data);
                 showCategoryModal.value = false;
                 fetchCategories(categoryPagination.value.current_page);
             }
-        } else if (type === 'publish' && target === 'categories') {
+        } else if (type === "publish" && target === "categories") {
             await faqService.bulkPublishCategories(ids, true);
             selectedCategories.value.clear();
             fetchCategories(categoryPagination.value.current_page);
@@ -613,15 +637,7 @@ const stripHtml = (html) => {
                     <h3
                         class="text-2xl font-bold text-[var(--text-primary)] mt-1"
                     >
-                        {{
-                            stats.helpful_rate?.total
-                                ? Math.round(
-                                      (stats.helpful_rate.helper /
-                                          stats.helpful_rate.total) *
-                                          100,
-                                  )
-                                : 0
-                        }}%
+                        {{ satisfactionRate }}%
                     </h3>
                 </div>
             </div>
@@ -724,18 +740,17 @@ const stripHtml = (html) => {
 
                         <!-- Status Filter -->
                         <div class="w-32">
-                           <SelectFilter
-                               v-model="categoryStatusFilter"
-                               :placeholder="'Status'"
-                               :options="[
-                                   { label: 'All Status', value: '' },
-                                   { label: 'Public', value: 'public' },
-                                   { label: 'Private', value: 'private' },
-                               ]"
-                           />
+                            <SelectFilter
+                                v-model="categoryStatusFilter"
+                                :placeholder="'Status'"
+                                :options="[
+                                    { label: 'All Status', value: '' },
+                                    { label: 'Public', value: 'public' },
+                                    { label: 'Private', value: 'private' },
+                                ]"
+                            />
                         </div>
                     </div>
-
 
                     <!-- Article Filters (Only visible on Articles tab) -->
                     <div
@@ -752,13 +767,13 @@ const stripHtml = (html) => {
                         </div>
 
                         <!-- Filter Toggle Button -->
-                         <button
+                        <button
                             @click="showArticleFilters = !showArticleFilters"
                             :class="[
                                 'p-2.5 rounded-lg border transition-all duration-200',
                                 showArticleFilters
                                     ? 'bg-[var(--surface-elevated)] border-[var(--interactive-primary)] text-[var(--interactive-primary)] shadow-sm'
-                                    : 'bg-[var(--surface-elevated)] border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)]'
+                                    : 'bg-[var(--surface-elevated)] border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)]',
                             ]"
                             title="Toggle Filters"
                         >
@@ -780,7 +795,12 @@ const stripHtml = (html) => {
                             class="h-8 w-px bg-[var(--border-default)] hidden sm:block mx-1"
                         ></div>
                         <!-- Publish/Unpublish -->
-                        <template v-if="activeTab === 'articles' || activeTab === 'categories'">
+                        <template
+                            v-if="
+                                activeTab === 'articles' ||
+                                activeTab === 'categories'
+                            "
+                        >
                             <Button
                                 variant="primary"
                                 size="sm"
@@ -788,7 +808,11 @@ const stripHtml = (html) => {
                                 @click="bulkPublish(true, activeTab)"
                             >
                                 <Eye class="w-4 h-4 mr-1.5" />
-                                Publish ({{ activeTab === 'categories' ? selectedCategories.size : selectedArticles.size }})
+                                Publish ({{
+                                    activeTab === "categories"
+                                        ? selectedCategories.size
+                                        : selectedArticles.size
+                                }})
                             </Button>
                             <Button
                                 variant="secondary"
@@ -937,8 +961,13 @@ const stripHtml = (html) => {
                 </div>
 
                 <!-- Clear All Filters -->
-                 <button
-                    v-if="articleCategoryFilter || articleStatusFilter || articleDateRange.from || articleDateRange.to"
+                <button
+                    v-if="
+                        articleCategoryFilter ||
+                        articleStatusFilter ||
+                        articleDateRange.from ||
+                        articleDateRange.to
+                    "
                     @click="
                         articleCategoryFilter = '';
                         articleStatusFilter = '';
@@ -2702,7 +2731,10 @@ const stripHtml = (html) => {
                 confirmAction?.type === 'delete' ? 'danger' : 'secondary'
             "
             :external-error="passwordError"
-            :show-reason="confirmAction?.type === 'unpublish' || confirmAction?.type === 'delete'"
+            :show-reason="
+                confirmAction?.type === 'unpublish' ||
+                confirmAction?.type === 'delete'
+            "
             @confirm="handlePasswordConfirm"
             @cancel="
                 showPasswordModal = false;

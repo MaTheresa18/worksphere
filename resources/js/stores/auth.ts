@@ -175,6 +175,21 @@ export const useAuthStore = defineStore('auth', () => {
     return user.value?.permissions?.some(p => p.name === permissionName) || false;
   }
 
+  function hasAnyTeamPermission(permissionName: string): boolean {
+    if (isSuperAdmin.value) return true;
+    if (!user.value?.team_permissions) return false;
+
+    return Object.values(user.value.team_permissions).some(perms => perms.includes(permissionName));
+  }
+
+  function hasTeamPermission(teamPublicId: string, permissionName: string): boolean {
+    if (isSuperAdmin.value) return true;
+    if (!user.value?.team_permissions) return false;
+
+    const perms = user.value.team_permissions[teamPublicId] || [];
+    return perms.includes(permissionName);
+  }
+
   const currentTeam = computed(() => {
     if (!user.value?.teams || user.value.teams.length === 0) return null;
     
@@ -745,6 +760,8 @@ export const useAuthStore = defineStore('auth', () => {
     isSuperAdmin,
     hasRole,
     hasPermission,
+    hasAnyTeamPermission,
+    hasTeamPermission,
     displayName,
     avatarUrl,
     initials,
