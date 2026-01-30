@@ -36,6 +36,8 @@ class TaskResource extends JsonResource
             'estimated_hours' => $this->estimated_hours,
             'actual_hours' => $this->actual_hours,
             'checklist' => $this->checklist,
+            'checklist_total' => $this->checklistItems()->count(),
+            'checklist_done' => $this->checklistItems()->where('status', \App\Enums\TaskChecklistItemStatus::Done)->count(),
             'is_overdue' => $this->is_overdue,
             'days_until_due' => $this->days_until_due,
             'available_transitions' => $this->when($request->has('with_transitions'), function () {
@@ -225,7 +227,9 @@ class TaskResource extends JsonResource
                                   $permService->hasTeamPermission($user, $team, 'tasks.manage_files'),
 
                 'complete_task' => $this->status === \App\Enums\TaskStatus::ClientApproved && 
-                                   ($permService->hasTeamPermission($user, $team, 'tasks.complete') || $this->assigned_to === $user->id),
+                                   ($permService->hasTeamPermission($user, $team, 'tasks.complete') || 
+                                    $permService->hasTeamPermission($user, $team, 'tasks.edit_all') ||
+                                    $this->assigned_to === $user->id),
                                    
                 'restart_task' => ($this->status->isRejected()) && 
                                   ($this->assigned_to === $user->id || $permService->hasTeamPermission($user, $team, 'tasks.update')),

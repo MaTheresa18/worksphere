@@ -376,7 +376,8 @@ class Project extends Model implements HasMedia
      */
     public function recalculateProgress(): void
     {
-        $totalTasks = $this->tasks()->count();
+        // Exclude archived tasks from the calculation
+        $totalTasks = $this->tasks()->where('status', '!=', ProjectStatus::Archived)->count();
 
         if ($totalTasks === 0) {
             $this->update(['progress_percentage' => 0]);

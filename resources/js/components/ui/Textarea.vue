@@ -12,6 +12,7 @@ const props = defineProps({
     hint: String,
     error: String,
     disabled: Boolean,
+    borderless: Boolean,
     rows: {
         type: [Number, String],
         default: 3,
@@ -28,9 +29,11 @@ const textareaClasses = computed(() =>
         "focus:outline-none focus:ring-2 focus:ring-[var(--interactive-primary)]/20",
         props.error
             ? "border-red-500 focus:border-red-500"
-            : "border-[var(--border-default)] focus:border-[var(--interactive-primary)]",
-        props.disabled && "opacity-50 cursor-not-allowed"
-    )
+            : props.borderless
+              ? "border-transparent focus:border-transparent"
+              : "border-[var(--border-default)] focus:border-[var(--interactive-primary)]",
+        props.disabled && "opacity-50 cursor-not-allowed",
+    ),
 );
 
 function handleInput(event) {

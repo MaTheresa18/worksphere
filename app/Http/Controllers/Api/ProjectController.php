@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\AuditAction;
 use App\Enums\AuditCategory;
+use App\Enums\InvoiceStatus;
 use App\Enums\ProjectStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Project\StoreProjectRequest;
@@ -156,19 +157,27 @@ class ProjectController extends Controller
         $stats = [
             'total_tasks' => $project->tasks()->count(),
             'completed_tasks' => $project->tasks()->where('status', 'completed')->count(),
-            'active_tasks' => $project->tasks()->where('status', 'active')->count(),
+            'in_progress_tasks' => $project->tasks()->where('status', 'in_progress')->count(),
+            'pending_tasks' => $project->tasks()->where('status', 'pending')->count(),
             'overdue_tasks' => $project->tasks()
                 ->whereNotNull('due_date')
                 ->where('due_date', '<', now())
                 ->whereNotIn('status', ['completed', 'archived'])
                 ->count(),
-            'members_count' => $project->members()->count(),
-            'completion_percentage' => 0,
+            'member_count' => $project->members()->count(),
+            'progress_percentage' => $project->progress_percentage,
+            'days_until_due' => $project->days_until_due,
+            'is_overdue' => $project->is_overdue,
+            'total_budget' => $project->budget,
+            'total_invoiced' => $project->invoices()->where('status', '!=', InvoiceStatus::Cancelled)->sum('total'),
+            'total_paid' => $project->invoices()->where('status', InvoiceStatus::Paid)->sum('total'),
+            'pending_amount' => $project->invoices()->whereIn('status', [
+                InvoiceStatus::Sent,
+                InvoiceStatus::Viewed,
+                InvoiceStatus::Overdue,
+            ])->sum('total'),
+            'currency' => $project->currency,
         ];
-
-        if ($stats['total_tasks'] > 0) {
-            $stats['completion_percentage'] = round(($stats['completed_tasks'] / $stats['total_tasks']) * 100);
-        }
 
         return response()->json($stats);
     }
@@ -657,6 +666,15 @@ class ProjectController extends Controller
             'progress_percentage' => $project->progress_percentage,
             'days_until_due' => $project->days_until_due,
             'is_overdue' => $project->is_overdue,
+            'total_budget' => $project->budget,
+            'total_invoiced' => $project->invoices()->where('status', '!=', InvoiceStatus::Cancelled)->sum('total'),
+            'total_paid' => $project->invoices()->where('status', InvoiceStatus::Paid)->sum('total'),
+            'pending_amount' => $project->invoices()->whereIn('status', [
+                InvoiceStatus::Sent,
+                InvoiceStatus::Viewed,
+                InvoiceStatus::Overdue,
+            ])->sum('total'),
+            'currency' => $project->currency,
         ];
 
         return response()->json($stats);

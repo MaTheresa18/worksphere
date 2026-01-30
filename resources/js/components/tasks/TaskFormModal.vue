@@ -7,7 +7,10 @@ import * as z from "zod";
 import axios from "axios";
 import { toast } from "vue-sonner";
 import { useAuthStore } from "@/stores/auth";
-import { taskTemplateService, type TaskTemplate } from "@/services/task-template.service";
+import {
+    taskTemplateService,
+    type TaskTemplate,
+} from "@/services/task-template.service";
 
 const authStore = useAuthStore();
 
@@ -135,19 +138,22 @@ const localMembers = ref<any[]>([]);
 const canEditMetadata = computed(() => {
     if (props.task) return (props.task as any).can?.edit_metadata;
     if (!selectedTeamId.value) return true; // Default to true if creating and team not yet selected (entry gated by teamOptions)
-    return authStore.hasTeamPermission(selectedTeamId.value, 'tasks.edit_all');
+    return authStore.hasTeamPermission(selectedTeamId.value, "tasks.edit_all");
 });
 
 const canManageChecklist = computed(() => {
     if (props.task) return (props.task as any).can?.manage_checklist;
     if (!selectedTeamId.value) return true;
-    return authStore.hasTeamPermission(selectedTeamId.value, 'tasks.manage_checklist');
+    return authStore.hasTeamPermission(
+        selectedTeamId.value,
+        "tasks.manage_checklist",
+    );
 });
 
 const canAssign = computed(() => {
     if (props.task) return (props.task as any).can?.assign;
     if (!selectedTeamId.value) return true;
-    return authStore.hasTeamPermission(selectedTeamId.value, 'tasks.assign');
+    return authStore.hasTeamPermission(selectedTeamId.value, "tasks.assign");
 });
 
 const isReadOnly = computed(() => {
@@ -155,24 +161,28 @@ const isReadOnly = computed(() => {
     return false;
 });
 
-
 const operatorMemberOptions = computed(() => {
-    const list = props.projectMembers && props.projectMembers.length > 0
-        ? props.projectMembers
-        : localMembers.value;
+    const list =
+        props.projectMembers && props.projectMembers.length > 0
+            ? props.projectMembers
+            : localMembers.value;
 
     return list.map((m: any) => ({
         value: m.public_id || m.id,
         label: m.name,
         avatar: m.avatar_url,
-        subtitle: (m.team_role || m.role)?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || m.email
+        subtitle:
+            (m.team_role || m.role)
+                ?.replace(/_/g, " ")
+                .replace(/\b\w/g, (c: string) => c.toUpperCase()) || m.email,
     }));
 });
 
 const qaMemberOptions = computed(() => {
-    const list = props.projectMembers && props.projectMembers.length > 0
-        ? props.projectMembers
-        : localMembers.value;
+    const list =
+        props.projectMembers && props.projectMembers.length > 0
+            ? props.projectMembers
+            : localMembers.value;
 
     return list
         .filter((m: any) => m.is_qa_eligible)
@@ -180,7 +190,11 @@ const qaMemberOptions = computed(() => {
             value: m.public_id || m.id,
             label: m.name,
             avatar: m.avatar_url,
-            subtitle: (m.team_role || m.role)?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || m.email
+            subtitle:
+                (m.team_role || m.role)
+                    ?.replace(/_/g, " ")
+                    .replace(/\b\w/g, (c: string) => c.toUpperCase()) ||
+                m.email,
         }));
 });
 
@@ -192,16 +206,19 @@ const projectOptions = ref<any[]>([]);
 const teamOptions = computed(() => {
     if (!authStore.user?.teams) return [];
 
-    return authStore.user.teams.filter((team) => {
-        // Super admin check
-        if (authStore.isSuperAdmin) return true; 
+    return authStore.user.teams
+        .filter((team) => {
+            // Super admin check
+            if (authStore.isSuperAdmin) return true;
 
-        const perms = authStore.user?.team_permissions?.[team.public_id] || [];
-        return perms.includes('tasks.create');
-    }).map((team) => ({
-        value: team.public_id,
-        label: team.name,
-    }));
+            const perms =
+                authStore.user?.team_permissions?.[team.public_id] || [];
+            return perms.includes("tasks.create");
+        })
+        .map((team) => ({
+            value: team.public_id,
+            label: team.name,
+        }));
 });
 
 // Fetch projects when team changes
@@ -302,22 +319,32 @@ watch(
             setValues({
                 status: "open",
                 priority:
-                    template.default_priority === "low" ? 1
-                    : template.default_priority === "medium" ? 2
-                    : template.default_priority === "high" ? 3
-                    : template.default_priority === "urgent" ? 4
-                    : 2,
+                    template.default_priority === "low"
+                        ? 1
+                        : template.default_priority === "medium"
+                          ? 2
+                          : template.default_priority === "high"
+                            ? 3
+                            : template.default_priority === "urgent"
+                              ? 4
+                              : 2,
             });
 
             formValues.value.title = template.name.replace(" (Template)", "");
-            formValues.value.description = template.description || formValues.value.description;
+            formValues.value.description =
+                template.description || formValues.value.description;
             formValues.value.priority =
-                template.default_priority === "low" ? 1
-                : template.default_priority === "medium" ? 2
-                : template.default_priority === "high" ? 3
-                : template.default_priority === "urgent" ? 4
-                : 2;
-            formValues.value.estimated_hours = template.default_estimated_hours || 0;
+                template.default_priority === "low"
+                    ? 1
+                    : template.default_priority === "medium"
+                      ? 2
+                      : template.default_priority === "high"
+                        ? 3
+                        : template.default_priority === "urgent"
+                          ? 4
+                          : 2;
+            formValues.value.estimated_hours =
+                template.default_estimated_hours || 0;
 
             if (template.checklist_template) {
                 formValues.value.checklist = JSON.parse(
@@ -346,7 +373,11 @@ const initializeModal = async () => {
     if (selectedTeamId.value && templates.value.length === 0) {
         await fetchTemplates();
     }
-    if (selectedTeamId.value && selectedProjectId.value && (!props.projectMembers || props.projectMembers.length === 0)) {
+    if (
+        selectedTeamId.value &&
+        selectedProjectId.value &&
+        (!props.projectMembers || props.projectMembers.length === 0)
+    ) {
         await fetchMembers();
     }
 };
@@ -366,15 +397,23 @@ watch(
     () => props.task,
     (newTask) => {
         if (newTask) {
-            const statusValue = typeof newTask.status === "object" ? newTask.status?.value : newTask.status;
-            const priorityValue = typeof newTask.priority === "object" ? newTask.priority?.value : newTask.priority;
+            const statusValue =
+                typeof newTask.status === "object"
+                    ? newTask.status?.value
+                    : newTask.status;
+            const priorityValue =
+                typeof newTask.priority === "object"
+                    ? newTask.priority?.value
+                    : newTask.priority;
 
             setValues({
                 title: newTask.title,
                 description: newTask.description,
                 status: statusValue || "open",
                 priority: priorityValue || 2,
-                due_date: newTask.due_date ? new Date(newTask.due_date).toISOString() : "",
+                due_date: newTask.due_date
+                    ? new Date(newTask.due_date).toISOString()
+                    : "",
                 assigned_to: newTask.assignee?.id || newTask.assigned_to || "",
                 estimated_hours: Number(newTask.estimated_hours) || 0,
             });
@@ -384,14 +423,25 @@ watch(
                 description: newTask.description || "",
                 status: statusValue || "open",
                 priority: priorityValue || 2,
-                due_date: newTask.due_date ? new Date(newTask.due_date).toISOString().split("T")[0] : "",
+                due_date: newTask.due_date
+                    ? new Date(newTask.due_date).toISOString().split("T")[0]
+                    : "",
                 assigned_to: newTask.assignee?.id || newTask.assigned_to || "",
                 qa_user_id: newTask.qa_user?.id || newTask.qa_user_id || "",
                 estimated_hours: Number(newTask.estimated_hours) || 0,
-                checklist: newTask.checklist?.map((item: any) => ({
-                    title: typeof item === "string" ? item : item.title || item.text,
-                    is_completed: typeof item === "string" ? false : item.is_completed || item.status === "done" || false,
-                })) || [],
+                checklist:
+                    newTask.checklist?.map((item: any) => ({
+                        title:
+                            typeof item === "string"
+                                ? item
+                                : item.title || item.text,
+                        is_completed:
+                            typeof item === "string"
+                                ? false
+                                : item.is_completed ||
+                                  item.status === "done" ||
+                                  false,
+                    })) || [],
                 save_as_template: false,
             };
         } else {
@@ -430,8 +480,19 @@ const onSubmit = async () => {
             }),
         };
 
-        const teamId = selectedTeamId.value || props.teamId || props.task?.project?.team_id || props.task?.team_id || "";
-        const projectId = selectedProjectId.value || props.projectId || props.task?.project?.id || props.task?.project?.public_id || props.task?.project_id || "";
+        const teamId =
+            selectedTeamId.value ||
+            props.teamId ||
+            props.task?.project?.team_id ||
+            props.task?.team_id ||
+            "";
+        const projectId =
+            selectedProjectId.value ||
+            props.projectId ||
+            props.task?.project?.id ||
+            props.task?.project?.public_id ||
+            props.task?.project_id ||
+            "";
 
         if (!teamId || !projectId) {
             toast.error("Please select a team and project");
@@ -478,8 +539,11 @@ const onSubmit = async () => {
                 class="flex flex-col gap-6 p-2"
             >
                 <div class="space-y-4">
-                  <!-- Project/Team Context (Horizontal) -->
-                   <div v-if="!props.projectId && !isEditing" class="grid grid-cols-2 gap-4">
+                    <!-- Project/Team Context (Horizontal) -->
+                    <div
+                        v-if="!props.projectId && !isEditing"
+                        class="grid grid-cols-2 gap-4"
+                    >
                         <SelectFilter
                             v-model="selectedTeamId"
                             :options="teamOptions"
@@ -493,17 +557,21 @@ const onSubmit = async () => {
                             :disabled="!selectedTeamId"
                             class="w-full"
                         />
-                   </div>
-                   
-                   <!-- Template Loader -->
-                   <div v-if="!isEditing && templates.length > 0 && selectedTeamId">
-                         <SelectFilter
+                    </div>
+
+                    <!-- Template Loader -->
+                    <div
+                        v-if="
+                            !isEditing && templates.length > 0 && selectedTeamId
+                        "
+                    >
+                        <SelectFilter
                             v-model="selectedTemplateId"
                             :options="templateOptions"
                             placeholder="Load from template..."
                             class="w-full"
                         />
-                   </div>
+                    </div>
 
                     <!-- Title -->
                     <div>
@@ -515,66 +583,115 @@ const onSubmit = async () => {
                             :disabled="!canEditMetadata || isReadOnly"
                         />
                     </div>
-                
+
                     <!-- Properties Grid -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 bg-[var(--surface-secondary)]/30 p-4 rounded-xl border border-[var(--border-subtle)]">
+                    <div
+                        class="grid grid-cols-2 md:grid-cols-4 gap-4 bg-[var(--surface-secondary)]/30 p-4 rounded-xl border border-[var(--border-subtle)]"
+                    >
                         <!-- Status -->
-                         <div class="space-y-1">
-                             <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Status</label>
-                             <SelectFilter
+                        <div class="space-y-1">
+                            <label
+                                class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]"
+                                >Status</label
+                            >
+                            <SelectFilter
                                 v-model="formValues.status"
                                 :options="statusOptions"
                                 placeholder="Status"
                                 class="w-full text-sm"
                                 :disabled="isReadOnly"
                             />
-                         </div>
+                        </div>
 
-                         <!-- Priority -->
-                         <div class="space-y-1">
-                             <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Priority</label>
-                             <SelectFilter
+                        <!-- Priority -->
+                        <div class="space-y-1">
+                            <label
+                                class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]"
+                                >Priority</label
+                            >
+                            <SelectFilter
                                 v-model="formValues.priority"
                                 :options="priorityOptions"
                                 placeholder="Priority"
                                 class="w-full text-sm"
                                 :disabled="!canEditMetadata || isReadOnly"
                             />
-                         </div>
-                         
-                         <!-- Due Date -->
-                          <div class="space-y-1">
-                             <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Due Date</label>
-                             <Input type="date" v-model="formValues.due_date" class="w-full text-sm h-10" :disabled="!canEditMetadata || isReadOnly" />
-                         </div>
+                        </div>
 
-                          <!-- Est Hours -->
-                          <div class="space-y-1">
-                             <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Est. Hours</label>
-                             <Input type="number" step="0.5" v-model="formValues.estimated_hours" class="w-full text-sm h-10" placeholder="0" :disabled="!canEditMetadata || isReadOnly" />
-                         </div>
+                        <!-- Due Date -->
+                        <div class="space-y-1">
+                            <label
+                                class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]"
+                                >Due Date</label
+                            >
+                            <Input
+                                type="date"
+                                v-model="formValues.due_date"
+                                class="w-full text-sm h-10"
+                                :disabled="!canEditMetadata || isReadOnly"
+                            />
+                        </div>
+
+                        <!-- Est Hours -->
+                        <div class="space-y-1">
+                            <label
+                                class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]"
+                                >Est. Hours</label
+                            >
+                            <Input
+                                type="number"
+                                step="0.5"
+                                v-model="formValues.estimated_hours"
+                                class="w-full text-sm h-10"
+                                placeholder="0"
+                                :disabled="!canEditMetadata || isReadOnly"
+                            />
+                        </div>
                     </div>
 
                     <!-- People Grid -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="space-y-1">
-                             <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">Assignee</label>
-                             <SelectFilter
+                            <label
+                                class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]"
+                                >Assignee</label
+                            >
+                            <SelectFilter
                                 v-model="formValues.assigned_to"
                                 :options="operatorMemberOptions"
-                                :placeholder="operatorMemberOptions.length === 0 ? 'No members' : 'Unassigned'"
-                                :disabled="operatorMemberOptions.length === 0 || !canAssign || isReadOnly"
+                                :placeholder="
+                                    operatorMemberOptions.length === 0
+                                        ? 'No members'
+                                        : 'Unassigned'
+                                "
+                                :disabled="
+                                    operatorMemberOptions.length === 0 ||
+                                    !canAssign ||
+                                    isReadOnly
+                                "
                                 class="w-full"
                                 searchable
                             />
                         </div>
                         <div class="space-y-1">
-                             <label class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]">QA Owner</label>
-                             <SelectFilter
+                            <label
+                                class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]"
+                                >QA Owner</label
+                            >
+                            <SelectFilter
                                 v-model="formValues.qa_user_id"
                                 :options="qaMemberOptions"
-                                :placeholder="qaMemberOptions.length === 0 ? 'No members' : 'Unassigned'"
-                                :disabled="qaMemberOptions.length === 0 || isFetchingMembers || !canAssign || isReadOnly"
+                                :placeholder="
+                                    qaMemberOptions.length === 0
+                                        ? 'No members'
+                                        : 'Unassigned'
+                                "
+                                :disabled="
+                                    qaMemberOptions.length === 0 ||
+                                    isFetchingMembers ||
+                                    !canAssign ||
+                                    isReadOnly
+                                "
                                 class="w-full"
                                 searchable
                             />
@@ -583,52 +700,124 @@ const onSubmit = async () => {
 
                     <!-- Description -->
                     <div class="space-y-2">
-                         <label class="text-sm font-medium text-[var(--text-secondary)]">Description</label>
-                         <Textarea
-                            v-model="formValues.description"
-                            placeholder="Add more details..."
-                            rows="5"
-                            class="resize-y min-h-[100px] bg-[var(--surface-primary)] border-[var(--border-default)] focus:border-[var(--primary-DEFAULT)]"
-                            :disabled="!canEditMetadata || isReadOnly"
-                        />
+                        <label
+                            class="text-sm font-medium text-[var(--text-secondary)]"
+                            >Description</label
+                        >
+                        <div
+                            class="bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-xl overflow-hidden focus-within:border-[var(--interactive-primary)] focus-within:ring-2 focus-within:ring-[var(--interactive-primary)]/20 transition-all"
+                        >
+                            <Textarea
+                                v-model="formValues.description"
+                                placeholder="Add more details..."
+                                rows="5"
+                                borderless
+                                class="border-none shadow-none bg-transparent focus:ring-0 focus-visible:ring-0 min-h-[120px] resize-y"
+                                :disabled="!canEditMetadata || isReadOnly"
+                            />
+                        </div>
                     </div>
 
                     <!-- Checklist -->
-                    <div class="space-y-3 pt-4 border-t border-[var(--border-subtle)]">
+                    <div
+                        class="space-y-3 pt-4 border-t border-[var(--border-subtle)]"
+                    >
                         <div class="flex items-center justify-between">
-                            <label class="text-sm font-medium text-[var(--text-secondary)]">Checklist</label>
-                            <span class="text-xs text-[var(--text-muted)]">{{ formValues.checklist.filter(i => typeof i === 'string' ? false : i.is_completed).length }}/{{ formValues.checklist.length }}</span>
+                            <label
+                                class="text-sm font-medium text-[var(--text-secondary)]"
+                                >Checklist</label
+                            >
+                            <span class="text-xs text-[var(--text-muted)]"
+                                >{{
+                                    formValues.checklist.filter((i) =>
+                                        typeof i === "string"
+                                            ? false
+                                            : i.is_completed,
+                                    ).length
+                                }}/{{ formValues.checklist.length }}</span
+                            >
                         </div>
-                        
+
                         <div class="space-y-2">
-                             <div class="flex gap-2">
+                            <div class="flex gap-2">
                                 <Input
                                     v-model="newChecklistItem"
                                     placeholder="Add item..."
                                     @keydown.enter.prevent="addChecklistItem"
                                     class="flex-1"
-                                    :disabled="!canManageChecklist || isReadOnly"
+                                    :disabled="
+                                        !canManageChecklist || isReadOnly
+                                    "
                                 />
-                                <Button type="button" size="sm" variant="secondary" @click="addChecklistItem">Add</Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="secondary"
+                                    @click="addChecklistItem"
+                                    >Add</Button
+                                >
                             </div>
-                            
-                            <div v-if="formValues.checklist.length > 0" class="space-y-2 mt-2">
+
+                            <div
+                                v-if="formValues.checklist.length > 0"
+                                class="space-y-2 mt-2"
+                            >
                                 <div
-                                    v-for="(item, index) in formValues.checklist"
+                                    v-for="(
+                                        item, index
+                                    ) in formValues.checklist"
                                     :key="index"
                                     class="flex items-center gap-3 p-2 rounded-lg bg-[var(--surface-secondary)]/30 border border-[var(--border-subtle)] hover:border-[var(--border-default)] transition-all group"
                                 >
-                                    <div class="w-4 h-4 rounded-full border border-[var(--border-default)] flex items-center justify-center">
-                                       <div v-if="typeof item !== 'string' && item.is_completed" class="w-2.5 h-2.5 bg-[var(--success-DEFAULT)] rounded-full"></div>
+                                    <div
+                                        class="w-4 h-4 rounded-full border border-[var(--border-default)] flex items-center justify-center"
+                                    >
+                                        <div
+                                            v-if="
+                                                typeof item !== 'string' &&
+                                                item.is_completed
+                                            "
+                                            class="w-2.5 h-2.5 bg-[var(--success-DEFAULT)] rounded-full"
+                                        ></div>
                                     </div>
-                                    <span class="text-sm flex-1 text-[var(--text-primary)]">{{ typeof item === "string" ? item : item.title }}</span>
+                                    <span
+                                        class="text-sm flex-1 text-[var(--text-primary)]"
+                                        >{{
+                                            typeof item === "string"
+                                                ? item
+                                                : item.title
+                                        }}</span
+                                    >
                                     <button
                                         v-if="canManageChecklist && !isReadOnly"
                                         type="button"
                                         @click="removeChecklistItem(index)"
                                         class="text-[var(--text-muted)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                                     >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                        <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width="14"
+                                            height="14"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                        >
+                                            <line
+                                                x1="18"
+                                                y1="6"
+                                                x2="6"
+                                                y2="18"
+                                            ></line>
+                                            <line
+                                                x1="6"
+                                                y1="6"
+                                                x2="18"
+                                                y2="18"
+                                            ></line>
+                                        </svg>
                                     </button>
                                 </div>
                             </div>
@@ -636,15 +825,30 @@ const onSubmit = async () => {
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2 pt-4 border-t border-[var(--border-subtle)] mt-auto">
+                <div
+                    class="flex items-center gap-2 pt-4 border-t border-[var(--border-subtle)] mt-auto"
+                >
                     <!-- Save as template -->
-                    <label class="flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer select-none">
-                        <input type="checkbox" v-model="formValues.save_as_template" class="rounded border-[var(--border-default)] text-[var(--primary-DEFAULT)] focus:ring-[var(--primary-DEFAULT)]" />
+                    <label
+                        class="flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer select-none"
+                    >
+                        <input
+                            type="checkbox"
+                            v-model="formValues.save_as_template"
+                            class="rounded border-[var(--border-default)] text-[var(--primary-DEFAULT)] focus:ring-[var(--primary-DEFAULT)]"
+                        />
                         Save as Template
                     </label>
                     <div class="flex-1"></div>
-                    <Button variant="ghost" type="button" @click="isOpen = false">Cancel</Button>
-                    <Button type="submit" :loading="isLoading">{{ isEditing ? 'Save Changes' : 'Create Task' }}</Button>
+                    <Button
+                        variant="ghost"
+                        type="button"
+                        @click="isOpen = false"
+                        >Cancel</Button
+                    >
+                    <Button type="submit" :loading="isLoading">{{
+                        isEditing ? "Save Changes" : "Create Task"
+                    }}</Button>
                 </div>
             </form>
         </template>

@@ -37,6 +37,9 @@ import {
     Activity, // for Activity tab/section
     Target, // for Deadlines or Workload
     BarChart, // for Workload
+    Banknote,
+    TrendingUp,
+    Receipt,
 } from "lucide-vue-next";
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth";
@@ -856,7 +859,13 @@ watch(
 
                     <div class="ml-auto flex items-center gap-2">
                         <Button
-                            v-if="activeTab === 'tasks'"
+                            v-if="
+                                activeTab === 'tasks' &&
+                                authStore.hasTeamPermission(
+                                    currentTeamId,
+                                    'tasks.create',
+                                )
+                            "
                             @click="onCreateTask"
                             size="sm"
                             class="shadow-sm"
@@ -1123,6 +1132,197 @@ watch(
                         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <!-- Left Column: Description & Activities -->
                             <div class="lg:col-span-2 space-y-6">
+                                <!-- Financial Overview Section -->
+                                <Card
+                                    v-if="stats"
+                                    padding="lg"
+                                    class="border-[var(--border-subtle)] shadow-sm overflow-hidden relative group"
+                                >
+                                    <div
+                                        class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:scale-110 transition-transform duration-500"
+                                    >
+                                        <Banknote class="w-32 h-32" />
+                                    </div>
+
+                                    <div class="relative z-10">
+                                        <div
+                                            class="flex items-center justify-between mb-6"
+                                        >
+                                            <h3
+                                                class="text-base font-bold text-[var(--text-primary)] flex items-center gap-2"
+                                            >
+                                                <div
+                                                    class="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500"
+                                                >
+                                                    <TrendingUp
+                                                        class="w-4 h-4"
+                                                    />
+                                                </div>
+                                                Financial Summary
+                                            </h3>
+                                            <Badge
+                                                variant="secondary"
+                                                class="bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                            >
+                                                {{ stats.currency || "USD" }}
+                                            </Badge>
+                                        </div>
+
+                                        <div
+                                            class="grid grid-cols-2 md:grid-cols-4 gap-4"
+                                        >
+                                            <!-- Total Budget -->
+                                            <div class="space-y-1">
+                                                <p
+                                                    class="text-[10px] uppercase tracking-widest font-bold text-[var(--text-muted)]"
+                                                >
+                                                    Total Budget
+                                                </p>
+                                                <p
+                                                    class="text-xl font-black text-[var(--text-primary)]"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            stats.total_budget ||
+                                                                0,
+                                                            stats.currency,
+                                                        )
+                                                    }}
+                                                </p>
+                                            </div>
+
+                                            <!-- Paid to Date -->
+                                            <div class="space-y-1">
+                                                <p
+                                                    class="text-[10px] uppercase tracking-widest font-bold text-[var(--text-muted)]"
+                                                >
+                                                    Paid to Date
+                                                </p>
+                                                <p
+                                                    class="text-xl font-black text-emerald-500"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            stats.total_paid ||
+                                                                0,
+                                                            stats.currency,
+                                                        )
+                                                    }}
+                                                </p>
+                                            </div>
+
+                                            <!-- Pending -->
+                                            <div class="space-y-1">
+                                                <p
+                                                    class="text-[10px] uppercase tracking-widest font-bold text-[var(--text-muted)]"
+                                                >
+                                                    Outstanding
+                                                </p>
+                                                <p
+                                                    class="text-xl font-black text-amber-500"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            stats.pending_amount ||
+                                                                0,
+                                                            stats.currency,
+                                                        )
+                                                    }}
+                                                </p>
+                                            </div>
+
+                                            <!-- Remaining -->
+                                            <div class="space-y-1">
+                                                <p
+                                                    class="text-[10px] uppercase tracking-widest font-bold text-[var(--text-muted)]"
+                                                >
+                                                    Remaining
+                                                </p>
+                                                <p
+                                                    class="text-xl font-black text-[var(--interactive-primary)]"
+                                                >
+                                                    {{
+                                                        formatCurrency(
+                                                            Math.max(
+                                                                0,
+                                                                (stats.total_budget ||
+                                                                    0) -
+                                                                    (stats.total_paid ||
+                                                                        0),
+                                                            ),
+                                                            stats.currency,
+                                                        )
+                                                    }}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <!-- Progress Bar -->
+                                        <div class="mt-6">
+                                            <div
+                                                class="flex items-center justify-between mb-2 text-[10px] font-bold uppercase tracking-tighter"
+                                            >
+                                                <span class="text-emerald-500"
+                                                    >Collected ({{
+                                                        Math.round(
+                                                            ((stats.total_paid ||
+                                                                0) /
+                                                                (stats.total_budget ||
+                                                                    1)) *
+                                                                100,
+                                                        )
+                                                    }}%)</span
+                                                >
+                                                <span
+                                                    class="text-[var(--text-muted)]"
+                                                    >{{
+                                                        Math.round(
+                                                            (Math.max(
+                                                                0,
+                                                                (stats.total_budget ||
+                                                                    0) -
+                                                                    (stats.total_paid ||
+                                                                        0),
+                                                            ) /
+                                                                (stats.total_budget ||
+                                                                    1)) *
+                                                                100,
+                                                        )
+                                                    }}% Left</span
+                                                >
+                                            </div>
+                                            <div
+                                                class="h-2 w-full bg-[var(--surface-tertiary)] rounded-full overflow-hidden flex"
+                                            >
+                                                <div
+                                                    class="h-full bg-emerald-500 transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(16,185,129,0.3)]"
+                                                    :style="{
+                                                        width: `${Math.round(
+                                                            ((stats.total_paid ||
+                                                                0) /
+                                                                (stats.total_budget ||
+                                                                    1)) *
+                                                                100,
+                                                        )}%`,
+                                                    }"
+                                                ></div>
+                                                <div
+                                                    class="h-full bg-amber-500 transition-all duration-1000 ease-out delay-300"
+                                                    :style="{
+                                                        width: `${Math.round(
+                                                            ((stats.pending_amount ||
+                                                                0) /
+                                                                (stats.total_budget ||
+                                                                    1)) *
+                                                                100,
+                                                        )}%`,
+                                                    }"
+                                                ></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Card>
+
                                 <Card
                                     padding="lg"
                                     class="border-[var(--border-subtle)] shadow-sm"

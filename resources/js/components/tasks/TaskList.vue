@@ -24,6 +24,7 @@ import {
     Folder,
     Users,
     Building2,
+    ListChecks,
 } from "lucide-vue-next";
 import { isPast, parseISO } from "date-fns";
 
@@ -49,6 +50,8 @@ interface Task {
         avatar_url: string;
     };
     created_at: string;
+    checklist_total?: number;
+    checklist_done?: number;
 }
 
 interface Props {
@@ -64,7 +67,7 @@ const emit = defineEmits<{
     (e: "task-click", task: Task): void;
     (e: "edit-task", task: Task): void;
     (e: "delete-task", task: Task): void;
-    (e: "quick-assign", task: Task, type?: 'operator' | 'qa'): void;
+    (e: "quick-assign", task: Task, type?: "operator" | "qa"): void;
 }>();
 
 const getStatusColor = (status: any) => {
@@ -237,6 +240,11 @@ const isOverdue = (dateString?: string, status?: any) => {
                             Task
                         </th>
                         <th
+                            class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-28 text-center"
+                        >
+                            Checklist
+                        </th>
+                        <th
                             class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-40"
                         >
                             Assigned To
@@ -379,12 +387,64 @@ const isOverdue = (dateString?: string, status?: any) => {
                             </div>
                         </td>
 
+                        <!-- Checklist Progress Column -->
+                        <td class="px-4 py-3 text-center">
+                            <div
+                                v-if="
+                                    task.checklist_total &&
+                                    task.checklist_total > 0
+                                "
+                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] text-[10px] font-semibold transition-all group-hover:bg-[var(--surface-tertiary)]"
+                                :class="{
+                                    'text-emerald-500 bg-emerald-500/10 border-emerald-500/20':
+                                        task.checklist_done ===
+                                        task.checklist_total,
+                                    'text-[var(--text-secondary)]':
+                                        task.checklist_done !==
+                                        task.checklist_total,
+                                }"
+                            >
+                                <ListChecks
+                                    class="w-3 h-3"
+                                    :class="{
+                                        'text-emerald-500':
+                                            task.checklist_done ===
+                                            task.checklist_total,
+                                        'text-[var(--text-muted)]':
+                                            task.checklist_done !==
+                                            task.checklist_total,
+                                    }"
+                                />
+                                <span
+                                    >{{ task.checklist_done }}/{{
+                                        task.checklist_total
+                                    }}</span
+                                >
+                            </div>
+                            <span
+                                v-else
+                                class="text-[10px] text-[var(--text-muted)] opacity-50"
+                                >-</span
+                            >
+                        </td>
+
                         <!-- Assigned To Column -->
                         <td class="px-4 py-3">
                             <div
-                                @click.stop="task.can?.assign && emit('quick-assign', task, 'operator')"
-                                :class="task.can?.assign ? 'cursor-pointer hover:opacity-80 transition-opacity' : 'cursor-default'"
-                                :title="task.can?.assign ? 'Quick Assign Operator' : ''"
+                                @click.stop="
+                                    task.can?.assign &&
+                                    emit('quick-assign', task, 'operator')
+                                "
+                                :class="
+                                    task.can?.assign
+                                        ? 'cursor-pointer hover:opacity-80 transition-opacity'
+                                        : 'cursor-default'
+                                "
+                                :title="
+                                    task.can?.assign
+                                        ? 'Quick Assign Operator'
+                                        : ''
+                                "
                             >
                                 <div
                                     v-if="task.assignee"
@@ -415,9 +475,18 @@ const isOverdue = (dateString?: string, status?: any) => {
                         <!-- QA Owner Column -->
                         <td class="px-4 py-3">
                             <div
-                                @click.stop="task.can?.assign && emit('quick-assign', task, 'qa')"
-                                :class="task.can?.assign ? 'cursor-pointer hover:opacity-80 transition-opacity' : 'cursor-default'"
-                                :title="task.can?.assign ? 'Quick Assign QA' : ''"
+                                @click.stop="
+                                    task.can?.assign &&
+                                    emit('quick-assign', task, 'qa')
+                                "
+                                :class="
+                                    task.can?.assign
+                                        ? 'cursor-pointer hover:opacity-80 transition-opacity'
+                                        : 'cursor-default'
+                                "
+                                :title="
+                                    task.can?.assign ? 'Quick Assign QA' : ''
+                                "
                             >
                                 <div
                                     v-if="task.qa_user"
