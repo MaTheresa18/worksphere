@@ -22,6 +22,7 @@ import {
     Circle,
     CheckCircle2,
     Play,
+    Pause,
     Send,
     Eye,
     Archive,
@@ -151,6 +152,13 @@ const statusConfig: Record<
         border: "border-amber-200 dark:border-amber-900",
         icon: Send,
     },
+    on_hold: {
+        label: "On Hold",
+        color: "text-amber-600 dark:text-amber-400",
+        bg: "bg-amber-50 dark:bg-amber-500/10",
+        border: "border-amber-200 dark:border-amber-900",
+        icon: Pause,
+    },
     in_qa: {
         label: "In QA Review",
         color: "text-orange-600 dark:text-orange-400",
@@ -260,9 +268,15 @@ const workflowStatuses = [
 const getStatus = (s: string) => statusConfig[s] || statusConfig["open"];
 
 // Treat 'approved' (legacy) as 'pm_review' for stepper/UI purposes
+// Map 'on_hold' to its previous status (visual location)
 const getStatusValue = (t: any) => {
     let val = t?.status?.value || t?.status || "open";
     if (val === "approved") return "pm_review";
+    if (val === "on_hold") {
+        const prev = t?.metadata?.previous_status;
+        // Ensure previous status is a valid workflow step, else default to in_progress
+        return workflowStatuses.includes(prev) ? prev : "in_progress";
+    }
     return val;
 };
 const getPriority = (p: number) => priorityConfig[p] || priorityConfig[2];
@@ -618,9 +632,15 @@ const submitForReview = async () => {
     await updateStatus("in_qa");
 };
 
-const internalArchiveTask = async () => {
+const showArchiveConfirmModal = ref(false);
+const showTaskDeleteConfirmModal = ref(false);
+
+const internalArchiveTask = () => {
+    showArchiveConfirmModal.value = true;
+};
+
+const executeArchiveTask = async () => {
     if (!task.value) return;
-    if (!confirm("Are you sure you want to archive this task?")) return;
 
     try {
         isArchiving.value = true;
@@ -630,6 +650,7 @@ const internalArchiveTask = async () => {
         task.value = response.data.data || response.data.task;
         toast.success("Task archived");
         await fetchStatusHistory();
+        showArchiveConfirmModal.value = false;
     } catch (err: any) {
         toast.error(err.response?.data?.message || "Failed to archive task");
     } finally {
@@ -637,14 +658,12 @@ const internalArchiveTask = async () => {
     }
 };
 
-const internalDeleteTask = async () => {
+const internalDeleteTask = () => {
+    showTaskDeleteConfirmModal.value = true;
+};
+
+const executeDeleteTask = async () => {
     if (!task.value) return;
-    if (
-        !confirm(
-            "Are you sure you want to delete this task? This cannot be undone.",
-        )
-    )
-        return;
 
     try {
         isTaskDeleting.value = true;
@@ -653,6 +672,7 @@ const internalDeleteTask = async () => {
         );
         toast.success("Task deleted");
         router.push(`/projects/${projectId.value}`);
+        showTaskDeleteConfirmModal.value = false;
     } catch (err: any) {
         toast.error(err.response?.data?.message || "Failed to delete task");
     } finally {
@@ -1022,7 +1042,13 @@ watch(
                                                                     task,
                                                                 ),
                                                             ) === index
-                                                          ? 'border-[var(--interactive-primary)] text-[var(--interactive-primary)]'
+                                                          ? task.status ===
+                                                                'on_hold' ||
+                                                            task.status
+                                                                ?.value ===
+                                                                'on_hold'
+                                                              ? 'border-amber-500 text-amber-600 bg-amber-50'
+                                                              : 'border-[var(--interactive-primary)] text-[var(--interactive-primary)]'
                                                           : 'border-[var(--border-default)] text-[var(--text-muted)]',
                                                 ]"
                                             >
@@ -1049,8 +1075,21 @@ watch(
                                                 <span
                                                     v-else
                                                     class="text-xs font-medium"
-                                                    >{{ index + 1 }}</span
                                                 >
+                                                    <component
+                                                        :is="
+                                                            statusConfig[step]
+                                                                .icon
+                                                        "
+                                                        v-if="
+                                                            step === 'on_hold'
+                                                        "
+                                                        class="w-4 h-4"
+                                                    />
+                                                    <template v-else>{{
+                                                        index + 1
+                                                    }}</template>
+                                                </span>
                                             </div>
 
                                             <!-- Label -->
@@ -2133,6 +2172,57 @@ watch(
                     :loading="isBulkDeleting"
                 >
                     Delete {{ filesToBulkDelete.length }} File(s)
+                </Button>
+            </template>
+        </Modal>
+        <!-- Archive Confirmation Modal -->
+        <Modal
+            :open="showArchiveConfirmModal"
+            @update:open="showArchiveConfirmModal = $event"
+            title="Archive Task"
+            description="Are you sure you want to archive this task? It will be moved to the archived list."
+            size="sm"
+        >
+            <template #footer>
+                <Button
+                    variant="ghost"
+                    @click="showArchiveConfirmModal = false"
+                    :disabled="isArchiving"
+                >
+                    Cancel
+                </Button>
+                <Button
+                    variant="primary"
+                    @click="executeArchiveTask"
+                    :loading="isArchiving"
+                >
+                    Archive Task
+                </Button>
+            </template>
+        </Modal>
+
+        <!-- Delete Confirmation Modal -->
+        <Modal
+            :open="showTaskDeleteConfirmModal"
+            @update:open="showTaskDeleteConfirmModal = $event"
+            title="Delete Task"
+            description="Are you sure you want to delete this task? This action cannot be undone."
+            size="sm"
+        >
+            <template #footer>
+                <Button
+                    variant="ghost"
+                    @click="showTaskDeleteConfirmModal = false"
+                    :disabled="isTaskDeleting"
+                >
+                    Cancel
+                </Button>
+                <Button
+                    variant="danger"
+                    @click="executeDeleteTask"
+                    :loading="isTaskDeleting"
+                >
+                    Delete Task
                 </Button>
             </template>
         </Modal>

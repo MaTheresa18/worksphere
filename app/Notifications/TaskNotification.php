@@ -23,6 +23,8 @@ class TaskNotification extends Notification implements ShouldBroadcast, ShouldQu
     public const TYPE_QA_REVIEW = 'task_qa_review';
     public const TYPE_CLIENT_REVIEW = 'task_client_review';
     public const TYPE_COMPLETED = 'task_completed';
+    public const TYPE_REJECTED = 'task_rejected';
+    public const TYPE_ON_HOLD = 'task_on_hold';
 
     /**
      * Create a new notification instance.
@@ -94,6 +96,8 @@ class TaskNotification extends Notification implements ShouldBroadcast, ShouldQu
             self::TYPE_QA_REVIEW => 'Task Ready for QA',
             self::TYPE_CLIENT_REVIEW => 'Task Ready for Client',
             self::TYPE_COMPLETED => 'Task Completed',
+            self::TYPE_REJECTED => 'Task Rejected',
+            self::TYPE_ON_HOLD => 'Task On Hold',
             default => 'Task Notification',
         };
     }
@@ -116,6 +120,8 @@ class TaskNotification extends Notification implements ShouldBroadcast, ShouldQu
             self::TYPE_QA_REVIEW => "{$actorName} submitted task for QA: {$title}",
             self::TYPE_CLIENT_REVIEW => "{$actorName} sent task for client review: {$title}",
             self::TYPE_COMPLETED => "{$actorName} completed task: {$title}",
+            self::TYPE_REJECTED => "{$actorName} rejected task: {$title}",
+            self::TYPE_ON_HOLD => "{$actorName} put task on hold: {$title}",
             default => "Update on task: {$title}",
         };
     }

@@ -534,6 +534,35 @@ class Task extends Model implements HasMedia
     }
 
     /**
+     * Get fields to exclude from auditing.
+     *
+     * @return array<string>
+     */
+    public function getAuditExclude(): array
+    {
+        return [
+            'updated_at',
+            'created_at',
+            'deleted_at',
+            'archived_at',
+            'archived_by',
+            'completed_at',
+            'started_at',
+            'submitted_at',
+            'approved_at',
+            'sent_to_client_at',
+            'client_approved_at',
+            'assigned_at',
+            'assigned_by', // We audit assignment via semantic action usually
+            'created_by',
+            'parent_id',
+            'project_id', // Usually doesn't change, but if it does, maybe we want it? I'll exclude for now to be safe on noise.
+            'task_template_id',
+            'sort_order', // Drag and drop updates shouldn't flood history
+        ];
+    }
+
+    /**
      * Scope: By status.
      *
      * @param  Builder<Task>  $query

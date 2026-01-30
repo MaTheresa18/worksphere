@@ -7,8 +7,8 @@ import {
     XCircle,
     ArrowRight,
     Play,
-    Archive,
     Pause,
+    Archive,
     RefreshCw,
 } from "lucide-vue-next";
 import axios from "axios";
@@ -304,6 +304,12 @@ const performAction = async (actionId: string, note?: string) => {
         submitting.value = false;
     }
 };
+const isResuming = computed(() => {
+    return (
+        props.task.status === "on_hold" ||
+        props.task.status?.value === "on_hold"
+    );
+});
 </script>
 
 <template>
@@ -326,12 +332,16 @@ const performAction = async (actionId: string, note?: string) => {
             @update:open="noteModalOpen = $event"
             :title="
                 currentAction === 'hold'
-                    ? 'Put Task on Hold'
+                    ? isResuming
+                        ? 'Resume Task'
+                        : 'Put Task on Hold'
                     : 'Add Note / Comment'
             "
             :description="
                 currentAction === 'hold'
-                    ? 'Please provide a reason for putting this task on hold.'
+                    ? isResuming
+                        ? 'You can add a note about resuming this task.'
+                        : 'Please provide a reason for putting this task on hold.'
                     : 'Please add a note or reason for this action.'
             "
             size="sm"
@@ -340,7 +350,9 @@ const performAction = async (actionId: string, note?: string) => {
                 v-model="actionNote"
                 :placeholder="
                     currentAction === 'hold'
-                        ? 'Enter reason for hold...'
+                        ? isResuming
+                            ? 'Reason for resuming (optional)...'
+                            : 'Enter reason for hold...'
                         : 'Enter details here...'
                 "
                 rows="3"
@@ -352,9 +364,18 @@ const performAction = async (actionId: string, note?: string) => {
                 >
                 <Button
                     @click="confirmModalAction"
-                    :disabled="submitting || !actionNote"
+                    :disabled="
+                        submitting ||
+                        (!actionNote && !isResuming && currentAction === 'hold')
+                    "
                 >
-                    {{ currentAction === "hold" ? "Put on Hold" : "Confirm" }}
+                    {{
+                        currentAction === "hold"
+                            ? isResuming
+                                ? "Resume Task"
+                                : "Put on Hold"
+                            : "Confirm"
+                    }}
                 </Button>
             </template>
         </Modal>

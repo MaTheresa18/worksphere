@@ -18,6 +18,19 @@ class TaskWorkflowService
     ) {}
 
     /**
+     * Create a system comment from notes.
+     */
+    protected function addSystemComment(Task $task, User $user, string $content): void
+    {
+        \App\Models\TaskComment::create([
+            'task_id' => $task->id,
+            'user_id' => $user->id,
+            'content' => $content,
+            'is_internal' => false, // Make visible as regular comments
+        ]);
+    }
+
+    /**
      * Assign a task to a user.
      */
     public function assignTask(Task $task, User $assignee, User $assignedBy): Task
@@ -96,6 +109,13 @@ class TaskWorkflowService
                 null,
                 ['task_title' => $task->title, 'action' => 'submitted_for_qa']
             );
+
+            if ($notes) {
+                $this->addSystemComment($task, $user, "Submitted for QA: $notes");
+            }
+
+            // Notify stakeholders suitable for QA submission (e.g. QA Lead, Assignee confirming submission)
+            $this->notifyStakeholders($task, \App\Notifications\TaskNotification::TYPE_QA_REVIEW, $user, "Submitted for QA");
         }
 
         return $result;
@@ -177,7 +197,15 @@ class TaskWorkflowService
                 ]
             );
 
-            return true;
+            if ($notes) {
+                $action = $approved ? 'QA Approved' : 'QA Rejected';
+                $this->addSystemComment($task, $reviewer, "$action: $notes");
+            }
+
+            // Notify stakeholders
+            $type = $approved ? \App\Notifications\TaskNotification::TYPE_UPDATED : \App\Notifications\TaskNotification::TYPE_REJECTED; // Use UPDATED for PM review move, REJECTED for rejection
+            $message = $approved ? "QA Approved task" : "QA Rejected task: " . ($notes ?? 'Issues found');
+            $this->notifyStakeholders($task, $type, $reviewer, $message);
         });
     }
 
@@ -204,6 +232,10 @@ class TaskWorkflowService
                 null,
                 ['task_title' => $task->title, 'action' => 'sent_to_client']
             );
+
+            if ($message) {
+                $this->addSystemComment($task, $user, "Sent to Client: $message");
+            }
 
             // TODO: Send notification to client
         }
@@ -234,6 +266,10 @@ class TaskWorkflowService
                 null,
                 ['task_title' => $task->title, 'action' => 'client_approved']
             );
+
+            if ($notes) {
+                $this->addSystemComment($task, $user, "Client Approved: $notes");
+            }
         }
 
         return $result;
@@ -259,6 +295,16 @@ class TaskWorkflowService
                 null,
                 null,
                 ['task_title' => $task->title, 'action' => 'client_rejected', 'reason' => $reason]
+            );
+
+            $this->addSystemComment($task, $user, "Client Rejected: $reason");
+
+            // Notify stakeholders
+            $this->notifyStakeholders(
+                $task,
+                \App\Notifications\TaskNotification::TYPE_REJECTED,
+                $user,
+                "Client Rejected task: $reason"
             );
         }
 
@@ -286,6 +332,10 @@ class TaskWorkflowService
                 null,
                 ['task_title' => $task->title, 'action' => 'returned_to_progress']
             );
+
+            if ($notes) {
+                $this->addSystemComment($task, $user, "Returned to Progress: $notes");
+            }
         }
 
         return $result;
@@ -314,6 +364,10 @@ class TaskWorkflowService
                 null,
                 ['task_title' => $task->title, 'action' => 'completed']
             );
+
+            if ($notes) {
+                $this->addSystemComment($task, $user, "Completed: $notes");
+            }
         }
 
         return $result;
@@ -352,29 +406,65 @@ class TaskWorkflowService
      */
     public function toggleHold(Task $task, User $user, ?string $notes = null): bool
     {
-        $targetStatus = $task->status === TaskStatus::OnHold ? TaskStatus::InProgress : TaskStatus::OnHold;
+        $targetStatus = null;
 
-        // If coming back from hold, we might return to Open if it wasn't started?
-        // But simplified logic: OnHold <-> InProgress (or previous state)
-        // For now, let's assume OnHold usually goes back to InProgress or Open.
-        // Based on allowedTransitions: OnHold -> InProgress, Open.
+        if ($task->status === TaskStatus::OnHold) {
+            // Resume: Try to restore previous status from metadata
+            $previousStatusValue = $task->metadata['previous_status'] ?? null;
+            if ($previousStatusValue) {
+                $targetStatus = TaskStatus::tryFrom($previousStatusValue);
+            }
+            // Fallback to InProgress if no history or invalid
+            if (! $targetStatus) {
+                $targetStatus = TaskStatus::InProgress;
+            }
+        } else {
+            // Hold: Store current status in metadata before transitioning
+            $metadata = $task->metadata ?? [];
+            $metadata['previous_status'] = $task->status->value;
+            $task->metadata = $metadata;
+            $task->saveQuietly(); // Update metadata without triggering observers/timestamps yet
 
-        if ($targetStatus === TaskStatus::InProgress && ! $task->canTransitionTo(TaskStatus::InProgress)) {
-            // Fallback to Open if InProgress is not allowed (e.g. from Draft -> OnHold -> Open)
-            if ($task->canTransitionTo(TaskStatus::Open)) {
-                $targetStatus = TaskStatus::Open;
+            $targetStatus = TaskStatus::OnHold;
+        }
+
+        // Validate transition
+        if (! $task->canTransitionTo($targetStatus)) {
+            // Fallbacks for Resume if original status is no longer valid
+            if ($task->status === TaskStatus::OnHold) {
+                if ($task->canTransitionTo(TaskStatus::InProgress)) {
+                    $targetStatus = TaskStatus::InProgress;
+                } elseif ($task->canTransitionTo(TaskStatus::Open)) {
+                    $targetStatus = TaskStatus::Open;
+                } else {
+                    return false;
+                }
             } else {
                 return false;
             }
         }
 
-        if (! $task->canTransitionTo($targetStatus)) {
-            return false;
+        $result = $task->transitionTo($targetStatus, $user, $notes ?? ($targetStatus === TaskStatus::OnHold ? 'Put on hold' : 'Resumed from hold'));
+
+        if ($result && $notes) {
+            $action = $targetStatus === TaskStatus::OnHold ? 'Put on Hold' : 'Resumed';
+            $this->addSystemComment($task, $user, "$action: $notes");
         }
 
-        return $task->transitionTo($targetStatus, $user, $notes ?? ($targetStatus === TaskStatus::OnHold ? 'Put on hold' : 'Resumed from hold'));
+        if ($result) {
+            $type = $targetStatus === TaskStatus::OnHold ? \App\Notifications\TaskNotification::TYPE_ON_HOLD : \App\Notifications\TaskNotification::TYPE_UPDATED;
+            $msg = $targetStatus === TaskStatus::OnHold ? "Task put on hold" : "Task resumed";
+            if ($notes) $msg .= ": $notes";
+            
+            $this->notifyStakeholders($task, $type, $user, $msg);
+        }
+
+        return $result;
     }
 
+    /**
+     * Send task to PM for review.
+     */
     /**
      * Send task to PM for review.
      */
@@ -396,9 +486,41 @@ class TaskWorkflowService
                 null,
                 ['task_title' => $task->title, 'action' => 'sent_to_pm']
             );
+
+            if ($notes) {
+                $this->addSystemComment($task, $user, "Sent to PM: $notes");
+            }
         }
 
         return $result;
+    }
+
+    /**
+     * Helper to notify all stakeholders of a task.
+     */
+    protected function notifyStakeholders(Task $task, string $type, ?User $actor, string $message): void
+    {
+        // Collect stakeholders
+        $stakeholders = collect([
+            $task->assignee,         // Operator
+            $task->qaUser,           // QA
+            $task->assigner,         // Team Lead/Assigner
+            $task->creator,          // Creator
+            // Add Project Manager if accessible via relationship
+        ])->filter(function (?User $user) use ($actor) {
+            // Filter out nulls and the actor themselves
+            return $user !== null && $actor && $user->id !== $actor->id;
+        })->unique('id');
+
+        // Send notification
+        foreach ($stakeholders as $stakeholder) {
+            $stakeholder->notify(new \App\Notifications\TaskNotification(
+                $task,
+                $type,
+                $actor,
+                $message
+            ));
+        }
     }
 
     /**

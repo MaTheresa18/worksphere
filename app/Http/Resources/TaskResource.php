@@ -194,6 +194,12 @@ class TaskResource extends JsonResource
                                ($this->assigned_to === $user->id || $permService->hasTeamPermission($user, $team, 'tasks.update')),
                                
                 'hold' => match(true) {
+                    // Resume from Hold (Check both Operator and QA permissions)
+                    $this->status === \App\Enums\TaskStatus::OnHold =>
+                        ($this->assigned_to === $user->id || 
+                         $permService->hasTeamPermission($user, $team, 'tasks.update') || 
+                         $permService->hasTeamPermission($user, $team, 'tasks.qa_review')),
+
                     // Initial Stage: Operator or Lead can hold
                     $this->status === \App\Enums\TaskStatus::InProgress => 
                         ($this->assigned_to === $user->id || $permService->hasTeamPermission($user, $team, 'tasks.update')),

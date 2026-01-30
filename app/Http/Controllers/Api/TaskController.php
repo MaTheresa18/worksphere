@@ -632,6 +632,11 @@ class TaskController extends Controller
         } elseif (in_array($task->status, [\App\Enums\TaskStatus::Submitted, \App\Enums\TaskStatus::InQa])) {
             // QA Stage: Only QA/Lead (tasks.qa_review)
             $canToggle = $this->permissionService->hasTeamPermission($request->user(), $team, 'tasks.qa_review');
+        } elseif ($task->status === \App\Enums\TaskStatus::OnHold) {
+            // Resume from Hold: Operator, Lead, or QA
+            $canToggle = $task->assigned_to === $request->user()->id || 
+                         $this->permissionService->hasTeamPermission($request->user(), $team, 'tasks.update') ||
+                         $this->permissionService->hasTeamPermission($request->user(), $team, 'tasks.qa_review');
         }
 
         if (! $canToggle) {
