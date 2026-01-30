@@ -71,6 +71,10 @@ class TaskChecklistItemController extends Controller
         $this->ensureProjectBelongsToTeam($team, $project);
         $this->ensureTaskBelongsToProject($project, $task);
 
+        if ($task->status->isTerminal()) {
+            abort(403, 'Checklist cannot be modified when task is completed or archived.');
+        }
+
         // Read-only logic: If in QA, only QA review can modify structure
         $isInReview = in_array($task->status, [TaskStatus::Submitted, TaskStatus::InQa, TaskStatus::PmReview]);
         $hasQaPermission = $this->permissionService->hasTeamPermission($user, $team, 'tasks.qa_review');
@@ -151,6 +155,10 @@ class TaskChecklistItemController extends Controller
     public function update(UpdateTaskChecklistItemRequest $request, Team $team, Project $project, Task $task, TaskChecklistItem $checklistItem): JsonResponse
     {
         $user = $request->user();
+
+        if ($task->status->isTerminal()) {
+            abort(403, 'Checklist cannot be modified when task is completed or archived.');
+        }
         
         // Read-only logic: If in QA, only QA review can modify
         $isInReview = in_array($task->status, [TaskStatus::Submitted, TaskStatus::InQa, TaskStatus::PmReview]);
@@ -234,6 +242,10 @@ class TaskChecklistItemController extends Controller
     public function destroy(Team $team, Project $project, Task $task, TaskChecklistItem $checklistItem): JsonResponse
     {
         $user = request()->user();
+
+        if ($task->status->isTerminal()) {
+            abort(403, 'Checklist cannot be modified when task is completed or archived.');
+        }
         
         // Read-only logic
         $isInReview = in_array($task->status, [TaskStatus::Submitted, TaskStatus::InQa, TaskStatus::PmReview]);
@@ -274,6 +286,10 @@ class TaskChecklistItemController extends Controller
     public function reorder(Request $request, Team $team, Project $project, Task $task): JsonResponse
     {
         $user = $request->user();
+
+        if ($task->status->isTerminal()) {
+            abort(403, 'Checklist cannot be modified when task is completed or archived.');
+        }
 
         // Read-only logic
         $isInReview = in_array($task->status, [TaskStatus::Submitted, TaskStatus::InQa, TaskStatus::PmReview]);

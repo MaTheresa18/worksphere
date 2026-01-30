@@ -108,6 +108,13 @@ Schedule::command('audit:prune --days=30')
     ->withoutOverlapping()
     ->onOneServer();
 
+// Auto-archive old completed tasks daily
+Schedule::command('worksphere:archive-tasks')
+    ->daily()
+    ->name('auto-archive-tasks')
+    ->withoutOverlapping()
+    ->onOneServer();
+
 // Prune old page views daily
 Schedule::command('model:prune', [
     '--model' => [\App\Models\PageView::class],

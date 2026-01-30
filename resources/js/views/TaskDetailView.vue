@@ -40,6 +40,8 @@ import {
     Building2,
     Lock,
     Target,
+    FileText,
+    ChevronDown,
 } from "lucide-vue-next";
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth";
@@ -59,6 +61,8 @@ const sanitize = (content: string) => {
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const isArchiving = ref(false);
+const isTaskDeleting = ref(false);
 
 // Route params
 const projectId = computed(
@@ -281,6 +285,10 @@ const canManageChecklist = computed(() => {
     // Feature: Disable structure changes if task is started, unless Creator or Lead/SME
     // "Started" = not draft/open
     const status = getStatusValue(task.value);
+
+    // Block modifications if completed (New Recquirement)
+    if (["completed", "archived", "cancelled"].includes(status)) return false;
+
     const isStarted = !["draft", "open"].includes(status);
 
     if (isStarted) {
@@ -391,6 +399,39 @@ const groupedActivity = computed(() => {
     });
 
     return groups;
+});
+
+// Task Actions Dropdown Items
+const taskActionItems = computed(() => {
+    const items = [];
+
+    if (canEditMetadata.value) {
+        items.push({
+            label: "Edit Task",
+            icon: Edit3,
+            action: () => {
+                showEditModal.value = true;
+            },
+        });
+    }
+
+    items.push(
+        {
+            label: "Archive Task",
+            icon: FileText,
+            action: internalArchiveTask,
+            disabled: isArchiving.value,
+        },
+        {
+            label: "Delete Task",
+            icon: Trash2,
+            variant: "danger",
+            action: internalDeleteTask,
+            disabled: isTaskDeleting.value,
+        },
+    );
+
+    return items;
 });
 
 // Navigation
@@ -575,6 +616,48 @@ const updateStatus = async (status: string) => {
 
 const submitForReview = async () => {
     await updateStatus("in_qa");
+};
+
+const internalArchiveTask = async () => {
+    if (!task.value) return;
+    if (!confirm("Are you sure you want to archive this task?")) return;
+
+    try {
+        isArchiving.value = true;
+        const response = await axios.post(
+            `/api/teams/${currentTeamId.value}/projects/${projectId.value}/tasks/${taskId.value}/archive`,
+        );
+        task.value = response.data.data || response.data.task;
+        toast.success("Task archived");
+        await fetchStatusHistory();
+    } catch (err: any) {
+        toast.error(err.response?.data?.message || "Failed to archive task");
+    } finally {
+        isArchiving.value = false;
+    }
+};
+
+const internalDeleteTask = async () => {
+    if (!task.value) return;
+    if (
+        !confirm(
+            "Are you sure you want to delete this task? This cannot be undone.",
+        )
+    )
+        return;
+
+    try {
+        isTaskDeleting.value = true;
+        await axios.delete(
+            `/api/teams/${currentTeamId.value}/projects/${projectId.value}/tasks/${taskId.value}`,
+        );
+        toast.success("Task deleted");
+        router.push(`/projects/${projectId.value}`);
+    } catch (err: any) {
+        toast.error(err.response?.data?.message || "Failed to delete task");
+    } finally {
+        isTaskDeleting.value = false;
+    }
 };
 
 // Helpers
@@ -882,18 +965,22 @@ watch(
                                         >
                                     </div>
                                 </div>
-                                <div
-                                    v-if="canEditMetadata"
-                                    class="flex items-center gap-2"
-                                >
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        @click="showEditModal = true"
+                                <div class="flex items-center gap-2">
+                                    <Dropdown
+                                        align="end"
+                                        :items="taskActionItems"
                                     >
-                                        <Edit3 class="w-4 h-4 mr-2" />
-                                        Edit
-                                    </Button>
+                                        <template #trigger>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                class="flex items-center gap-2"
+                                            >
+                                                Actions
+                                                <ChevronDown class="w-4 h-4" />
+                                            </Button>
+                                        </template>
+                                    </Dropdown>
                                 </div>
                             </div>
 
@@ -1105,6 +1192,7 @@ watch(
                                     class="space-y-2"
                                     :animation="200"
                                     ghost-class="opacity-50"
+                                    :disabled="!canManageChecklist"
                                 >
                                     <template #item="{ element: item }">
                                         <div
@@ -1116,6 +1204,7 @@ watch(
                                         >
                                             <!-- Drag Handle -->
                                             <div
+                                                v-if="canManageChecklist"
                                                 class="drag-handle cursor-grab active:cursor-grabbing text-[var(--text-muted)] hover:text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 transition-opacity p-1"
                                             >
                                                 <GripVertical class="w-4 h-4" />

@@ -79,6 +79,7 @@ const selectedMemberToAdd = ref("");
 const selectedMemberRole = ref("member");
 const isAddingMember = ref(false);
 const isFetchingTeamMembers = ref(false);
+const isRefreshing = ref(false);
 
 const availableTeamMembers = computed(() => {
     if (!teamMembers.value.length || !project.value) return [];
@@ -858,6 +859,21 @@ watch(
                     </div>
 
                     <div class="ml-auto flex items-center gap-2">
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            @click="refreshData"
+                            :disabled="isRefreshing"
+                        >
+                            <RefreshCw
+                                class="w-4 h-4"
+                                :class="{
+                                    'animate-spin': isRefreshing,
+                                    'mr-2': true,
+                                }"
+                            />
+                            Refresh
+                        </Button>
                         <Button
                             v-if="
                                 activeTab === 'tasks' &&
