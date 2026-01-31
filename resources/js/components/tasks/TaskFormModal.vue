@@ -347,8 +347,11 @@ watch(
                 template.default_estimated_hours || 0;
 
             if (template.checklist_template) {
-                formValues.value.checklist = JSON.parse(
-                    JSON.stringify(template.checklist_template),
+                formValues.value.checklist = template.checklist_template.map(
+                    (item: any) => ({
+                        title: item.title || item.text || "",
+                        is_completed: item.is_completed || false,
+                    }),
                 );
             }
             toast.success("Template loaded");

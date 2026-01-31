@@ -238,6 +238,8 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
         // Activity / Audit Trail
         Route::get('/activity', [\App\Http\Controllers\Api\TeamController::class, 'activity']);
         Route::get('/stats/financial', [\App\Http\Controllers\Api\TeamController::class, 'financialStats']);
+        Route::get('/stats/analytics-overview', [\App\Http\Controllers\Api\TeamController::class, 'analyticsOverview']);
+        Route::get('/stats/analytics-members', [\App\Http\Controllers\Api\TeamController::class, 'analyticsMembers']);
 
         // Calendar
         Route::get('/calendar', [\App\Http\Controllers\Api\TeamController::class, 'calendar']);

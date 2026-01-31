@@ -19,7 +19,8 @@ class TeamController extends Controller
     public function __construct(
         protected \App\Services\AuditService $auditService,
         protected \App\Services\MediaService $mediaService,
-        protected \App\Services\PermissionService $permissionService
+        protected \App\Services\PermissionService $permissionService,
+        protected \App\Services\TeamAnalyticsService $teamAnalyticsService
     ) {}
 
     /**
@@ -61,6 +62,30 @@ class TeamController extends Controller
     /**
      * Get team financial statistics.
      */
+    /**
+     * Get team analytics overview.
+     */
+    public function analyticsOverview(Team $team): JsonResponse
+    {
+        $this->authorize('view', $team);
+
+        $stats = $this->teamAnalyticsService->getOverviewStats($team);
+
+        return response()->json($stats);
+    }
+
+    /**
+     * Get team member analytics.
+     */
+    public function analyticsMembers(Team $team): JsonResponse
+    {
+        $this->authorize('view', $team);
+
+        $stats = $this->teamAnalyticsService->getMemberStats($team);
+
+        return response()->json($stats);
+    }
+
     public function financialStats(Team $team): JsonResponse
     {
         $this->authorize('view', $team);

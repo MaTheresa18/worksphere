@@ -188,6 +188,7 @@ class TaskResource extends JsonResource
                 
                 // Workflow Actions
                 'start_task' => in_array($this->status, [\App\Enums\TaskStatus::Open, \App\Enums\TaskStatus::Draft]) && 
+                                ! empty($this->assigned_to) &&
                                 ($this->assigned_to === $user->id || $permService->hasTeamPermission($user, $team, 'tasks.update')),
                 
                 'submit_qa' => $this->status === \App\Enums\TaskStatus::InProgress && 
@@ -212,6 +213,7 @@ class TaskResource extends JsonResource
                 },
 
                 'start_qa_review' => $this->status === \App\Enums\TaskStatus::Submitted && 
+                                     ! empty($this->qa_user_id) &&
                                      $permService->hasTeamPermission($user, $team, 'tasks.qa_review'),
                                      
                 'complete_qa_review' => $this->status === \App\Enums\TaskStatus::InQa && 

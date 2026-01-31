@@ -266,7 +266,7 @@ class ProjectController extends Controller
     protected function getProjectsQuery(Request $request): \Illuminate\Database\Eloquent\Builder
     {
         return Project::query()
-            ->with(['creator', 'client', 'members', 'team'])
+            ->with(['creator', 'client', 'team'])
             ->withCount(['tasks', 'members'])
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {

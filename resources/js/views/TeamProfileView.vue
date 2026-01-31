@@ -44,9 +44,11 @@ import MediaManager from "@/components/tools/MediaManager.vue";
 import TeamCalendar from "@/components/tools/TeamCalendar.vue";
 import TeamEventModal from "@/components/modals/TeamEventModal.vue";
 import TeamProjectsTab from "@/components/teams/TeamProjectsTab.vue";
-import ClientList from '@/components/clients/ClientList.vue';
-import ClientFormModal from '@/components/clients/ClientFormModal.vue';
+import ClientList from "@/components/clients/ClientList.vue";
+import ClientFormModal from "@/components/clients/ClientFormModal.vue";
 import EarningsTrendChart from "@/components/charts/EarningsTrendChart.vue";
+import TeamOverviewMetrics from "@/components/teams/TeamOverviewMetrics.vue";
+import TeamStatsTab from "@/components/teams/TeamStatsTab.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -65,7 +67,9 @@ const fetchFinancialStats = async () => {
     if (!team.value) return;
     financialLoading.value = true;
     try {
-        const response = await axios.get(`/api/teams/${team.value.public_id}/stats/financial`);
+        const response = await axios.get(
+            `/api/teams/${team.value.public_id}/stats/financial`,
+        );
         financialStats.value = response.data;
     } catch (error) {
         console.error("Error fetching financial stats:", error);
@@ -359,9 +363,9 @@ const clientsLoading = ref(false);
 const clientListParams = ref({
     page: 1,
     perPage: 15,
-    total: 0
+    total: 0,
 });
-const clientViewMode = ref('grid');
+const clientViewMode = ref("grid");
 const showClientFormModal = ref(false);
 const clientToEdit = ref(null);
 
@@ -372,7 +376,7 @@ const fetchClients = async (page = 1) => {
         const params = {
             team_id: team.value.public_id, // Scope to this team (Admin or Member)
             page,
-            per_page: clientListParams.value.perPage
+            per_page: clientListParams.value.perPage,
         };
         const response = await axios.get("/api/clients", { params });
         clients.value = response.data.data;
@@ -380,7 +384,7 @@ const fetchClients = async (page = 1) => {
             currentPage: response.data.current_page,
             lastPage: response.data.last_page,
             total: response.data.total,
-            perPage: response.data.per_page
+            perPage: response.data.per_page,
         };
     } catch (error) {
         console.error("Error fetching clients:", error);
@@ -404,14 +408,18 @@ const openClientEdit = (client) => {
 // TeamProfile has `deleteModalOpen` / `deleteTarget`.
 // It handles 'single', 'bulk', 'avatar'. I can extend it for 'client'.
 const requestDeleteClient = (client) => {
-    deleteTarget.value = { type: 'client', id: client.public_id, name: client.name };
+    deleteTarget.value = {
+        type: "client",
+        id: client.public_id,
+        name: client.name,
+    };
     deleteModalOpen.value = true;
 };
 
 const handleViewClient = (client) => {
     router.push({
-        name: 'client-detail',
-        params: { public_id: client.public_id }
+        name: "client-detail",
+        params: { public_id: client.public_id },
     });
 };
 
@@ -847,7 +855,7 @@ const confirmDelete = async () => {
             console.error("Failed to remove avatar:", error);
             toast.error("Failed to remove avatar");
         }
-    } else if (deleteTarget.value.type === 'client') {
+    } else if (deleteTarget.value.type === "client") {
         try {
             await axios.delete(`/api/clients/${deleteTarget.value.id}`);
             toast.success("Client deleted successfully");
@@ -938,7 +946,7 @@ const canRemoveMember = (member) => {
             <div
                 class="bg-[var(--surface-elevated)] border-b border-[var(--border-default)]"
             >
-                <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div class="w-full px-4 sm:px-6 lg:px-8 py-8">
                     <div
                         class="flex flex-col md:flex-row md:items-center md:justify-between gap-6"
                     >
@@ -1038,6 +1046,7 @@ const canRemoveMember = (member) => {
                         <button
                             v-for="tab in [
                                 'overview',
+                                'stats',
                                 'projects',
                                 'templates',
                                 'members',
@@ -1065,37 +1074,80 @@ const canRemoveMember = (member) => {
                 </div>
             </div>
 
-            <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="w-full px-4 sm:px-6 lg:px-8 py-8">
                 <!-- Overview Tab -->
                 <div v-if="activeTab === 'overview'" class="space-y-8">
-                     <!-- Financial Overview -->
+                    <!-- Critical Metrics -->
+                    <TeamOverviewMetrics />
+
+                    <!-- Financial Overview -->
                     <div class="mb-8" v-if="financialStats || financialLoading">
-                        <h3 class="text-lg font-semibold text-[var(--text-primary)] mb-4">Financial Overview</h3>
-                        
+                        <h3
+                            class="text-lg font-semibold text-[var(--text-primary)] mb-4"
+                        >
+                            Financial Overview
+                        </h3>
+
                         <!-- Loading State -->
-                        <div v-if="financialLoading" class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div class="h-32 bg-[var(--surface-elevated)] animate-pulse rounded-lg"></div>
-                            <div class="h-64 bg-[var(--surface-elevated)] animate-pulse rounded-lg"></div>
-                            <div class="h-64 bg-[var(--surface-elevated)] animate-pulse rounded-lg"></div>
+                        <div
+                            v-if="financialLoading"
+                            class="grid grid-cols-1 md:grid-cols-3 gap-6"
+                        >
+                            <div
+                                class="h-32 bg-[var(--surface-elevated)] animate-pulse rounded-lg"
+                            ></div>
+                            <div
+                                class="h-64 bg-[var(--surface-elevated)] animate-pulse rounded-lg"
+                            ></div>
+                            <div
+                                class="h-64 bg-[var(--surface-elevated)] animate-pulse rounded-lg"
+                            ></div>
                         </div>
                         <div v-else class="space-y-6">
                             <!-- Total Earnings & Trend -->
-                            <Card class="bg-gradient-to-br from-[var(--surface-elevated)] to-[var(--surface-secondary)] border-[var(--border-default)] overflow-hidden">
-                                <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                            <Card
+                                class="bg-gradient-to-br from-[var(--surface-elevated)] to-[var(--surface-secondary)] border-[var(--border-default)] overflow-hidden"
+                            >
+                                <div
+                                    class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 items-center"
+                                >
                                     <div class="md:col-span-1 space-y-4">
                                         <div>
-                                            <p class="text-sm font-medium text-[var(--text-secondary)]">Total Earnings</p>
-                                            <p class="text-4xl font-bold text-[var(--text-primary)] mt-1 tracking-tight">
-                                                {{ new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(financialStats.total_earnings) }}
+                                            <p
+                                                class="text-sm font-medium text-[var(--text-secondary)]"
+                                            >
+                                                Total Earnings
+                                            </p>
+                                            <p
+                                                class="text-4xl font-bold text-[var(--text-primary)] mt-1 tracking-tight"
+                                            >
+                                                {{
+                                                    new Intl.NumberFormat(
+                                                        "en-US",
+                                                        {
+                                                            style: "currency",
+                                                            currency: "USD",
+                                                        },
+                                                    ).format(
+                                                        financialStats.total_earnings,
+                                                    )
+                                                }}
                                             </p>
                                         </div>
-                                        <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium">
+                                        <div
+                                            class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium"
+                                        >
                                             <DollarSign class="h-3.5 w-3.5" />
                                             <span>Lifetime Revenue</span>
                                         </div>
                                     </div>
                                     <div class="md:col-span-2 h-[200px]">
-                                        <EarningsTrendChart :data="financialStats.monthly_earnings || []" />
+                                        <EarningsTrendChart
+                                            :data="
+                                                financialStats.monthly_earnings ||
+                                                []
+                                            "
+                                        />
                                     </div>
                                 </div>
                             </Card>
@@ -1103,24 +1155,69 @@ const canRemoveMember = (member) => {
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <!-- Top Projects -->
                                 <Card>
-                                    <div class="flex items-center justify-between mb-4">
-                                        <h4 class="font-semibold text-[var(--text-primary)]">Highest Earning Projects</h4>
-                                        <BarChart3 class="h-4 w-4 text-[var(--text-muted)]" />
+                                    <div
+                                        class="flex items-center justify-between mb-4"
+                                    >
+                                        <h4
+                                            class="font-semibold text-[var(--text-primary)]"
+                                        >
+                                            Highest Earning Projects
+                                        </h4>
+                                        <BarChart3
+                                            class="h-4 w-4 text-[var(--text-muted)]"
+                                        />
                                     </div>
                                     <div class="space-y-3">
-                                        <div v-for="(project, index) in financialStats.top_projects" :key="project.id" class="flex items-center justify-between p-2 hover:bg-[var(--surface-secondary)] rounded-md transition-colors">
-                                            <div class="flex items-center gap-3">
-                                                <span class="text-sm font-bold text-[var(--text-muted)] w-4">{{ index + 1 }}</span>
+                                        <div
+                                            v-for="(
+                                                project, index
+                                            ) in financialStats.top_projects"
+                                            :key="project.id"
+                                            class="flex items-center justify-between p-2 hover:bg-[var(--surface-secondary)] rounded-md transition-colors"
+                                        >
+                                            <div
+                                                class="flex items-center gap-3"
+                                            >
+                                                <span
+                                                    class="text-sm font-bold text-[var(--text-muted)] w-4"
+                                                    >{{ index + 1 }}</span
+                                                >
                                                 <div>
-                                                    <p class="text-sm font-medium text-[var(--text-primary)] line-clamp-1">{{ project.name }}</p>
-                                                    <StatusBadge :status="project.status" size="xs" />
+                                                    <p
+                                                        class="text-sm font-medium text-[var(--text-primary)] line-clamp-1"
+                                                    >
+                                                        {{ project.name }}
+                                                    </p>
+                                                    <StatusBadge
+                                                        :status="project.status"
+                                                        size="xs"
+                                                    />
                                                 </div>
                                             </div>
-                                            <span class="text-sm font-semibold text-[var(--text-primary)]">
-                                                {{ new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(project.total_earnings) }}
+                                            <span
+                                                class="text-sm font-semibold text-[var(--text-primary)]"
+                                            >
+                                                {{
+                                                    new Intl.NumberFormat(
+                                                        "en-US",
+                                                        {
+                                                            style: "currency",
+                                                            currency: "USD",
+                                                        },
+                                                    ).format(
+                                                        project.total_earnings,
+                                                    )
+                                                }}
                                             </span>
                                         </div>
-                                        <div v-if="!financialStats.top_projects || financialStats.top_projects.length === 0" class="text-center text-sm text-[var(--text-muted)] py-4">
+                                        <div
+                                            v-if="
+                                                !financialStats.top_projects ||
+                                                financialStats.top_projects
+                                                    .length === 0
+                                            "
+                                            class="text-center text-sm text-[var(--text-muted)] py-4"
+                                        >
                                             No earnings data available
                                         </div>
                                     </div>
@@ -1128,23 +1225,75 @@ const canRemoveMember = (member) => {
 
                                 <!-- Top Clients -->
                                 <Card>
-                                    <div class="flex items-center justify-between mb-4">
-                                        <h4 class="font-semibold text-[var(--text-primary)]">Top Clients</h4>
-                                        <Users class="h-4 w-4 text-[var(--text-muted)]" />
+                                    <div
+                                        class="flex items-center justify-between mb-4"
+                                    >
+                                        <h4
+                                            class="font-semibold text-[var(--text-primary)]"
+                                        >
+                                            Top Clients
+                                        </h4>
+                                        <Users
+                                            class="h-4 w-4 text-[var(--text-muted)]"
+                                        />
                                     </div>
                                     <div class="space-y-3">
-                                        <div v-for="(client, index) in financialStats.top_clients" :key="client.id" class="flex items-center justify-between p-2 hover:bg-[var(--surface-secondary)] rounded-md transition-colors">
-                                            <div class="flex items-center gap-3">
-                                                <Avatar :src="client.avatar_url" :fallback="client.name ? client.name.substring(0,2).toUpperCase() : '?'" size="sm" />
+                                        <div
+                                            v-for="(
+                                                client, index
+                                            ) in financialStats.top_clients"
+                                            :key="client.id"
+                                            class="flex items-center justify-between p-2 hover:bg-[var(--surface-secondary)] rounded-md transition-colors"
+                                        >
+                                            <div
+                                                class="flex items-center gap-3"
+                                            >
+                                                <Avatar
+                                                    :src="client.avatar_url"
+                                                    :fallback="
+                                                        client.name
+                                                            ? client.name
+                                                                  .substring(
+                                                                      0,
+                                                                      2,
+                                                                  )
+                                                                  .toUpperCase()
+                                                            : '?'
+                                                    "
+                                                    size="sm"
+                                                />
                                                 <div>
-                                                    <p class="text-sm font-medium text-[var(--text-primary)] line-clamp-1">{{ client.name }}</p>
+                                                    <p
+                                                        class="text-sm font-medium text-[var(--text-primary)] line-clamp-1"
+                                                    >
+                                                        {{ client.name }}
+                                                    </p>
                                                 </div>
                                             </div>
-                                            <span class="text-sm font-semibold text-[var(--text-primary)]">
-                                                {{ new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(client.total_earnings) }}
+                                            <span
+                                                class="text-sm font-semibold text-[var(--text-primary)]"
+                                            >
+                                                {{
+                                                    new Intl.NumberFormat(
+                                                        "en-US",
+                                                        {
+                                                            style: "currency",
+                                                            currency: "USD",
+                                                        },
+                                                    ).format(
+                                                        client.total_earnings,
+                                                    )
+                                                }}
                                             </span>
                                         </div>
-                                        <div v-if="!financialStats.top_clients || financialStats.top_clients.length === 0" class="text-center text-sm text-[var(--text-muted)] py-4">
+                                        <div
+                                            v-if="
+                                                !financialStats.top_clients ||
+                                                financialStats.top_clients
+                                                    .length === 0
+                                            "
+                                            class="text-center text-sm text-[var(--text-muted)] py-4"
+                                        >
                                             No client earnings data available
                                         </div>
                                     </div>
@@ -1231,7 +1380,10 @@ const canRemoveMember = (member) => {
                                         Clients
                                     </h3>
                                 </div>
-                                <Button variant="ghost" size="sm" @click="activeTab = 'clients'"
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    @click="activeTab = 'clients'"
                                     >View All</Button
                                 >
                             </div>
@@ -1255,7 +1407,9 @@ const canRemoveMember = (member) => {
                                     class="flex items-center gap-3 p-3 hover:bg-[var(--surface-secondary)] rounded-lg transition-colors cursor-pointer"
                                     @click="handleViewClient(client)"
                                 >
-                                    <div class="h-8 w-8 rounded bg-[var(--surface-primary)] border border-[var(--border-default)] flex items-center justify-center text-xs font-bold text-[var(--text-secondary)] uppercase">
+                                    <div
+                                        class="h-8 w-8 rounded bg-[var(--surface-primary)] border border-[var(--border-default)] flex items-center justify-center text-xs font-bold text-[var(--text-secondary)] uppercase"
+                                    >
                                         {{ client.initials }}
                                     </div>
                                     <div>
@@ -1274,8 +1428,6 @@ const canRemoveMember = (member) => {
                             </div>
                         </Card>
                     </div>
-
-
 
                     <!-- Calendar Widget -->
                     <div>
@@ -1301,20 +1453,31 @@ const canRemoveMember = (member) => {
                     </div>
                 </div>
 
+                <!-- Stats Tab -->
+                <div v-if="activeTab === 'stats'" class="space-y-6">
+                    <TeamStatsTab />
+                </div>
+
                 <!-- Clients Tab -->
                 <div v-if="activeTab === 'clients'" class="space-y-6">
-                     <div class="flex items-center justify-between">
-                         <div>
-                             <h2 class="text-lg font-semibold text-[var(--text-primary)]">Clients</h2>
-                             <p class="text-[var(--text-secondary)]">Manage organizations associated with this team</p>
-                         </div>
-                         <Button v-if="isTeamAdmin" @click="openClientCreate">
-                             <Plus class="w-4 h-4 mr-2" />
-                             Add Client
-                         </Button>
-                     </div>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2
+                                class="text-lg font-semibold text-[var(--text-primary)]"
+                            >
+                                Clients
+                            </h2>
+                            <p class="text-[var(--text-secondary)]">
+                                Manage organizations associated with this team
+                            </p>
+                        </div>
+                        <Button v-if="isTeamAdmin" @click="openClientCreate">
+                            <Plus class="w-4 h-4 mr-2" />
+                            Add Client
+                        </Button>
+                    </div>
 
-                     <ClientList 
+                    <ClientList
                         :clients="clients"
                         :loading="clientsLoading"
                         v-model:viewQuery="clientViewMode"
@@ -1324,8 +1487,13 @@ const canRemoveMember = (member) => {
                         @view="handleViewClient"
                         @page-change="fetchClients"
                     >
-                         <template #empty-actions>
-                            <Button v-if="isTeamAdmin" variant="outline" class="mt-4" @click="openClientCreate">
+                        <template #empty-actions>
+                            <Button
+                                v-if="isTeamAdmin"
+                                variant="outline"
+                                class="mt-4"
+                                @click="openClientCreate"
+                            >
                                 Add Client
                             </Button>
                         </template>
@@ -1724,7 +1892,14 @@ const canRemoveMember = (member) => {
                                                     : 'bg-gray-100 text-gray-800'
                                             "
                                         >
-                                            {{ member.role_label || member.role?.replace(/_/g, " ") || "operator" }}
+                                            {{
+                                                member.role_label ||
+                                                member.role?.replace(
+                                                    /_/g,
+                                                    " ",
+                                                ) ||
+                                                "operator"
+                                            }}
                                         </span>
                                     </td>
                                     <td
@@ -2089,22 +2264,22 @@ const canRemoveMember = (member) => {
         <Modal
             v-model:open="deleteModalOpen"
             :title="
-                deleteTarget.type === 'client' 
+                deleteTarget.type === 'client'
                     ? 'Delete Client'
                     : deleteTarget.type === 'bulk'
-                        ? 'Delete Files'
-                        : deleteTarget.type === 'avatar'
-                            ? 'Remove Avatar'
-                            : 'Delete File'
+                      ? 'Delete Files'
+                      : deleteTarget.type === 'avatar'
+                        ? 'Remove Avatar'
+                        : 'Delete File'
             "
             :description="
-                deleteTarget.type === 'client' 
+                deleteTarget.type === 'client'
                     ? `Are you sure you want to delete ${deleteTarget.name}? This action cannot be undone.`
                     : deleteTarget.type === 'bulk'
-                        ? `Are you sure you want to delete ${deleteTarget.ids.length} files? This action cannot be undone.`
-                        : deleteTarget.type === 'avatar'
-                            ? 'Are you sure you want to remove the team avatar? This cannot be undone.'
-                            : 'Are you sure you want to delete this file? This action cannot be undone.'
+                      ? `Are you sure you want to delete ${deleteTarget.ids.length} files? This action cannot be undone.`
+                      : deleteTarget.type === 'avatar'
+                        ? 'Are you sure you want to remove the team avatar? This cannot be undone.'
+                        : 'Are you sure you want to delete this file? This action cannot be undone.'
             "
             size="sm"
         >

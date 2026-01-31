@@ -61,6 +61,10 @@ class TaskWorkflowService
      */
     public function startTask(Task $task, User $user): bool
     {
+        if (! $task->assigned_to) {
+            throw new \Exception('Task must be assigned to a user before it can be started.');
+        }
+
         if (! $task->canTransitionTo(TaskStatus::InProgress)) {
             return false;
         }
@@ -126,6 +130,10 @@ class TaskWorkflowService
      */
     public function startQaReview(Task $task, User $reviewer, ?QaCheckTemplate $template = null): ?TaskQaReview
     {
+        if (! $task->qa_user_id) {
+            throw new \Exception('Task must have a QA user assigned before starting QA review.');
+        }
+
         if (! $task->canTransitionTo(TaskStatus::InQa)) {
             return null;
         }

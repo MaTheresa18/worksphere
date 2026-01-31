@@ -284,13 +284,20 @@ class TaskController extends Controller
 
         // Handle Save as Template
         if ($request->boolean('save_as_template')) {
+            $checklistForTemplate = ! empty($taskData['checklist']) && is_array($taskData['checklist'])
+                ? array_map(function ($item) {
+                    $val = is_array($item) ? ($item['text'] ?? $item['title'] ?? '') : $item;
+                    return ['text' => $val, 'is_completed' => false];
+                }, $taskData['checklist'])
+                : null;
+
             TaskTemplate::create([
                 'team_id' => $team->id,
                 'name' => $task->title.' (Template)',
                 'description' => $task->description,
                 'default_priority' => $task->priority ?? 2,
                 'default_estimated_hours' => $task->estimated_hours ?? 0,
-                'checklist_template' => $taskData['checklist'],
+                'checklist_template' => $checklistForTemplate,
                 'is_active' => true,
                 'created_by' => $request->user()->id,
             ]);
