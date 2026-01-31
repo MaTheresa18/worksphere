@@ -681,6 +681,83 @@ class ProjectController extends Controller
     }
 
     /**
+     * Get project members.
+     */
+    public function members(Request $request, Team $team, Project $project): AnonymousResourceCollection
+    {
+        $user = request()->user();
+        // Permission check: View Project or View Assigned (if member)
+        $hasView = $this->permissionService->hasTeamPermission($user, $team, 'projects.view');
+        $hasViewAssigned = $this->permissionService->hasTeamPermission($user, $team, 'projects.view_assigned');
+
+        if (! $hasView && ! $hasViewAssigned) {
+             abort(403, 'You do not have permission to view project members.');
+        }
+
+        $this->ensureProjectBelongsToTeam($team, $project);
+
+        if (! $hasView && $hasViewAssigned) {
+            if (! $project->hasMember($user)) {
+                abort(403, 'You do not have permission to view members of this project.');
+            }
+        }
+        
+        // Members are accessed via relationship defined in Project model (belongsToMany User)
+        // We can reuse UserResource or creating a simple customized response if needed.
+        // For now, let's use a standard User resource or just simple collection.
+        // The frontend expects: label, value, avatar, subtitle (role).
+        
+        // Let's return JSON directly to match what frontend likely wants, 
+        // OR return a ResourceCollection. 
+        // The current QuickAssignModal expects `data` array.
+
+        $members = $project->members()
+            ->withPivot(['role', 'joined_at'])
+            ->with(['teams' => function ($query) use ($project) {
+                // Ensure we only get the pivot for this specific team (in case user is in multiple)
+                $query->where('teams.id', $project->team_id);
+            }])
+            ->orderBy('name')
+            ->get();
+            
+        // Minimal transformation for UI optimization if desired, 
+        // but creating a resource class is cleaner. 
+        // Let's check what `TeamController::members` returns.
+        // It likely returns UserResource.
+        
+        // Using ProjectMemberResource to include pivot data
+        return \App\Http\Resources\ProjectMemberResource::collection($members);
+    }
+
+    /**
+     * Get project members (Global access).
+     */
+    public function membersGlobal(Request $request, Project $project): \Illuminate\Http\Resources\Json\AnonymousResourceCollection
+    {
+        $user = $request->user();
+
+        // Check permissions
+        if ($user->id !== $project->team->owner_id && ! $project->hasMember($user)) {
+             // Allow if admin or specific permission?
+             // mimicking access control from members()
+             if (! $user->hasRole('administrator')) {
+                 abort(403, 'You do not have permission to view members of this project.');
+             }
+        }
+
+        $members = $project->members()
+            ->withPivot(['role', 'joined_at'])
+            ->with(['teams' => function ($query) use ($project) {
+                // Ensure we only get the pivot for this specific team (in case user is in multiple)
+                $query->where('teams.id', $project->team_id);
+            }])
+            ->orderBy('name')
+            ->get();
+
+        return \App\Http\Resources\ProjectMemberResource::collection($members);
+    }
+
+    /**
      * Get project files/attachments.
      */
     public function files(Request $request, Team $team, Project $project): JsonResponse
@@ -798,6 +875,7 @@ class ProjectController extends Controller
         }
 
         $fileName = $media->file_name;
+
         $media->delete();
 
         $this->auditService->log(

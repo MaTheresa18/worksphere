@@ -32,6 +32,7 @@ class Task extends Model implements HasMedia
         'description',
         'status',
         'priority',
+        'readable_id',
         'due_date',
         'started_at',
         'submitted_at',
@@ -88,6 +89,18 @@ class Task extends Model implements HasMedia
         static::creating(function (Task $task): void {
             if (empty($task->public_id)) {
                 $task->public_id = (string) Str::uuid();
+            }
+            
+            if (empty($task->readable_id) && $task->project_id) {
+                // Determine prefix and number
+                $project = $task->project;
+                if ($project) {
+                     // We use fresh instance/query to get latest number to minimize race conditions, 
+                     // though atomic lock would be ideal for high scale.
+                     // Using increment() return value would be best if available, but here we can just do:
+                     $project->increment('last_task_number');
+                     $task->readable_id = $project->prefix . '-' . $project->last_task_number;
+                }
             }
         });
     }

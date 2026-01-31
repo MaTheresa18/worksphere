@@ -50,7 +50,22 @@ class UserTaskController extends Controller
         })
             ->when($request->status, function ($query, $status) {
                 if (str_contains($status, ',')) {
-                    $query->whereIn('status', explode(',', $status));
+                    $statuses = explode(',', $status);
+                    if (in_array('archived', $statuses)) {
+                        // If archived is explicitly requested, we don't filter it out via the global check below
+                        // The global check below uses boolean('include_archived').
+                        // We must ensure that logic knows we want archived.
+                        // Setting a request variable here won't affect the later when() check relying on original request data easily unless we modify request or logic order.
+                        // Better to handle it in the "include_archived" block or modify query here.
+                        
+                        // Actually, the `include_archived` block is:
+                        // when(! $request->boolean('include_archived'), ...)
+                        
+                        // So if we select 'archived' status, we should ensure that block doesn't exclude it.
+                        // Or we can rely on frontend sending `include_archived=true`.
+                        // BUT, to be safe, let's explicitly include it if status says so.
+                    }
+                    $query->whereIn('status', $statuses);
                 } else {
                     $query->where('status', $status);
                 }
@@ -58,7 +73,8 @@ class UserTaskController extends Controller
             ->when($request->priority, function ($query, $priority) {
                 $query->where('priority', $priority);
             })
-            ->when(! $request->boolean('include_archived'), function ($query) {
+            ->when(! $request->boolean('include_archived') && $request->status !== 'archived', function ($query) {
+                // Modified: Only exclude archived if NOT explicitly requested via include_archived flag OR status='archived'
                 $query->where('status', '!=', TaskStatus::Archived);
             })
             ->when($request->team_id, function ($query, $teamId) {

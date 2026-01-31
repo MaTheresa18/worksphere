@@ -45,13 +45,12 @@ const schema = toTypedSchema(
         description: z.string().optional(),
         status: z.string().min(1, "Status is required"),
         priority: z.number().min(1, "Priority is required"),
-        due_date: z.string().optional(),
+        due_date: z.string().min(1, "Due date is required"),
         assigned_to: z.string().optional(),
         qa_user_id: z.string().optional(),
         estimated_hours: z.number().min(0).optional(),
     }),
 );
-
 const { setValues } = useForm({
     validationSchema: schema,
     initialValues: {
@@ -471,6 +470,16 @@ const onSubmit = async () => {
         return;
     }
 
+    if (!formValues.value.due_date) {
+        toast.error("Due date is required");
+        return;
+    }
+
+    if (formValues.value.checklist.length === 0) {
+        toast.error("At least one checklist item is required");
+        return;
+    }
+
     try {
         isLoading.value = true;
         const payload = {
@@ -625,7 +634,8 @@ const onSubmit = async () => {
                         <div class="space-y-1">
                             <label
                                 class="text-[10px] uppercase tracking-wider font-bold text-[var(--text-muted)]"
-                                >Due Date</label
+                                >Due Date
+                                <span class="text-red-500">*</span></label
                             >
                             <Input
                                 type="date"
@@ -728,7 +738,11 @@ const onSubmit = async () => {
                         <div class="flex items-center justify-between">
                             <label
                                 class="text-sm font-medium text-[var(--text-secondary)]"
-                                >Checklist</label
+                                >Checklist <span class="text-red-500">*</span>
+                                <span
+                                    class="text-xs text-[var(--text-muted)] font-normal"
+                                    >(Min. 1 item)</span
+                                ></label
                             >
                             <span class="text-xs text-[var(--text-muted)]"
                                 >{{

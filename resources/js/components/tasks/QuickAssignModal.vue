@@ -31,6 +31,8 @@ const fetchMembers = async () => {
                    props.task.team_id || 
                    props.task.team_public_id ||
                    authStore.currentTeamId;
+                   
+    const projectId = props.task.project?.id || props.task.project?.public_id || props.task.project_id;
     
     if (!teamId) {
         console.warn('QuickAssignModal: No team ID found for task or session', props.task);
@@ -39,30 +41,46 @@ const fetchMembers = async () => {
 
     try {
         isFetchingMembers.value = true;
-        // Fetch TEAM members to allow assigning any team member (for Operator)
-        // and to get roles for filtering (for QA)
-        const response = await axios.get(
-            `/api/teams/${teamId}/members?per_page=100`
-        );
+        let response;
+        
+        // Use Project members endpoint if we have a project ID
+        // This ensures proper scoping as requested.
+        if (projectId) {
+             response = await axios.get(
+                `/api/projects/${projectId}/members`
+            );
+        } else {
+            // Fallback to team members if implementation requires it or project context missing
+            console.warn('QuickAssignModal: No project ID found, falling back to team members');
+            response = await axios.get(
+                `/api/teams/${teamId}/members?per_page=100`
+            );
+        }
         
         const rawMembers = response.data.data || [];
         // console.log('QuickAssignModal: Raw members from API:', rawMembers);
 
         let filteredMembers = rawMembers;
         if (props.assignType === 'qa') {
-            filteredMembers = rawMembers.filter((m: any) => m.is_qa_eligible);
+            // For QA, we might want to filter further if backend data supports it (e.g. role check)
+            // But usually project members are enough scope. If backend sends 'is_qa_eligible', use it.
+            // If not available in project member resource, we might skip or rely on role checking.
+            // ProjectMember resource (UserResource) should contain needed info.
+            if (filteredMembers.length > 0 && 'is_qa_eligible' in filteredMembers[0]) {
+                 filteredMembers = rawMembers.filter((m: any) => m.is_qa_eligible);
+            }
         }
         
         members.value = filteredMembers.map((m: any) => ({
             label: m.name,
             value: m.public_id || m.id,
             avatar: m.avatar_url,
-            subtitle: (m.team_role || m.role)?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || m.email
+            subtitle: (m.team_role || m.role || m.pivot?.role)?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || m.email
         }));
         console.log(`QuickAssignModal (${props.assignType}): Members:`, members.value);
     } catch (error) {
         console.error("Failed to fetch members", error);
-        toast.error("Could not load team members.");
+        toast.error("Could not load members.");
     } finally {
         isFetchingMembers.value = false;
     }

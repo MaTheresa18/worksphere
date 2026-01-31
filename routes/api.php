@@ -216,6 +216,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
     Route::get('/projects/{project}/tasks', [\App\Http\Controllers\Api\TaskController::class, 'indexGlobal']);
     Route::get('/projects/{project}/stats', [\App\Http\Controllers\Api\ProjectController::class, 'statsGlobal']);
     Route::get('/projects/{project}/files', [\App\Http\Controllers\Api\ProjectController::class, 'filesGlobal']);
+    Route::get('/projects/{project}/members', [\App\Http\Controllers\Api\ProjectController::class, 'membersGlobal']);
 
     // User Management
     Route::apiResource('teams', \App\Http\Controllers\Api\TeamController::class);
@@ -281,6 +282,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
             Route::get('/{project}/calendar', [\App\Http\Controllers\Api\ProjectController::class, 'calendar']);
 
             // Project Members
+            Route::get('/{project}/members', [\App\Http\Controllers\Api\ProjectController::class, 'members']);
             Route::post('/{project}/members/{user}', [\App\Http\Controllers\Api\ProjectController::class, 'addMember']);
             Route::put('/{project}/members/{user}', [\App\Http\Controllers\Api\ProjectController::class, 'updateMemberRole']);
             Route::delete('/{project}/members/{user}', [\App\Http\Controllers\Api\ProjectController::class, 'removeMember']);

@@ -43,6 +43,7 @@ import {
     Target,
     FileText,
     ChevronDown,
+    Copy,
 } from "lucide-vue-next";
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth";
@@ -841,6 +842,15 @@ const handleDownload = (fileOrId: number | string | any) => {
     document.body.removeChild(link);
 };
 
+
+
+const copyTaskId = () => {
+    const idToCopy = task.value.readable_id || task.value.public_id;
+    navigator.clipboard.writeText(idToCopy).then(() => {
+        toast.success("Task ID copied to clipboard");
+    });
+};
+
 const handleViewMedia = (file: any) => {
     window.open(file.url, "_blank");
 };
@@ -972,13 +982,6 @@ watch(
                                     <div
                                         class="flex items-center gap-3 text-sm text-[var(--text-secondary)]"
                                     >
-                                        <span
-                                            class="font-mono bg-[var(--surface-tertiary)] px-1.5 py-0.5 rounded text-xs"
-                                            >{{
-                                                task.public_id?.substring(0, 8)
-                                            }}</span
-                                        >
-                                        <span>&bull;</span>
                                         <span
                                             >Created by {{ task.creator?.name }}
                                             {{ timeAgo(task.created_at) }}</span
@@ -1857,6 +1860,26 @@ watch(
                             >
 
                             <dl class="space-y-5">
+                                <!-- Task ID -->
+                                <div>
+                                    <dt
+                                        class="text-xs font-medium text-[var(--text-secondary)] mb-1.5"
+                                    >
+                                        Task ID
+                                    </dt>
+                                    <dd
+                                        class="flex items-center gap-2 text-sm text-[var(--text-primary)] font-mono"
+                                    >
+                                        <span class="bg-[var(--surface-tertiary)] px-1.5 py-0.5 rounded text-xs select-all">{{ task.readable_id || task.public_id?.substring(0, 8) }}</span>
+                                        <button
+                                            @click="copyTaskId"
+                                            class="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                                            title="Copy ID"
+                                        >
+                                            <Copy class="w-3.5 h-3.5" />
+                                        </button>
+                                    </dd>
+                                </div>
                                 <!-- Context -->
                                 <div>
                                     <dt
@@ -2064,6 +2087,23 @@ watch(
                                             class="w-4 h-4 text-[var(--text-muted)]"
                                         />
                                         {{ task.estimated_hours }} hours
+                                    </dd>
+                                </div>
+
+                                <!-- Actual Hours -->
+                                <div v-if="task.actual_hours">
+                                    <dt
+                                        class="text-xs font-medium text-[var(--text-secondary)] mb-1.5"
+                                    >
+                                        Actual Hours
+                                    </dt>
+                                    <dd
+                                        class="flex items-center gap-2 text-sm text-[var(--text-primary)]"
+                                    >
+                                        <Clock
+                                            class="w-4 h-4 text-[var(--text-muted)]"
+                                        />
+                                        {{ task.actual_hours }} hours
                                     </dd>
                                 </div>
 

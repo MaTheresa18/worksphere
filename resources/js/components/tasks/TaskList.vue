@@ -221,51 +221,51 @@ const isOverdue = (dateString?: string, status?: any) => {
                         class="bg-[var(--surface-secondary)]/50 border-b border-[var(--border-subtle)]"
                     >
                         <th
-                            class="px-4 py-3 text-left text-xs font-semibold uppercase text-[var(--text-muted)] w-10"
+                            class="px-3 py-3 text-left text-xs font-semibold uppercase text-[var(--text-muted)] w-10"
                         ></th>
                         <th
-                            class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-48"
+                            class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-36"
                         >
                             Client
                         </th>
                         <th
                             v-if="showProject"
-                            class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-40"
+                            class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-32"
                         >
                             Project
                         </th>
                         <th
-                            class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] flex-1 min-w-[200px] max-w-[380px]"
+                            class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] flex-1 min-w-[150px] max-w-[250px]"
                         >
                             Task
                         </th>
                         <th
-                            class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-28 text-center"
+                            class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-24 text-center"
                         >
                             Checklist
                         </th>
                         <th
-                            class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-40"
+                            class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-36"
                         >
                             Assigned To
                         </th>
                         <th
-                            class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-40"
+                            class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-36"
                         >
                             QA Owner
                         </th>
                         <th
-                            class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-32"
+                            class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-28"
                         >
                             Status
                         </th>
                         <th
-                            class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-32"
+                            class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-28"
                         >
                             Priority
                         </th>
                         <th
-                            class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-32"
+                            class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] w-48"
                         >
                             Due Date
                         </th>
@@ -283,7 +283,7 @@ const isOverdue = (dateString?: string, status?: any) => {
                         @click="emit('task-click', task)"
                     >
                         <!-- Status Icon Column -->
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-3">
                             <div
                                 class="p-2 rounded-lg bg-[var(--surface-secondary)] group-hover:bg-[var(--surface-tertiary)] transition-colors flex items-center justify-center w-8 h-8"
                             >
@@ -333,16 +333,17 @@ const isOverdue = (dateString?: string, status?: any) => {
                         </td>
 
                         <!-- Client Column -->
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-3">
                             <div
                                 v-if="(task as any).project?.client"
-                                class="flex items-center gap-2"
+                                class="flex items-center gap-2 max-w-[120px]"
                             >
                                 <Building2
-                                    class="w-3.5 h-3.5 text-[var(--text-muted)]"
+                                    class="w-3.5 h-3.5 text-[var(--text-muted)] flex-shrink-0"
                                 />
                                 <span
-                                    class="text-sm font-medium text-[var(--text-secondary)]"
+                                    class="text-sm font-medium text-[var(--text-secondary)] truncate"
+                                    :title="(task as any).project.client.name"
                                 >
                                     {{ (task as any).project.client.name }}
                                 </span>
@@ -355,13 +356,14 @@ const isOverdue = (dateString?: string, status?: any) => {
                         </td>
 
                         <!-- Project Column -->
-                        <td v-if="showProject" class="px-4 py-3">
-                            <div class="flex items-center gap-2">
+                        <td v-if="showProject" class="px-3 py-3">
+                            <div class="flex items-center gap-2 max-w-[120px]">
                                 <Folder
-                                    class="w-3.5 h-3.5 text-[var(--text-muted)]"
+                                    class="w-3.5 h-3.5 text-[var(--text-muted)] flex-shrink-0"
                                 />
                                 <span
-                                    class="text-sm font-medium text-[var(--text-secondary)]"
+                                    class="text-sm font-medium text-[var(--text-secondary)] truncate"
+                                    :title="(task as any).project?.name || '-'"
                                 >
                                     {{ (task as any).project?.name || "-" }}
                                 </span>
@@ -369,15 +371,15 @@ const isOverdue = (dateString?: string, status?: any) => {
                         </td>
 
                         <!-- Task Details Column -->
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-3">
                             <div class="flex flex-col gap-1">
                                 <span
-                                    class="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--interactive-primary)] transition-colors"
+                                    class="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--interactive-primary)] transition-colors truncate"
                                 >
                                     {{ task.title }}
                                 </span>
                                 <p
-                                    class="text-xs text-[var(--text-muted)] line-clamp-1 max-w-[300px]"
+                                    class="text-xs text-[var(--text-muted)] line-clamp-1 max-w-[250px]"
                                 >
                                     {{
                                         task.description ||
@@ -388,7 +390,7 @@ const isOverdue = (dateString?: string, status?: any) => {
                         </td>
 
                         <!-- Checklist Progress Column -->
-                        <td class="px-4 py-3 text-center">
+                        <td class="px-3 py-3 text-center">
                             <div
                                 v-if="
                                     task.checklist_total &&
@@ -429,7 +431,7 @@ const isOverdue = (dateString?: string, status?: any) => {
                         </td>
 
                         <!-- Assigned To Column -->
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-3">
                             <div
                                 @click.stop="
                                     task.can?.assign &&
@@ -457,7 +459,7 @@ const isOverdue = (dateString?: string, status?: any) => {
                                         class="ring-2 ring-[var(--surface-primary)]"
                                     />
                                     <span
-                                        class="text-sm font-medium text-[var(--text-secondary)]"
+                                        class="text-sm font-medium text-[var(--text-secondary)] truncate max-w-[100px]"
                                     >
                                         {{ task.assignee.name }}
                                     </span>
@@ -473,7 +475,7 @@ const isOverdue = (dateString?: string, status?: any) => {
                         </td>
 
                         <!-- QA Owner Column -->
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-3">
                             <div
                                 @click.stop="
                                     task.can?.assign &&
@@ -499,7 +501,7 @@ const isOverdue = (dateString?: string, status?: any) => {
                                         class="ring-2 ring-[var(--surface-primary)]"
                                     />
                                     <span
-                                        class="text-sm font-medium text-[var(--text-secondary)]"
+                                        class="text-sm font-medium text-[var(--text-secondary)] truncate max-w-[100px]"
                                     >
                                         {{ task.qa_user.name }}
                                     </span>
@@ -515,7 +517,7 @@ const isOverdue = (dateString?: string, status?: any) => {
                         </td>
 
                         <!-- Status Column -->
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-3">
                             <Badge
                                 :variant="getStatusColor(task.status)"
                                 size="md"
@@ -526,7 +528,7 @@ const isOverdue = (dateString?: string, status?: any) => {
                         </td>
 
                         <!-- Priority Column -->
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-3">
                             <div
                                 class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border"
                                 :class="
@@ -545,7 +547,7 @@ const isOverdue = (dateString?: string, status?: any) => {
                         </td>
 
                         <!-- Due Date Column -->
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-3">
                             <div
                                 class="flex items-center gap-2 text-sm"
                                 :class="{

@@ -7,11 +7,13 @@ interface Task {
     public_id: string;
     title: string;
     description: string;
-    status: {
-        value: string;
-        label: string;
-        color: string;
-    } | string;
+    status:
+        | {
+              value: string;
+              label: string;
+              color: string;
+          }
+        | string;
     priority: string;
     due_date?: string;
     assignee?: {
@@ -59,28 +61,34 @@ const draggingTask = ref<Task | null>(null);
 
 const getTasksByStatus = (status: string) => {
     return props.tasks.filter((t) => {
-        const tStatus = typeof t.status === 'object' && t.status !== null ? t.status.value : t.status;
+        const tStatus =
+            typeof t.status === "object" && t.status !== null
+                ? t.status.value
+                : t.status;
         return tStatus === status;
     });
 };
 
 const getPriorityColor = (priority: string | number) => {
     const p = String(priority).toLowerCase();
-    
-    if (p === '4' || p === 'urgent') return "text-red-500 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20";
-    if (p === '3' || p === 'high') return "text-orange-500 bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/20";
-    if (p === '2' || p === 'medium') return "text-blue-500 bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20";
-    
+
+    if (p === "4" || p === "urgent")
+        return "text-red-500 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20";
+    if (p === "3" || p === "high")
+        return "text-orange-500 bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/20";
+    if (p === "2" || p === "medium")
+        return "text-blue-500 bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20";
+
     // 1 or low
     return "text-gray-500 bg-gray-50 dark:bg-gray-500/10 border-gray-200 dark:border-gray-500/20";
 };
 
 const getPriorityLabel = (priority: string | number) => {
     const p = String(priority).toLowerCase();
-    if (p === '4' || p === 'urgent') return 'Urgent';
-    if (p === '3' || p === 'high') return 'High';
-    if (p === '2' || p === 'medium') return 'Medium';
-    return 'Low';
+    if (p === "4" || p === "urgent") return "Urgent";
+    if (p === "3" || p === "high") return "High";
+    if (p === "2" || p === "medium") return "Medium";
+    return "Low";
 };
 
 const formatDate = (dateString?: string) => {
@@ -102,7 +110,10 @@ const onDragStart = (event: DragEvent, task: Task) => {
 
 const onDrop = (_event: DragEvent, status: string) => {
     if (draggingTask.value) {
-        const currentStatus = typeof draggingTask.value.status === 'object' ? draggingTask.value.status.value : draggingTask.value.status;
+        const currentStatus =
+            typeof draggingTask.value.status === "object"
+                ? draggingTask.value.status.value
+                : draggingTask.value.status;
         if (currentStatus !== status) {
             emit("task-moved", draggingTask.value.public_id, status);
         }
@@ -116,12 +127,14 @@ const onDragOver = (event: DragEvent) => {
 </script>
 
 <template>
-    <div class="h-full overflow-x-auto overflow-y-hidden">
-        <div class="flex h-full gap-6 pb-4 min-w-full w-max px-1">
+    <div class="h-full overflow-y-auto overflow-x-hidden p-2">
+        <div
+            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-8"
+        >
             <div
                 v-for="status in statuses"
                 :key="status.value"
-                class="flex flex-col w-[320px] flex-shrink-0 max-h-full rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)]"
+                class="flex flex-col w-full h-[600px] rounded-xl bg-[var(--surface-secondary)]/50 border border-[var(--border-subtle)] shadow-sm"
                 @dragover="onDragOver"
                 @drop="onDrop($event, status.value)"
             >
@@ -134,10 +147,16 @@ const onDragOver = (event: DragEvent) => {
                             class="w-2.5 h-2.5 rounded-full ring-2 ring-offset-2 ring-offset-[var(--surface-secondary)]"
                             :class="`bg-${status.color}-500 ring-${status.color}-500/30`"
                         ></div>
-                        <h3 class="font-semibold text-sm text-[var(--text-primary)]">
+                        <h3
+                            class="font-semibold text-sm text-[var(--text-primary)]"
+                        >
                             {{ status.label }}
                         </h3>
-                        <Badge variant="secondary" size="sm" class="ml-1 px-1.5 min-w-[20px] justify-center">
+                        <Badge
+                            variant="secondary"
+                            size="sm"
+                            class="ml-1 px-1.5 min-w-[20px] justify-center"
+                        >
                             {{ getTasksByStatus(status.value).length }}
                         </Badge>
                     </div>
@@ -151,19 +170,26 @@ const onDragOver = (event: DragEvent) => {
                         v-for="task in getTasksByStatus(status.value)"
                         :key="task.public_id"
                         :draggable="!readOnly && (task as any).can?.edit"
-                        @dragstart="!readOnly && (task as any).can?.edit && onDragStart($event, (task as any))"
+                        @dragstart="
+                            !readOnly &&
+                            (task as any).can?.edit &&
+                            onDragStart($event, task as any)
+                        "
                         @click="emit('task-click', task)"
                         class="group relative bg-[var(--surface-primary)] p-4 rounded-xl shadow-sm border border-[var(--border-subtle)] hover:shadow-md hover:border-[var(--brand-primary)]/50 transition-all duration-200 cursor-pointer select-none"
                         :class="{
                             'opacity-50 rotate-2 scale-95 ring-2 ring-[var(--brand-primary)]':
                                 draggingTask?.public_id === task.public_id,
-                            'cursor-default': readOnly || !(task as any).can?.edit
+                            'cursor-default':
+                                readOnly || !(task as any).can?.edit,
                         }"
                     >
                         <!-- Card Header -->
                         <div class="flex items-start justify-between mb-3">
                             <div class="flex items-center gap-2">
-                                <span class="text-[10px] font-mono text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors">
+                                <span
+                                    class="text-[10px] font-mono text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors"
+                                >
                                     #{{ task.public_id.substring(0, 4) }}
                                 </span>
                                 <Badge
@@ -175,10 +201,14 @@ const onDragOver = (event: DragEvent) => {
                                     {{ task.project.name }}
                                 </Badge>
                             </div>
-                            
-                            <div 
+
+                            <div
                                 class="w-1.5 h-1.5 rounded-full"
-                                :class="getPriorityColor(task.priority).replace('bg-', 'bg-').replace('text-', 'bg-')"
+                                :class="
+                                    getPriorityColor(task.priority)
+                                        .replace('bg-', 'bg-')
+                                        .replace('text-', 'bg-')
+                                "
                             ></div>
                         </div>
 
@@ -190,15 +220,28 @@ const onDragOver = (event: DragEvent) => {
                         </h4>
 
                         <!-- Footer -->
-                        <div class="flex items-center justify-between mt-auto pt-3 border-t border-[var(--border-subtle)]/50">
+                        <div
+                            class="flex items-center justify-between mt-auto pt-3 border-t border-[var(--border-subtle)]/50"
+                        >
                             <!-- People -->
                             <div class="flex items-center -space-x-2">
                                 <!-- Operator -->
                                 <div
-                                    @click.stop="(task as any).can?.assign && emit('quick-assign', (task as any))"
+                                    @click.stop="
+                                        (task as any).can?.assign &&
+                                        emit('quick-assign', task as any)
+                                    "
                                     class="relative z-10"
-                                    :class="(task as any).can?.assign ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-default'"
-                                    :title="(task as any).can?.assign ? 'Assign Operator' : ''"
+                                    :class="
+                                        (task as any).can?.assign
+                                            ? 'cursor-pointer hover:scale-110 transition-transform'
+                                            : 'cursor-default'
+                                    "
+                                    :title="
+                                        (task as any).can?.assign
+                                            ? 'Assign Operator'
+                                            : ''
+                                    "
                                 >
                                     <Avatar
                                         v-if="task.assignee"
@@ -231,7 +274,7 @@ const onDragOver = (event: DragEvent) => {
                             <!-- Meta -->
                             <div class="flex items-center gap-3">
                                 <!-- Priority Label -->
-                                <span 
+                                <span
                                     class="text-[10px] font-medium px-1.5 py-0.5 rounded"
                                     :class="getPriorityColor(task.priority)"
                                 >
@@ -243,8 +286,12 @@ const onDragOver = (event: DragEvent) => {
                                     v-if="task.due_date"
                                     class="flex items-center text-[10px] gap-1"
                                     :class="{
-                                        'text-red-500 font-medium': new Date(task.due_date) < new Date(),
-                                        'text-[var(--text-muted)]': new Date(task.due_date) >= new Date()
+                                        'text-red-500 font-medium':
+                                            new Date(task.due_date) <
+                                            new Date(),
+                                        'text-[var(--text-muted)]':
+                                            new Date(task.due_date) >=
+                                            new Date(),
                                     }"
                                 >
                                     <Calendar class="w-3 h-3" />
@@ -259,10 +306,13 @@ const onDragOver = (event: DragEvent) => {
                         v-if="getTasksByStatus(status.value).length === 0"
                         class="flex flex-col items-center justify-center py-12 px-4 border-2 border-dashed border-[var(--border-subtle)] rounded-xl bg-[var(--surface-primary)]/30"
                     >
-                        <div class="w-10 h-10 rounded-full bg-[var(--surface-tertiary)] flex items-center justify-center mb-2">
+                        <div
+                            class="w-10 h-10 rounded-full bg-[var(--surface-tertiary)] flex items-center justify-center mb-2"
+                        >
                             <span class="text-xl opacity-20">📋</span>
                         </div>
-                        <span class="text-xs font-medium text-[var(--text-muted)]"
+                        <span
+                            class="text-xs font-medium text-[var(--text-muted)]"
                             >No tasks in {{ status.label }}</span
                         >
                     </div>

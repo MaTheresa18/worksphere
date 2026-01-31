@@ -32,10 +32,10 @@ class StoreTaskRequest extends FormRequest
             'assigned_to' => ['nullable', 'string', 'exists:users,public_id'],
             'qa_user_id' => ['nullable', 'string', 'exists:users,public_id'],
             'priority' => ['sometimes', 'integer', 'min:1', 'max:5'],
-            'due_date' => ['nullable', 'date'],
+            'due_date' => ['required', 'date'],
             'estimated_hours' => ['nullable', 'numeric', 'min:0', 'max:9999.99'],
             'sort_order' => ['sometimes', 'integer', 'min:0'],
-            'checklist' => ['nullable', 'array'],
+            'checklist' => ['required', 'array', 'min:1'],
             'checklist.*.title' => ['required_with:checklist', 'string', 'max:255'],
             'checklist.*.is_completed' => ['sometimes', 'boolean'],
         ];

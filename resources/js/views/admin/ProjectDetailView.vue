@@ -759,6 +759,8 @@ onMounted(() => {
     fetchTeamMembers();
 });
 
+
+
 // Watch for query param changes (e.g. back/forward navigation)
 watch(
     () => route.query,
@@ -774,6 +776,10 @@ watch(
         }
     },
 );
+
+const refreshData = () => {
+    fetchProject();
+};
 </script>
 
 <template>

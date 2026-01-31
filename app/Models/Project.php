@@ -32,6 +32,7 @@ class Project extends Model implements HasMedia
     protected $fillable = [
         'team_id',
         'name',
+        'prefix',
         'slug',
         'description',
         'status',
@@ -47,6 +48,7 @@ class Project extends Model implements HasMedia
         'created_by',
         'archived_at',
         'archived_by',
+        'last_task_number',
     ];
 
     /**
@@ -60,6 +62,7 @@ class Project extends Model implements HasMedia
         'client_id',
         'created_by',
         'archived_by',
+        'last_task_number', // internal use
     ];
 
     /**
@@ -87,6 +90,14 @@ class Project extends Model implements HasMedia
 
             if (empty($project->slug)) {
                 $project->slug = self::generateSlug($project->name, $project->team_id);
+            }
+
+            if (empty($project->prefix)) {
+                // Generate prefix: Uppercase, alphanumeric only, max 4 chars
+                $name = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $project->name));
+                $prefix = substr($name, 0, 3);
+                if (strlen($prefix) < 2) $prefix = 'PROJ';
+                $project->prefix = $prefix;
             }
         });
     }

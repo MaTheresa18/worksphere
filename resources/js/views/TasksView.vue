@@ -83,6 +83,7 @@ const statusOptions = [
     { label: "Approved", value: "approved" },
     { label: "Client Review", value: "sent_to_client" },
     { label: "Completed", value: "completed" },
+    { label: "Archived", value: "archived" },
 ];
 
 const priorityOptions = [
@@ -211,12 +212,17 @@ const onTaskAssigned = () => {
 const fetchTasks = async () => {
     loading.value = true;
     try {
+        // Determine include_archived based on status filter
+        // If status filter contains 'archived', we want archived tasks.
+        const isArchivedSelected = statusFilter.value === 'archived' || 
+                                  (statusFilter.value && statusFilter.value.includes('archived'));
+                                  
         const params: any = {
             scope: scopeFilter.value,
             search: searchQuery.value,
             status: statusFilter.value,
             priority: priorityFilter.value,
-            include_archived: false,
+            include_archived: isArchivedSelected, 
             // Use the locally selected team ID, not the global store one,
             // because the user is filtering by team in this view.
             team_id: selectedTeamId.value,
