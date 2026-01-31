@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\BlockedIp;
 use App\Models\SuspiciousActivity;
 use App\Models\User;
+use App\Models\WhitelistedIp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Torann\GeoIP\Facades\GeoIP;
@@ -28,6 +29,7 @@ class SecurityDashboardController extends Controller
 
         $bannedUsersCount = User::where('status', 'banned')->count();
         $suspendedUsersCount = User::where('status', 'suspended')->count();
+        $whitelistedIpsCount = WhitelistedIp::count();
 
         // Count security incidents today
         $incidentsToday = AuditLog::whereDate('created_at', today())
@@ -44,6 +46,7 @@ class SecurityDashboardController extends Controller
             'blocked_ips' => $blockedIpsCount,
             'banned_users' => $bannedUsersCount,
             'suspended_users' => $suspendedUsersCount,
+            'whitelisted_ips' => $whitelistedIpsCount,
             'incidents_today' => $incidentsToday,
         ]);
     }
@@ -217,5 +220,56 @@ class SecurityDashboardController extends Controller
             });
 
         return response()->json($activities);
+    }
+    /**
+     * Get whitelisted IPs list.
+     */
+    public function whitelistedIps(Request $request)
+    {
+        $this->authorize('viewAny', BlockedIp::class);
+
+        $ips = WhitelistedIp::with('creator')
+            ->latest()
+            ->paginate($request->integer('per_page', 20));
+
+        return response()->json($ips);
+    }
+
+    /**
+     * Add an IP to the whitelist.
+     */
+    public function whitelistIp(Request $request)
+    {
+        $this->authorize('create', BlockedIp::class);
+
+        $validated = $request->validate([
+            'ip_address' => 'required|ip|unique:whitelisted_ips,ip_address',
+            'label' => 'nullable|string|max:100',
+        ]);
+
+        $whitelisted = WhitelistedIp::create([
+            'ip_address' => $validated['ip_address'],
+            'label' => $validated['label'],
+            'added_by' => $request->user()?->id,
+        ]);
+
+        return response()->json([
+            'message' => 'IP address added to whitelist successfully',
+            'data' => $whitelisted,
+        ]);
+    }
+
+    /**
+     * Remove an IP from the whitelist.
+     */
+    public function unwhitelistIp(WhitelistedIp $ip)
+    {
+        $this->authorize('delete', BlockedIp::class);
+
+        $ip->delete();
+
+        return response()->json([
+            'message' => 'IP address removed from whitelist successfully',
+        ]);
     }
 }

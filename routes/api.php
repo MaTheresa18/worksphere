@@ -669,6 +669,9 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
         Route::get('/blocked-ips', [\App\Http\Controllers\Api\SecurityDashboardController::class, 'blockedIps']);
         Route::post('/blocked-ips', [\App\Http\Controllers\Api\SecurityDashboardController::class, 'blockIp']);
         Route::delete('/blocked-ips/{blockedIp}', [\App\Http\Controllers\Api\SecurityDashboardController::class, 'unblockIp']);
+        Route::get('/whitelisted-ips', [\App\Http\Controllers\Api\SecurityDashboardController::class, 'whitelistedIps']);
+        Route::post('/whitelisted-ips', [\App\Http\Controllers\Api\SecurityDashboardController::class, 'whitelistIp']);
+        Route::delete('/whitelisted-ips/{ip}', [\App\Http\Controllers\Api\SecurityDashboardController::class, 'unwhitelistIp']);
         Route::get('/banned-users', [\App\Http\Controllers\Api\SecurityDashboardController::class, 'bannedUsers']);
     });
 

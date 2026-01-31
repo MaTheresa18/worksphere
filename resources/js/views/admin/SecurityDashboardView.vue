@@ -18,6 +18,7 @@ import SecurityActivityFeed from "@/components/admin/SecurityActivityFeed.vue";
 import BlockedIpsTable from "@/components/admin/BlockedIpsTable.vue";
 import BannedUsersTable from "@/components/admin/BannedUsersTable.vue";
 import SuspiciousActivityTable from "@/components/admin/SuspiciousActivityTable.vue";
+import WhitelistedIpsTable from "@/components/admin/WhitelistedIpsTable.vue";
 import DashboardLineChart from "@/components/charts/DashboardLineChart.vue";
 import DashboardDoughnutChart from "@/components/charts/DashboardDoughnutChart.vue";
 import SecurityMap from "@/components/admin/SecurityMap.vue";
@@ -29,6 +30,7 @@ const axios = api;
 const activeTab = ref("overview");
 const stats = ref({
     blocked_ips: 0,
+    whitelisted_ips: 0,
     banned_users: 0,
     suspended_users: 0,
     incidents_today: 0,
@@ -147,6 +149,14 @@ onMounted(() => {
                 class="hover:scale-[1.02] transition-transform duration-200"
             />
             <DashboardStatsCard
+                title="Whitelisted IPs"
+                :value="stats.whitelisted_ips ?? 0"
+                icon="ShieldCheckIcon"
+                color="text-emerald-500"
+                bg-color="bg-emerald-500/10"
+                class="hover:scale-[1.02] transition-transform duration-200"
+            />
+            <DashboardStatsCard
                 title="Banned User Logins"
                 :value="stats.banned_users ?? 0"
                 icon="UserMinusIcon"
@@ -214,6 +224,14 @@ onMounted(() => {
                 <LockClosedIcon class="w-5 h-5" />
                 Banned Users
             </button>
+            <button
+                @click="activeTab = 'whitelisted-ips'"
+                class="py-4 px-2 text-base font-semibold border-b-2 transition-all duration-200 whitespace-nowrap flex items-center gap-2"
+                :class="activeTab === 'whitelisted-ips' ? 'border-[var(--interactive-primary)] text-[var(--interactive-primary)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'"
+            >
+                <ShieldCheckIcon class="w-5 h-5" />
+                Whitelist
+            </button>
         </div>
 
         <!-- Tab Content -->
@@ -278,16 +296,14 @@ onMounted(() => {
                                     <ClockIcon class="w-5 h-5 text-[var(--interactive-primary)]" />
                                     Recent Security Activity
                                 </h3>
-                            </div>
-                            <SecurityActivityFeed />
-                            <div class="mt-8 pt-6 border-t border-[var(--border-default)] text-center">
-                                 <RouterLink
+                                <RouterLink
                                     :to="{ name: 'system-logs', query: { category: 'security' } }"
                                     class="text-sm font-medium text-[var(--interactive-primary)] hover:underline"
                                 >
-                                    View Detailed Logs &rarr;
+                                    View All &rarr;
                                 </RouterLink>
                             </div>
+                            <SecurityActivityFeed />
                         </div>
                     </div>
                 </div>
@@ -323,6 +339,11 @@ onMounted(() => {
             <!-- Banned Users Tab -->
             <div v-if="activeTab === 'banned-users'" class="animate-in fade-in duration-300">
                 <BannedUsersTable />
+            </div>
+
+            <!-- Whitelisted IPs Tab -->
+            <div v-if="activeTab === 'whitelisted-ips'" class="animate-in fade-in duration-300">
+                <WhitelistedIpsTable @updated="refreshDashboard" />
             </div>
         </div>
     </div>

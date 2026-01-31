@@ -16,7 +16,13 @@ class CheckBlockedIp
     public function handle(Request $request, Closure $next): Response
     {
         $ip = $request->ip();
+        
+        // Priority 1: Check Whitelist
+        if (\App\Models\WhitelistedIp::where('ip_address', $ip)->exists()) {
+            return $next($request);
+        }
 
+        // Priority 2: Check Blocklist
         $blockedIp = \App\Models\BlockedIp::where('ip_address', $ip)
             ->where(function ($query) {
                 $query->whereNull('expires_at')
