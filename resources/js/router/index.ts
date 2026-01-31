@@ -644,6 +644,19 @@ const routes: RouteRecordRaw[] = [
                 },
             },
 
+            // Security Dashboard
+            {
+                path: "/admin/security",
+                name: "admin.security",
+                component: () => import("@/views/admin/SecurityDashboardView.vue"),
+                meta: {
+                    title: "Security Dashboard",
+                    breadcrumb: "Security Logs",
+                    transition: "slide-fade",
+                    permission: "security.view",
+                },
+            },
+
             // User Management
             {
                 path: "/admin/users",

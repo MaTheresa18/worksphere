@@ -40,6 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Append middleware to web group
         $middleware->web(append: [
+            \App\Http\Middleware\CheckBlockedIp::class,
             CheckUserStatus::class,
             \App\Http\Middleware\SecurityHeaders::class,
             \App\Http\Middleware\TrackPageView::class,
@@ -47,6 +48,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // API middleware configuration
         $middleware->api(prepend: [
+            \App\Http\Middleware\CheckBlockedIp::class,
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);
 

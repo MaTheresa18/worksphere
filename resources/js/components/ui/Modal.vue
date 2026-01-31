@@ -152,7 +152,7 @@ defineSlots<{
     <DialogRoot :open="open" @update:open="handleOpenChange">
         <DialogPortal>
             <DialogOverlay
-                class="fixed inset-0 z-[1040] bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+                class="fixed inset-0 z-[1040] bg-black data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
             />
             <DialogContent :class="contentClasses">
                 <!-- Accessibility: Always render Title/Description -->

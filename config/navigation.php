@@ -252,7 +252,7 @@ return [
             'id' => 'system',
             'label' => 'System Settings & Logs',
             'icon' => 'sliders',
-            'permission' => ['audit.view', 'settings.system'],
+            'permission' => ['audit.view', 'settings.system', 'security.view'],
             'pinnable' => true,
             'pinned_default' => false,
             'children' => [
@@ -261,6 +261,12 @@ return [
                     'label' => 'General Settings',
                     'route' => '/system/settings',
                     'permission' => 'settings.system',
+                ],
+                [
+                    'id' => 'security-dashboard',
+                    'label' => 'Security Dashboard',
+                    'route' => '/admin/security',
+                    'permission' => 'security.view',
                 ],
                 [
                     'id' => 'system-logs',

@@ -660,6 +660,18 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
         Route::get('/roles', [TwoFactorEnforcementController::class, 'roleEnforcements']);
     });
 
+    // Security Dashboard (Admin)
+    Route::middleware(['permission:security.view'])->prefix('admin/security')->group(function () {
+        Route::get('/stats', [\App\Http\Controllers\Api\SecurityDashboardController::class, 'stats']);
+        Route::get('/charts', [\App\Http\Controllers\Api\SecurityDashboardController::class, 'charts']);
+        Route::get('/map-data', [\App\Http\Controllers\Api\SecurityDashboardController::class, 'mapData']);
+        Route::get('/activity', [\App\Http\Controllers\Api\SecurityDashboardController::class, 'activity']);
+        Route::get('/blocked-ips', [\App\Http\Controllers\Api\SecurityDashboardController::class, 'blockedIps']);
+        Route::post('/blocked-ips', [\App\Http\Controllers\Api\SecurityDashboardController::class, 'blockIp']);
+        Route::delete('/blocked-ips/{blockedIp}', [\App\Http\Controllers\Api\SecurityDashboardController::class, 'unblockIp']);
+        Route::get('/banned-users', [\App\Http\Controllers\Api\SecurityDashboardController::class, 'bannedUsers']);
+    });
+
     // 2FA Enforcement Status (for current user)
     Route::get('/user/2fa-enforcement-status', [TwoFactorEnforcementController::class, 'getEnforcementStatus']);
 

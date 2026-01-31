@@ -13,6 +13,25 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 class AuditLog extends Model
 {
     /**
+     * The "booted" method of the model.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (AuditLog $log) {
+            if ($log->category === AuditCategory::Security || 
+                $log->action === AuditAction::LoginFailed ||
+                $log->action === AuditAction::RateLimitExceeded) {
+                
+                try {
+                    \App\Services\SecurityDashboardService::recordSuspiciousActivity($log);
+                } catch (\Throwable $e) {
+                    // Fail silently to avoid interrupting the main flow
+                }
+            }
+        });
+    }
+
+    /**
      * Indicates if the model should be timestamped.
      *
      * @var bool
