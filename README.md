@@ -1,7 +1,19 @@
 # WorkSphere
 
 <p align="center">
-<img src="doc/screenshots/worksphere_brand.png" width="400" alt="WorkSphere Brand">
+    <a href="https://github.com/SummerRijndael/worksphere/stargazers"><img src="https://img.shields.io/github/stars/SummerRijndael/worksphere?style=for-the-badge&logo=github&color=yellow" alt="Stars"></a>
+    <a href="https://github.com/SummerRijndael/worksphere/blob/main/LICENSE"><img src="https://img.shields.io/github/license/SummerRijndael/worksphere?style=for-the-badge&logo=github&color=blue" alt="License"></a>
+    <img src="https://img.shields.io/badge/PHP-8.2%2B-777BB4?style=for-the-badge&logo=php&logoColor=white" alt="PHP 8.2+">
+    <img src="https://img.shields.io/badge/Laravel-12.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white" alt="Laravel 12">
+    <img src="https://img.shields.io/badge/Vue.js-3.5-4FC08D?style=for-the-badge&logo=vue.js&logoColor=white" alt="Vue 3">
+</p>
+
+<p align="center">
+    <img src="doc/screenshots/worksphere_brand.png" width="400" alt="WorkSphere Brand">
+</p>
+
+<p align="center">
+    <a href="https://www.buymeacoffee.com/evryannolax" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 </p>
 
 > [!WARNING]
