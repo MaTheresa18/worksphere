@@ -15,6 +15,17 @@ class UserProfileController extends Controller
     {
         $this->authorize('viewProfile', $user);
 
+        // Fetch teams
+        $teams = $user->teams()->select('teams.id', 'teams.public_id', 'teams.name', 'teams.slug', 'team_user.role as team_role')
+            ->get()
+            ->map(function ($team) {
+                return [
+                    'public_id' => $team->public_id,
+                    'name' => $team->name,
+                    'role' => $team->team_role,
+                ];
+            });
+
         return response()->json([
             'data' => [
                 'public_id' => $user->public_id,
@@ -31,6 +42,7 @@ class UserProfileController extends Controller
                 'status' => $user->status,
                 // Only show email if they are in the same team
                 'email' => $user->email,
+                'teams' => $teams,
             ],
         ]);
     }
@@ -47,14 +59,20 @@ class UserProfileController extends Controller
         // - Assigned to target user
         // - Created by SOMEONE ELSE (not self-assigned)
         // - Visible to AUTH user (via project membership)
+        // 2. Query Tasks
+        // - Assigned to target user
+        // - Created by SOMEONE ELSE (not self-assigned)
+        // - Visible to AUTH user (via project membership OR if admin)
         $query = \App\Models\Task::query()
-            ->with(['project', 'creator', 'status'])
+            ->with(['project', 'creator'])
             ->where('assigned_to', $user->id)
             ->where('created_by', '!=', $user->id) // Filter out self-assigned
-            ->whereHas('project', function ($q) use ($request) {
-                // Ensure AUTH user is a member of the project
-                $q->whereHas('members', function ($m) use ($request) {
-                    $m->where('user_id', $request->user()->id);
+            ->when(! $request->user()->hasRole('administrator'), function ($q) use ($request) {
+                $q->whereHas('project', function ($p) use ($request) {
+                    // Ensure AUTH user is a member of the project
+                    $p->whereHas('members', function ($m) use ($request) {
+                        $m->where('user_id', $request->user()->id);
+                    });
                 });
             })
             ->orderBy('due_date', 'asc')
