@@ -626,8 +626,9 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
         Route::put('/{key}', [\App\Http\Controllers\Api\SettingsController::class, 'updateSingle']);
         Route::put('/{key}', [\App\Http\Controllers\Api\SettingsController::class, 'updateSingle']);
         Route::post('/cache/clear', [\App\Http\Controllers\Api\SettingsController::class, 'clearCache']);
-        Route::post('/logo', [\App\Http\Controllers\Api\SettingsController::class, 'uploadLogo']);
-        Route::post('/favicon', [\App\Http\Controllers\Api\SettingsController::class, 'uploadFavicon']);
+        Route::post('/upload-logo', [\App\Http\Controllers\Api\SettingsController::class, 'uploadLogo']);
+        Route::post('/upload-favicon', [\App\Http\Controllers\Api\SettingsController::class, 'uploadFavicon']);
+        Route::post('/upload-opengraph', [\App\Http\Controllers\Api\SettingsController::class, 'uploadOpengraph']);
     });
 
     // Announcements - Public (for viewing/dismissing)

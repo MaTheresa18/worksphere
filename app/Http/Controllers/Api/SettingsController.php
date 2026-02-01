@@ -239,4 +239,24 @@ class SettingsController extends Controller
             'url' => $url,
         ]);
     }
+
+    /**
+     * Upload application OpenGraph image.
+     */
+    public function uploadOpengraph(Request $request): JsonResponse
+    {
+        $request->validate([
+            'opengraph' => ['required', 'file', 'mimes:png,jpg,jpeg,webp', 'max:4096'],
+        ]);
+
+        $path = $request->file('opengraph')->store('branding', 'public');
+        $url = \Illuminate\Support\Facades\Storage::url($path);
+
+        $this->settingsService->set('app.opengraph', $url, ['group' => 'app', 'type' => 'string']);
+
+        return response()->json([
+            'message' => 'OpenGraph image uploaded successfully.',
+            'url' => $url,
+        ]);
+    }
 }

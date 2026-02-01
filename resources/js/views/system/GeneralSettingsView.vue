@@ -16,6 +16,8 @@ import {
     Eye,
     EyeOff,
     Copy,
+    Share2,
+    Upload,
 } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import axios from "axios";
@@ -71,6 +73,7 @@ const settings = ref({
     // Branding
     "app.logo": "",
     "app.favicon": "",
+    "app.opengraph": "",
     // Team Management
     "teams.max_owned": 5,
     "teams.max_joined": 20,
@@ -241,22 +244,60 @@ const testSystemSmtp = async () => {
     }
 };
 
-// Branding Upload
-const uploadBrandingFile = async (event, type) => {
+// Branding Upload State
+const selectedFiles = ref({
+    logo: null,
+    favicon: null,
+    opengraph: null,
+});
+
+const brandingUploading = ref({
+    logo: false,
+    favicon: false,
+    opengraph: false,
+});
+
+const handleFileSelect = (event, type) => {
     const file = event.target.files[0];
+    if (file) {
+        selectedFiles.value[type] = file;
+    }
+};
+
+const updateBrowserFavicon = (url) => {
+    const link = document.querySelector("link[rel*='icon']") || document.createElement('link');
+    link.type = 'image/x-icon';
+    link.rel = 'shortcut icon';
+    link.href = url;
+    document.getElementsByTagName('head')[0].appendChild(link);
+};
+
+const uploadBranding = async (type) => {
+    const file = selectedFiles.value[type];
     if (!file) return;
 
+    brandingUploading.value[type] = true;
     const formData = new FormData();
     formData.append(type, file);
 
     try {
-        const response = await axios.post(`/api/settings/${type}`, formData, {
+        const response = await axios.post(`/api/settings/upload-${type}`, formData, {
             headers: {
                 "Content-Type": "multipart/form-data",
             },
         });
 
         settings.value[`app.${type}`] = response.data.url;
+        selectedFiles.value[type] = null; // Clear selection
+        
+        // Reset file input
+        const fileInput = document.getElementById(`${type}-upload`);
+        if (fileInput) fileInput.value = '';
+
+        if (type === 'favicon') {
+            updateBrowserFavicon(response.data.url);
+        }
+
         toast.success(
             `${
                 type.charAt(0).toUpperCase() + type.slice(1)
@@ -267,6 +308,8 @@ const uploadBrandingFile = async (event, type) => {
         toast.error(
             error.response?.data?.message || `Failed to upload ${type}`,
         );
+    } finally {
+        brandingUploading.value[type] = false;
     }
 };
 
@@ -546,46 +589,63 @@ onMounted(async () => {
                 </div>
                 <div class="p-6 space-y-6">
                     <!-- Logo Upload -->
-                    <div class="flex items-start gap-6">
-                        <div class="flex-1 space-y-1.5">
+                    <div class="flex flex-col sm:flex-row items-center gap-4">
+                        <div class="flex-1 space-y-1">
                             <label
                                 class="text-sm font-medium text-[var(--text-secondary)]"
                             >
                                 Application Logo
                             </label>
                             <p class="text-xs text-[var(--text-muted)]">
-                                Upload a logo for your application (min
-                                100x100).
+                                Upload a logo for your application (min 100x100).
                             </p>
                         </div>
-                        <div class="flex flex-col items-center gap-3">
+                        <div class="flex flex-row items-center gap-4 w-full sm:w-auto">
                             <div
-                                class="w-20 h-20 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] flex items-center justify-center overflow-hidden"
+                                class="w-16 h-16 shrink-0 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] flex items-center justify-center overflow-hidden relative group"
                             >
                                 <img
                                     v-if="settings['app.logo']"
                                     :src="settings['app.logo']"
                                     alt="Logo"
-                                    class="w-full h-full object-contain"
+                                    class="w-full h-full object-contain p-2"
                                 />
                                 <span
                                     v-else
-                                    class="text-xs text-[var(--text-muted)]"
+                                    class="text-[10px] text-[var(--text-muted)]"
                                     >No Logo</span
                                 >
                             </div>
-                            <div class="relative">
-                                <input
-                                    type="file"
-                                    @change="
-                                        (e) => uploadBrandingFile(e, 'logo')
-                                    "
-                                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                    accept="image/*"
-                                />
-                                <Button variant="outline" size="sm">
+                            
+                            <div class="flex flex-col gap-2 min-w-[120px]">
+                                <div class="relative w-full">
+                                    <input
+                                        id="logo-upload"
+                                        type="file"
+                                        @change="(e) => handleFileSelect(e, 'logo')"
+                                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                        accept="image/*"
+                                    />
+                                    <Button variant="outline" size="sm" class="w-full justify-center">
+                                        <div class="truncate">
+                                            {{ selectedFiles.logo ? 'Change' : 'Select File' }}
+                                        </div>
+                                    </Button>
+                                </div>
+                                <Button 
+                                    v-if="selectedFiles.logo"
+                                    variant="primary" 
+                                    size="xs"
+                                    class="w-full"
+                                    :loading="brandingUploading.logo"
+                                    @click="uploadBranding('logo')"
+                                >
+                                    <Upload class="w-3 h-3 mr-1" />
                                     Upload
                                 </Button>
+                                <p v-if="selectedFiles.logo" class="text-[10px] text-[var(--text-primary)] truncate max-w-[120px]">
+                                    {{ selectedFiles.logo.name }}
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -593,45 +653,126 @@ onMounted(async () => {
                     <div class="h-px bg-[var(--border-default)]"></div>
 
                     <!-- Favicon Upload -->
-                    <div class="flex items-start gap-6">
-                        <div class="flex-1 space-y-1.5">
+                    <div class="flex flex-col sm:flex-row items-center gap-4">
+                        <div class="flex-1 space-y-1">
                             <label
                                 class="text-sm font-medium text-[var(--text-secondary)]"
                             >
                                 Favicon
                             </label>
                             <p class="text-xs text-[var(--text-muted)]">
-                                Upload a favicon (max 512x512).
+                                Upload a favicon (max 512x512). ICO, PNG, or SVG.
                             </p>
                         </div>
-                        <div class="flex flex-col items-center gap-3">
+                        <div class="flex flex-row items-center gap-4 w-full sm:w-auto">
                             <div
-                                class="w-12 h-12 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] flex items-center justify-center overflow-hidden"
+                                class="w-12 h-12 shrink-0 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] flex items-center justify-center overflow-hidden"
                             >
                                 <img
                                     v-if="settings['app.favicon']"
                                     :src="settings['app.favicon']"
                                     alt="Favicon"
-                                    class="w-8 h-8 object-contain"
+                                    class="w-6 h-6 object-contain"
                                 />
                                 <span
                                     v-else
-                                    class="text-xs text-[var(--text-muted)]"
+                                    class="text-[10px] text-[var(--text-muted)]"
                                     >None</span
                                 >
                             </div>
-                            <div class="relative">
-                                <input
-                                    type="file"
-                                    @change="
-                                        (e) => uploadBrandingFile(e, 'favicon')
-                                    "
-                                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                    accept="image/*"
-                                />
-                                <Button variant="outline" size="sm">
+                            
+                            <div class="flex flex-col gap-2 min-w-[120px]">
+                                <div class="relative w-full">
+                                    <input
+                                        id="favicon-upload"
+                                        type="file"
+                                        @change="(e) => handleFileSelect(e, 'favicon')"
+                                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                        accept="image/x-icon,image/png,image/svg+xml"
+                                    />
+                                    <Button variant="outline" size="sm" class="w-full justify-center">
+                                        <div class="truncate">
+                                            {{ selectedFiles.favicon ? 'Change' : 'Select File' }}
+                                        </div>
+                                    </Button>
+                                </div>
+                                <Button 
+                                    v-if="selectedFiles.favicon"
+                                    variant="primary" 
+                                    size="xs"
+                                    class="w-full"
+                                    :loading="brandingUploading.favicon"
+                                    @click="uploadBranding('favicon')"
+                                >
+                                    <Upload class="w-3 h-3 mr-1" />
                                     Upload
                                 </Button>
+                                <p v-if="selectedFiles.favicon" class="text-[10px] text-[var(--text-primary)] truncate max-w-[120px]">
+                                    {{ selectedFiles.favicon.name }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="h-px bg-[var(--border-default)]"></div>
+
+                    <!-- OpenGraph Upload -->
+                    <div class="flex flex-col sm:flex-row items-center gap-4">
+                        <div class="flex-1 space-y-1">
+                            <label
+                                class="text-sm font-medium text-[var(--text-secondary)]"
+                            >
+                                Social Share Image (OpenGraph)
+                            </label>
+                            <p class="text-xs text-[var(--text-muted)]">
+                                The image displayed when sharing links on social media.
+                            </p>
+                        </div>
+                        <div class="flex flex-row items-center gap-4 w-full sm:w-auto">
+                            <div
+                                class="w-32 h-16 shrink-0 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] flex items-center justify-center overflow-hidden relative"
+                            >
+                                <img
+                                    v-if="settings['app.opengraph']"
+                                    :src="settings['app.opengraph']"
+                                    alt="OpenGraph Image"
+                                    class="w-full h-full object-cover"
+                                />
+                                <div v-else class="flex flex-col items-center justify-center text-[var(--text-muted)]">
+                                    <Share2 class="w-4 h-4 mb-1 opacity-50" />
+                                    <span class="text-[10px]">No Image</span>
+                                </div>
+                            </div>
+                            
+                            <div class="flex flex-col gap-2 min-w-[120px]">
+                                <div class="relative w-full">
+                                    <input
+                                        id="opengraph-upload"
+                                        type="file"
+                                        @change="(e) => handleFileSelect(e, 'opengraph')"
+                                        class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                        accept="image/png,image/jpeg,image/webp"
+                                    />
+                                    <Button variant="outline" size="sm" class="w-full justify-center">
+                                        <div class="truncate">
+                                            {{ selectedFiles.opengraph ? 'Change' : 'Select File' }}
+                                        </div>
+                                    </Button>
+                                </div>
+                                <Button 
+                                    v-if="selectedFiles.opengraph"
+                                    variant="primary" 
+                                    size="xs"
+                                    class="w-full"
+                                    :loading="brandingUploading.opengraph"
+                                    @click="uploadBranding('opengraph')"
+                                >
+                                    <Upload class="w-3 h-3 mr-1" />
+                                    Upload
+                                </Button>
+                                <p v-if="selectedFiles.opengraph" class="text-[10px] text-[var(--text-primary)] truncate max-w-[120px]">
+                                    {{ selectedFiles.opengraph.name }}
+                                </p>
                             </div>
                         </div>
                     </div>

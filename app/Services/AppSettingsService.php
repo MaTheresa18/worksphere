@@ -56,7 +56,6 @@ class AppSettingsService
         // OpenAI
         'openai.api_key' => ['env' => 'OPENAI_API_KEY'],
         'openai.organization' => ['env' => 'OPENAI_ORGANIZATION'],
-        'openai.organization' => ['env' => 'OPENAI_ORGANIZATION'],
         // Storage
         'storage.max_team_storage' => ['config' => 'storage.max_team_storage', 'default' => 1024], // MB
         // Team Lifecycle
@@ -256,6 +255,27 @@ class AppSettingsService
                     'value' => $this->get('app.timezone', 'UTC'),
                     'description' => 'Default timezone for the application',
                 ],
+                [
+                    'key' => 'app.logo',
+                    'label' => 'Logo',
+                    'type' => 'string',
+                    'value' => $this->get('app.logo'),
+                    'description' => 'Application Logo URL',
+                ],
+                [
+                    'key' => 'app.favicon',
+                    'label' => 'Favicon',
+                    'type' => 'string',
+                    'value' => $this->get('app.favicon'),
+                    'description' => 'Application Favicon URL',
+                ],
+                [
+                    'key' => 'app.opengraph',
+                    'label' => 'OpenGraph Image',
+                    'type' => 'string',
+                    'value' => $this->get('app.opengraph'),
+                    'description' => 'Social Share Image URL',
+                ],
             ],
             'security' => [
                 [
@@ -372,7 +392,6 @@ class AppSettingsService
                     'type' => 'string',
                     'value' => null,
                     'description' => 'Client Secret for GitHub OAuth',
-                    'is_sensitive' => true,
                     'is_sensitive' => true,
                 ],
             ],
