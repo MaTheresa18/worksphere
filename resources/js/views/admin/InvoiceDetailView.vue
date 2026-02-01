@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, reactive } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
     Card,
@@ -8,6 +8,8 @@ import {
     PageLoader,
     Dropdown,
     Avatar,
+    Modal,
+    Input,
 } from "@/components/ui";
 import {
     ArrowLeft,
@@ -72,7 +74,7 @@ const fetchInvoice = async () => {
     try {
         isLoading.value = true;
         const response = await axios.get(
-            `/api/teams/${currentTeamId.value}/invoices/${invoiceId.value}`
+            `/api/teams/${currentTeamId.value}/invoices/${invoiceId.value}`,
         );
         invoice.value = response.data.data;
     } catch (err: any) {
@@ -87,7 +89,7 @@ const deleteInvoice = async () => {
     if (!currentTeamId.value || !invoice.value) return;
     if (
         !confirm(
-            "Are you sure you want to delete this invoice? This action cannot be undone."
+            "Are you sure you want to delete this invoice? This action cannot be undone.",
         )
     )
         return;
@@ -95,7 +97,7 @@ const deleteInvoice = async () => {
     try {
         isProcessing.value = true;
         await axios.delete(
-            `/api/teams/${currentTeamId.value}/invoices/${invoice.value.public_id}`
+            `/api/teams/${currentTeamId.value}/invoices/${invoice.value.public_id}`,
         );
         toast.success("Invoice deleted");
         router.push("/admin/invoices");
@@ -112,7 +114,7 @@ const sendInvoice = async () => {
     try {
         isProcessing.value = true;
         await axios.post(
-            `/api/teams/${currentTeamId.value}/invoices/${invoice.value.public_id}/send`
+            `/api/teams/${currentTeamId.value}/invoices/${invoice.value.public_id}/send`,
         );
         toast.success("Invoice sent successfully");
         fetchInvoice();
@@ -123,15 +125,49 @@ const sendInvoice = async () => {
     }
 };
 
-const recordPayment = async () => {
+const showPaymentModal = ref(false);
+const paymentForm = reactive({
+    date: new Date().toISOString().split("T")[0],
+    note: "",
+    proof: null as File | null,
+});
+
+const handleFileChange = (event: Event) => {
+    const target = event.target as HTMLInputElement;
+    if (target.files && target.files[0]) {
+        paymentForm.proof = target.files[0];
+    }
+};
+
+const recordPayment = () => {
+    showPaymentModal.value = true;
+};
+
+const submitPayment = async () => {
     if (!currentTeamId.value || !invoice.value) return;
 
     try {
         isProcessing.value = true;
+        const formData = new FormData();
+        formData.append("date", paymentForm.date);
+        if (paymentForm.note) formData.append("note", paymentForm.note);
+        if (paymentForm.proof) formData.append("proof", paymentForm.proof);
+
         await axios.post(
-            `/api/teams/${currentTeamId.value}/invoices/${invoice.value.public_id}/record-payment`
+            `/api/teams/${currentTeamId.value}/invoices/${invoice.value.public_id}/record-payment`,
+            formData,
+            {
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                },
+            },
         );
         toast.success("Payment recorded successfully");
+        showPaymentModal.value = false;
+        // Reset form
+        paymentForm.note = "";
+        paymentForm.proof = null;
+        paymentForm.date = new Date().toISOString().split("T")[0];
         fetchInvoice();
     } catch (err: any) {
         toast.error(err.response?.data?.message || "Failed to record payment");
@@ -147,7 +183,7 @@ const cancelInvoice = async () => {
     try {
         isProcessing.value = true;
         await axios.post(
-            `/api/teams/${currentTeamId.value}/invoices/${invoice.value.public_id}/cancel`
+            `/api/teams/${currentTeamId.value}/invoices/${invoice.value.public_id}/cancel`,
         );
         toast.success("Invoice cancelled");
         fetchInvoice();
@@ -168,7 +204,7 @@ const downloadPdf = async () => {
     try {
         const response = await axios.get(
             `/api/teams/${currentTeamId.value}/invoices/${invoice.value.public_id}/download-pdf`,
-            { responseType: "blob" }
+            { responseType: "blob" },
         );
 
         const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -176,7 +212,7 @@ const downloadPdf = async () => {
         link.href = url;
         link.setAttribute(
             "download",
-            `Invoice-${invoice.value.invoice_number}.pdf`
+            `Invoice-${invoice.value.invoice_number}.pdf`,
         );
         document.body.appendChild(link);
         link.click();
@@ -475,7 +511,7 @@ onMounted(() => {
                                         {{
                                             formatCurrency(
                                                 item.unit_price,
-                                                invoice.currency
+                                                invoice.currency,
                                             )
                                         }}
                                     </div>
@@ -485,7 +521,7 @@ onMounted(() => {
                                         {{
                                             formatCurrency(
                                                 item.total,
-                                                invoice.currency
+                                                invoice.currency,
                                             )
                                         }}
                                     </div>
@@ -505,7 +541,7 @@ onMounted(() => {
                                     <span>{{
                                         formatCurrency(
                                             invoice.subtotal,
-                                            invoice.currency
+                                            invoice.currency,
                                         )
                                     }}</span>
                                 </div>
@@ -517,7 +553,7 @@ onMounted(() => {
                                     <span>{{
                                         formatCurrency(
                                             invoice.tax_amount,
-                                            invoice.currency
+                                            invoice.currency,
                                         )
                                     }}</span>
                                 </div>
@@ -530,7 +566,7 @@ onMounted(() => {
                                         >-{{
                                             formatCurrency(
                                                 invoice.discount_amount,
-                                                invoice.currency
+                                                invoice.currency,
                                             )
                                         }}</span
                                     >
@@ -542,7 +578,7 @@ onMounted(() => {
                                     <span>{{
                                         formatCurrency(
                                             invoice.total,
-                                            invoice.currency
+                                            invoice.currency,
                                         )
                                     }}</span>
                                 </div>
@@ -702,7 +738,7 @@ onMounted(() => {
                                 {{
                                     formatCurrency(
                                         invoice.total,
-                                        invoice.currency
+                                        invoice.currency,
                                     )
                                 }}
                             </p>
@@ -712,4 +748,67 @@ onMounted(() => {
             </div>
         </template>
     </div>
+
+    <!-- Record Payment Modal -->
+    <Modal
+        :open="showPaymentModal"
+        @update:open="showPaymentModal = $event"
+        title="Record Payment"
+        description="Record a manual payment for this invoice."
+    >
+        <div class="space-y-4">
+            <div>
+                <label
+                    class="block text-sm font-medium text-[var(--text-secondary)] mb-1"
+                >
+                    Payment Date
+                </label>
+                <Input v-model="paymentForm.date" type="date" />
+            </div>
+
+            <div>
+                <label
+                    class="block text-sm font-medium text-[var(--text-secondary)] mb-1"
+                >
+                    Proof of Payment (Optional)
+                </label>
+                <input
+                    type="file"
+                    class="block w-full text-sm text-[var(--text-secondary)] file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[var(--primary-light)] file:text-[var(--primary)] hover:file:bg-[var(--primary-light)]/80"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    @change="handleFileChange"
+                />
+                <p class="text-xs text-[var(--text-muted)] mt-1">
+                    Accepted: PDF, JPG, PNG (Max 10MB)
+                </p>
+            </div>
+
+            <div>
+                <label
+                    class="block text-sm font-medium text-[var(--text-secondary)] mb-1"
+                >
+                    Note (Optional)
+                </label>
+                <textarea
+                    v-model="paymentForm.note"
+                    rows="3"
+                    class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Enter payment details (e.g., Check #1234)"
+                ></textarea>
+            </div>
+        </div>
+
+        <template #footer>
+            <Button
+                variant="ghost"
+                @click="showPaymentModal = false"
+                :disabled="isProcessing"
+            >
+                Cancel
+            </Button>
+            <Button @click="submitPayment" :loading="isProcessing">
+                Record Payment
+            </Button>
+        </template>
+    </Modal>
 </template>

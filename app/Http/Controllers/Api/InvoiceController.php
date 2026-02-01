@@ -260,21 +260,25 @@ class InvoiceController extends Controller
             abort(404);
         }
 
-        $success = $this->invoiceService->recordPayment(
-            invoice: $invoice,
-            recordedBy: $request->user()
-        );
-
-        if (! $success) {
-            return response()->json([
-                'message' => 'Payment cannot be recorded for this invoice.',
-            ], 422);
-        }
-
-        return response()->json([
-            'message' => 'Payment recorded successfully.',
-            'invoice' => new InvoiceResource($invoice->fresh(['client', 'project', 'creator', 'items'])),
+        $validated = $request->validate([
+            'date' => ['required', 'date'],
+            'note' => ['nullable', 'string', 'max:1000'],
+            'proof' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'], // Max 10MB
         ]);
+
+        try {
+            $updatedInvoice = $this->invoiceService->recordPayment(
+                invoice: $invoice,
+                recordedBy: $request->user(),
+                date: $validated['date'],
+                note: $validated['note'] ?? null,
+                proof: $request->file('proof')
+            );
+
+            return response()->json(new InvoiceResource($updatedInvoice));
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     /**

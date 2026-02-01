@@ -46,7 +46,7 @@ class InvoiceResource extends JsonResource
             // Computed flags
             'is_overdue' => $this->is_overdue,
             'days_until_due' => $this->days_until_due,
-            'can_edit' => $this->can_edit,
+            'can_edit' => $request->user()?->can('update', $this->resource) ?? false,
             'can_send' => $this->can_send,
             'can_record_payment' => $this->can_record_payment,
 

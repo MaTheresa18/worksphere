@@ -385,6 +385,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
         Route::get('/projects/{project}', [\App\Http\Controllers\Api\ClientPortalController::class, 'projectDetail']);
         Route::get('/invoices', [\App\Http\Controllers\Api\ClientPortalController::class, 'invoices']);
         Route::get('/invoices/{invoice}', [\App\Http\Controllers\Api\ClientPortalController::class, 'invoiceDetail']);
+        Route::get('/invoices/{invoice}/download', [\App\Http\Controllers\Api\ClientPortalController::class, 'download']);
         Route::get('/tickets', [\App\Http\Controllers\Api\ClientPortalController::class, 'tickets']);
         Route::post('/request-update', [\App\Http\Controllers\Api\ClientPortalController::class, 'requestInfoUpdate']);
     });

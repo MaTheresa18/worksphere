@@ -16,6 +16,10 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ClientPortalController extends Controller
 {
+    public function __construct(
+        protected \App\Services\InvoiceService $invoiceService
+    ) {}
+
     /**
      * Get the authenticated user's linked client.
      */
@@ -30,6 +34,35 @@ class ClientPortalController extends Controller
 
         // Try to find a client by email
         return Client::where('email', $user->email)->first();
+    }
+
+    /**
+     * Download invoice PDF.
+     */
+    public function download(Request $request, Invoice $invoice)
+    {
+        $client = $this->getClientForUser($request);
+
+        if (! $client) {
+            abort(404, 'No client profile found.');
+        }
+
+        // Verify invoice belongs to client
+        if ($invoice->client_id !== $client->id) {
+            abort(404, 'Invoice not found.');
+        }
+
+        $pdfPath = $this->invoiceService->getPdfPath($invoice);
+
+        if (! \Illuminate\Support\Facades\Storage::disk('local')->exists($pdfPath)) {
+            return response()->json(['message' => 'PDF not found.'], 404);
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('local')->download(
+            $pdfPath,
+            "Invoice-{$invoice->invoice_number}.pdf",
+            ['Content-Type' => 'application/pdf']
+        );
     }
 
     /**

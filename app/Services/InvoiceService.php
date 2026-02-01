@@ -19,7 +19,8 @@ use Illuminate\Support\Facades\Storage;
 class InvoiceService
 {
     public function __construct(
-        protected AuditService $auditService
+        protected AuditService $auditService,
+        protected MediaService $mediaService
     ) {}
 
     /**
@@ -215,27 +216,41 @@ class InvoiceService
     /**
      * Record a payment for the invoice.
      */
-    public function recordPayment(Invoice $invoice, User $recordedBy): bool
+    public function recordPayment(Invoice $invoice, User $recordedBy, string $date, ?string $note = null, ?\Illuminate\Http\UploadedFile $proof = null): Invoice
     {
         if (! $invoice->status->canRecordPayment()) {
-            return false;
+            throw new \Exception('Cannot record payment for this invoice.');
         }
 
-        $oldStatus = $invoice->status->value;
-        $invoice->markAsPaid();
+        $proofMedia = null;
+        if ($proof) {
+            $proofMedia = $this->mediaService->attach(
+                model: $invoice,
+                file: $proof,
+                collection: 'payment_proofs'
+            );
+        }
 
-        // Audit log
+        $invoice->update([
+            'status' => InvoiceStatus::Paid,
+            'paid_at' => $date,
+        ]);
+
         $this->auditService->log(
-            AuditAction::Updated,
-            AuditCategory::InvoiceManagement,
-            $invoice,
-            $recordedBy,
-            ['status' => $oldStatus, 'paid_at' => null],
-            ['status' => InvoiceStatus::Paid->value, 'paid_at' => $invoice->paid_at],
-            ['action' => 'payment_recorded']
+            action: AuditAction::Updated,
+            category: AuditCategory::InvoiceManagement,
+            auditable: $invoice,
+            context: [
+                'action' => 'payment_recorded',
+                'team_id' => $invoice->team_id,
+                'paid_at' => $date,
+                'note' => $note,
+                'has_proof' => (bool) $proofMedia,
+                'recorded_by' => $recordedBy->id,
+            ]
         );
 
-        return true;
+        return $invoice;
     }
 
     /**

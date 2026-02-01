@@ -27,7 +27,8 @@ const authStore = useAuthStore();
 
 const isEditing = computed(() => !!route.params.id);
 const invoiceId = computed(() => route.params.id as string);
-const currentTeamId = computed(() => authStore.currentTeam?.public_id);
+// const currentTeamId = computed(() => authStore.currentTeam?.public_id); // Removed dependency on store for active ID
+const activeTeamId = ref(authStore.currentTeam?.public_id || "");
 
 const isLoading = ref(isEditing.value);
 const isSaving = ref(false);
@@ -35,6 +36,7 @@ const clients = ref<any[]>([]);
 const projects = ref<any[]>([]);
 
 const form = ref({
+    team_id: "",
     client_id: "",
     project_id: "",
     issue_date: new Date().toISOString().split("T")[0],
@@ -48,6 +50,26 @@ const form = ref({
     tax_rate: 0,
     discount_amount: 0,
 });
+
+const teamOptions = computed(() => {
+    return (authStore.user?.teams || []).map((t) => ({
+        value: t.public_id,
+        label: t.name,
+    }));
+});
+
+watch(
+    () => form.value.team_id,
+    (newTeamId) => {
+        if (newTeamId && newTeamId !== activeTeamId.value) {
+            activeTeamId.value = newTeamId;
+            // Reset client/project
+            form.value.client_id = "";
+            form.value.project_id = "";
+            fetchData();
+        }
+    },
+);
 
 const clientOptions = computed(() => {
     return (clients.value || []).map((c) => ({
@@ -64,53 +86,59 @@ const projectOptions = computed(() => {
 });
 
 // Templates Logic
-import { invoiceTemplateService, type InvoiceTemplate } from '@/services/invoice-template.service';
+import {
+    invoiceTemplateService,
+    type InvoiceTemplate,
+} from "@/services/invoice-template.service";
 
 const templates = ref<InvoiceTemplate[]>([]);
-const selectedTemplateId = ref('');
+const selectedTemplateId = ref("");
 
 const templateOptions = computed(() => {
-    return templates.value.map(t => ({
+    return templates.value.map((t) => ({
         value: t.public_id,
-        label: t.name
+        label: t.name,
     }));
 });
 
 const fetchTemplates = async () => {
-    if (!currentTeamId.value) return;
+    if (!activeTeamId.value) return;
     try {
-        const data = await invoiceTemplateService.getAll(currentTeamId.value);
+        const data = await invoiceTemplateService.getAll(activeTeamId.value);
         templates.value = data;
     } catch (error) {
-        console.error('Failed to fetch templates', error);
+        console.error("Failed to fetch templates", error);
     }
 };
 
-watch(() => selectedTemplateId.value, (newVal: string) => {
-    const template = templates.value.find(t => t.public_id === newVal);
-    
-    if (template) {
-        form.value.currency = template.currency || 'USD';
-        form.value.notes = template.default_notes || '';
-        form.value.terms = template.default_terms || '';
-        
-        if (template.line_items && template.line_items.length > 0) {
-            form.value.items = template.line_items.map(item => ({
-                description: item.description,
-                quantity: Number(item.quantity),
-                unit_price: Number(item.unit_price),
-                total: Number(item.quantity) * Number(item.unit_price)
-            }));
+watch(
+    () => selectedTemplateId.value,
+    (newVal: string) => {
+        const template = templates.value.find((t) => t.public_id === newVal);
+
+        if (template) {
+            form.value.currency = template.currency || "USD";
+            form.value.notes = template.default_notes || "";
+            form.value.terms = template.default_terms || "";
+
+            if (template.line_items && template.line_items.length > 0) {
+                form.value.items = template.line_items.map((item) => ({
+                    description: item.description,
+                    quantity: Number(item.quantity),
+                    unit_price: Number(item.unit_price),
+                    total: Number(item.quantity) * Number(item.unit_price),
+                }));
+            }
+
+            toast.success("Template loaded");
         }
-        
-        toast.success("Template loaded");
-    }
-});
+    },
+);
 
 const subtotal = computed(() => {
     return form.value.items.reduce(
         (acc, item) => acc + item.quantity * item.unit_price,
-        0
+        0,
     );
 });
 
@@ -121,7 +149,7 @@ const taxAmount = computed(() => {
 const total = computed(() => {
     return Math.max(
         0,
-        subtotal.value + taxAmount.value - form.value.discount_amount
+        subtotal.value + taxAmount.value - form.value.discount_amount,
     );
 });
 
@@ -133,27 +161,28 @@ const formatCurrency = (amount: number) => {
 };
 
 const fetchData = async () => {
-    if (!currentTeamId.value) return;
+    if (!activeTeamId.value) return;
 
     try {
         const [clientsRes, projectsRes] = await Promise.all([
-            axios.get(`/api/teams/${currentTeamId.value}/clients`),
-            axios.get(`/api/teams/${currentTeamId.value}/projects`),
+            axios.get(`/api/teams/${activeTeamId.value}/clients`),
+            axios.get(`/api/teams/${activeTeamId.value}/projects`),
         ]);
 
         clients.value = clientsRes.data.data || [];
         projects.value = projectsRes.data.data || []; // Assuming project resource structure
-        
+
         // Fetch templates
         fetchTemplates();
 
         if (isEditing.value) {
             const invoiceRes = await axios.get(
-                `/api/teams/${currentTeamId.value}/invoices/${invoiceId.value}`
+                `/api/teams/${activeTeamId.value}/invoices/${invoiceId.value}`,
             );
             const invoice = invoiceRes.data.data;
 
             form.value = {
+                team_id: invoice.team_id || activeTeamId.value, // Ensure team_id is set
                 client_id: invoice.client.public_id,
                 project_id: invoice.project?.public_id || "",
                 issue_date: invoice.issue_date.split("T")[0],
@@ -199,7 +228,7 @@ const calculateItemTotal = (index: number) => {
 };
 
 const saveInvoice = async () => {
-    if (!currentTeamId.value) return;
+    if (!activeTeamId.value) return;
 
     // Basic validation
     if (!form.value.client_id) {
@@ -232,14 +261,14 @@ const saveInvoice = async () => {
 
         if (isEditing.value) {
             await axios.put(
-                `/api/teams/${currentTeamId.value}/invoices/${invoiceId.value}`,
-                payload
+                `/api/teams/${activeTeamId.value}/invoices/${invoiceId.value}`,
+                payload,
             );
             toast.success("Invoice updated successfully");
         } else {
             const res = await axios.post(
-                `/api/teams/${currentTeamId.value}/invoices`,
-                payload
+                `/api/teams/${activeTeamId.value}/invoices`,
+                payload,
             );
             toast.success("Invoice created successfully");
             router.replace(`/admin/invoices/${res.data.data.public_id}/edit`);
@@ -266,7 +295,8 @@ const cancel = () => {
 };
 
 onMounted(() => {
-    if (currentTeamId.value) {
+    if (activeTeamId.value) {
+        form.value.team_id = activeTeamId.value; // Initialize form team_id
         fetchData();
     }
 });
@@ -302,9 +332,16 @@ onMounted(() => {
                 <!-- Main Content -->
                 <div class="lg:col-span-2 space-y-6">
                     <!-- Template Selector -->
-                    <Card v-if="!isEditing && templates.length > 0" padding="sm" class="bg-[var(--surface-secondary)] border-[var(--border-subtle)]">
+                    <Card
+                        v-if="!isEditing && templates.length > 0"
+                        padding="sm"
+                        class="bg-[var(--surface-secondary)] border-[var(--border-subtle)]"
+                    >
                         <div class="flex items-center gap-4">
-                            <span class="text-sm font-medium text-[var(--text-secondary)] whitespace-nowrap">Load Template:</span>
+                            <span
+                                class="text-sm font-medium text-[var(--text-secondary)] whitespace-nowrap"
+                                >Load Template:</span
+                            >
                             <SelectFilter
                                 v-model="selectedTemplateId"
                                 :options="templateOptions"
@@ -316,6 +353,20 @@ onMounted(() => {
 
                     <!-- Basic Info -->
                     <Card padding="lg" class="space-y-4">
+                        <!-- Team Selector -->
+                        <div v-if="!isEditing" class="space-y-1">
+                            <label
+                                class="text-sm font-medium text-[var(--text-primary)]"
+                                >Team</label
+                            >
+                            <SelectFilter
+                                v-model="form.team_id"
+                                :options="teamOptions"
+                                placeholder="Select Team"
+                                class="w-full"
+                            />
+                        </div>
+
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div class="space-y-1">
                                 <label
@@ -409,7 +460,7 @@ onMounted(() => {
                                             {{
                                                 formatCurrency(
                                                     item.quantity *
-                                                        item.unit_price
+                                                        item.unit_price,
                                                 )
                                             }}
                                         </span>

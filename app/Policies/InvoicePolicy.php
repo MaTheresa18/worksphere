@@ -63,17 +63,24 @@ class InvoicePolicy
      */
     public function update(User $user, Invoice $invoice): bool
     {
-        // Only allow editing draft invoices
-        if (! $invoice->can_edit) {
-            return false;
-        }
-
         $team = $invoice->team;
         if (! $team->hasMember($user)) {
             return false;
         }
 
-        return $user->can('invoices.update');
+        // Allow editing draft invoices
+        if ($invoice->can_edit) {
+            return $user->can('invoices.update');
+        }
+
+        // Allow admins/owners to edit sent invoices (but not paid/cancelled)
+        if ($invoice->status === \App\Enums\InvoiceStatus::Sent) {
+            if ($user->hasRole('administrator') || $team->owner_id === $user->id) {
+                return $user->can('invoices.update');
+            }
+        }
+
+        return false;
     }
 
     /**

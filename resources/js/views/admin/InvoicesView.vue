@@ -41,6 +41,9 @@ const authStore = useAuthStore();
 const isLoading = ref(true);
 const isRefreshing = ref(false);
 const invoices = ref<any[]>([]);
+const clients = ref<any[]>([]);
+const projects = ref<any[]>([]);
+
 const stats = ref({
     total: 0,
     draft: 0,
@@ -61,6 +64,7 @@ const pagination = ref({
 const filters = ref({
     status: "",
     client_id: "",
+    project_id: "",
     search: "",
     sort_by: "created_at",
     sort_order: "desc",
@@ -69,7 +73,18 @@ const filters = ref({
 const viewMode = ref<"list" | "grid">("list");
 // selectedInvoices removed
 
+// Initialize with store's current team, but allow local override via filter if needed
+// For now, we sync with the store's current team as the "Team Context"
 const currentTeamId = computed(() => authStore.currentTeam?.public_id);
+// We can use a local ref if we want to allow switching distinct from the global context
+// But per requirement "Team selector > client > project" implies we might want to switch context here.
+// However, the `InvoicesView` is usually scoped to the current team in the dashboard.
+// If the user wants to switch teams, they usually do it via the main app team switcher.
+// BUT, the `InvoiceForm` added a specific team selector.
+// Let's check the plan: "Add Team Selector (dropdown) at the top".
+// So we should probably treat `activeTeamId` as a local override of `currentTeamId`.
+
+const activeTeamId = ref(authStore.currentTeam?.public_id || "");
 
 const statusOptions = [
     { value: "", label: "All Statuses" },
@@ -109,8 +124,49 @@ const getStatusVariant = (status: string) => {
     return variants[status] || "secondary";
 };
 
+const fetchClients = async () => {
+    if (!activeTeamId.value) return;
+    try {
+        const response = await axios.get(
+            `/api/teams/${activeTeamId.value}/clients`,
+        );
+        clients.value = response.data.data;
+    } catch (err) {
+        console.error("Failed to fetch clients", err);
+    }
+};
+
+const fetchProjects = async () => {
+    if (!activeTeamId.value) return;
+    try {
+        const params: any = {};
+        if (filters.value.client_id) {
+            // If backend supports filtering projects by client, helpful.
+            // If not, we might filter client-side or assume all team projects are ok.
+            // Usually projects belong to a client.
+            // Let's assume we can filter or just fetch all team projects.
+            // InvoiceForm uses `/api/teams/:id/projects`.
+        }
+        const response = await axios.get(
+            `/api/teams/${activeTeamId.value}/projects`,
+        );
+        // If we want to filter by client client-side:
+        let allProjects = response.data.data || [];
+        if (filters.value.client_id) {
+            allProjects = allProjects.filter(
+                (p: any) =>
+                    p.client_id === filters.value.client_id ||
+                    p.client?.public_id === filters.value.client_id,
+            );
+        }
+        projects.value = allProjects;
+    } catch (err) {
+        console.error("Failed to fetch projects", err);
+    }
+};
+
 const fetchInvoices = async (page = 1) => {
-    if (!currentTeamId.value) return;
+    if (!activeTeamId.value) return;
 
     try {
         isLoading.value = true;
@@ -124,14 +180,16 @@ const fetchInvoices = async (page = 1) => {
 
         if (filters.value.status) params.status = filters.value.status;
         if (filters.value.client_id) params.client_id = filters.value.client_id;
+        if (filters.value.project_id)
+            params.project_id = filters.value.project_id;
         if (filters.value.search) params.search = filters.value.search;
 
         const response = await axios.get(
-            `/api/teams/${currentTeamId.value}/invoices`,
-            { params }
+            `/api/teams/${activeTeamId.value}/invoices`,
+            { params },
         );
         invoices.value = response.data.data;
-        
+
         const meta = response.data.meta || response.data;
         pagination.value = {
             current_page: meta.current_page,
@@ -148,11 +206,11 @@ const fetchInvoices = async (page = 1) => {
 };
 
 const fetchStats = async () => {
-    if (!currentTeamId.value) return;
+    if (!activeTeamId.value) return;
 
     try {
         const response = await axios.get(
-            `/api/teams/${currentTeamId.value}/invoices/stats`
+            `/api/teams/${activeTeamId.value}/invoices/stats`,
         );
         stats.value = response.data;
     } catch (err) {
@@ -176,7 +234,10 @@ const changePage = (page: number) => {
 };
 
 const viewInvoice = (invoice: any) => {
-    const detailRoute = route.name === 'admin-invoices' ? 'admin-invoice-detail' : 'invoice-detail';
+    const detailRoute =
+        route.name === "admin-invoices"
+            ? "admin-invoice-detail"
+            : "invoice-detail";
     router.push({ name: detailRoute, params: { id: invoice.public_id } });
 };
 
@@ -185,11 +246,11 @@ const createInvoice = () => {
 };
 
 const sendInvoice = async (invoice: any) => {
-    if (!currentTeamId.value) return;
+    if (!activeTeamId.value) return;
 
     try {
         await axios.post(
-            `/api/teams/${currentTeamId.value}/invoices/${invoice.public_id}/send`
+            `/api/teams/${activeTeamId.value}/invoices/${invoice.public_id}/send`,
         );
         toast.success("Invoice sent successfully");
         refreshData();
@@ -199,11 +260,11 @@ const sendInvoice = async (invoice: any) => {
 };
 
 const recordPayment = async (invoice: any) => {
-    if (!currentTeamId.value) return;
+    if (!activeTeamId.value) return;
 
     try {
         await axios.post(
-            `/api/teams/${currentTeamId.value}/invoices/${invoice.public_id}/record-payment`
+            `/api/teams/${activeTeamId.value}/invoices/${invoice.public_id}/record-payment`,
         );
         toast.success("Payment recorded successfully");
         refreshData();
@@ -213,12 +274,12 @@ const recordPayment = async (invoice: any) => {
 };
 
 const cancelInvoice = async (invoice: any) => {
-    if (!currentTeamId.value) return;
+    if (!activeTeamId.value) return;
     if (!confirm("Are you sure you want to cancel this invoice?")) return;
 
     try {
         await axios.post(
-            `/api/teams/${currentTeamId.value}/invoices/${invoice.public_id}/cancel`
+            `/api/teams/${activeTeamId.value}/invoices/${invoice.public_id}/cancel`,
         );
         toast.success("Invoice cancelled");
         refreshData();
@@ -228,17 +289,17 @@ const cancelInvoice = async (invoice: any) => {
 };
 
 const deleteInvoice = async (invoice: any) => {
-    if (!currentTeamId.value) return;
+    if (!activeTeamId.value) return;
     if (
         !confirm(
-            "Are you sure you want to delete this invoice? This action cannot be undone."
+            "Are you sure you want to delete this invoice? This action cannot be undone.",
         )
     )
         return;
 
     try {
         await axios.delete(
-            `/api/teams/${currentTeamId.value}/invoices/${invoice.public_id}`
+            `/api/teams/${activeTeamId.value}/invoices/${invoice.public_id}`,
         );
         toast.success("Invoice deleted");
         refreshData();
@@ -248,12 +309,12 @@ const deleteInvoice = async (invoice: any) => {
 };
 
 const downloadPdf = async (invoice: any) => {
-    if (!currentTeamId.value) return;
+    if (!activeTeamId.value) return;
 
     try {
         const response = await axios.get(
-            `/api/teams/${currentTeamId.value}/invoices/${invoice.public_id}/download-pdf`,
-            { responseType: "blob" }
+            `/api/teams/${activeTeamId.value}/invoices/${invoice.public_id}/download-pdf`,
+            { responseType: "blob" },
         );
 
         const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -339,26 +400,48 @@ const onSearchChange = () => {
     }, 300);
 };
 
+// Update watchers
 watch(
-    () => filters.value.status,
-    () => fetchInvoices(1)
-);
-watch(
-    () => currentTeamId.value,
-    () => {
-        if (currentTeamId.value) {
-            fetchInvoices();
-            fetchStats();
+    () => authStore.currentTeam?.public_id,
+    (newId) => {
+        if (newId) {
+            activeTeamId.value = newId;
         }
     },
-    { immediate: true }
+);
+
+watch(
+    () => activeTeamId.value,
+    async (newId) => {
+        if (newId) {
+            filters.value.client_id = "";
+            filters.value.project_id = "";
+            await Promise.all([
+                fetchClients(),
+                fetchProjects(), // Initial fetch of all projects
+                fetchInvoices(1),
+                fetchStats(),
+            ]);
+        }
+    },
+    { immediate: true },
+);
+
+watch(
+    () => filters.value.client_id,
+    () => {
+        filters.value.project_id = ""; // Reset project when client changes
+        fetchProjects(); // Re-fetch or re-filter projects
+        fetchInvoices(1);
+    },
+);
+
+watch([() => filters.value.status, () => filters.value.project_id], () =>
+    fetchInvoices(1),
 );
 
 onMounted(() => {
-    if (currentTeamId.value) {
-        fetchInvoices();
-        fetchStats();
-    }
+    // Handled by immediate watch on activeTeamId
 });
 </script>
 
@@ -467,7 +550,9 @@ onMounted(() => {
                     <p class="text-xl font-bold text-green-600">
                         {{ formatCurrency(stats.total_collected) }}
                     </p>
-                    <p class="text-xs text-[var(--text-muted)]">Total Collected</p>
+                    <p class="text-xs text-[var(--text-muted)]">
+                        Total Collected
+                    </p>
                 </div>
             </Card>
         </div>
@@ -488,11 +573,52 @@ onMounted(() => {
                         </template>
                     </Input>
                 </div>
+
+                <!-- Team Selector (Active Team Context) -->
+                <SelectFilter
+                    v-model="activeTeamId"
+                    :options="
+                        (authStore.teams || []).map((t) => ({
+                            value: t.public_id,
+                            label: t.name,
+                        }))
+                    "
+                    placeholder="Select Team"
+                    searchable
+                    class="w-full sm:w-48"
+                />
+
                 <SelectFilter
                     v-model="filters.status"
                     :options="statusOptions"
                     placeholder="Filter by status"
-                    class="w-full sm:w-44"
+                    class="w-full sm:w-40"
+                />
+
+                <SelectFilter
+                    v-model="filters.client_id"
+                    :options="
+                        clients.map((c) => ({
+                            value: c.public_id,
+                            label: c.name,
+                        }))
+                    "
+                    placeholder="Filter by Client"
+                    searchable
+                    class="w-full sm:w-48"
+                />
+
+                <SelectFilter
+                    v-model="filters.project_id"
+                    :options="
+                        projects.map((p) => ({
+                            value: p.public_id,
+                            label: p.name,
+                        }))
+                    "
+                    placeholder="Filter by Project"
+                    searchable
+                    class="w-full sm:w-48"
                 />
             </div>
             <div class="flex items-center gap-2">
@@ -642,7 +768,7 @@ onMounted(() => {
                                         {{
                                             formatCurrency(
                                                 invoice.total,
-                                                invoice.currency
+                                                invoice.currency,
                                             )
                                         }}
                                     </span>
@@ -719,7 +845,7 @@ onMounted(() => {
                                 {{
                                     formatCurrency(
                                         invoice.total,
-                                        invoice.currency
+                                        invoice.currency,
                                     )
                                 }}
                             </span>
@@ -769,7 +895,7 @@ onMounted(() => {
                     {{
                         Math.min(
                             pagination.current_page * pagination.per_page,
-                            pagination.total
+                            pagination.total,
                         )
                     }}
                     of {{ pagination.total }} invoices

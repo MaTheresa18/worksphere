@@ -771,6 +771,7 @@ export const useAuthStore = defineStore('auth', () => {
     isPasswordSet,
     passwordLastUpdatedAt,
     currentTeam,
+    teams: computed(() => user.value?.teams || []),
     hasTeams,
     // Actions
     login,
