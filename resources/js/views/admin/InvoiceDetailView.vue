@@ -21,6 +21,7 @@ import {
     Trash2,
     MoreHorizontal,
     XCircle,
+    Copy,
 } from "lucide-vue-next";
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth";
@@ -54,6 +55,11 @@ const formatShortDate = (dateString: string) => {
         day: "numeric",
         year: "numeric",
     });
+};
+
+const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard");
 };
 
 const getStatusVariant = (status: string) => {
@@ -635,8 +641,17 @@ onMounted(() => {
                                 >
                                     Invoice Number
                                 </dt>
-                                <dd class="text-[var(--text-primary)]">
+                                <dd class="text-[var(--text-primary)] flex items-center gap-2">
                                     {{ invoice.invoice_number }}
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        class="h-6 w-6 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                                        @click="copyToClipboard(invoice.invoice_number)"
+                                        title="Copy Invoice Number"
+                                    >
+                                        <Copy class="w-3 h-3" />
+                                    </Button>
                                 </dd>
                             </div>
                             <div>
