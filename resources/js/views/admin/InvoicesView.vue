@@ -35,7 +35,7 @@ import { useAuthStore } from "@/stores/auth";
 import { toast } from "vue-sonner";
 
 const router = useRouter();
-// route removed
+const route = useRoute();
 const authStore = useAuthStore();
 
 const isLoading = ref(true);
