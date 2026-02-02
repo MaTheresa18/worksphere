@@ -1,250 +1,178 @@
-# WorkSphere
+<div align="center">
+    <img src="doc/screenshots/worksphere_brand.png" width="400" alt="WorkSphere Brand">
+    <h1>WorkSphere</h1>
+    <p><strong>The Ultimate Enterprise "Super App" for Modern Business Management</strong></p>
 
-<p align="center">
-    <a href="https://github.com/SummerRijndael/worksphere/stargazers"><img src="https://img.shields.io/github/stars/SummerRijndael/worksphere?style=for-the-badge&logo=github&color=yellow" alt="Stars"></a>
-    <a href="https://github.com/SummerRijndael/worksphere/blob/main/LICENSE"><img src="https://img.shields.io/github/license/SummerRijndael/worksphere?style=for-the-badge&logo=github&color=blue" alt="License"></a>
+<!-- Badges -->
+<p>
+    <a href="https://github.com/SummerRijndael/worksphere/stargazers">
+        <img src="https://img.shields.io/github/stars/SummerRijndael/worksphere?style=for-the-badge&logo=github&color=FFD700" alt="Stars">
+    </a>
+    <a href="https://github.com/SummerRijndael/worksphere/blob/main/LICENSE">
+        <img src="https://img.shields.io/github/license/SummerRijndael/worksphere?style=for-the-badge&logo=apache&color=007EC6" alt="License">
+    </a>
     <img src="https://img.shields.io/badge/PHP-8.2%2B-777BB4?style=for-the-badge&logo=php&logoColor=white" alt="PHP 8.2+">
     <img src="https://img.shields.io/badge/Laravel-12.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white" alt="Laravel 12">
     <img src="https://img.shields.io/badge/Vue.js-3.5-4FC08D?style=for-the-badge&logo=vue.js&logoColor=white" alt="Vue 3">
 </p>
 
-<p align="center">
-    <img src="doc/screenshots/worksphere_brand.png" width="400" alt="WorkSphere Brand">
+<!-- Support -->
+<p>
+    <a href='https://ko-fi.com/ryannolaso' target='_blank'>
+        <img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi2.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' />
+    </a>
 </p>
+</div>
 
-<p align="center">
-    <a href="https://www.buymeacoffee.com/evryannolax" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
-    <a href='https://ko-fi.com/ryannolaso' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi2.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
-</p>
+<br/>
 
 > [!WARNING]
-> **BETA RELEASE NOTICE**
-> WorkSphere is currently in active **BETA** development. Features are subject to change, and you may encounter bugs or instability.
-> NOT RECOMMENDED FOR PRODUCTION USE without extensive testing.
+> **BETA RELEASE NOTICE**<br>
+> WorkSphere is currently in active **BETA** development. Features are subject to change, and you may encounter bugs or instability.<br>
+> **NOT RECOMMENDED FOR PRODUCTION USE without extensive testing.**
 
-## Overview
+---
 
-WorkSphere is a comprehensive enterprise **Single Page Application (SPA)** built on **Laravel 12** and **Vue 3**. It functions as a "Super App," integrating multiple core business modules into a unified, real-time interface.
+## 🚀 Overview
 
-## Technology Stack
+**WorkSphere** is a comprehensive enterprise **Single Page Application (SPA)** built on **Laravel 12** and **Vue 3**. It functions as a centralized "Super App," seamlessly integrating multiple core business modules into a unified, real-time interface designed for efficiency and scalability.
 
-### Backend
+## 🛠️ Technology Stack
 
-- **Framework**: Laravel 12.x
-- **Real-time**: Laravel Reverb (WebSocket)
-- **Database**: MySQL 8.x + Redis (Cache/Queue)
-- **Search**: Database (via Laravel Scout)
-- **Authentication**: Laravel Fortify (Session) + Sanctum (API) + Socialite (OAuth)
-- **Key Packages**: `spatie/laravel-permission`, `spatie/media-library`, `webklex/laravel-imap`
+| **Backend Core** | **Frontend Ecosystem** |
+| :--- | :--- |
+| ![Laravel](https://img.shields.io/badge/Laravel_12-FF2D20?style=flat-square&logo=laravel&logoColor=white) **Framework** | ![Vue.js](https://img.shields.io/badge/Vue.js_3.5-4FC08D?style=flat-square&logo=vue.js&logoColor=white) **Framework** |
+| ![Reverb](https://img.shields.io/badge/Laravel_Reverb-FF2D20?style=flat-square&logo=laravel&logoColor=white) **Real-time (WebSocket)** | ![Pinia](https://img.shields.io/badge/Pinia-State_Management-yellow?style=flat-square&logo=vue.js&logoColor=white) **State Management** |
+| ![MySQL](https://img.shields.io/badge/MySQL_8-4479A1?style=flat-square&logo=mysql&logoColor=white) **Database** | ![Tailwind](https://img.shields.io/badge/Tailwind_CSS_4.0-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white) **Styling** |
+| ![Redis](https://img.shields.io/badge/Redis-Cache-DC382D?style=flat-square&logo=redis&logoColor=white) **Cache/Queue** | ![Vite](https://img.shields.io/badge/Vite_6.0-646CFF?style=flat-square&logo=vite&logoColor=white) **Build Tool** |
+| **Authentication:** Fortify + Sanctum + Socialite | **Key Libs:** Tiptap, FullCalendar, Chart.js |
 
-### Frontend
+## ✨ Core Features & Modules
 
-- **Framework**: Vue 3.5 (Composition API)
-- **State Management**: Pinia
-- **Styling**: Tailwind CSS 4.0 + Reka UI
-- **Build Tool**: Vite 6.0
-- **Key Libraries**: `tiptap` (Rich Text), `fullcalendar` (Events), `chart.js` (Analytics), `laravel-echo` (Real-time)
-
-## Core Features & Modules
-
-### Authentication
-
-_Secure login with social auth and multi-factor authentication support._
+### 🔐 Authentication
+*Secure login with social auth, multi-factor authentication (MFA), and role-based access.*
 ![Login Page](doc/screenshots/login_page.png)
 
-### Dashboard
-
-_Central hub for personal stats, tasks, and system overview._
+### 📊 Dashboard
+*A central hub for personal stats, pending tasks, and a high-level system overview.*
 ![Dashboard](doc/screenshots/dashboard.png)
 
-### Real-time Chat System
+### 💬 Real-time Chat System
+*Full-featured instant messaging with groups, file sharing, and typing indicators.*
+<div style="display: flex; gap: 10px;">
+    <img src="doc/screenshots/chat_mini.png" width="45%" alt="Chat Mini">
+    <img src="doc/screenshots/chat_fullpage.png" width="45%" alt="Chat Full Page">
+</div>
 
-_Full-featured messaging with groups, file sharing, and typing indicators._
-![Chat Mini](doc/screenshots/chat_mini.png)
-![Chat Full Page](doc/screenshots/chat_fullpage.png)
-
-### Project Management & Calendar
-
-_Task tracking, Kanban boards, and integrated calendar scheduling._
+### 📅 Project Management & Calendar
+*Advanced task tracking, Kanban boards, and integrated scheduling.*
 ![Calendar](doc/screenshots/calendar.png)
 ![Team Details](doc/screenshots/team_details.png)
 ![Project Details](doc/screenshots/projects_details.png)
 ![Task Details](doc/screenshots/task_details.png)
-![Invoice Create](doc/screenshots/invoice_create.png)
 
-### Ticket System
-
-_Internal support ticketing with automated workflows._
+### 🎫 Ticket System
+*Internal support ticketing with automated workflows and status tracking.*
 ![Tickets List](doc/screenshots/tickets.png)
 ![Ticket Details](doc/screenshots/ticket_details.png)
 
-### Unified Email Client
-
-_IMAP/SMTP inbox with folder management and rich text composition._
+### 📧 Unified Email Client
+*IMAP/SMTP inbox with folder management and a rich text editor.*
 ![Email Client](doc/screenshots/email.png)
 
-### Analytics
-
-_Visual insights and reporting._
+### 📈 Analytics
+*Visual insights, reporting, and data visualization.*
 ![Analytics](doc/screenshots/analytics.png)
 
-### Knowledge Base
-
-_Knowledge base management with public article publishing._
+### 📚 Knowledge Base
+*Knowledge management system with internal drafts and public article publishing.*
 ![KB Article List](doc/screenshots/kb_article_list.png)
 ![KB Article Editor](doc/screenshots/kb_article.png)
 ![Public Article](doc/screenshots/public_article_read.png)
 
-### Personal Notes
-
-_Markdown-supported personal note-taking app._
+### 📝 Personal Notes
+*Markdown-supported personal note-taking app.*
 ![Notes](doc/screenshots/notes.png)
 
-### Team & User Management
-
-_Role-based access control (RBAC), team management, and user profiles._
+### 👥 Team & User Management
+*Granular Role-Based Access Control (RBAC), team management, and user profiles.*
 ![User Manager](doc/screenshots/user_manager.png)
 ![User Details](doc/screenshots/user_details_manage.png)
 ![Roles & Permissions](doc/screenshots/roles_perms_manager.png)
-![Role Permission Details](doc/screenshots/role_perm_details_manage.png)
 
-### System Maintenance
-
-_System health monitoring, queue management, and backups._
+### 🛠️ System Maintenance
+*System health monitoring, queue management, and backups.*
 ![Maintenance](doc/screenshots/maintenance.png)
 
-## Installation & Setup
+---
 
-1. **Clone the repository**
+## ⚙️ Installation & Setup
 
-    ```bash
-    git clone git@github.com:SummerRijndael/worksphere.git
-    cd worksphere
-    ```
+### 1. Clone the Repository
+```bash
+git clone git@github.com:SummerRijndael/worksphere.git
+cd worksphere
+```
 
-2. **Install Dependencies**
+### 2. Install Dependencies
+```bash
+composer install
+npm install
+```
 
-    ```bash
-    composer install
-    npm install
-    ```
+### 3. Environment Setup
+```bash
+cp .env.example .env
+php artisan key:generate
+```
+> [!IMPORTANT]
+> The `.env` file contains critical sensitive information. **Never** commit it to version control.
 
-3. **Environment Setup**
+### 4. Configure External Services
+Update `REVERB_*`, `GOOGLE_*`, `RECAPTCHA_*`, etc. in your `.env` file.
 
-    ```bash
-    cp .env.example .env
-    php artisan key:generate
-    ```
+**Real-time (Laravel Reverb):**
+```ini
+REVERB_APP_ID=my-app-id
+REVERB_APP_KEY=my-app-key
+REVERB_APP_SECRET=my-app-secret
+REVERB_HOST="localhost"
+REVERB_PORT=8080
+REVERB_SCHEME=http
+```
 
-    > **Note:** The `.env` file contains critical sensitive information. Never commit it to version control. Use `.env.example` as a template.
+### 5. Initialize System
+```bash
+php artisan migrate --seed
+php artisan storage:link
+```
 
-4. **Configure External Services**
-
-    Open your `.env` file and populate the necessary service credentials.
-
-    ### Real-time (Laravel Reverb)
-
-    WorkSphere uses Laravel Reverb for real-time WebSocket communication (chat, notifications, presence).
-
-    ```ini
-    REVERB_APP_ID=my-app-id
-    REVERB_APP_KEY=my-app-key
-    REVERB_APP_SECRET=my-app-secret
-    REVERB_HOST="localhost"
-    REVERB_PORT=8080
-    REVERB_SCHEME=http
-    ```
-
-    ### Social Auth & Integrations
-
-    **Google Calendar Sync:**
-    You must enable the **Google Calendar API** in your Google Cloud Console and add the following redirect URI:
-    `http://127.0.0.1:8000/callback/calendar`
-
-    ```ini
-    GOOGLE_CLIENT_ID=your-google-client-id
-    GOOGLE_CLIENT_SECRET=your-google-client-secret
-    GOOGLE_REDIRECT_URI="${APP_URL}/auth/google/callback"
-    GOOGLE_CALENDAR_REDIRECT_URI="${APP_URL}/callback/calendar"
-    ```
-
-    ### Security (reCAPTCHA)
-
-    The system supports both V2 (Checkbox) and V3 (Invisible) reCAPTCHA.
-
-    ```ini
-    RECAPTCHA_ENABLED=true
-    RECAPTCHA_V3_SITE_KEY=...
-    RECAPTCHA_V3_SECRET_KEY=...
-    ```
-
-    ### Giphy Integration
-
-    To enable Giphy support in Chat, obtain an API key from the [Giphy Developers Portal](https://developers.giphy.com/).
-
-    ```ini
-    GIPHY_API_KEY=your-giphy-api-key
-    ```
-
-    ### Other Integrations
-
-    The system relies on several external services for full functionality. Populate these in `.env`:
-    - **OpenAI**: Required for AI-powered features. (`OPENAI_API_KEY`, etc.)
-    - **Twilio**: Used for SMS notifications and 2FA. (`TWILIO_SID`, `TWILIO_AUTH_TOKEN`, etc.)
-    - **AWS S3**: Recommended for production file storage. (`AWS_ACCESS_KEY_ID`, `AWS_BUCKET`, etc.)
-    - **MaxMind/GeoIP**: Required for location-based features. (`MAXMIND_LICENSE_KEY`)
-
-5. **Initialize System**
-
-    ```bash
-    php artisan migrate --seed
-    php artisan storage:link
-    ```
-
-6. **Run Application**
-    ```bash
-    npm run start-all
-    ```
-    _This command runs Laravel Serve, Reverb, Queue Worker (Horizon), and Vite concurrently._
-
-**Test Users:**
-
-- `admin@example.com` / `Xachgamb@01`
-- `test@example.com` / `Xachgamb@01`
-
-## Architecture
-
-- **API-First**: The backend serves as a headless API (`routes/api.php`) protected by Sanctum.
-- **SPA Frontend**: The Vue app is served via a single entry point (`views/app.blade.php`, `routes/web.php`).
-- **Real-time**: Events are broadcasted to private channels (`private-user.{id}`) using Laravel Reverb.
-- **Authorization**: Strict Policy and Permission-based access control (RBAC).
-
-## Security
-
-- **Authentication**: Supports Password, Social Login (Google/GitHub), and 2FA (TOTP/SMS/WebAuthn/Passkeys).
-- **Rate Limiting**: Strict throttling on auth endpoints and sensitive actions.
-- **Media**: Private uploads are securely served via signed URLs.
-
-## Documentation
-
-For detailed internal documentation, open `app_doc.html` in your browser.
-
-## License
-
-This project is licensed under the **Apache License 2.0**.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+### 6. Run Application
+```bash
+npm run start-all
+```
+*Runs Laravel Serve, Reverb, Queue Worker, and Vite concurrently.*
 
 ---
+
+## 🔑 Test Users
+
+| Role | Email | Password |
+| :--- | :--- | :--- |
+| **Admin** | `admin@example.com` | `Xachgamb@01` |
+| **User** | `test@example.com` | `Xachgamb@01` |
+
+---
+
+## 🏛️ Architecture
+
+*   **API-First**: Headless API (`routes/api.php`) protected by Sanctum.
+*   **SPA Frontend**: Vue 3 app via single entry point.
+*   **Real-time**: Private channel broadcasting via Laravel Reverb.
+*   **Authorization**: Strict RBAC Policies.
+
+## 📄 License
+
+This project is licensed under the **Apache License 2.0**.
 
 &copy; 2026 WorkSphere. Internal Development.

@@ -57,7 +57,7 @@ class TicketController extends Controller
         }
 
         // If user can only view own tickets, filter by user
-        if (! $user->hasPermissionTo('tickets.view') && ! $user->hasRole('administrator')) {
+        if (! $user->hasPermissionTo('tickets.view') && ! $user->hasPermissionTo('tickets.manage') && ! $user->hasRole('administrator')) {
             $filters['for_user'] = $user;
         }
 
@@ -95,7 +95,7 @@ class TicketController extends Controller
         }
 
         // 2. Personal scope if needed
-        if (! $user->hasPermissionTo('tickets.view') && ! $user->hasRole('administrator')) {
+        if (! $user->hasPermissionTo('tickets.view') && ! $user->hasPermissionTo('tickets.manage') && ! $user->hasRole('administrator')) {
             $filters['for_user'] = $user;
         }
 
@@ -289,17 +289,26 @@ class TicketController extends Controller
         $reason = $validated['reason'];
         unset($validated['reason']);
 
+        // RESTRICT SENSITIVE FIELDS
+        // Only Admins or Managers can update Priority, Type, SLA, Due Date, Reporter
+        if (! $request->user()->hasPermissionTo('tickets.manage') && ! $request->user()->hasRole('administrator')) {
+            unset($validated['priority']);
+            unset($validated['type']);
+            unset($validated['sla_response_hours']);
+            unset($validated['sla_resolution_hours']);
+            unset($validated['due_date']);
+            unset($validated['reporter_id']);
+        }
+
         // Sanitize 'assigned_to' if user doesn't have permission to assign
         if (isset($validated['assigned_to']) && ! $request->user()->can('assign', $ticket)) {
             unset($validated['assigned_to']);
         }
 
         // Sanitize 'tags' if user doesn't have permission to update (edit tags)
-        // Actually 'update' policy is for the whole ticket.
-        // If user has 'tickets.update', they can edit everything.
         // If user is Owner (view_own/update_own) but NOT 'tickets.update' (staff), they shouldn't edit tags.
-        // We'll check for the specific permission 'tickets.update' or admin.
-        if (isset($validated['tags']) && ! ($request->user()->hasPermissionTo('tickets.update') || $request->user()->hasRole('administrator'))) {
+        // We'll check for the specific permission 'tickets.manage' or admin for tags too, to be safe.
+        if (isset($validated['tags']) && ! ($request->user()->hasPermissionTo('tickets.manage') || $request->user()->hasRole('administrator'))) {
             unset($validated['tags']);
         }
 
@@ -677,7 +686,7 @@ class TicketController extends Controller
      */
     public function archive(Request $request, Ticket $ticket): JsonResponse
     {
-        // $this->authorize('delete', $ticket); // Or specific 'archive'? Use delete for now.
+        $this->authorize('delete', $ticket);
 
         $validated = $request->validate([
             'reason' => 'nullable|string|max:500',
@@ -703,12 +712,13 @@ class TicketController extends Controller
             'reason' => 'nullable|string|max:500',
         ]);
 
+        // Check if user has permission to delete/manage tickets globally or at least for these tickets
+        if (! $request->user()->hasPermissionTo('tickets.delete') && ! $request->user()->hasPermissionTo('tickets.manage') && ! $request->user()->hasRole('administrator')) {
+            abort(403, 'Unauthorized to archive tickets.');
+        }
+
         // Resolve public IDs to internal IDs
         $ticketIds = Ticket::whereIn('public_id', $validated['ids'])->pluck('id')->toArray();
-
-        // Permission check?
-        // For now assume user can archive if they have generic access.
-        // Ideally check per ticket or global permission.
 
         $count = $this->ticketService->bulkArchive($ticketIds, $validated['reason'] ?? null);
 

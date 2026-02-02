@@ -180,7 +180,7 @@ const ticket = ref<TicketDetail | null>(null);
 const canManageAttachments = computed(() => {
     if (ticket.value?.status === "closed") return false;
     if (ticket.value?.isLocked) return false;
-    return can("tickets.update");
+    return can("tickets.update") || can("tickets.manage");
 });
 
 const isInternalNote = ref(false);
@@ -218,8 +218,8 @@ const activeTab = ref("comments"); // 'comments', 'activity', 'attachments'
 
 const visibleTabs = computed(() => {
     const tabs = ["comments"];
-    // Updated to match backend policy (tickets.update instead of tickets.manage)
-    if (can("tickets.update")) {
+    // Updated to match backend policy
+    if (can("tickets.manage")) {
         tabs.push("activity", "attachments", "user-tickets");
     }
     return tabs;
@@ -813,9 +813,11 @@ function formatChangeValue(value: any) {
 }
 
 function goBack() {
-    if (can("tickets.view")) {
+    // If the user can manage tickets, go to the admin list
+    if (can("tickets.manage")) {
         router.push({ name: "tickets" });
     } else {
+        // Otherwise go to the user support portal
         router.push({ name: "support" });
     }
 }
@@ -1412,7 +1414,12 @@ function isVisualMedia(att: Attachment) {
         </div>
 
         <div v-else-if="ticket" class="p-6 space-y-6">
-            <Alert v-if="ticket.isLocked" variant="warning" class="mb-4">
+            <Alert
+                v-if="ticket.isLocked"
+                variant="warning"
+                class="mb-4"
+                :icon="false"
+            >
                 <div class="flex items-center gap-2">
                     <Lock class="w-4 h-4" />
                     <span v-if="ticket.isArchived"
@@ -1515,7 +1522,7 @@ function isVisualMedia(att: Attachment) {
                         {{ isFollowing ? "Following" : "Follow" }}
                     </Button>
 
-                    <Dropdown align="end" v-if="can('tickets.update')">
+                    <Dropdown align="end" v-if="can('tickets.manage')">
                         <template #trigger>
                             <Button variant="outline" size="sm">
                                 Status
@@ -1541,11 +1548,7 @@ function isVisualMedia(att: Attachment) {
 
                     <Dropdown
                         align="end"
-                        v-if="
-                            can('tickets.update') ||
-                            can('tickets.assign') ||
-                            can('tickets.delete')
-                        "
+                        v-if="can('tickets.manage') || can('tickets.delete')"
                     >
                         <template #trigger>
                             <Button variant="ghost" size="icon">
@@ -1554,27 +1557,26 @@ function isVisualMedia(att: Attachment) {
                         </template>
                         <DropdownItem
                             @select="openEditModal"
-                            v-if="can('tickets.update')"
+                            v-if="can('tickets.manage')"
                         >
                             <Edit3 class="h-4 w-4" />
                             Edit Ticket
                         </DropdownItem>
                         <DropdownItem
                             @select="openAssignModal"
-                            v-if="can('tickets.assign')"
+                            v-if="can('tickets.manage')"
                         >
                             <UserPlus class="h-4 w-4" />
                             Assign to...
                         </DropdownItem>
                         <DropdownSeparator
                             v-if="
-                                (can('tickets.update') ||
-                                    can('tickets.assign')) &&
-                                can('tickets.delete')
+                                can('tickets.manage') &&
+                                (can('tickets.delete') || can('tickets.manage'))
                             "
                         />
                         <DropdownItem
-                            v-if="can('tickets.delete')"
+                            v-if="can('tickets.manage')"
                             @click="
                                 showDeleteModal = true;
                                 deleteReason = '';
@@ -1585,7 +1587,7 @@ function isVisualMedia(att: Attachment) {
                         </DropdownItem>
                         <DropdownItem
                             @click="openArchiveModal"
-                            v-if="can('tickets.delete')"
+                            v-if="can('tickets.manage')"
                         >
                             <ArchiveIcon class="mr-2 h-4 w-4" />
                             <span>Archive Ticket</span>
@@ -1835,6 +1837,7 @@ function isVisualMedia(att: Attachment) {
                                                         ? '[&_.ProseMirror]:bg-transparent'
                                                         : ''
                                                 "
+                                                :editable="!ticket.isLocked"
                                             />
 
                                             <!-- File Drop/Selected Area -->
@@ -1872,6 +1875,7 @@ function isVisualMedia(att: Attachment) {
                                                 multiple
                                                 class="hidden"
                                                 @change="handleFileSelect"
+                                                :disabled="ticket.isLocked"
                                             />
                                         </div>
                                         <div
@@ -1888,6 +1892,7 @@ function isVisualMedia(att: Attachment) {
                                                     @click="
                                                         $refs.fileInput.click()
                                                     "
+                                                    :disabled="ticket.isLocked"
                                                 >
                                                     <Paperclip
                                                         class="h-4 w-4 text-[var(--text-secondary)]"
@@ -1927,7 +1932,10 @@ function isVisualMedia(att: Attachment) {
                                             </div>
                                             <Button
                                                 size="sm"
-                                                :disabled="!newComment.trim()"
+                                                :disabled="
+                                                    !newComment.trim() ||
+                                                    ticket.isLocked
+                                                "
                                                 :loading="isSubmittingComment"
                                                 :class="
                                                     isInternalNote
@@ -2309,7 +2317,12 @@ function isVisualMedia(att: Attachment) {
                 <!-- Sidebar -->
                 <div class="lg:col-span-1 space-y-6">
                     <!-- SLA Status -->
-                    <Card padding="lg" v-if="ticket.slaResolutionHours">
+                    <Card
+                        padding="lg"
+                        v-if="
+                            ticket.slaResolutionHours && can('tickets.manage')
+                        "
+                    >
                         <h2
                             class="text-lg font-semibold text-[var(--text-primary)] mb-4"
                         >
@@ -2550,7 +2563,7 @@ function isVisualMedia(att: Attachment) {
                                     </span>
                                 </div>
                                 <Button
-                                    v-else-if="can('tickets.assign')"
+                                    v-else-if="can('tickets.manage')"
                                     variant="ghost"
                                     size="sm"
                                     class="h-7 px-2"
@@ -2710,7 +2723,10 @@ function isVisualMedia(att: Attachment) {
                                     class="text-sm text-[var(--text-secondary)]"
                                 >
                                     <button
-                                        v-if="can('tickets.update')"
+                                        v-if="
+                                            can('tickets.update') &&
+                                            can('tickets.manage')
+                                        "
                                         @click="openLinkModal"
                                         class="text-[var(--interactive-primary)] hover:underline flex items-center gap-1"
                                         :disabled="ticket.isLocked"
@@ -2818,7 +2834,7 @@ function isVisualMedia(att: Attachment) {
                     </Card>
 
                     <!-- Tags -->
-                    <Card padding="lg" v-if="can('tickets.update')">
+                    <Card padding="lg" v-if="can('tickets.manage')">
                         <h2
                             class="text-lg font-semibold text-[var(--text-primary)] mb-4"
                         >
@@ -2844,7 +2860,7 @@ function isVisualMedia(att: Attachment) {
                     </Card>
 
                     <!-- Followers -->
-                    <Card padding="lg" v-if="can('tickets.update')">
+                    <Card padding="lg" v-if="can('tickets.manage')">
                         <h2
                             class="text-lg font-semibold text-[var(--text-primary)] mb-4"
                         >
@@ -2922,7 +2938,10 @@ function isVisualMedia(att: Attachment) {
                 </div>
 
                 <!-- Priority & Type -->
-                <div class="grid grid-cols-2 gap-4">
+                <div
+                    class="grid grid-cols-2 gap-4"
+                    v-if="can('tickets.manage')"
+                >
                     <div class="space-y-1.5">
                         <label
                             class="text-sm font-medium text-[var(--text-primary)]"
@@ -2959,7 +2978,7 @@ function isVisualMedia(att: Attachment) {
                 </div>
 
                 <!-- Tags -->
-                <div class="space-y-1.5">
+                <div class="space-y-1.5" v-if="can('tickets.manage')">
                     <label
                         class="text-sm font-medium text-[var(--text-primary)]"
                         >Tags</label
@@ -3108,13 +3127,10 @@ function isVisualMedia(att: Attachment) {
         >
             <div class="space-y-4 py-2">
                 <Alert variant="warning">
-                    <div class="flex gap-2">
-                        <AlertTriangle class="w-4 h-4 mt-0.5" />
-                        <div class="text-sm">
-                            Archived tickets are
-                            <strong>locked permanently</strong> and cannot be
-                            reopened.
-                        </div>
+                    <div class="text-sm">
+                        Archived tickets are
+                        <strong>locked permanently</strong> and cannot be
+                        reopened.
                     </div>
                 </Alert>
 

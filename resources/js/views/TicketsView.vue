@@ -67,7 +67,7 @@ const ticketStats = ref({
     resolved: 0,
     closed: 0,
     total: 0,
-    sla_breached: 0
+    sla_breached: 0,
 });
 
 // Pagination
@@ -92,7 +92,7 @@ const authStore = useAuthStore();
 
 // View Mode
 const getStorageKey = () => {
-    const publicId = authStore.user?.public_id || 'guest';
+    const publicId = authStore.user?.public_id || "guest";
     return `worksphere_tickets_view_mode_${publicId}`;
 };
 
@@ -104,9 +104,12 @@ function setViewMode(mode) {
 }
 
 // Watch for user changes to reload preference (though rare to switch user without reload)
-watch(() => authStore.user?.public_id, () => {
-    viewMode.value = localStorage.getItem(getStorageKey()) || "list";
-});
+watch(
+    () => authStore.user?.public_id,
+    () => {
+        viewMode.value = localStorage.getItem(getStorageKey()) || "list";
+    },
+);
 
 // Filters
 const searchQuery = ref("");
@@ -114,26 +117,26 @@ const statusFilter = ref("all");
 const priorityFilter = ref("all");
 
 const statusOptions = [
-    { value: 'all', label: 'All Statuses' },
-    { value: 'open', label: 'Open' },
-    { value: 'in_progress', label: 'In Progress' },
-    { value: 'resolved', label: 'Resolved' },
-    { value: 'closed', label: 'Closed' }
+    { value: "all", label: "All Statuses" },
+    { value: "open", label: "Open" },
+    { value: "in_progress", label: "In Progress" },
+    { value: "resolved", label: "Resolved" },
+    { value: "closed", label: "Closed" },
 ];
 
 const priorityOptions = [
-    { value: 'all', label: 'All Priorities' },
-    { value: 'critical', label: 'Critical' },
-    { value: 'high', label: 'High' },
-    { value: 'medium', label: 'Medium' },
-    { value: 'low', label: 'Low' }
+    { value: "all", label: "All Priorities" },
+    { value: "critical", label: "Critical" },
+    { value: "high", label: "High" },
+    { value: "medium", label: "Medium" },
+    { value: "low", label: "Low" },
 ];
 
 const perPageOptions = [
-    { value: 15, label: '15' },
-    { value: 25, label: '25' },
-    { value: 50, label: '50' },
-    { value: 100, label: '100' }
+    { value: 15, label: "15" },
+    { value: 25, label: "25" },
+    { value: 50, label: "50" },
+    { value: 100, label: "100" },
 ];
 
 // Bulk Actions
@@ -256,7 +259,6 @@ async function fetchTickets() {
         const params = {
             page: currentPage.value,
             per_page: perPage.value,
-            per_page: perPage.value,
         };
 
         // Query Params Filters
@@ -264,6 +266,7 @@ async function fetchTickets() {
             params.assigned_to = route.query.assigned_to;
         if (route.query.reporter_id)
             params.reporter_id = route.query.reporter_id;
+        if (route.query.archived) params.archived = route.query.archived;
         if (route.query.search) searchQuery.value = route.query.search;
 
         if (statusFilter.value !== "all") params.status = statusFilter.value;
@@ -800,9 +803,9 @@ function viewTicket(ticketId) {
                     >
                         Unassigned
                     </button>
-                    
-                     <!-- Archived -->
-                     <button
+
+                    <!-- Archived -->
+                    <button
                         @click="activeView = 'archived'"
                         :class="[
                             activeView === 'archived'

@@ -13,6 +13,7 @@ class TicketPolicy
     public function viewAny(User $user): bool
     {
         return $user->hasPermissionTo('tickets.view')
+            || $user->hasPermissionTo('tickets.manage')
             || $user->hasPermissionTo('tickets.view_own')
             || $user->hasRole('administrator');
     }
@@ -23,7 +24,7 @@ class TicketPolicy
     public function view(User $user, Ticket $ticket): bool
     {
         // Admin or full view permission
-        if ($user->hasPermissionTo('tickets.view') || $user->hasRole('administrator')) {
+        if ($user->hasPermissionTo('tickets.view') || $user->hasPermissionTo('tickets.manage') || $user->hasRole('administrator')) {
             return true;
         }
 
@@ -53,13 +54,22 @@ class TicketPolicy
      */
     public function update(User $user, Ticket $ticket): bool
     {
-        // Admin always allowed
+        // Deny updates if ticket is archived
+        if ($ticket->is_archived) {
+            return false;
+        }
+
+        // Admin always allowed (EXCEPT if archived - handled above, but maybe Admins can unarchive? For now, strict read-only).
+        // Actually, let's allow Admins to update even if archived? User requirement said:
+        // "even administrator cannot change anything to it anymore"
+        // So the check above stands for everyone including admins.
+
         if ($user->hasRole('administrator')) {
             return true;
         }
 
         // Users with tickets.update permission can update any ticket
-        if ($user->hasPermissionTo('tickets.update')) {
+        if ($user->hasPermissionTo('tickets.update') || $user->hasPermissionTo('tickets.manage')) {
             return true;
         }
 
@@ -81,7 +91,9 @@ class TicketPolicy
      */
     public function delete(User $user, Ticket $ticket): bool
     {
-        return $user->hasPermissionTo('tickets.delete') || $user->hasRole('administrator');
+        return $user->hasPermissionTo('tickets.delete')
+            || $user->hasPermissionTo('tickets.manage')
+            || $user->hasRole('administrator');
     }
 
     /**
@@ -89,7 +101,9 @@ class TicketPolicy
      */
     public function assign(User $user, Ticket $ticket): bool
     {
-        return $user->hasPermissionTo('tickets.assign') || $user->hasRole('administrator');
+        return $user->hasPermissionTo('tickets.assign')
+            || $user->hasPermissionTo('tickets.manage')
+            || $user->hasRole('administrator');
     }
 
     /**
@@ -101,9 +115,9 @@ class TicketPolicy
             return true;
         }
 
-        // Support Staff: Must be assignee
-        if ($user->hasPermissionTo('tickets.close')) {
-            return $ticket->assigned_to === $user->id;
+        // Support Staff: Must be assignee or have manage permission
+        if ($user->hasPermissionTo('tickets.close') || $user->hasPermissionTo('tickets.manage')) {
+            return $user->hasPermissionTo('tickets.manage') ? true : $ticket->assigned_to === $user->id;
         }
 
         return false;
@@ -114,7 +128,9 @@ class TicketPolicy
      */
     public function viewInternalNotes(User $user, Ticket $ticket): bool
     {
-        return $user->hasPermissionTo('tickets.internal_notes') || $user->hasRole('administrator');
+        return $user->hasPermissionTo('tickets.internal_notes')
+            || $user->hasPermissionTo('tickets.manage')
+            || $user->hasRole('administrator');
     }
 
     /**
@@ -122,7 +138,13 @@ class TicketPolicy
      */
     public function addInternalNote(User $user, Ticket $ticket): bool
     {
+        // Deny internal notes if ticket is archived
+        if ($ticket->is_archived) {
+            return false;
+        }
+
         return $user->hasPermissionTo('tickets.internal_notes')
+            || $user->hasPermissionTo('tickets.manage')
             || $user->hasRole('administrator')
             || $ticket->assigned_to === $user->id;
     }
@@ -140,6 +162,11 @@ class TicketPolicy
      */
     public function addComment(User $user, Ticket $ticket): bool
     {
+        // Deny comments if ticket is archived
+        if ($ticket->is_archived) {
+            return false;
+        }
+
         // Anyone who can view the ticket can comment on it
         return $this->view($user, $ticket);
     }
@@ -172,6 +199,7 @@ class TicketPolicy
         // Only staff/admins with full view/manage permissions can see attachments tab
         return $user->hasPermissionTo('tickets.view')
             || $user->hasPermissionTo('tickets.update')
+            || $user->hasPermissionTo('tickets.manage')
             || $user->hasRole('administrator');
     }
 
@@ -182,6 +210,7 @@ class TicketPolicy
     {
         return $user->hasPermissionTo('tickets.view')
             || $user->hasPermissionTo('tickets.update')
+            || $user->hasPermissionTo('tickets.manage')
             || $user->hasRole('administrator');
     }
 }

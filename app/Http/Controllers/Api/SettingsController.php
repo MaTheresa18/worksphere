@@ -210,7 +210,7 @@ class SettingsController extends Controller
         ]);
 
         $path = $request->file('logo')->store('branding', 'public');
-        $url = \Illuminate\Support\Facades\Storage::url($path);
+        $url = \Illuminate\Support\Facades\Storage::disk('public')->url($path);
 
         $this->settingsService->set('app.logo', $url, ['group' => 'app', 'type' => 'string']);
 
@@ -230,7 +230,7 @@ class SettingsController extends Controller
         ]);
 
         $path = $request->file('favicon')->store('branding', 'public');
-        $url = \Illuminate\Support\Facades\Storage::url($path);
+        $url = \Illuminate\Support\Facades\Storage::disk('public')->url($path);
 
         $this->settingsService->set('app.favicon', $url, ['group' => 'app', 'type' => 'string']);
 
@@ -250,7 +250,7 @@ class SettingsController extends Controller
         ]);
 
         $path = $request->file('opengraph')->store('branding', 'public');
-        $url = \Illuminate\Support\Facades\Storage::url($path);
+        $url = \Illuminate\Support\Facades\Storage::disk('public')->url($path);
 
         $this->settingsService->set('app.opengraph', $url, ['group' => 'app', 'type' => 'string']);
 
