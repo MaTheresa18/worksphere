@@ -12,7 +12,7 @@ onMounted(() => {
 
 const lastUpdated = 'February 3, 2026';
 const companyName = appConfig.name;
-const supportEmail = computed(() => authStore.publicConfig?.contact?.legal || 'legal@coresync.io');
+const supportEmail = computed(() => authStore.publicConfig?.contact?.legal || 'legal@worksphere.com');
 </script>
 
 <template>

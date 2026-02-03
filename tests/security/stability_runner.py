@@ -26,6 +26,8 @@ SECURITY_TESTS = [
     {"name": "Security Headers", "script": "pentest_headers.py", "category": "security"},
     {"name": "File Upload", "script": "pentest_file_upload.py", "category": "security"},
     {"name": "WebSocket Security", "script": "pentest_websocket.py", "category": "security"},
+    {"name": "SSRF", "script": "pentest_ssrf.py", "category": "security"},
+    {"name": "Path Traversal", "script": "pentest_path_traversal.py", "category": "security"},
 ]
 
 STABILITY_TESTS = [
@@ -34,6 +36,7 @@ STABILITY_TESTS = [
     {"name": "Database Stability", "script": "stability_db.py", "category": "stability"},
     {"name": "Memory Leak Detection", "script": "stability_memory.py", "category": "stability"},
 ]
+
 
 
 def run_test(test_info):

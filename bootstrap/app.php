@@ -49,12 +49,12 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // API middleware configuration
         $middleware->api(prepend: [
+            \App\Http\Middleware\SecurityHeaders::class,  // Must be first for all responses
             \App\Http\Middleware\CheckBlockedIp::class,
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);
 
         $middleware->api(append: [
-            \App\Http\Middleware\SecurityHeaders::class,
             \App\Http\Middleware\CheckImpersonation::class,
         ]);
 

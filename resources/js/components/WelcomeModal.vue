@@ -59,14 +59,10 @@ async function close() {
                 </p>
             </div>
 
-            <div class="flex items-center space-x-2 justify-center">
-                <Checkbox id="dontShow" :checked="dontShowAgain" @update:checked="dontShowAgain = $event" />
-                <label
-                    for="dontShow"
-                    class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                >
+            <div class="flex items-center justify-center">
+                <Checkbox id="dontShow" v-model="dontShowAgain">
                     Don't show this again
-                </label>
+                </Checkbox>
             </div>
 
             <div class="flex justify-end w-full">

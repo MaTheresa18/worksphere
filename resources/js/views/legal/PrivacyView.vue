@@ -13,7 +13,7 @@ onMounted(() => {
 const lastUpdated = 'February 3, 2026';
 const companyName = appConfig.name;
 // Use privacy contact email if available, otherwise fallback to support
-const supportEmail = computed(() => authStore.publicConfig?.contact?.privacy || authStore.publicConfig?.contact?.support || 'privacy@coresync.io');
+const supportEmail = computed(() => authStore.publicConfig?.contact?.privacy || authStore.publicConfig?.contact?.support || 'privacy@worksphere.com');
 </script>
 
 <template>

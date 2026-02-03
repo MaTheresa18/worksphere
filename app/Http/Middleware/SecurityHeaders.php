@@ -36,14 +36,19 @@ class SecurityHeaders
         // Control referrer information
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-        // Remove server version disclosure
+        // Remove server version disclosure (PHP level and response level)
+        if (function_exists('header_remove')) {
+            header_remove('X-Powered-By');
+        }
         $response->headers->remove('X-Powered-By');
 
         // Permissions Policy (formerly Feature Policy)
         $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
 
-        // Content Security Policy
-        $this->addCspHeader($response);
+        // Content Security Policy (skip for Horizon which uses inline scripts)
+        if (!$request->is('horizon*')) {
+            $this->addCspHeader($response);
+        }
 
         return $response;
     }

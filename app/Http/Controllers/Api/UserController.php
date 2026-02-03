@@ -505,6 +505,7 @@ class UserController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
+            'welcome_seen' => ['sometimes', 'boolean'],
             'notifications' => ['sometimes', 'array'],
             'notifications.email' => ['sometimes', 'boolean'],
             'notifications.push' => ['sometimes', 'boolean'],
