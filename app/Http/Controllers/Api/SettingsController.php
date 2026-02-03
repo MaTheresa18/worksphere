@@ -259,4 +259,30 @@ class SettingsController extends Controller
             'url' => $url,
         ]);
     }
+
+    /**
+     * Verify the secret phrase for Demo Mode access.
+     */
+    public function verifyDemoAccess(Request $request): JsonResponse
+    {
+        $request->validate([
+            'password' => ['required', 'string'],
+        ]);
+
+        $hash = config('app.demo_mode_secret_hash');
+        
+        if (empty($hash)) {
+            // Fallback just in case, or fail closed
+            return response()->json(['message' => 'Demo mode configuration error.'], 500);
+        }
+
+        if (\Illuminate\Support\Facades\Hash::check($request->password, $hash)) {
+            return response()->json(['success' => true]);
+        }
+
+        return response()->json([
+            'message' => 'Invalid secret phrase.',
+            'success' => false,
+        ], 403);
+    }
 }

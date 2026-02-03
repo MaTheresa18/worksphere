@@ -10,13 +10,15 @@ const isDemoMode = computed(() => authStore.user?.is_demo_mode || false);
 <template>
     <div
         v-if="isDemoMode"
-        class="bg-[var(--interactive-primary)] text-white py-1 px-4 text-center text-xs font-medium flex items-center justify-center gap-2 shadow-sm z-[100] relative"
+        class="bg-orange-600 text-white py-2 px-4 text-center text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-md z-[9999] relative"
     >
-        <ShieldAlert class="h-3.5 w-3.5" />
+        <ShieldAlert class="h-4 w-4" />
         <span>
-            <strong>Demo Mode Active:</strong> Some destructive actions and sensitive settings are restricted.
+            <strong>DEMO MODE ACTIVE</strong>
         </span>
-        <Info class="h-3 w-3 opacity-70 ml-1 cursor-help" title="In Demo Mode, system settings and deletion of core data are disabled to maintain the integrity of the demonstration environment." />
+        <span class="hidden sm:inline normal-case font-medium tracking-normal opacity-90 mx-1">
+            &mdash; Changes will not be saved.
+        </span>
     </div>
 </template>
 

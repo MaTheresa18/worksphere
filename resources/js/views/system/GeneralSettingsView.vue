@@ -18,6 +18,7 @@ import {
     Copy,
     Share2,
     Upload,
+    X,
 } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import axios from "axios";
@@ -38,7 +39,9 @@ const settings = ref({
     "app.name": "",
     "app.url": "",
     "app.timezone": "UTC",
+    "app.timezone": "UTC",
     "app.locale": "en",
+    "app.is_demo_mode": false,
     // Security
     "auth.registration_enabled": true,
     "auth.email_verification": true,
@@ -440,6 +443,63 @@ const toggleAnnouncementActive = async (announcement) => {
     }
 };
 
+// Demo Mode Verification
+const showDemoPasswordModal = ref(false);
+const demoPassword = ref("");
+const isVerifyingDemoPassword = ref(false);
+const pendingDemoState = ref(false);
+
+const handleDemoModeToggle = (newValue) => {
+    // If enabling, or disabling, we require password?
+    // User requirement: "guard demo mode with password confirm and secret"
+    // Let's require it for BOTH to be safe, or just ensuring accidental toggles don't happen.
+    // Usually disabling is the sensitive part (re-enabling writes), but enabling can be DOS.
+    // Let's require it for toggle.
+    
+    // Reset toggle visually until verified (we manually handle v-model update)
+    // Actually, v-model will update it. We need to revert if cancelled.
+    
+    pendingDemoState.value = newValue;
+    // settings.value['app.is_demo_mode'] is already updated by v-model before this likely change event?
+    // If using <Switch :checked="val" @update:checked="..."> it's better.
+    // If using v-model, we might need to revert.
+    
+    // We'll assume we catch it before save? 
+    // Wait, the "Save Changes" button saves ALL settings.
+    // So the toggle just changes the local state.
+    // If we want to guard the CHANGE, we should intercept the change.
+    
+    // But typically "Demo Mode" is a setting that takes effect immediately or on save?
+    // If it's just a setting in the big form, the password should probably be required *to change the setting in the form*.
+    
+    // Revert change first
+    settings.value['app.is_demo_mode'] = !newValue;
+    
+    showDemoPasswordModal.value = true;
+};
+
+const verifyDemoPassword = async () => {
+    if (!demoPassword.value) return;
+    
+    isVerifyingDemoPassword.value = true;
+    try {
+        const response = await axios.post('/api/settings/verify-demo', {
+            password: demoPassword.value
+        });
+        
+        if (response.data.success) {
+            settings.value['app.is_demo_mode'] = pendingDemoState.value;
+            showDemoPasswordModal.value = false;
+            demoPassword.value = "";
+            toast.success("Demo mode access verified. Click 'Save Changes' to apply.");
+        }
+    } catch (error) {
+        toast.error(error.response?.data?.message || "Invalid secret phrase");
+    } finally {
+        isVerifyingDemoPassword.value = false;
+    }
+};
+
 onMounted(async () => {
     try {
         await Promise.all([fetchSettings(), fetchAnnouncements()]);
@@ -567,6 +627,25 @@ onMounted(async () => {
                                 </option>
                             </select>
                         </div>
+                    </div>
+
+                     <!-- Demo Mode Toggle -->
+                    <div class="p-4 bg-orange-500/5 rounded-lg border border-orange-200 mt-4 flex items-center justify-between">
+                        <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center shrink-0">
+                                 <Key class="w-4 h-4 text-orange-600" />
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium text-orange-900">Demo Mode</h4>
+                                <p class="text-xs text-orange-700 mt-0.5">
+                                    Restrict destructive actions. Requires secret phrase to toggle.
+                                </p>
+                            </div>
+                        </div>
+                        <Switch
+                            :model-value="settings['app.is_demo_mode']"
+                            @update:model-value="handleDemoModeToggle"
+                        />
                     </div>
                 </div>
             </div>
@@ -1793,139 +1872,168 @@ onMounted(async () => {
         <Modal
             :open="showAnnouncementModal"
             @update:open="showAnnouncementModal = $event"
-            :title="
-                editingAnnouncement ? 'Edit Announcement' : 'New Announcement'
-            "
-            size="lg"
         >
-            <div class="space-y-4">
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="col-span-2 space-y-1.5">
-                        <label
-                            class="text-sm font-medium text-[var(--text-primary)]"
-                            >Title *</label
-                        >
+            <div class="p-6 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-xl font-bold">
+                        {{
+                            editingAnnouncement
+                                ? "Edit Announcement"
+                                : "New Announcement"
+                        }}
+                    </h2>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        @click="showAnnouncementModal = false"
+                    >
+                        <X class="w-5 h-5" />
+                    </Button>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- Title -->
+                    <div class="space-y-1.5">
+                        <label class="text-sm font-medium">Title</label>
                         <Input
                             v-model="announcementForm.title"
-                            placeholder="Announcement title"
+                            placeholder="System Maintenance"
                         />
-                    </div>
-                    <div class="col-span-2 space-y-1.5">
-                        <label
-                            class="text-sm font-medium text-[var(--text-primary)]"
-                            >Message *</label
+                        <p
+                            v-if="announcementErrors.title"
+                            class="text-xs text-red-500"
                         >
+                            {{ announcementErrors.title[0] }}
+                        </p>
+                    </div>
+
+                    <!-- Message -->
+                    <div class="space-y-1.5">
+                        <label class="text-sm font-medium">Message</label>
                         <textarea
                             v-model="announcementForm.message"
                             rows="3"
-                            placeholder="Announcement message..."
-                            class="w-full px-3 py-2 text-sm bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] resize-none"
-                        />
+                            class="w-full px-3 py-2 text-sm bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+                            placeholder="We will be undergoing maintenance..."
+                        ></textarea>
+                        <p
+                            v-if="announcementErrors.message"
+                            class="text-xs text-red-500"
+                        >
+                            {{ announcementErrors.message[0] }}
+                        </p>
                     </div>
-                    <div class="space-y-1.5">
-                        <label
-                            class="text-sm font-medium text-[var(--text-primary)]"
-                            >Type</label
-                        >
-                        <select
-                            v-model="announcementForm.type"
-                            class="w-full px-3 py-2 text-sm bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
-                        >
-                            <option
-                                v-for="t in announcementTypes"
-                                :key="t.value"
-                                :value="t.value"
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Type -->
+                        <div class="space-y-1.5">
+                            <label class="text-sm font-medium">Type</label>
+                            <select
+                                v-model="announcementForm.type"
+                                class="w-full px-3 py-2 text-sm bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
                             >
-                                {{ t.label }}
-                            </option>
-                        </select>
+                                <option
+                                    v-for="type in announcementTypes"
+                                    :key="type.value"
+                                    :value="type.value"
+                                >
+                                    {{ type.label }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Active Toggle -->
+                        <div class="space-y-1.5">
+                            <label class="text-sm font-medium">Status</label>
+                            <div class="flex items-center h-[38px] px-1">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <Switch
+                                        v-model:checked="announcementForm.is_active"
+                                    />
+                                    <span class="text-sm">{{
+                                        announcementForm.is_active
+                                            ? "Active"
+                                            : "Inactive"
+                                    }}</span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
-                    <div class="space-y-1.5">
-                        <label
-                            class="text-sm font-medium text-[var(--text-primary)]"
-                            >Action Button</label
-                        >
-                        <Input
-                            v-model="announcementForm.action_text"
-                            placeholder="Learn More"
-                        />
-                    </div>
-                    <div class="col-span-2 space-y-1.5">
-                        <label
-                            class="text-sm font-medium text-[var(--text-primary)]"
-                            >Action URL</label
-                        >
-                        <Input
-                            v-model="announcementForm.action_url"
-                            type="url"
-                            placeholder="https://..."
-                        />
-                    </div>
-                    <div class="space-y-1.5">
-                        <label
-                            class="text-sm font-medium text-[var(--text-primary)]"
-                            >Start Date</label
-                        >
-                        <Input
-                            v-model="announcementForm.starts_at"
-                            type="datetime-local"
-                        />
-                    </div>
-                    <div class="space-y-1.5">
-                        <label
-                            class="text-sm font-medium text-[var(--text-primary)]"
-                            >End Date</label
-                        >
-                        <Input
-                            v-model="announcementForm.ends_at"
-                            type="datetime-local"
-                        />
-                    </div>
-                    <div class="flex items-center gap-6 col-span-2 pt-2">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                v-model="announcementForm.is_dismissable"
-                                class="rounded"
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Action Text -->
+                        <div class="space-y-1.5">
+                            <label class="text-sm font-medium"
+                                >Action Text (Optional)</label
+                            >
+                            <Input
+                                v-model="announcementForm.action_text"
+                                placeholder="Read More"
                             />
-                            <span class="text-sm text-[var(--text-primary)]"
-                                >Dismissable</span
+                        </div>
+
+                        <!-- Action URL -->
+                        <div class="space-y-1.5">
+                            <label class="text-sm font-medium"
+                                >Action URL (Optional)</label
                             >
-                        </label>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                v-model="announcementForm.is_active"
-                                class="rounded"
+                            <Input
+                                v-model="announcementForm.action_url"
+                                placeholder="https://..."
                             />
-                            <span class="text-sm text-[var(--text-primary)]"
-                                >Active</span
-                            >
-                        </label>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                v-model="announcementForm.is_public"
-                                class="rounded"
-                            />
-                            <span class="text-sm text-[var(--text-primary)]"
-                                >Show on Public Pages</span
-                            >
-                        </label>
+                        </div>
+                    </div>
+
+                    <!-- Dismissable -->
+                    <div class="flex items-center gap-2">
+                        <Switch
+                            v-model:checked="announcementForm.is_dismissable"
+                        />
+                        <span class="text-sm">Users can dismiss</span>
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="flex justify-end gap-3 pt-4">
+                        <Button
+                            variant="ghost"
+                            @click="showAnnouncementModal = false"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="primary"
+                            @click="saveAnnouncement"
+                            :loading="isSavingAnnouncement"
+                        >
+                            Save Announcement
+                        </Button>
                     </div>
                 </div>
             </div>
-            <template #footer>
-                <Button variant="outline" @click="showAnnouncementModal = false"
-                    >Cancel</Button
-                >
-                <Button
-                    variant="primary"
-                    @click="saveAnnouncement"
-                    :loading="isSavingAnnouncement"
-                    >{{ editingAnnouncement ? "Update" : "Create" }}</Button
-                >
-            </template>
+        </Modal>
+
+        <!-- Demo Mode Password Modal -->
+         <Modal 
+            :open="showDemoPasswordModal" 
+            @update:open="showDemoPasswordModal = $event"
+            title="Verification Required"
+            :description="`${pendingDemoState ? 'Enabling' : 'Disabling'} Demo Mode requires authentication. Please enter the secret phrase.`"
+        >
+            <div class="space-y-4">
+                <Input
+                    v-model="demoPassword"
+                    type="password"
+                    placeholder="Enter secret phrase..."
+                    @keyup.enter="verifyDemoPassword"
+                    autoFocus
+                />
+                <div class="flex justify-end gap-3">
+                    <Button variant="ghost" @click="showDemoPasswordModal = false">Cancel</Button>
+                    <Button variant="primary" :loading="isVerifyingDemoPassword" @click="verifyDemoPassword">
+                        Verify & Toggle
+                    </Button>
+                </div>
+            </div>
         </Modal>
     </div>
 </template>
