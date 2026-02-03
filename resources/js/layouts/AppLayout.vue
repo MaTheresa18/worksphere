@@ -13,6 +13,8 @@ import MediaViewer from "@/components/tools/MediaViewer.vue";
 import { ScrollToTop } from "@/components/ui";
 import AccountBlockedModal from "@/components/AccountBlockedModal.vue";
 import RoleChangeNotificationModal from "@/components/RoleChangeNotificationModal.vue";
+import WelcomeModal from "@/components/WelcomeModal.vue";
+import LegalUpdateModal from "@/components/LegalUpdateModal.vue";
 import MiniChatLauncher from "@/components/minichat/MiniChatLauncher.vue";
 import { appConfig } from "@/config/app";
 
@@ -237,6 +239,9 @@ function handleRoleChangeLogout() {
             @acknowledge="handleRoleChangeAcknowledge"
             @logout="handleRoleChangeLogout"
         />
+
+        <WelcomeModal />
+        <LegalUpdateModal />
     </div>
 </template>
 

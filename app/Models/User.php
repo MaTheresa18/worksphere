@@ -799,9 +799,37 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, WebAuth
             return new \Illuminate\Database\Eloquent\Collection;
         }
 
-        return Project::where('client_id', $client->id)->get();
+        return $client->projects;
     }
-    // ==================
+
+    // ==================== Legal Compliance ====================
+
+    /**
+     * Get legal agreement logs for this user.
+     */
+    public function legalAgreementLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(LegalAgreementLog::class);
+    }
+
+    /**
+     * Check if user has accepted the latest version of a document.
+     *
+     * @param string $type 'tos' or 'privacy'
+     */
+    public function hasAcceptedLatest(string $type): bool
+    {
+        $config = config("legal.{$type}");
+        
+        if (!$config) {
+            return true; // No config means no requirement
+        }
+
+        return $this->legalAgreementLogs()
+            ->where('document_type', $type)
+            ->where('version', $config['version'])
+            ->exists();
+    }
     // Email System
     // ==================
 

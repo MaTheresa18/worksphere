@@ -1,9 +1,18 @@
 <script setup>
 import { appConfig } from '@/config/app';
+import { useAuthStore } from '@/stores/auth';
+import { computed, onMounted } from 'vue';
 
-const lastUpdated = 'December 28, 2025';
+const authStore = useAuthStore();
+onMounted(() => {
+    if (!authStore.publicConfig) {
+        authStore.fetchPublicConfig();
+    }
+});
+
+const lastUpdated = 'February 3, 2026';
 const companyName = appConfig.name;
-const supportEmail = 'legal@coresync.io';
+const supportEmail = computed(() => authStore.publicConfig?.contact?.legal || 'legal@coresync.io');
 </script>
 
 <template>
@@ -63,10 +72,44 @@ const supportEmail = 'legal@coresync.io';
                 <p class="text-[var(--text-secondary)] leading-relaxed mt-4">
                     You must be at least 13 years old to use the Service. By using the Service, you represent that you meet this requirement.
                 </p>
+
+                <div class="mt-6 space-y-4">
+                    <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-100 dark:border-gray-700">
+                        <h4 class="font-semibold text-[var(--text-primary)] mb-2">3.1. Support & Account Recovery</h4>
+                        <p class="text-sm text-[var(--text-secondary)]">
+                            <strong>Free Tier Users:</strong> Support for free accounts is limited to self-service tools (e.g., password reset). 
+                            We do not offer manual account recovery or ownership verification for free users. If you lose access to your credentials 
+                            and cannot recover them via self-service means, you may lose access to your account permanently.
+                        </p>
+                    </div>
+
+                    <div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-100 dark:border-gray-700">
+                        <h4 class="font-semibold text-[var(--text-primary)] mb-2">3.2. Account Disputes</h4>
+                        <p class="text-sm text-[var(--text-secondary)]">
+                            In the event of a dispute over account ownership or control (e.g., between business partners or team members), 
+                            {{ companyName }} will not act as an arbiter or judge. You agree that you must resolve such disputes yourselves. 
+                            We reserve the right to <strong>suspend the account and all associated data indefinitely...</strong> until we receive joint written instructions 
+                            resolved to our satisfaction or a valid court order.
+                        </p>
+                    </div>
+                </div>
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">4. Acceptable Use</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">4. Data Export</h2>
+                <p class="text-[var(--text-secondary)] leading-relaxed mb-4">
+                    You have the right to request a copy of the content you have created (e.g., tasks, tickets, comments).
+                    This export is limited to your User Content and does not include:
+                </p>
+                <ul class="list-disc list-inside space-y-2 text-[var(--text-secondary)]">
+                    <li>Platform metadata, configuration, or system logs</li>
+                    <li>Proprietary app data (e.g., roles, permissions architecture)</li>
+                    <li>Data belonging to other users or organizations to which you do not have admin rights</li>
+                </ul>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">5. Acceptable Use</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed mb-4">
                     You agree not to use the Service to:
                 </p>
@@ -84,20 +127,33 @@ const supportEmail = 'legal@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">5. User Content</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">6. User Content</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed mb-4">
                     You retain ownership of any content you submit, post, or display on or through the Service ("User Content").
                     By submitting User Content, you grant us a worldwide, non-exclusive, royalty-free license to use, reproduce,
                     modify, and display such content solely for the purpose of operating and providing the Service.
                 </p>
-                <p class="text-[var(--text-secondary)] leading-relaxed">
+                <div class="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-100 dark:border-gray-700">
+                    <h4 class="font-semibold text-[var(--text-primary)] mb-2">6.1. File Uploads & Monitoring Disclaimer</h4>
+                    <p class="text-sm text-[var(--text-secondary)] mb-2">
+                        You acknowledge that {{ companyName }} acts as a passive conduit for the storage and transmission of User Content. 
+                        <strong>We do not actively monitor, review, or edit User Content or uploaded files.</strong>
+                    </p>
+                    <p class="text-sm text-[var(--text-secondary)]">
+                        You are solely responsible for all files you upload. You agree not to upload sensitive or regulated data 
+                        (including but not limited to data subject to GDPR, HIPAA, or patent protections) unless you have the necessary rights and 
+                        have verified that the Service's security controls meet your compliance obligations. {{ companyName }} disclaims all liability 
+                        for any sensitive data uploaded to the Service.
+                    </p>
+                </div>
+                <p class="text-[var(--text-secondary)] leading-relaxed mt-4">
                     You represent and warrant that you own or have the necessary rights to your User Content and that it does not
-                    violate any third-party rights or applicable laws.
+                    violate any third-party rights (including patents, copyrights, or trade secrets) or applicable laws.
                 </p>
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">6. Intellectual Property</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">7. Intellectual Property</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed">
                     The Service and its original content (excluding User Content), features, and functionality are and will remain
                     the exclusive property of {{ companyName }} and its licensors. The Service is protected by copyright, trademark,
@@ -106,7 +162,7 @@ const supportEmail = 'legal@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">7. Payment and Billing</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">8. Payment and Billing</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed mb-4">
                     If you subscribe to a paid plan:
                 </p>
@@ -120,7 +176,7 @@ const supportEmail = 'legal@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">8. Termination</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">9. Termination</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed mb-4">
                     We may terminate or suspend your account immediately, without prior notice, for any reason, including:
                 </p>
@@ -137,7 +193,7 @@ const supportEmail = 'legal@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">9. Disclaimer of Warranties</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">10. Disclaimer of Warranties</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed">
                     THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS
                     OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
@@ -147,7 +203,7 @@ const supportEmail = 'legal@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">10. Limitation of Liability</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">11. Limitation of Liability</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed">
                     TO THE MAXIMUM EXTENT PERMITTED BY LAW, {{ companyName.toUpperCase() }} SHALL NOT BE LIABLE FOR ANY INDIRECT,
                     INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED
@@ -158,7 +214,7 @@ const supportEmail = 'legal@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">11. Indemnification</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">12. Indemnification</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed">
                     You agree to defend, indemnify, and hold harmless {{ companyName }} and its officers, directors, employees,
                     and agents from any claims, damages, losses, liabilities, and expenses (including reasonable attorneys' fees)
@@ -167,7 +223,7 @@ const supportEmail = 'legal@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">12. Governing Law</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">13. Governing Law</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed">
                     These Terms shall be governed by and construed in accordance with the laws of the jurisdiction in which
                     {{ companyName }} is incorporated, without regard to its conflict of law provisions. Any disputes arising
@@ -176,7 +232,7 @@ const supportEmail = 'legal@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">13. Changes to Terms</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">14. Changes to Terms</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed">
                     We reserve the right to modify or replace these Terms at any time. If a revision is material, we will provide
                     at least 30 days' notice prior to any new terms taking effect. What constitutes a material change will be
@@ -186,7 +242,7 @@ const supportEmail = 'legal@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">14. Severability</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">15. Severability</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed">
                     If any provision of these Terms is held to be unenforceable or invalid, such provision will be modified to
                     the minimum extent necessary to make it enforceable, and the remaining provisions will continue in full force and effect.
@@ -194,7 +250,7 @@ const supportEmail = 'legal@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">15. Entire Agreement</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">16. Entire Agreement</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed">
                     These Terms, together with our Privacy Policy, constitute the entire agreement between you and {{ companyName }}
                     regarding the Service and supersede all prior agreements and understandings.
@@ -202,7 +258,7 @@ const supportEmail = 'legal@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">16. Contact Us</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">17. Contact Us</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed">
                     If you have any questions about these Terms, please contact us:
                 </p>

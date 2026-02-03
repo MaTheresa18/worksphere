@@ -175,6 +175,15 @@ const routes: RouteRecordRaw[] = [
                     }
                 },
             },
+            {
+                path: "social-complete",
+                name: "social-complete",
+                component: () => import("@/views/auth/SocialRegistration.vue"),
+                meta: {
+                    title: "Complete Registration",
+                    transition: "fade",
+                },
+            },
         ],
     },
     {

@@ -80,10 +80,16 @@ const settings = ref({
     // Team Management
     "teams.max_owned": 5,
     "teams.max_joined": 20,
+    "teams.max_joined": 20,
     "teams.dormant_days": 90,
     "teams.deletion_grace_days": 30,
     "teams.auto_delete": false,
     "teams.require_approval": false,
+    // Contact Information
+    "contact.support": "",
+    "contact.legal": "",
+    "contact.dmca": "",
+    "contact.privacy": "",
     // Tickets SLA
     "tickets.sla.enabled": true,
     "tickets.sla.business_hours_enabled": false,
@@ -646,6 +652,75 @@ onMounted(async () => {
                             :model-value="settings['app.is_demo_mode']"
                             @update:model-value="handleDemoModeToggle"
                         />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact Information Settings -->
+            <div
+                class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] overflow-hidden"
+            >
+                <div
+                    class="p-4 border-b border-[var(--border-default)] flex items-center gap-3"
+                >
+                    <div
+                        class="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center"
+                    >
+                        <Mail class="w-4 h-4 text-green-600" />
+                    </div>
+                    <h3 class="font-medium text-[var(--text-primary)]">
+                        Contact Information
+                    </h3>
+                </div>
+                <div class="p-6 space-y-4">
+                    <p class="text-sm text-[var(--text-secondary)] mb-4">
+                        These email addresses will be displayed in legal documents (Terms, Privacy) and throughout the application.
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="space-y-1.5">
+                            <label
+                                class="text-sm font-medium text-[var(--text-secondary)]"
+                                >Support Email</label
+                            >
+                            <Input
+                                v-model="settings['contact.support']"
+                                type="email"
+                                placeholder="support@example.com"
+                            />
+                        </div>
+                        <div class="space-y-1.5">
+                            <label
+                                class="text-sm font-medium text-[var(--text-secondary)]"
+                                >Legal Email</label
+                            >
+                            <Input
+                                v-model="settings['contact.legal']"
+                                type="email"
+                                placeholder="legal@example.com"
+                            />
+                        </div>
+                        <div class="space-y-1.5">
+                            <label
+                                class="text-sm font-medium text-[var(--text-secondary)]"
+                                >DMCA / Copyright Email</label
+                            >
+                            <Input
+                                v-model="settings['contact.dmca']"
+                                type="email"
+                                placeholder="dmca@example.com"
+                            />
+                        </div>
+                        <div class="space-y-1.5">
+                            <label
+                                class="text-sm font-medium text-[var(--text-secondary)]"
+                                >Privacy Officer Email</label
+                            >
+                            <Input
+                                v-model="settings['contact.privacy']"
+                                type="email"
+                                placeholder="privacy@example.com"
+                            />
+                        </div>
                     </div>
                 </div>
             </div>

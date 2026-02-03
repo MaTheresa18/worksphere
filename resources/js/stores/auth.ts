@@ -68,9 +68,22 @@ interface TwoFactorEnforcementEvent {
   } | null;
 }
 
+interface PublicConfig {
+  social_login_enabled: boolean;
+  recaptcha_enabled: boolean;
+  recaptcha_site_key?: string;
+  contact?: {
+    support?: string;
+    legal?: string;
+    dmca?: string;
+    privacy?: string;
+  };
+}
+
 export const useAuthStore = defineStore('auth', () => {
   // State
   const user: Ref<User | null> = ref(null);
+  const publicConfig: Ref<PublicConfig | null> = ref(null);
   const currentTeamId: Ref<string | null> = ref(null);
   const isLoading = ref(false);
 
@@ -254,6 +267,15 @@ export const useAuthStore = defineStore('auth', () => {
         clearHints();
       }
       return false;
+    }
+  }
+
+  async function fetchPublicConfig(): Promise<void> {
+    try {
+      const response = await api.get('/api/auth/config');
+      publicConfig.value = response.data;
+    } catch (error) {
+      console.warn('[Auth] Failed to fetch public config:', error);
     }
   }
 
@@ -747,6 +769,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading,
     userHints,
     fetchedHints,
+    publicConfig,
     // Real-time state
     statusChangeEvent,
     showBlockedModal,
@@ -781,6 +804,7 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     fetchUser,
     fetchUserHints,
+    fetchPublicConfig,
     setUserHints,
     clearHints,
     updatePresence,

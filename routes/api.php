@@ -37,6 +37,7 @@ Route::middleware(['throttle:guest'])->group(function () {
     Route::get('/auth/{provider}/redirect', [AuthController::class, 'socialRedirect']);
     Route::get('/auth/{provider}/callback', [AuthController::class, 'socialCallback']);
     Route::post('/auth/social/verify-link', [AuthController::class, 'verifySocialLink'])->name('social.verify-link');
+    Route::post('/auth/social/complete', [AuthController::class, 'completeSocialRegistration']);
 
     // Passkey Authentication (passwordless login)
     Route::post('/auth/passkey/login/options', [\App\Http\Controllers\Api\PasskeyController::class, 'loginOptions']);
@@ -124,6 +125,10 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce', 'demo'])->grou
     Route::delete('/user/media/{media}', [UserController::class, 'deleteMedia']);
     Route::get('/user/media/{media}/download', [\App\Http\Controllers\Api\MediaController::class, 'download'])->name('api.user.media.download');
     Route::delete('/user/avatar', [UserController::class, 'deleteAvatar']);
+
+    // Legal Compliance
+    Route::get('/legal/status', [\App\Http\Controllers\Api\LegalAgreementController::class, 'status']);
+    Route::post('/legal/agreements', [\App\Http\Controllers\Api\LegalAgreementController::class, 'store']);
 
     // Generic Secure Media Delivery
     Route::get('/media/{media}/{conversion?}', [\App\Http\Controllers\Api\MediaController::class, 'show'])

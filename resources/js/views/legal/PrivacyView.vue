@@ -1,9 +1,19 @@
 <script setup>
 import { appConfig } from '@/config/app';
+import { useAuthStore } from '@/stores/auth';
+import { computed, onMounted } from 'vue';
 
-const lastUpdated = 'December 28, 2025';
+const authStore = useAuthStore();
+onMounted(() => {
+    if (!authStore.publicConfig) {
+        authStore.fetchPublicConfig();
+    }
+});
+
+const lastUpdated = 'February 3, 2026';
 const companyName = appConfig.name;
-const supportEmail = 'privacy@coresync.io';
+// Use privacy contact email if available, otherwise fallback to support
+const supportEmail = computed(() => authStore.publicConfig?.contact?.privacy || authStore.publicConfig?.contact?.support || 'privacy@coresync.io');
 </script>
 
 <template>
@@ -67,7 +77,23 @@ const supportEmail = 'privacy@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">5. Data Security</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">5. User Uploaded Data & Compliance</h2>
+                <p class="text-[var(--text-secondary)] leading-relaxed mb-4">
+                    When you upload files or content ("Uploaded Data") to the Service, you retain full responsibility for the nature and content of that data.
+                </p>
+                <div class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-100 dark:border-blue-900/50">
+                    <h4 class="font-semibold text-[var(--text-primary)] mb-2 text-sm">Responsibility for Sensitive Data</h4>
+                    <p class="text-sm text-[var(--text-secondary)] leading-relaxed">
+                        You acknowledge that you are responsible for determining whether your Uploaded Data contains sensitive or regulated information, 
+                        including but not limited to Protected Health Information (PHI) under HIPAA, personal data under GDPR, or patented information. 
+                        <strong>We do not inspect the contents of your files.</strong> You agree to only upload such data if you have verified that our 
+                        security measures meet your specific compliance requirements.
+                    </p>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">6. Data Security</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed">
                     We implement appropriate technical and organizational security measures to protect your personal data against
                     unauthorized access, alteration, disclosure, or destruction. These measures include encryption, secure servers,
@@ -77,7 +103,7 @@ const supportEmail = 'privacy@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">6. Data Retention</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">7. Data Retention</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed">
                     We retain your personal data only for as long as necessary to fulfill the purposes for which it was collected,
                     including to satisfy legal, accounting, or reporting requirements. When we no longer need your personal data,
@@ -86,7 +112,7 @@ const supportEmail = 'privacy@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">7. Your Rights</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">8. Your Rights</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed mb-4">
                     Depending on your location, you may have the following rights regarding your personal data:
                 </p>
@@ -94,7 +120,10 @@ const supportEmail = 'privacy@coresync.io';
                     <li><strong>Access:</strong> Request access to your personal data</li>
                     <li><strong>Correction:</strong> Request correction of inaccurate or incomplete data</li>
                     <li><strong>Deletion:</strong> Request deletion of your personal data</li>
-                    <li><strong>Portability:</strong> Request a copy of your data in a structured, machine-readable format</li>
+                    <li>
+                        <strong>Portability:</strong> Request a copy of your <strong>User Created Data</strong> in a structured format. 
+                        Note that this excludes proprietary system data, roles, and permissions structures.
+                    </li>
                     <li><strong>Objection:</strong> Object to processing of your personal data</li>
                     <li><strong>Restriction:</strong> Request restriction of processing</li>
                 </ul>
@@ -104,7 +133,7 @@ const supportEmail = 'privacy@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">8. Cookies and Tracking</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">9. Cookies and Tracking</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed">
                     We use cookies and similar tracking technologies to track activity on our service and store certain information.
                     Cookies are files with a small amount of data that may include an anonymous unique identifier. You can instruct
@@ -114,7 +143,7 @@ const supportEmail = 'privacy@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">9. Third-Party Services</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">10. Third-Party Services</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed">
                     Our service may contain links to third-party websites or services that are not operated by us. We have no control
                     over, and assume no responsibility for, the content, privacy policies, or practices of any third-party sites or
@@ -123,7 +152,7 @@ const supportEmail = 'privacy@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">10. Children's Privacy</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">11. Children's Privacy</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed">
                     Our service is not intended for children under 13 years of age. We do not knowingly collect personal information
                     from children under 13. If we become aware that we have collected personal data from a child under 13, we will
@@ -132,7 +161,7 @@ const supportEmail = 'privacy@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">11. Changes to This Policy</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">12. Changes to This Policy</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed">
                     We may update this privacy policy from time to time. We will notify you of any changes by posting the new policy
                     on this page and updating the "Last updated" date. You are advised to review this policy periodically for any changes.
@@ -140,7 +169,7 @@ const supportEmail = 'privacy@coresync.io';
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">12. Contact Us</h2>
+                <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-4">13. Contact Us</h2>
                 <p class="text-[var(--text-secondary)] leading-relaxed">
                     If you have any questions about this Privacy Policy, please contact us:
                 </p>

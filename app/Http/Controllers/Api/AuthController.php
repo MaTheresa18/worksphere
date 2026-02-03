@@ -50,12 +50,12 @@ class AuthController extends Controller
         // Generate username if not provided
         $userData['username'] = $request->username ?? explode('@', $request->email)[0].rand(100, 999);
 
+        $user = User::create($userData);
+
         // Auto-verify if email verification is disabled
         if (! config('auth.email_verification', true)) {
-            $userData['email_verified_at'] = now();
+            $user->markEmailAsVerified();
         }
-
-        $user = User::create($userData);
 
         // Assign default role
         $defaultRole = config('roles.default_role', 'user');
@@ -65,7 +65,19 @@ class AuthController extends Controller
         // which calls $user->sendEmailVerificationNotification() automatically
         event(new Registered($user));
 
-        // Manual notification removed to prevent double email loop
+        // Record Legal Agreement Acceptance (assumed via registration form checkbox)
+        foreach (['tos', 'privacy'] as $type) {
+            if ($config = config("legal.{$type}")) {
+                \App\Models\LegalAgreementLog::create([
+                    'user_id' => $user->id,
+                    'document_type' => $type,
+                    'version' => $config['version'],
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                    'accepted_at' => now(),
+                ]);
+            }
+        }
 
         Auth::login($user);
         $user->recordLogin($request->ip());
@@ -423,6 +435,10 @@ class AuthController extends Controller
             return redirect($frontendUrl.'/auth/login?verification_required=1&message='.urlencode($result['message']));
         }
 
+        if ($result['status'] === 'social_completion_required') {
+            return redirect($frontendUrl.'/auth/social-complete?token='.$result['token'].'&provider='.$provider);
+        }
+
         $user = $result['user'];
 
         if (! $user->canLogin()) {
@@ -478,6 +494,10 @@ class AuthController extends Controller
 
         if ($result['status'] === 'verification_required') {
             return redirect($frontendUrl.'/auth/login?verification_required=1&message='.urlencode($result['message']));
+        }
+
+        if ($result['status'] === 'social_completion_required') {
+            return redirect($frontendUrl.'/auth/social-complete?token='.$result['token'].'&provider='.$provider);
         }
 
         $user = $result['user'];
@@ -608,51 +628,106 @@ class AuthController extends Controller
             ];
         }
 
-        // Create new user with social account
-        $user = User::create([
-            'name' => $socialUser->getName() ?? $socialUser->getNickname(),
+        // INTERCEPT: New user via social login
+        // Cache data and require legal agreement acceptance before creation
+        $tempToken = \Illuminate\Support\Str::random(64);
+        \Illuminate\Support\Facades\Cache::put("social_completion_{$tempToken}", [
+            'provider' => $provider,
+            'provider_id' => $socialUser->getId(),
             'email' => $socialUser->getEmail(),
-            'username' => $socialUser->getNickname() ?? explode('@', $socialUser->getEmail())[0].rand(100, 999),
-            'email_verified_at' => now(), // Auto-verify social login users
+            'name' => $socialUser->getName() ?? $socialUser->getNickname(),
+            'nickname' => $socialUser->getNickname(),
+            'avatar' => $socialUser->getAvatar(),
+        ], now()->addMinutes(30));
+
+        return [
+            'status' => 'social_completion_required',
+            'token' => $tempToken,
+        ];
+    }
+    
+    /**
+     * Complete social registration after legal acceptance.
+     */
+    public function completeSocialRegistration(Request $request): JsonResponse
+    {
+        $request->validate([
+            'token' => 'required|string',
+            'agreed' => 'required|accepted',
+        ]);
+
+        $data = \Illuminate\Support\Facades\Cache::pull("social_completion_{$request->token}");
+
+        if (!$data) {
+            return response()->json(['message' => 'Invalid or expired registration session.'], 400);
+        }
+
+        // Create new user
+        $user = User::create([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'username' => $data['nickname'] ?? explode('@', $data['email'])[0].rand(100, 999),
+            // 'email_verified_at' => now(), // Handled explicitly below
             'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(32)),
             'status' => 'active',
             'is_password_set' => false,
             'preferences' => [
-                'appearance' => [
-                    'mode' => 'system',
-                    'color' => 'default',
-                ],
-                'notifications' => [
-                    'email' => true,
-                    'push' => true,
-                ],
+                'appearance' => ['mode' => 'system', 'color' => 'default'],
+                'notifications' => ['email' => true, 'push' => true],
             ],
+            'provider' => $data['provider'], // Legacy compat
+            'provider_id' => $data['provider_id'], // Legacy compat
         ]);
 
-        // Create social account entry
+        // Explicitly mark as verified since it's not in fillable
+        $user->markEmailAsVerified();
+
+        // Create social account
         \App\Models\SocialAccount::create([
             'user_id' => $user->id,
-            'provider' => $provider,
-            'provider_id' => $socialUser->getId(),
-            'provider_email' => $socialUser->getEmail(),
-            'provider_avatar' => $socialUser->getAvatar(),
-            'provider_name' => $socialUser->getName(),
+            'provider' => $data['provider'],
+            'provider_id' => $data['provider_id'],
+            'provider_email' => $data['email'],
+            'provider_avatar' => $data['avatar'],
+            'provider_name' => $data['name'],
         ]);
 
-        // Sync avatar using AvatarService
-        if ($avatarUrl = $socialUser->getAvatar()) {
-            app(\App\Contracts\AvatarContract::class)->syncFromSocial($avatarUrl, $user);
+        // Sync avatar
+        if ($data['avatar']) {
+            app(\App\Contracts\AvatarContract::class)->syncFromSocial($data['avatar'], $user);
         }
 
+        // Assign Role
         $defaultRole = config('roles.default_role', 'user');
         $user->assignRole($defaultRole);
 
+        // Record Legal Agreements
+        foreach (['tos', 'privacy'] as $type) {
+            if ($config = config("legal.{$type}")) {
+                \App\Models\LegalAgreementLog::create([
+                    'user_id' => $user->id,
+                    'document_type' => $type,
+                    'version' => $config['version'],
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                    'accepted_at' => now(),
+                ]);
+            }
+        }
+
+        // Send Welcome Email
         $token = Password::createToken($user);
         $resetUrl = url(config('app.url').'/reset-password?token='.$token.'&email='.urlencode($user->email));
-
         $user->notify(new \App\Notifications\WelcomeEmailNotification(true, $resetUrl, 'Set Password & Access Dashboard'));
 
-        return ['status' => 'success', 'user' => $user];
+        // Login
+        Auth::login($user);
+        $user->recordLogin($request->ip());
+
+        return response()->json([
+            'message' => 'Registration complete.',
+            'data' => ['user' => new UserResource($user)],
+        ]);
     }
 
     /**
@@ -683,6 +758,12 @@ class AuthController extends Controller
             'social_login_enabled' => config('auth.social_login_enabled', true),
             'recaptcha_enabled' => config('recaptcha.enabled', false),
             'recaptcha_site_key' => config('recaptcha.site_key'),
+            'contact' => [
+                'support' => \App\Models\Setting::getValue('contact.support', 'support@worksphere.com'),
+                'legal' => \App\Models\Setting::getValue('contact.legal', 'legal@worksphere.com'),
+                'dmca' => \App\Models\Setting::getValue('contact.dmca', 'dmca@worksphere.com'),
+                'privacy' => \App\Models\Setting::getValue('contact.privacy', 'privacy@worksphere.com'),
+            ],
         ]);
     }
 

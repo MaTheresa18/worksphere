@@ -40,7 +40,6 @@ import {
     CheckCircle2,
     Activity,
 } from "lucide-vue-next";
-import WelcomeDialog from "@/components/WelcomeDialog.vue";
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -199,7 +198,6 @@ function getTrendIcon(trend: string) {
 
 <template>
     <div>
-        <WelcomeDialog />
         <div class="space-y-6">
             <!-- Welcome Header -->
             <div
