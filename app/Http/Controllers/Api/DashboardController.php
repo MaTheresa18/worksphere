@@ -25,9 +25,10 @@ class DashboardController extends Controller
             'session_id' => $request->hasSession() ? $request->session()->getId() : 'no-session',
         ]);
         $team = $this->resolveTeam($request);
+        $projectPublicId = $request->input('project_id');
         $period = $request->input('period', 'week');
 
-        $data = $this->dashboardService->getDashboard($user, $team, $period);
+        $data = $this->dashboardService->getDashboard($user, $team, $period, $projectPublicId);
 
         return response()->json([
             'data' => $data,

@@ -137,6 +137,7 @@ class UserResource extends JsonResource
                         ];
                     });
                 }),
+                'is_demo_mode' => config('app.is_demo_mode', false),
             ]);
         }
 

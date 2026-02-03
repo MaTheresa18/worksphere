@@ -144,26 +144,48 @@ class AuditService
             if (config('audit.async', true) && $this->shouldQueueLog($action)) {
                 dispatch(function () use ($data, $action): void {
                     try {
-                         \Illuminate\Support\Facades\Log::info('AuditService: Attempting async log create', ['public_id' => $data['public_id'], 'action' => $action->value]);
+                        \Illuminate\Support\Facades\Log::debug('AuditService: Attempting async log create', [
+                            'public_id' => $data['public_id'],
+                            'action' => $action->value
+                        ]);
                         AuditLog::create($data);
                     } catch (\Throwable $e) {
+                        if ($e instanceof \Illuminate\Database\UniqueConstraintViolationException) {
+                            \Illuminate\Support\Facades\Log::critical('AuditService: UNIQUE COLLISION DETECTED', [
+                                'public_id' => $data['public_id'],
+                                'action' => $action->value,
+                                'existing' => AuditLog::where('public_id', $data['public_id'])->first()?->toArray(),
+                                'new_data' => $data
+                            ]);
+                        }
                         \Illuminate\Support\Facades\Log::error('AuditService: Async logging failed', [
                             'public_id' => $data['public_id'],
                             'action' => $action->value,
-                            'error' => $e->getMessage(),
-                            'trace' => $e->getTraceAsString()
+                            'error' => $e->getMessage()
                         ]);
-                        throw $e; // Re-throw to make sure we see it if needed
+                        // Don't re-throw in production to avoid crashing async workers, but maybe in dev?
                     }
                 })->afterResponse();
 
                 return null;
             }
 
-            $auditLog = AuditLog::create($data);
-            $this->invalidateRecentLogsCache();
+            try {
+                $auditLog = AuditLog::create($data);
+                $this->invalidateRecentLogsCache();
 
-            return $auditLog;
+                return $auditLog;
+            } catch (\Throwable $e) {
+                if ($e instanceof \Illuminate\Database\UniqueConstraintViolationException) {
+                     \Illuminate\Support\Facades\Log::critical('AuditService: SYNC UNIQUE COLLISION DETECTED', [
+                        'public_id' => $data['public_id'],
+                        'action' => $action->value,
+                        'existing' => AuditLog::where('public_id', $data['public_id'])->first()?->toArray(),
+                        'new_data' => $data
+                    ]);
+                }
+                throw $e;
+            }
         } catch (Throwable $e) {
             Log::error('Audit logging failed', [
                 'action' => $action->value,

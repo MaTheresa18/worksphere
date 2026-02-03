@@ -135,6 +135,8 @@ class RoleController extends Controller
      */
     public function update(Request $request, Role $role): JsonResponse
     {
+        $this->authorize('update', $role);
+
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255', 'unique:roles,name,'.$role->id],
             'permissions' => ['sometimes', 'array'],

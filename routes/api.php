@@ -106,7 +106,7 @@ Route::get('/media/secure/{media}', [\App\Http\Controllers\Api\MediaController::
     ->name('api.media.secure-download')
     ->middleware('signed');
 
-Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(function () {
+Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce', 'demo'])->group(function () {
     // Current User
     Route::get('/user', [AuthController::class, 'user']);
     Route::get('/user/details', [UserController::class, 'details']);
@@ -545,7 +545,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce'])->group(functi
         Route::get('permissions', [RoleController::class, 'permissions']);
     });
 
-    Route::middleware('permission:roles.update')->prefix('roles')->group(function () {
+    Route::middleware('permission:roles.manage')->prefix('roles')->group(function () {
         Route::put('/{role}', [RoleController::class, 'update']);
     });
 

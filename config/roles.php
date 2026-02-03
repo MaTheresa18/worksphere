@@ -133,6 +133,7 @@ return [
             'roles.create' => 'Create roles',
             'roles.update' => 'Update roles',
             'roles.delete' => 'Delete roles',
+            'roles.manage' => 'Manage global role definitions and critical permissions',
             'roles.assign' => 'Assign roles to users',
         ],
 
@@ -547,6 +548,7 @@ return [
     'approval_required_roles' => [
         'administrator',
         'it_support',
+        'user',
     ],
 
 ];

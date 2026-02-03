@@ -116,10 +116,27 @@ api.interceptors.response.use(
             return Promise.reject(error);
         }
 
+        // Handle 403 Forbidden - Demo Mode
+        if (
+            error.response?.status === 403 &&
+            (error.response?.data as any)?.is_demo
+        ) {
+            const message = (error.response?.data as any)?.message || 'Action disabled in Demo Mode.';
+            try {
+                const { toast } = await import('vue-sonner');
+                toast.error('Demo Restricted', {
+                    description: message,
+                });
+            } catch (e) {
+                console.warn('[API] Could not show demo toast:', e);
+            }
+            return Promise.reject(error);
+        }
+
         // Handle 403 Forbidden - Enforce 2FA
         if (
             error.response?.status === 403 &&
-            error.response?.data?.action === "setup_2fa"
+            (error.response?.data as any)?.action === "setup_2fa"
         ) {
             if (window.location.pathname !== "/auth/setup-2fa") {
                 window.location.href = "/auth/setup-2fa";

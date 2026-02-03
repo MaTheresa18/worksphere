@@ -41,7 +41,7 @@ class LockoutProtectionService
         // 3. Count remaining.
 
         // Critical permissions to maintain access
-        $criticalPermissions = ['roles.update', 'users.update', 'users.view'];
+        $criticalPermissions = ['roles.manage', 'roles.update', 'users.update', 'users.view'];
 
         // Check if we are removing any critical permission
         $removingCritical = false;
@@ -100,7 +100,7 @@ class LockoutProtectionService
     public function validatePermissionOverride(User $targetUser, string $permission, string $action): bool
     {
         // If we are blocking a critical permission or revoking a grant of a critical permission (if they lacked it otherwise)
-        if (! in_array($permission, ['roles.update', 'users.update', '*', 'user_manage'])) {
+        if (! in_array($permission, ['roles.manage', 'roles.update', 'users.update', '*', 'user_manage'])) {
             return true;
         }
 
@@ -135,8 +135,8 @@ class LockoutProtectionService
         // Better: Get users with 'administrator' role.
         $admins = User::role('administrator')->whereNotIn('id', $excludeIds)->get();
 
-        // Also users with direct permission 'roles.update' (if any)
-        $usersWithPerm = User::permission('roles.update')->whereNotIn('id', $excludeIds)->get();
+        // Also users with direct permission 'roles.update' or 'roles.manage'
+        $usersWithPerm = User::permission(['roles.update', 'roles.manage'])->whereNotIn('id', $excludeIds)->get();
 
         $allAdmins = $admins->merge($usersWithPerm)->unique('id');
 
@@ -153,6 +153,6 @@ class LockoutProtectionService
 
     protected function isUserAdmin(User $user): bool
     {
-        return $user->hasPermissionTo('roles.update') || $user->hasRole('administrator');
+        return $user->hasPermissionTo('roles.update') || $user->hasPermissionTo('roles.manage') || $user->hasRole('administrator');
     }
 }

@@ -36,6 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'team.permission' => TeamPermission::class,
             'audit' => AuditRequest::class,
             '2fa.enforce' => \App\Http\Middleware\EnforceTwoFactor::class,
+            'demo' => \App\Http\Middleware\CheckDemoMode::class,
         ]);
 
         // Append middleware to web group

@@ -10,7 +10,11 @@ import type {
     ActivityItem,
     ProjectSummary,
     DashboardCharts,
+    FinancialData,
+    TaskDetailData,
+    Project,
 } from "@/services/dashboard.service";
+import { projectService } from "@/services/project.service";
 import { Card, Button, Badge, Avatar, Dropdown } from "@/components/ui";
 import {
     DashboardLineChart,
@@ -31,6 +35,10 @@ import {
     AlertCircle,
     ChevronDown,
     Building2,
+    DollarSign,
+    CreditCard,
+    CheckCircle2,
+    Activity,
 } from "lucide-vue-next";
 import WelcomeDialog from "@/components/WelcomeDialog.vue";
 
@@ -52,6 +60,16 @@ const features = ref<DashboardFeatures>({
 const activity = ref<ActivityItem[]>([]);
 const projects = ref<ProjectSummary[]>([]);
 const charts = ref<DashboardCharts | null>(null);
+const financial = ref<FinancialData | null>(null);
+const taskDetail = ref<TaskDetailData | null>(null);
+
+const allProjects = ref<Project[]>([]);
+const selectedProjectId = ref<string | null>(null);
+const selectedProjectName = computed(() => {
+    if (!selectedProjectId.value) return "All Projects";
+    const p = allProjects.value.find(p => p.public_id === selectedProjectId.value);
+    return p ? p.name : "All Projects";
+});
 
 const periods = [
     { label: "7 Days", value: "week" },
@@ -98,18 +116,31 @@ async function fetchDashboard() {
         error.value = null;
         const data = await dashboardService.fetchDashboard(
             currentTeamId.value,
-            selectedPeriod.value
+            selectedPeriod.value,
+            selectedProjectId.value || undefined
         );
         stats.value = data.stats;
         features.value = data.features;
         activity.value = data.activity;
         projects.value = data.projects;
         charts.value = data.charts;
+        financial.value = data.financial;
+        taskDetail.value = data.task_detail;
     } catch (e: any) {
         error.value = e.message || "Failed to load dashboard data";
         console.error("Dashboard fetch error:", e);
     } finally {
         isLoading.value = false;
+    }
+}
+
+async function fetchAllProjects() {
+    if (!currentTeamId.value || !features.value.projects_enabled) return;
+    try {
+        const response = await projectService.fetchProjects(currentTeamId.value, { per_page: 50 });
+        allProjects.value = response.data;
+    } catch (e) {
+        console.error("Failed to fetch projects for selector:", e);
     }
 }
 
@@ -120,13 +151,19 @@ async function refresh() {
 }
 
 // Watch for team or period changes
-watch([currentTeamId, selectedPeriod], () => {
+watch([currentTeamId, selectedPeriod, selectedProjectId], () => {
     isLoading.value = true;
     fetchDashboard();
 });
 
-onMounted(() => {
-    fetchDashboard();
+watch(currentTeamId, () => {
+    selectedProjectId.value = null;
+    fetchAllProjects();
+});
+
+onMounted(async () => {
+    await fetchDashboard();
+    fetchAllProjects();
 });
 
 function getStatusColor(
@@ -209,6 +246,54 @@ function getTrendIcon(trend: string) {
                             </button>
                         </div>
                     </Dropdown>
+
+                    <!-- Project Selector -->
+                    <Dropdown v-if="features.projects_enabled" align="end">
+                        <template #trigger>
+                            <Button variant="outline" size="sm" class="gap-2">
+                                <FolderKanban class="h-4 w-4" />
+                                <span class="max-w-[120px] truncate">{{
+                                    selectedProjectName
+                                }}</span>
+                                <ChevronDown class="h-4 w-4" />
+                            </Button>
+                        </template>
+                        <div class="py-1 max-h-[300px] overflow-y-auto">
+                            <button
+                                @click="selectedProjectId = null"
+                                class="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-[var(--surface-secondary)] transition-colors"
+                                :class="{
+                                    'bg-[var(--interactive-primary)]/10 text-[var(--interactive-primary)]':
+                                        !selectedProjectId,
+                                }"
+                            >
+                                <span class="flex-1 text-left truncate">All Projects</span>
+                                <span
+                                    v-if="!selectedProjectId"
+                                    class="h-2 w-2 rounded-full bg-[var(--interactive-primary)]"
+                                />
+                            </button>
+                            <button
+                                v-for="project in allProjects"
+                                :key="project.public_id"
+                                @click="selectedProjectId = project.public_id"
+                                class="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-[var(--surface-secondary)] transition-colors"
+                                :class="{
+                                    'bg-[var(--interactive-primary)]/10 text-[var(--interactive-primary)]':
+                                        project.public_id === selectedProjectId,
+                                }"
+                            >
+                                <span class="flex-1 text-left truncate">{{
+                                    project.name
+                                }}</span>
+                                <span
+                                    v-if="project.public_id === selectedProjectId"
+                                    class="h-2 w-2 rounded-full bg-[var(--interactive-primary)]"
+                                />
+                            </button>
+                        </div>
+                    </Dropdown>
+
                     <div class="hidden sm:flex items-center gap-1 bg-[var(--surface-secondary)] p-1 rounded-lg border border-[var(--border-default)]">
                         <Button
                             v-for="p in periods"
@@ -387,6 +472,102 @@ function getTrendIcon(trend: string) {
                     <p class="text-[var(--text-secondary)]">
                         No statistics available for your current permissions.
                     </p>
+                </Card>
+
+                <!-- Financial Section -->
+                <div v-if="financial && features.invoices_enabled" class="grid gap-6 sm:grid-cols-2">
+                    <Card padding="lg" class="bg-gradient-to-br from-[var(--surface-primary)] to-[var(--surface-secondary)] border-l-4 border-emerald-500 overflow-hidden relative group">
+                        <div class="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <DollarSign class="h-32 w-32" />
+                        </div>
+                        <div class="flex items-center gap-4 relative">
+                            <div class="h-12 w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-600">
+                                <DollarSign class="h-6 w-6" />
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Collected Payments</p>
+                                <div class="flex items-baseline gap-2">
+                                    <h3 class="text-3xl font-black text-[var(--text-primary)]">
+                                        {{ financial.collected.currency }} {{ financial.collected.value }}
+                                    </h3>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+
+                    <Card padding="lg" class="bg-gradient-to-br from-[var(--surface-primary)] to-[var(--surface-secondary)] border-l-4 border-amber-500 overflow-hidden relative group">
+                        <div class="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <CreditCard class="h-32 w-32" />
+                        </div>
+                        <div class="flex items-center gap-4 relative">
+                            <div class="h-12 w-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-600">
+                                <CreditCard class="h-6 w-6" />
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Pending Payments</p>
+                                <div class="flex items-baseline gap-2">
+                                    <h3 class="text-3xl font-black text-[var(--text-primary)]">
+                                        {{ financial.pending.currency }} {{ financial.pending.value }}
+                                    </h3>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+
+                <!-- Task High-Level Breakdown -->
+                <Card v-if="taskDetail" padding="lg">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h3 class="text-lg font-bold text-[var(--text-primary)]">Task Breakdown</h3>
+                            <p class="text-sm text-[var(--text-secondary)]">Total {{ taskDetail.total }} tasks documented</p>
+                        </div>
+                        <Badge variant="primary" class="font-mono">{{ taskDetail.total }} Tasks</Badge>
+                    </div>
+                    
+                    <div class="grid gap-6 sm:grid-cols-3">
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
+                                    <CheckCircle2 class="h-4 w-4 text-emerald-500" />
+                                    Completed
+                                </span>
+                                <span class="text-sm font-bold text-emerald-600">{{ taskDetail.completed.count }}</span>
+                            </div>
+                            <div class="h-2 rounded-full bg-[var(--surface-tertiary)] overflow-hidden">
+                                <div class="h-full bg-emerald-500 transition-all duration-1000" :style="{ width: `${taskDetail.completed.percentage}%` }"></div>
+                            </div>
+                            <p class="text-[10px] text-[var(--text-muted)] text-right font-medium">{{ taskDetail.completed.percentage }}% of total</p>
+                        </div>
+
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
+                                    <Activity class="h-4 w-4 text-blue-500" />
+                                    In Progress
+                                </span>
+                                <span class="text-sm font-bold text-blue-600">{{ taskDetail.in_progress.count }}</span>
+                            </div>
+                            <div class="h-2 rounded-full bg-[var(--surface-tertiary)] overflow-hidden">
+                                <div class="h-full bg-blue-500 transition-all duration-1000" :style="{ width: `${taskDetail.in_progress.percentage}%` }"></div>
+                            </div>
+                            <p class="text-[10px] text-[var(--text-muted)] text-right font-medium">{{ taskDetail.in_progress.percentage }}% of total</p>
+                        </div>
+
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
+                                    <Clock class="h-4 w-4 text-red-500" />
+                                    Past Due
+                                </span>
+                                <span class="text-sm font-bold text-red-600">{{ taskDetail.past_due.count }}</span>
+                            </div>
+                            <div class="h-2 rounded-full bg-[var(--surface-tertiary)] overflow-hidden">
+                                <div class="h-full bg-red-500 transition-all duration-1000" :style="{ width: `${taskDetail.past_due.percentage}%` }"></div>
+                            </div>
+                            <p class="text-[10px] text-[var(--text-muted)] text-right font-medium">{{ taskDetail.past_due.percentage }}% of total</p>
+                        </div>
+                    </div>
                 </Card>
 
                 <!-- Charts Row -->

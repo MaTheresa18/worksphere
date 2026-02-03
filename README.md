@@ -164,12 +164,28 @@ npm run start-all
 
 ---
 
+## 🏢 Roles & Permissions
+
+WorkSphere uses a multi-layered authorization system:
+
+- **Global Roles**: Powered by `Spatie/Permission` for application-wide access.
+- **Team Roles**: Specific permissions within a team (Owner, Admin, Member, etc.).
+- **Authorization Persona**: Centralized logic in the backend that resolves all permissions (Global + Team + Overrides) into a single context for efficient checking.
+- **Permission Overrides**: Ability to grant or block specific permissions for a user, either permanently or temporarily.
+
+## 🧭 Navigation & Security
+
+- **Route Guards**: Frontend navigation is protected by Vue Router guards checking authentication, email verification, and specific permission requirements (`to.meta.permission`).
+- **Permission-Scoped UI**: Components and actions are conditionally rendered based on the user's active permissions.
+- **Secure APIs**: All backend endpoints are protected by Laravel Sanctum and fine-grained Policies/Gates.
+
 ## 🏛️ Architecture
 
 *   **API-First**: Headless API (`routes/api.php`) protected by Sanctum.
 *   **SPA Frontend**: Vue 3 app via single entry point.
 *   **Real-time**: Private channel broadcasting via Laravel Reverb.
 *   **Authorization**: Strict RBAC Policies.
+*   **Service Pattern**: Business logic encapsulated in targeted Services (`app/Services`).
 
 ## 📄 License
 

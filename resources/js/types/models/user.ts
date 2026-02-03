@@ -20,6 +20,7 @@ export interface User {
   has_2fa_enabled?: boolean;
   requires_2fa_setup?: boolean;
   team_permissions?: Record<string, string[]>;
+  is_demo_mode?: boolean;
 }
 
 export interface Role {

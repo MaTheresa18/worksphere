@@ -18,6 +18,7 @@ export interface DashboardFeatures {
   tickets_enabled: boolean;
   tasks_enabled: boolean;
   invoices_enabled: boolean;
+  is_demo_mode: boolean;
 }
 
 export interface ActivityUser {
@@ -79,9 +80,36 @@ export interface DashboardCharts {
   ticket_trends: TicketTrendsChartData;
 }
 
+export interface FinancialStat {
+  label: string;
+  value: string;
+  raw: number;
+  currency: string;
+}
+
+export interface FinancialData {
+  collected: FinancialStat;
+  pending: FinancialStat;
+}
+
+export interface TaskBreakdownItem {
+  label: string;
+  count: number;
+  percentage: number;
+}
+
+export interface TaskDetailData {
+  completed: TaskBreakdownItem;
+  in_progress: TaskBreakdownItem;
+  past_due: TaskBreakdownItem;
+  total: number;
+}
+
 export interface DashboardData {
   stats: DashboardStat[];
   features: DashboardFeatures;
+  financial: FinancialData | null;
+  task_detail: TaskDetailData | null;
   activity: ActivityItem[];
   projects: ProjectSummary[];
   charts: DashboardCharts;
@@ -96,11 +124,14 @@ class DashboardService extends BaseService {
   /**
    * Fetch complete dashboard data
    */
-  async fetchDashboard(teamId?: string, period: string = 'week'): Promise<DashboardData> {
+  async fetchDashboard(teamId?: string, period: string = 'week', projectId?: string): Promise<DashboardData> {
     try {
       const params: Record<string, any> = { period };
       if (teamId) {
         params.team_id = teamId;
+      }
+      if (projectId) {
+        params.project_id = projectId;
       }
       const response = await this.api.get<ApiResponse<DashboardData>>(
         '/api/dashboard',

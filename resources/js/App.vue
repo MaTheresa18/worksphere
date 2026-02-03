@@ -4,6 +4,7 @@ import { RouterView, useRoute } from "vue-router";
 import { useThemeStore } from "@/stores/theme";
 import { Toaster } from "vue-sonner";
 import NetworkStatus from "@/components/ui/NetworkStatus.vue";
+import DemoBanner from "@/components/ui/DemoBanner.vue";
 
 // Import Echo to initialize WebSocket connection
 import "@/echo";
@@ -35,6 +36,7 @@ watch(
 <template>
     <!-- Network status banner (shows when offline) -->
     <NetworkStatus position="top" />
+    <DemoBanner />
 
     <RouterView />
     <Toaster

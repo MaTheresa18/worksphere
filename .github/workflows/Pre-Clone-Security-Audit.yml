@@ -1,0 +1,24 @@
+name: "Pre-Clone Security Audit"
+on: [push, workflow_dispatch]
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Malware Scan (ClamAV)
+        uses: djdefi/gitavscan@main
+        # This scans for binary payloads and malicious scripts
+
+      - name: Secret Scan (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Dependency Audit (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          severity: "CRITICAL,HIGH"

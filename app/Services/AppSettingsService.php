@@ -26,6 +26,7 @@ class AppSettingsService
         'app.url' => ['env' => 'APP_URL', 'config' => 'app.url'],
         'app.timezone' => ['env' => 'APP_TIMEZONE', 'config' => 'app.timezone'],
         'app.locale' => ['env' => 'APP_LOCALE', 'config' => 'app.locale'],
+        'app.is_demo_mode' => ['env' => 'APP_DEMO_MODE', 'config' => 'app.is_demo_mode', 'default' => false],
         // Security
         'auth.registration_enabled' => ['config' => 'auth.registration_enabled', 'default' => true],
         'auth.email_verification' => ['config' => 'auth.email_verification', 'default' => true],
@@ -270,11 +271,15 @@ class AppSettingsService
                     'description' => 'Application Favicon URL',
                 ],
                 [
-                    'key' => 'app.opengraph',
-                    'label' => 'OpenGraph Image',
-                    'type' => 'string',
                     'value' => $this->get('app.opengraph'),
                     'description' => 'Social Share Image URL',
+                ],
+                [
+                    'key' => 'app.is_demo_mode',
+                    'label' => 'Demo Mode',
+                    'type' => 'boolean',
+                    'value' => $this->get('app.is_demo_mode', false),
+                    'description' => 'Enable Demo Mode (restricts destructive actions)',
                 ],
             ],
             'security' => [
