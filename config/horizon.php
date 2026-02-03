@@ -249,6 +249,33 @@ return [
             'nice' => 0,
             'sleep' => 3,
         ],
+        // Forward crawler - high priority, fast processing for new emails
+        'supervisor-email-live' => [
+            'connection' => 'redis',
+            'queue' => ['emails-live'],
+            'balance' => 'simple',
+            'maxProcesses' => 2,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 3,
+            'timeout' => 60,
+            'nice' => 0,
+        ],
+        // Backfill crawler - low priority, throttled for historical emails
+        'supervisor-email-backfill' => [
+            'connection' => 'redis',
+            'queue' => ['emails-backfill'],
+            'balance' => 'simple',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 384,
+            'tries' => 5,
+            'timeout' => 180,
+            'nice' => 0,
+            'sleep' => 3, // Throttle between batches
+        ],
     ],
 
     'environments' => [
@@ -298,6 +325,31 @@ return [
                 'timeout' => 600, // 10 minutes
                 'sleep' => 3,
             ],
+            // Forward crawler - fetches new emails every 2 minutes
+            'supervisor-email-live' => [
+                'connection' => 'redis',
+                'queue' => ['emails-live'],
+                'balance' => 'simple',
+                'minProcesses' => 1,
+                'maxProcesses' => 2,
+                'tries' => 3,
+                'memory' => 256,
+                'retry_after' => 120,
+                'timeout' => 60,
+            ],
+            // Backfill crawler - syncs historical emails in background
+            'supervisor-email-backfill' => [
+                'connection' => 'redis',
+                'queue' => ['emails-backfill'],
+                'balance' => 'simple',
+                'minProcesses' => 1,
+                'maxProcesses' => 1,
+                'tries' => 5,
+                'memory' => 384,
+                'retry_after' => 300,
+                'timeout' => 180,
+                'sleep' => 3, // Throttle between batches
+            ],
         ],
 
         'local' => [
@@ -331,6 +383,31 @@ return [
                 'tries' => 1, // Fail fast for debugging
                 'retry_after' => 300,
                 'timeout' => 600, // Align with default
+                'sleep' => 3,
+            ],
+            // Forward crawler - local
+            'supervisor-email-live' => [
+                'connection' => 'redis',
+                'queue' => ['emails-live'],
+                'balance' => 'simple',
+                'minProcesses' => 1,
+                'maxProcesses' => 2,
+                'tries' => 1,
+                'memory' => 256,
+                'retry_after' => 120,
+                'timeout' => 60,
+            ],
+            // Backfill crawler - local
+            'supervisor-email-backfill' => [
+                'connection' => 'redis',
+                'queue' => ['emails-backfill'],
+                'balance' => 'simple',
+                'minProcesses' => 1,
+                'maxProcesses' => 1,
+                'tries' => 1,
+                'memory' => 384,
+                'retry_after' => 300,
+                'timeout' => 180,
                 'sleep' => 3,
             ],
         ],

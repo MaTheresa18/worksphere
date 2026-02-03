@@ -7,6 +7,8 @@ use App\Enums\EmailFolderType;
 use App\Enums\EmailSyncStatus;
 use App\Events\Email\EmailReceived;
 use App\Events\Email\SyncStatusChanged;
+use App\Jobs\BackfillEmailsJob;
+use App\Jobs\FetchLatestEmailsJob;
 use App\Jobs\FetchNewEmailsJob;
 use App\Jobs\SeedEmailAccountJob;
 use App\Jobs\SyncEmailFolderJob;
@@ -19,30 +21,46 @@ use Illuminate\Support\Facades\Log;
 class EmailSyncService implements EmailSyncServiceContract
 {
     /**
-     * Start initial seed for an account (Phase 1).
+     * Start initial seed for an account using dual-crawler architecture.
+     *
+     * This dispatches both the forward crawler (for new emails) and
+     * backfill crawler (for historical emails) to run in parallel.
      */
     public function startSeed(EmailAccount $account): void
     {
-        // Update status
+        // Update status and initialize cursors
         $account->update([
-            'sync_status' => EmailSyncStatus::Seeding,
+            'sync_status' => EmailSyncStatus::Syncing,
             'sync_cursor' => $this->initializeSyncCursor(),
             'sync_error' => null,
+            'sync_started_at' => now(),
+            'forward_uid_cursor' => null,
+            'backfill_uid_cursor' => null,
+            'backfill_complete' => false,
         ]);
 
-        // Log seed start
-        EmailSyncLog::logSeedStarted(
-            $account->id,
-            array_map(fn ($f) => $f->value, EmailFolderType::priorityFolders())
-        );
+        // Log sync start
+        EmailSyncLog::create([
+            'email_account_id' => $account->id,
+            'action' => 'dual_sync_started',
+            'details' => [
+                'started_at' => now()->toIso8601String(),
+                'folders' => array_map(fn ($f) => $f->value, EmailFolderType::priorityFolders()),
+            ],
+        ]);
 
-        // Dispatch seed job (handles parallel fetch of priority folders)
-        SeedEmailAccountJob::dispatch($account->id);
+        // Dispatch forward crawler immediately (fetches newest emails first)
+        FetchLatestEmailsJob::dispatch($account->id);
+
+        // Dispatch backfill crawler with slight delay (for historical emails)
+        BackfillEmailsJob::dispatch($account->id)->delay(now()->addSeconds(10));
 
         SyncStatusChanged::dispatch(
             $account,
-            EmailSyncStatus::Seeding->value
+            EmailSyncStatus::Syncing->value
         );
+
+        Log::info('[EmailSync] Started dual-crawler sync', ['account_id' => $account->id]);
     }
 
     /**
@@ -80,29 +98,38 @@ class EmailSyncService implements EmailSyncServiceContract
     }
 
     /**
-     * Fetch new emails for a fully synced account (incremental).
+     * Fetch new emails using the forward crawler.
+     * Now works during any sync status (seeding, syncing, completed).
      */
     public function fetchNewEmails(EmailAccount $account): int
     {
-        if ($account->sync_status !== EmailSyncStatus::Completed) {
+        // Forward crawler can run during any active sync status
+        if (!$account->canRunForwardCrawler()) {
             return 0;
         }
 
-        // Dispatch incremental fetch job
-        FetchNewEmailsJob::dispatch($account->id);
+        // Dispatch forward crawler job
+        FetchLatestEmailsJob::dispatch($account->id);
 
         return 0; // Actual count returned via job
     }
 
     /**
-     * Get sync progress for an account.
+     * Get sync progress for an account (dual-crawler aware).
      */
     public function getSyncProgress(EmailAccount $account): array
     {
+        // Calculate progress based on dual cursors
+        $forwardCursor = $account->forward_uid_cursor ?? 0;
+        $backfillCursor = $account->backfill_uid_cursor ?? 0;
+        $backfillComplete = $account->backfill_complete ?? false;
+
+        // Legacy cursor support
         $cursor = $account->sync_cursor ?? [];
         $folders = $cursor['folders'] ?? [];
         $phase = $cursor['phase'] ?? 'pending';
 
+        // Calculate folder progress for legacy display
         $totalEmails = 0;
         $syncedEmails = 0;
         $folderProgress = [];
@@ -120,15 +147,22 @@ class EmailSyncService implements EmailSyncServiceContract
             ];
         }
 
-        $overallPercent = $totalEmails > 0 ? round(($syncedEmails / $totalEmails) * 100) : 0;
+        $overallPercent = $account->getSyncProgressPercent();
 
         return [
             'status' => $account->sync_status->value,
-            'phase' => $phase,
+            'phase' => $backfillComplete ? 'completed' : 'syncing',
             'folders' => $folderProgress,
             'overall_percent' => $overallPercent,
             'total_emails' => $totalEmails,
             'synced_emails' => $syncedEmails,
+            // Dual-crawler specific fields
+            'forward_cursor' => $forwardCursor,
+            'backfill_cursor' => $backfillCursor,
+            'backfill_complete' => $backfillComplete,
+            'can_use_email' => $account->hasEmailsReady(),
+            'last_forward_sync' => $account->last_forward_sync_at?->toIso8601String(),
+            'last_backfill' => $account->last_backfill_at?->toIso8601String(),
         ];
     }
 
@@ -195,19 +229,24 @@ class EmailSyncService implements EmailSyncServiceContract
     }
 
     /**
-     * Get accounts ready for incremental sync.
+     * Get accounts ready for forward sync (incremental).
+     * Now works during seeding, syncing, or completed status.
      */
     public function getAccountsForIncrementalSync(): Collection
     {
-        $intervalMinutes = config('email.scheduler.incremental_interval', 5);
+        $intervalMinutes = config('email.scheduler.forward_interval', 2);
 
         return EmailAccount::query()
             ->active()
             ->verified()
-            ->syncCompleted()
+            ->whereIn('sync_status', [
+                EmailSyncStatus::Seeding,
+                EmailSyncStatus::Syncing,
+                EmailSyncStatus::Completed,
+            ])
             ->where(function ($query) use ($intervalMinutes) {
-                $query->whereNull('last_sync_at')
-                    ->orWhere('last_sync_at', '<=', now()->subMinutes($intervalMinutes));
+                $query->whereNull('last_forward_sync_at')
+                    ->orWhere('last_forward_sync_at', '<=', now()->subMinutes($intervalMinutes));
             })
             ->get();
     }

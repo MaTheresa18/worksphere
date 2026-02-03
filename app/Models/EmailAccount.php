@@ -54,6 +54,13 @@ class EmailAccount extends Model
         'storage_used',
         'storage_limit',
         'storage_updated_at',
+        // Dual crawler fields
+        'forward_uid_cursor',
+        'last_forward_sync_at',
+        'backfill_uid_cursor',
+        'backfill_complete',
+        'last_backfill_at',
+        'sync_started_at',
     ];
 
     protected $casts = [
@@ -75,6 +82,13 @@ class EmailAccount extends Model
         'sync_status' => EmailSyncStatus::class,
         'needs_reauth' => 'boolean',
         'consecutive_failures' => 'integer',
+        // Dual crawler casts
+        'forward_uid_cursor' => 'integer',
+        'last_forward_sync_at' => 'datetime',
+        'backfill_uid_cursor' => 'integer',
+        'backfill_complete' => 'boolean',
+        'last_backfill_at' => 'datetime',
+        'sync_started_at' => 'datetime',
     ];
 
     protected static function boot()
@@ -347,5 +361,64 @@ class EmailAccount extends Model
     public function isShared(): bool
     {
         return $this->team_id !== null;
+    }
+
+    // ==================
+    // Dual Crawler Helpers
+    // ==================
+
+    /**
+     * Check if the forward crawler can run.
+     * Allowed during seeding, syncing, or completed status.
+     */
+    public function canRunForwardCrawler(): bool
+    {
+        return $this->is_active && $this->is_verified && in_array($this->sync_status, [
+            EmailSyncStatus::Seeding,
+            EmailSyncStatus::Syncing,
+            EmailSyncStatus::Completed,
+        ]);
+    }
+
+    /**
+     * Check if the backfill crawler can run.
+     */
+    public function canRunBackfillCrawler(): bool
+    {
+        return $this->is_active && $this->is_verified && !$this->backfill_complete;
+    }
+
+    /**
+     * Check if user can see emails (forward cursor has been set).
+     */
+    public function hasEmailsReady(): bool
+    {
+        return $this->forward_uid_cursor !== null && $this->forward_uid_cursor > 0;
+    }
+
+    /**
+     * Get sync progress percentage (based on cursor positions).
+     */
+    public function getSyncProgressPercent(): int
+    {
+        if ($this->backfill_complete) {
+            return 100;
+        }
+
+        $forward = $this->forward_uid_cursor ?? 0;
+        $backfill = $this->backfill_uid_cursor ?? 0;
+
+        if ($forward === 0) {
+            return 0;
+        }
+
+        // Estimate: backfill progress relative to forward cursor
+        if ($forward > 0 && $backfill > 0) {
+            $filled = $forward - $backfill;
+            return min(100, (int) (($filled / $forward) * 100));
+        }
+
+        // If only forward set, we have at least some emails
+        return 10;
     }
 }

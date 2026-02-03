@@ -72,7 +72,7 @@ Schedule::command('server-monitor:run-checks')
     ->onOneServer();
 
 Schedule::command('email:sync-incremental')
-    ->everyFiveMinutes()
+    ->everyTwoMinutes()
     ->name('email:sync-incremental')
     ->withoutOverlapping()
     ->onOneServer();
