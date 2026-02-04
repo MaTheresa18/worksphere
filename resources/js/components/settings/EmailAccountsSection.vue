@@ -792,6 +792,46 @@ onMounted(async () => {
                         </div>
                     </div>
                 </div>
+
+                <!-- Folder Sync Settings (visible when editing any account type) -->
+                <div
+                    v-if="editingAccount"
+                    class="border-t border-[var(--border-default)] pt-4 mt-2"
+                >
+                    <div class="flex items-center gap-2 mb-3">
+                        <div
+                            class="w-1 h-4 bg-amber-500 rounded-full"
+                        ></div>
+                        <p
+                            class="text-sm font-medium text-[var(--text-primary)]"
+                        >
+                            Folder Sync Settings
+                        </p>
+                    </div>
+                    <p class="text-xs text-[var(--text-muted)] mb-3">
+                        Toggle which folders to sync. Disabled folders won't be downloaded.
+                    </p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div
+                            v-for="folder in folderTypes"
+                            :key="folder.value"
+                            class="flex items-center justify-between p-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)]"
+                        >
+                            <div class="flex flex-col">
+                                <span class="text-sm font-medium text-[var(--text-primary)]">
+                                    {{ folder.label }}
+                                </span>
+                                <span class="text-xs text-[var(--text-muted)]">
+                                    {{ folder.description }}
+                                </span>
+                            </div>
+                            <Switch
+                                :checked="!form.disabled_folders.includes(folder.value)"
+                                @update:checked="toggleFolderSync(folder.value)"
+                            />
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <template #footer>
@@ -824,6 +864,15 @@ onMounted(async () => {
                                     ? "Update Account"
                                     : "Save Account"
                             }}
+                        </Button>
+                        <!-- Update button for OAuth accounts (only when editing) -->
+                        <Button
+                            v-if="selectedProvider.supports_oauth && editingAccount"
+                            variant="primary"
+                            @click="saveAccount"
+                            :loading="isSaving"
+                        >
+                            Update Settings
                         </Button>
                     </div>
                 </div>
