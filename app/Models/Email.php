@@ -267,6 +267,7 @@ class Email extends Model implements HasMedia
                 'type' => $media->mime_type,
                 'url' => $media->getUrl(),
                 'content_id' => $media->getCustomProperty('content_id'),
+                'is_inline' => $media->getCustomProperty('is_inline', false),
                 'is_downloaded' => true,
             ];
         });

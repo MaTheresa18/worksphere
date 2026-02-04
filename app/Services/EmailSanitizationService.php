@@ -234,7 +234,10 @@ class EmailSanitizationService
             return (string) $html;
         }
 
+        // Refresh media relation to ensure we have the latest attachments
+        $email->load('media');
         $attachments = $email->getMedia('attachments');
+        
         if ($attachments->isEmpty()) {
             return (string) $html;
         }
@@ -245,16 +248,20 @@ class EmailSanitizationService
                 continue;
             }
 
-            // Match src="cid:content_id" patterns (case insensitive)
-            // We handle both src="cid:..." and src='cid:...'
-            $pattern = '/src\s*=\s*(["\'])cid:'.preg_quote($contentId, '/').'\1/i';
-            $replacement = 'src="'.$media->getUrl().'"';
-            
-            $html = preg_replace($pattern, $replacement, $html);
+            $url = $media->getUrl();
+            $quotedCid = preg_quote($contentId, '/');
 
-            // Also handle cases with angle brackets in CID
+            // 1. Standard quoted: src="cid:xyz" or src='cid:xyz'
+            $pattern = '/src\s*=\s*(["\'])cid:'.$quotedCid.'\1/i';
+            $html = preg_replace($pattern, 'src="'.$url.'"', $html);
+
+            // 2. Angle brackets in CID: src="cid:<xyz>"
             $patternWithBrackets = '/src\s*=\s*(["\'])cid:'.preg_quote('<'.$contentId.'>', '/').'\1/i';
-            $html = preg_replace($patternWithBrackets, $replacement, $html);
+            $html = preg_replace($patternWithBrackets, 'src="'.$url.'"', $html);
+            
+            // 3. Unquoted (less common but valid in some clients): src=cid:xyz
+            $patternUnquoted = '/src\s*=\s*cid:'.$quotedCid.'(\s|>)/i';
+            $html = preg_replace($patternUnquoted, 'src="'.$url.'"\1', $html);
         }
 
         return $html;

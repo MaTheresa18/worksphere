@@ -472,11 +472,14 @@ class EmailSyncService implements EmailSyncServiceContract
                                     ->usingName($attachment['name'] ?? 'Attachment')
                                     ->toMediaCollection('attachments');
 
-                                // Store content_id in custom properties for inline image matching
+                                // Store content_id and is_inline in custom properties
                                 if (!empty($attachment['content_id'])) {
                                     $media->setCustomProperty('content_id', $attachment['content_id']);
-                                    $media->save();
                                 }
+                                if (!empty($attachment['is_inline'])) {
+                                    $media->setCustomProperty('is_inline', true);
+                                }
+                                $media->save();
                             } catch (\Throwable $e) {
                                 Log::warning('[EmailSync] Failed to store attachment', [
                                     'email_id' => $email->id,

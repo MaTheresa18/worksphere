@@ -244,7 +244,7 @@
                 </div>
 
                 <div
-                    v-for="(att, idx) in email.attachments"
+                    v-for="(att, idx) in visibleAttachments"
                     :key="att.id"
                     class="group relative flex items-center p-3 border border-[var(--border-default)] rounded-xl bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] hover:border-[var(--interactive-primary)]/30 transition-all cursor-pointer select-none"
                     :class="{
@@ -491,17 +491,22 @@ watch(
     },
 );
 
+const visibleAttachments = computed(() => {
+    if (!props.email?.attachments) return [];
+    return props.email.attachments.filter((att: any) => !att.is_inline);
+});
+
 // Check if any attachments are still in cloud (placeholders)
 const hasPlaceholderAttachments = computed(() => {
-    if (!props.email?.attachments?.length) return false;
-    return props.email.attachments.some((att: any) => att.is_downloaded === false);
+    if (!visibleAttachments.value.length) return false;
+    return visibleAttachments.value.some((att: any) => att.is_downloaded === false);
 });
 
 // Check if all selected attachments are downloaded
 const allSelectedDownloaded = computed(() => {
     if (selectedAttachments.value.size === 0) return true;
     return Array.from(selectedAttachments.value).every((id) => {
-        const att = props.email?.attachments?.find((a: any) => a.id === id);
+        const att = visibleAttachments.value.find((a: any) => a.id === id);
         return att?.is_downloaded !== false;
     });
 });
