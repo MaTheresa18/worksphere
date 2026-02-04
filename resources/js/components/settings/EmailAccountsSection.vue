@@ -48,10 +48,29 @@ const form = ref({
     smtp_port: 587,
     smtp_encryption: "tls",
     username: "",
-    username: "",
     password: "",
     system_usage: "",
+    disabled_folders: [],
 });
+
+// Available folder types for sync settings
+const folderTypes = [
+    { value: "inbox", label: "Inbox", description: "Primary incoming emails" },
+    { value: "sent", label: "Sent", description: "Sent emails" },
+    { value: "drafts", label: "Drafts", description: "Draft emails" },
+    { value: "trash", label: "Trash", description: "Deleted emails" },
+    { value: "spam", label: "Spam", description: "Spam/junk emails" },
+    { value: "archive", label: "Archive", description: "Gmail All Mail / Archived" },
+];
+
+const toggleFolderSync = (folderValue) => {
+    const idx = form.value.disabled_folders.indexOf(folderValue);
+    if (idx === -1) {
+        form.value.disabled_folders.push(folderValue);
+    } else {
+        form.value.disabled_folders.splice(idx, 1);
+    }
+};
 
 const errors = ref({});
 
@@ -102,9 +121,9 @@ const openModal = (account = null) => {
             smtp_port: account.smtp_port,
             smtp_encryption: account.smtp_encryption,
             username: account.username || "",
-            username: account.username || "",
             password: "",
             system_usage: account.system_usage || "",
+            disabled_folders: account.disabled_folders || [],
         };
     } else {
         form.value = {
@@ -119,9 +138,9 @@ const openModal = (account = null) => {
             smtp_port: 587,
             smtp_encryption: "tls",
             username: "",
-            username: "",
             password: "",
             system_usage: "",
+            disabled_folders: [],
         };
     }
     errors.value = {};

@@ -547,11 +547,12 @@ class EmailSyncService implements EmailSyncServiceContract
         $adapter = $this->getAdapterForAccount($account);
 
         try {
-            $client = $adapter->getClient($account);
+            $client = $adapter->createClient($account);
             $client->connect();
             
             // Get the folder and the message
-            $folder = $client->getFolder($email->folder);
+            $imapFolderName = $adapter->getFolderName($email->folder);
+            $folder = $client->getFolder($imapFolderName);
             $message = $adapter->getMessageByUid($folder, $email->imap_uid);
 
             if (!$message) {
