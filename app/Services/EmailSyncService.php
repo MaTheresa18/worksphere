@@ -550,9 +550,18 @@ class EmailSyncService implements EmailSyncServiceContract
             $client = $adapter->createClient($account);
             $client->connect();
             
-            // Get the folder and the message
-            $imapFolderName = $adapter->getFolderName($email->folder);
+            // For Gmail, always use [Gmail]/All Mail since UIDs are folder-specific
+            // and All Mail contains all messages. For other providers, use the stored folder.
+            $imapFolderName = $adapter->getProvider() === 'gmail' 
+                ? '[Gmail]/All Mail'
+                : $adapter->getFolderName($email->folder);
+            
             $folder = $client->getFolder($imapFolderName);
+            
+            if (!$folder) {
+                throw new \RuntimeException("Folder '{$imapFolderName}' not found on IMAP server.");
+            }
+            
             $message = $adapter->getMessageByUid($folder, $email->imap_uid);
 
             if (!$message) {
