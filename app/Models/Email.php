@@ -41,6 +41,7 @@ class Email extends Model implements HasMedia
         'is_draft',
         'has_attachments',
         'imap_uid',
+        'attachment_placeholders',
         'sent_at',
         'received_at',
         'sanitized_at',
@@ -63,6 +64,7 @@ class Email extends Model implements HasMedia
             'is_draft' => 'boolean',
             'has_attachments' => 'boolean',
             'imap_uid' => 'integer',
+            'attachment_placeholders' => 'array',
             'sent_at' => 'datetime',
             'received_at' => 'datetime',
             'sanitized_at' => 'datetime',
@@ -253,11 +255,11 @@ class Email extends Model implements HasMedia
     }
 
     /**
-     * Get attachments from media library.
+     * Get attachments from media library and placeholders.
      */
     public function getAttachmentsAttribute(): array
     {
-        return $this->getMedia('attachments')->map(function ($media) {
+        $attachments = $this->getMedia('attachments')->map(function ($media) {
             return [
                 'id' => (string) $media->id,
                 'name' => $media->file_name,
@@ -265,7 +267,26 @@ class Email extends Model implements HasMedia
                 'type' => $media->mime_type,
                 'url' => $media->getUrl(),
                 'content_id' => $media->getCustomProperty('content_id'),
+                'is_downloaded' => true,
             ];
-        })->values()->toArray();
+        });
+
+        // Merge with placeholders (on-demand attachments)
+        if (!empty($this->attachment_placeholders)) {
+            foreach ($this->attachment_placeholders as $index => $placeholder) {
+                $attachments->push([
+                    'id' => "placeholder_{$index}",
+                    'name' => $placeholder['name'] ?? 'attachment',
+                    'size' => $placeholder['size'] ?? '0 B',
+                    'type' => $placeholder['mime'] ?? 'application/octet-stream',
+                    'url' => null,
+                    'content_id' => $placeholder['content_id'] ?? null,
+                    'is_downloaded' => false,
+                    'placeholder_index' => $index,
+                ]);
+            }
+        }
+
+        return $attachments->values()->toArray();
     }
 }

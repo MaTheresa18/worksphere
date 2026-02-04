@@ -66,6 +66,16 @@ return [
             'trash' => '[Gmail]/Trash',
             'spam' => '[Gmail]/Spam',
             'archive' => '[Gmail]/All Mail',
+            'starred' => '[Gmail]/Starred',
+            'important' => '[Gmail]/Important',
+        ],
+        // Alternative Gmail folder names (some locales)
+        'gmail_alternatives' => [
+            'sent' => ['[Gmail]/Sent Mail', '[Google Mail]/Sent Mail', 'Sent', 'Sent Messages'],
+            'drafts' => ['[Gmail]/Drafts', '[Google Mail]/Drafts', 'Drafts'],
+            'trash' => ['[Gmail]/Trash', '[Google Mail]/Trash', 'Trash', 'Deleted Messages'],
+            'spam' => ['[Gmail]/Spam', '[Google Mail]/Spam', 'Spam', 'Junk'],
+            'archive' => ['[Gmail]/All Mail', '[Google Mail]/All Mail', 'Archive'],
         ],
         'outlook' => [
             'inbox' => 'INBOX',
@@ -74,6 +84,37 @@ return [
             'trash' => 'Deleted Items',
             'spam' => 'Junk Email',
             'archive' => 'Archive',
+            'notes' => 'Notes',
+        ],
+        // Outlook.com / Hotmail alternatives
+        'outlook_alternatives' => [
+            'sent' => ['Sent Items', 'Sent', 'Sent Messages'],
+            'trash' => ['Deleted Items', 'Deleted', 'Trash'],
+            'spam' => ['Junk Email', 'Junk', 'Spam'],
+        ],
+        'yahoo' => [
+            'inbox' => 'INBOX',
+            'sent' => 'Sent',
+            'drafts' => 'Draft',
+            'trash' => 'Trash',
+            'spam' => 'Bulk Mail',
+            'archive' => 'Archive',
+        ],
+        'icloud' => [
+            'inbox' => 'INBOX',
+            'sent' => 'Sent Messages',
+            'drafts' => 'Drafts',
+            'trash' => 'Deleted Messages',
+            'spam' => 'Junk',
+            'archive' => 'Archive',
+        ],
+        'zoho' => [
+            'inbox' => 'INBOX',
+            'sent' => 'Sent',
+            'drafts' => 'Drafts',
+            'trash' => 'Trash',
+            'spam' => 'Spam',
+            'archive' => 'Archives',
         ],
         'custom' => [
             'inbox' => 'INBOX',
@@ -123,7 +164,10 @@ return [
         // Watchdog checks for pending/stalled syncs
         'watchdog_interval' => env('EMAIL_WATCHDOG_INTERVAL', 1), // minutes
 
-        // Incremental sync for completed accounts
+        // Forward crawler interval (new emails)
+        'forward_interval' => env('EMAIL_FORWARD_INTERVAL', 2), // minutes
+
+        // Incremental sync for completed accounts (legacy)
         'incremental_interval' => env('EMAIL_INCREMENTAL_INTERVAL', 5), // minutes
     ],
 ];

@@ -15,7 +15,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
+use App\Support\EmailSyncLogger as Log;
 
 /**
  * Backfill Crawler - Fetches historical emails (UID < backfill_uid_cursor).
@@ -33,9 +33,16 @@ class BackfillEmailsJob implements ShouldQueue, ShouldBeUnique
 
     public int $tries = 5;
 
-    public int $timeout = 180;
+    public int $timeout = 300;
 
-    public int $backoff = 30;
+    /**
+     * Exponential backoff for retries.
+     * Starts at 60s, then 5m, 10m, 20m.
+     */
+    public function backoff(): array
+    {
+        return [60, 300, 600, 1200];
+    }
 
     /**
      * The number of seconds after which the job's unique lock will be released.
@@ -45,7 +52,7 @@ class BackfillEmailsJob implements ShouldQueue, ShouldBeUnique
     /**
      * Number of emails to fetch per batch.
      */
-    protected int $batchSize = 50;
+    protected int $batchSize = 25; 
 
     public function __construct(
         public int $accountId,
@@ -71,31 +78,53 @@ class BackfillEmailsJob implements ShouldQueue, ShouldBeUnique
             return;
         }
 
+        Log::info('[BackfillEmailsJob] Starting backfill job', [
+            'account_id' => $this->accountId,
+            'email' => $account->email,
+            'backfill_cursor' => $account->backfill_uid_cursor,
+            'forward_cursor' => $account->forward_uid_cursor,
+            'backfill_complete' => $account->backfill_complete,
+        ]);
+
         // Check if backfill can run
         if (!$account->canRunBackfillCrawler()) {
-            Log::debug('[BackfillEmailsJob] Backfill complete or account not ready', [
+            Log::info('[BackfillEmailsJob] Backfill complete or account not ready', [
                 'account_id' => $this->accountId,
                 'backfill_complete' => $account->backfill_complete,
+                'sync_status' => $account->sync_status->value,
             ]);
             return;
         }
 
         $startTime = microtime(true);
         $totalFetched = 0;
+        $folderResults = [];
 
         try {
             $adapter = AdapterFactory::make($account);
             $client = $adapter->createClient($account);
             $client->connect();
 
-            // Determine which folders to backfill
+            Log::debug('[BackfillEmailsJob] Connected to IMAP', [
+                'account_id' => $this->accountId,
+                'provider' => $adapter->getProvider(),
+            ]);
+
+
+            // [CRITICAL FIX] Only backfill INBOX (or All Mail for Gmail).
+            // Shared 'backfill_uid_cursor' causes data loss when syncing multiple folders with different UID ranges.
             $folders = $this->folderType
                 ? [EmailFolderType::from($this->folderType)]
-                : EmailFolderType::syncOrder();
+                : ($adapter->getProvider() === 'gmail' ? [EmailFolderType::Archive] : [EmailFolderType::Inbox]);
 
             $hasMoreToFetch = false;
 
             foreach ($folders as $folderType) {
+                Log::debug('[BackfillEmailsJob] Processing folder', [
+                    'folder' => $folderType->value,
+                    'account_id' => $this->accountId,
+                ]);
+
                 $result = $this->backfillFolder(
                     $client,
                     $adapter,
@@ -104,11 +133,19 @@ class BackfillEmailsJob implements ShouldQueue, ShouldBeUnique
                     $syncService
                 );
 
+                $folderResults[$folderType->value] = $result;
                 $totalFetched += $result['fetched'];
 
                 if ($result['has_more']) {
                     $hasMoreToFetch = true;
                 }
+
+                Log::debug('[BackfillEmailsJob] Folder result', [
+                    'folder' => $folderType->value,
+                    'fetched' => $result['fetched'],
+                    'has_more' => $result['has_more'],
+                    'new_cursor' => $result['new_cursor'] ?? 'N/A',
+                ]);
             }
 
             $client->disconnect();
@@ -118,6 +155,9 @@ class BackfillEmailsJob implements ShouldQueue, ShouldBeUnique
 
             $durationMs = (int) ((microtime(true) - $startTime) * 1000);
 
+            // Refresh account to check latest cursor
+            $account->refresh();
+
             EmailSyncLog::create([
                 'email_account_id' => $account->id,
                 'action' => 'backfill_batch',
@@ -125,31 +165,41 @@ class BackfillEmailsJob implements ShouldQueue, ShouldBeUnique
                     'fetched_count' => $totalFetched,
                     'duration_ms' => $durationMs,
                     'has_more' => $hasMoreToFetch,
+                    'folder_results' => $folderResults,
+                    'backfill_cursor_after' => $account->backfill_uid_cursor,
                 ],
             ]);
 
-            if ($totalFetched > 0) {
-                Log::info('[BackfillEmailsJob] Backfilled emails', [
-                    'account_id' => $this->accountId,
-                    'count' => $totalFetched,
-                    'duration_ms' => $durationMs,
-                ]);
-            }
+            Log::info('[BackfillEmailsJob] Batch completed', [
+                'account_id' => $this->accountId,
+                'fetched' => $totalFetched,
+                'duration_ms' => $durationMs,
+                'has_more' => $hasMoreToFetch,
+                'backfill_cursor' => $account->backfill_uid_cursor,
+            ]);
 
             // Check if backfill is complete
-            $account->refresh();
             if ($hasMoreToFetch && !$account->backfill_complete) {
+                Log::info('[BackfillEmailsJob] Dispatching next batch', [
+                    'account_id' => $this->accountId,
+                    'delay_seconds' => 5,
+                ]);
+
                 // Self-dispatch for next batch with delay
                 self::dispatch($this->accountId, $this->folderType)
                     ->delay(now()->addSeconds(5));
             } elseif (!$hasMoreToFetch) {
                 // Mark backfill as complete
+                Log::info('[BackfillEmailsJob] No more to fetch, marking complete', [
+                    'account_id' => $this->accountId,
+                ]);
                 $this->markBackfillComplete($account);
             }
         } catch (\Throwable $e) {
-            Log::error('[BackfillEmailsJob] Failed', [
+            Log::error('[BackfillEmailsJob] Job failed with exception', [
                 'account_id' => $this->accountId,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             throw $e;
@@ -167,80 +217,135 @@ class BackfillEmailsJob implements ShouldQueue, ShouldBeUnique
         EmailSyncService $syncService
     ): array {
         $folderName = $adapter->getFolderName($folderType->value);
-        $folder = $client->getFolder($folderName);
+
+        Log::debug('[BackfillEmailsJob] Getting folder', [
+            'folder_type' => $folderType->value,
+            'folder_name' => $folderName,
+        ]);
+
+        // Use getFolderWithFallback to try alternative folder names
+        $folder = $adapter->getFolderWithFallback($client, $folderType->value);
 
         if (!$folder) {
-            return ['fetched' => 0, 'has_more' => false];
+            // Folder not found even with fallbacks - skip this folder
+            return ['fetched' => 0, 'has_more' => false, 'new_cursor' => null];
         }
 
         try {
             // Get folder info
             $examine = $folder->examine();
             $totalMessages = $examine['exists'] ?? 0;
+            $uidValidity = $examine['uidvalidity'] ?? 0;
+
+            Log::debug('[BackfillEmailsJob] Folder info', [
+                'folder' => $folderName,
+                'total_messages' => $totalMessages,
+                'uid_validity' => $uidValidity,
+            ]);
 
             if ($totalMessages === 0) {
-                return ['fetched' => 0, 'has_more' => false];
+                Log::debug('[BackfillEmailsJob] Folder is empty', ['folder' => $folderName]);
+                return ['fetched' => 0, 'has_more' => false, 'new_cursor' => null];
             }
 
             // Get cursor positions
             $backfillCursor = $account->backfill_uid_cursor;
-            $forwardCursor = $account->forward_uid_cursor ?? PHP_INT_MAX;
+            $forwardCursor = $account->forward_uid_cursor;
+
+            Log::debug('[BackfillEmailsJob] Cursor state', [
+                'backfill_cursor' => $backfillCursor,
+                'forward_cursor' => $forwardCursor,
+            ]);
 
             // Initialize backfill cursor if not set
-            if ($backfillCursor === null) {
-                // Start from the forward cursor (or latest UID) and work backwards
-                $backfillCursor = $forwardCursor;
-                
-                // If forward cursor isn't set yet, get the latest UID
-                if ($backfillCursor === PHP_INT_MAX) {
-                    $overview = $folder->overview('1:1');
-                    $firstItem = collect($overview)->first();
-                    if ($firstItem) {
-                        $minUid = $adapter->extractUidFromOverview($firstItem);
-                        // Get latest UID
-                        $latestOverview = $folder->overview("$totalMessages:$totalMessages");
-                        $latestItem = collect($latestOverview)->first();
-                        $backfillCursor = $latestItem ? $adapter->extractUidFromOverview($latestItem) : $totalMessages;
-                    } else {
-                        $backfillCursor = $totalMessages;
-                    }
+            if ($backfillCursor === null || $backfillCursor === 0) {
+                // Start from the forward cursor (if set) minus 1
+                if ($forwardCursor && $forwardCursor > 0) {
+                    $backfillCursor = $forwardCursor;
+                    Log::info('[BackfillEmailsJob] Initialized backfill cursor from forward cursor', [
+                        'backfill_cursor' => $backfillCursor,
+                    ]);
+                } else {
+                    // Get the highest UID in the folder
+                    $latestUids = $adapter->fetchLatestUids($folder, 1);
+                    $backfillCursor = !empty($latestUids) ? max($latestUids) : $totalMessages;
+                    Log::info('[BackfillEmailsJob] Initialized backfill cursor from latest UID', [
+                        'backfill_cursor' => $backfillCursor,
+                    ]);
                 }
             }
 
             // If cursor is at or below 1, nothing more to backfill
             if ($backfillCursor <= 1) {
-                return ['fetched' => 0, 'has_more' => false];
+                Log::info('[BackfillEmailsJob] Cursor at minimum, nothing to backfill', [
+                    'backfill_cursor' => $backfillCursor,
+                ]);
+                return ['fetched' => 0, 'has_more' => false, 'new_cursor' => 1];
             }
 
-            // Calculate range: work backwards from cursor
-            $endUid = max(1, $backfillCursor - 1);
-            $startUid = max(1, $endUid - $this->batchSize + 1);
-
-            // Fetch UIDs in range
+            // Sliding Window Strategy:
+            // Instead of fetching 1:$backfillCursor (which can cause timeouts/memory issues),
+            // we fetch a small window below the cursor.
+            $windowSize = 50; 
+            $startUid = max(1, $backfillCursor - $windowSize);
+            $endUid = $backfillCursor - 1;
+            
             $range = "$startUid:$endUid";
-            $overview = $folder->overview($range);
 
-            $uidsToFetch = [];
-            foreach ($overview as $item) {
-                $uid = $adapter->extractUidFromOverview($item);
-                if ($uid && $uid < $backfillCursor) {
-                    $uidsToFetch[] = $uid;
-                }
+            Log::info('[BackfillEmailsJob] Fetching window', [
+                'range' => $range,
+                'start' => $startUid,
+                'end' => $endUid,
+                'current_cursor' => $backfillCursor
+            ]);
+
+            try {
+                // Use fetchUidRange from adapter (optimized for range queries)
+                // This returns an ARRAY of UIDs
+                $allUids = $adapter->fetchUidRange($folder, $startUid, $endUid);
+            } catch (\Throwable $e) {
+                Log::error('[BackfillEmailsJob] Window fetch failed', ['error' => $e->getMessage()]);
+                $allUids = [];
             }
 
-            if (empty($uidsToFetch)) {
-                // No more to fetch
-                $account->update(['backfill_uid_cursor' => 1]);
-                return ['fetched' => 0, 'has_more' => false];
+            if (empty($allUids)) {
+                // If no UIDs found in this window, we simply move the cursor down 
+                // to the start of the window (skipping the gap)
+                Log::info('[BackfillEmailsJob] Empty window - skipping gap', [
+                    'old_cursor' => $backfillCursor,
+                    'new_cursor' => $startUid
+                ]);
+                
+                return [
+                    'fetched' => 0,
+                    'has_more' => $startUid > 1, // Only have more if we haven't reached bottom
+                    'new_cursor' => $startUid,
+                    'skipped' => 0,
+                    'errors' => 0
+                ];
             }
 
-            // Sort descending (newest first within batch)
-            rsort($uidsToFetch);
+            // Sort descending (highest first)
+            rsort($allUids);
+            
+            // Process up to batchSize from this window
+            // Note: In sliding window, we might process all of them if window <= batchSize
+            // But usually window (50) > batch (5).
+            $uidsToProcess = array_slice($allUids, 0, $this->batchSize);
+            
+            Log::info('[BackfillEmailsJob] Processing UIDs', [
+                'total_found' => count($allUids),
+                'processing' => count($uidsToProcess),
+                'window_size' => $windowSize
+            ]);
 
             $fetched = 0;
+            $skipped = 0;
+            $errors = 0;
+            // Initialize minUid to something high; we want the lowest UID from processed batch
             $minUid = $backfillCursor;
 
-            foreach ($uidsToFetch as $uid) {
+            foreach ($uidsToProcess as $uid) {
                 try {
                     // Check if already exists
                     $exists = Email::where('email_account_id', $account->id)
@@ -249,41 +354,70 @@ class BackfillEmailsJob implements ShouldQueue, ShouldBeUnique
                         ->exists();
 
                     if ($exists) {
+                        $skipped++;
                         $minUid = min($minUid, $uid);
                         continue;
                     }
 
-                    $message = $folder->query()->getMessageByUid($uid);
+                    $message = $adapter->getMessageByUid($folder, $uid);
                     if ($message) {
-                        $emailData = $this->parseMessage($message);
-                        $syncService->storeEmailFromImap($account, $emailData, $folderType->value);
+                        // delegate parsing to adapter (handles X-GM-LABELS)
+                        // [Lazy Sync] Set skipAttachments to true
+                        $emailData = $adapter->parseMessage($message, true);
+                        $targetFolder = $emailData['folder'] ?? $folderType->value;
+                        
+                        $syncService->storeEmailFromImap($account, $emailData, $targetFolder, false);
                         $fetched++;
                         $minUid = min($minUid, $uid);
                     }
                 } catch (\Throwable $e) {
+                    $errors++;
                     Log::warning('[BackfillEmailsJob] Failed to fetch UID', [
                         'uid' => $uid,
+                        'folder' => $folderType->value,
                         'error' => $e->getMessage(),
                     ]);
-                    $minUid = min($minUid, $uid);
+                    // On error, we still want to move properly. 
+                    // If we fail to fetch 11767, we should strictly move past it OR retry.
+                    // For now, let's treat it as processed so we don't get stuck forever on one bad email.
+                     $minUid = min($minUid, $uid);
                 }
             }
 
-            // Update backfill cursor
+            // Update backfill cursor to the minimum UID we processed
             if ($minUid < $backfillCursor) {
+                // IMPORTANT: If we processed everything in the batch starting at X, 
+                // the new cursor should be X. If the whole window was empty, we handled that above.
                 $account->update(['backfill_uid_cursor' => $minUid]);
             }
+            
+            // Check if there are more
+            $remainingInWindow = count($allUids) - count($uidsToProcess);
+            // We have more if there are items left in window OR if startUid > 1
+            $hasMore = $remainingInWindow > 0 || $startUid > 1;
 
-            // Has more if cursor is still above 1
-            $hasMore = $minUid > 1;
+            Log::info('[BackfillEmailsJob] Batch complete', [
+                'fetched' => $fetched,
+                'new_cursor' => $minUid,
+                'window_remaining' => $remainingInWindow,
+                'start_uid' => $startUid,
+                'has_more' => $hasMore
+            ]);
 
-            return ['fetched' => $fetched, 'has_more' => $hasMore];
+            return [
+                'fetched' => $fetched,
+                'has_more' => $hasMore,
+                'new_cursor' => $minUid,
+                'skipped' => $skipped,
+                'errors' => $errors,
+            ];
         } catch (\Throwable $e) {
-            Log::warning('[BackfillEmailsJob] Folder backfill failed', [
+            Log::error('[BackfillEmailsJob] Folder backfill exception', [
                 'folder' => $folderType->value,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
-            return ['fetched' => 0, 'has_more' => false];
+            return ['fetched' => 0, 'has_more' => false, 'new_cursor' => null];
         }
     }
 
@@ -301,11 +435,16 @@ class BackfillEmailsJob implements ShouldQueue, ShouldBeUnique
         EmailSyncLog::create([
             'email_account_id' => $account->id,
             'action' => 'backfill_completed',
-            'details' => ['completed_at' => now()->toIso8601String()],
+            'details' => [
+                'completed_at' => now()->toIso8601String(),
+                'final_cursor' => $account->backfill_uid_cursor,
+                'total_emails' => $account->emails()->count(),
+            ],
         ]);
 
         Log::info('[BackfillEmailsJob] Backfill complete', [
             'account_id' => $account->id,
+            'total_emails' => $account->emails()->count(),
         ]);
 
         // Dispatch sync status changed event
@@ -315,100 +454,22 @@ class BackfillEmailsJob implements ShouldQueue, ShouldBeUnique
         );
     }
 
-    /**
-     * Parse IMAP message to email data array.
-     */
-    protected function parseMessage($message): array
-    {
-        $from = $message->getFrom()[0] ?? null;
-
-        $fromEmail = 'unknown@unknown.com';
-        $fromName = null;
-
-        if ($from && is_object($from)) {
-            $fromEmail = $from->mail ?? 'unknown@unknown.com';
-            $fromName = $from->personal ?? null;
-        } elseif (is_string($from)) {
-            $fromEmail = $from;
-        }
-
-        $textBody = $message->getTextBody() ?? '';
-        $preview = \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/', ' ', $textBody)), 200);
-
-        // Process attachments
-        $attachments = [];
-        if ($message->hasAttachments()) {
-            foreach ($message->getAttachments() as $attachment) {
-                $contentId = $attachment->id ?? null;
-                if ($contentId) {
-                    $contentId = trim($contentId, '<>');
-                }
-
-                $attachments[] = [
-                    'name' => $attachment->getName(),
-                    'content' => $attachment->getContent(),
-                    'mime' => $attachment->getMimeType(),
-                    'content_id' => $contentId,
-                ];
-            }
-        }
-
-        // Process headers
-        $headers = [];
-        try {
-            $rawHeaders = $message->getHeader()->getAttributes();
-            foreach ($rawHeaders as $key => $value) {
-                $headers[$key] = (string) $value;
-            }
-        } catch (\Throwable $e) {
-        }
-
-        return [
-            'message_id' => (string) ($message->getMessageId()?->first() ?? ''),
-            'from_email' => $fromEmail,
-            'from_name' => (string) ($fromName ?? $fromEmail),
-            'to' => $this->formatRecipients($message->getTo()),
-            'cc' => $this->formatRecipients($message->getCc()),
-            'bcc' => $this->formatRecipients($message->getBcc()),
-            'subject' => (string) ($message->getSubject()?->first() ?? '(No Subject)'),
-            'preview' => (string) $preview,
-            'body_html' => (string) ($message->getHTMLBody() ?? ''),
-            'body_plain' => (string) $textBody,
-            'headers' => $headers,
-            'is_read' => $message->getFlags()->contains('Seen'),
-            'is_starred' => $message->getFlags()->contains('Flagged'),
-            'has_attachments' => $message->hasAttachments(),
-            'attachments' => $attachments,
-            'imap_uid' => (int) $message->getUid(),
-            'date' => $message->getDate()?->first()?->toDate(),
-        ];
-    }
-
-    /**
-     * Format recipients to array of [name, email].
-     */
-    protected function formatRecipients($attribute): array
-    {
-        if (!$attribute || !method_exists($attribute, 'toArray')) {
-            return [];
-        }
-
-        $flattened = [];
-        foreach ($attribute->toArray() as $recipient) {
-            $flattened[] = [
-                'name' => $recipient->personal,
-                'email' => $recipient->mail,
-            ];
-        }
-
-        return $flattened;
-    }
 
     public function failed(\Throwable $exception): void
     {
-        Log::error('[BackfillEmailsJob] Job failed', [
+        Log::error('[BackfillEmailsJob] Job permanently failed', [
             'account_id' => $this->accountId,
             'error' => $exception->getMessage(),
+            'trace' => $exception->getTraceAsString(),
+        ]);
+
+        EmailSyncLog::create([
+            'email_account_id' => $this->accountId,
+            'action' => 'backfill_failed',
+            'details' => [
+                'error' => $exception->getMessage(),
+                'failed_at' => now()->toIso8601String(),
+            ],
         ]);
     }
 

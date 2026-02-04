@@ -15,7 +15,9 @@ use App\Jobs\SyncEmailFolderJob;
 use App\Models\Email;
 use App\Models\EmailAccount;
 use App\Models\EmailSyncLog;
+use App\Services\EmailAdapters\AdapterFactory;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class EmailSyncService implements EmailSyncServiceContract
@@ -339,72 +341,273 @@ class EmailSyncService implements EmailSyncServiceContract
     }
 
     /**
-     * Store fetched email from IMAP.
+     * Store fetched email from IMAP with transaction and deduplication.
+     *
+     * Uses updateOrCreate to prevent duplicates and DB::transaction for atomicity.
+     * Retries up to 3 times on deadlock.
+     *
+     * @param bool $broadcast Whether to broadcast realtime event (false for backfill)
      */
     public function storeEmailFromImap(
         EmailAccount $account,
         array $emailData,
-        string $folder
+        string $folder,
+        bool $broadcast = true
     ): Email {
-        // Get the sanitization service
-        $sanitizer = app(EmailSanitizationService::class);
+        $maxRetries = 3;
+        $attempt = 0;
 
-        // Store original HTML in body_raw, sanitize for body_html
-        $bodyRaw = $emailData['body_html'] ?? null;
-        $bodyHtml = $bodyRaw ? $sanitizer->sanitize($bodyRaw, $account->provider ?? 'imap') : null;
+        while ($attempt < $maxRetries) {
+            try {
+                return DB::transaction(function () use ($account, $emailData, $folder, $broadcast) {
+                    // Get the sanitization service
+                    $sanitizer = app(EmailSanitizationService::class);
 
-        $email = Email::create([
-            'email_account_id' => $account->id,
-            'user_id' => $account->user_id,
-            'message_id' => $emailData['message_id'] ?? null,
-            'thread_id' => $emailData['thread_id'] ?? null,
-            'folder' => $folder,
-            'from_email' => $emailData['from_email'],
-            'from_name' => $emailData['from_name'] ?? null,
-            'to' => $emailData['to'] ?? [],
-            'cc' => $emailData['cc'] ?? [],
-            'bcc' => $emailData['bcc'] ?? [],
-            'subject' => $emailData['subject'] ?? '(No Subject)',
-            'preview' => $emailData['preview'] ?? '',
-            'body_html' => $bodyHtml,
-            'body_plain' => $emailData['body_plain'] ?? null,
-            'body_raw' => $bodyRaw,
-            'headers' => $emailData['headers'] ?? [],
-            'is_read' => $emailData['is_read'] ?? false,
-            'is_starred' => $emailData['is_starred'] ?? false,
-            'has_attachments' => $emailData['has_attachments'] ?? false,
-            'imap_uid' => $emailData['imap_uid'] ?? null,
-            'received_at' => $emailData['date'] ?? now(),
-            'sanitized_at' => $bodyHtml ? now() : null,
-        ]);
+                    // Store original HTML in body_raw, sanitize for body_html
+                    $bodyRaw = $emailData['body_html'] ?? null;
+                    $bodyHtml = $bodyRaw ? $sanitizer->sanitize($bodyRaw, $account->provider ?? 'imap') : null;
 
-        // Store attachments with content_id for inline image support
-        if (! empty($emailData['attachments'])) {
-            foreach ($emailData['attachments'] as $attachment) {
-                try {
-                    $media = $email->addMediaFromString($attachment['content'])
-                        ->usingFileName($attachment['name'] ?? 'attachment')
-                        ->usingName($attachment['name'] ?? 'Attachment')
-                        ->toMediaCollection('attachments');
-
-                    // Store content_id in custom properties for inline image matching
-                    if (! empty($attachment['content_id'])) {
-                        $media->setCustomProperty('content_id', $attachment['content_id']);
-                        $media->save();
+                    // Use updateOrCreate to handle duplicates gracefully
+                    // [Refactor] Match by message_id to allow migration from Inbox UIDs to All Mail UIDs without duplicates
+                    $matchAttributes = [
+                        'email_account_id' => $account->id,
+                    ];
+                    
+                    if (!empty($emailData['message_id'])) {
+                        $matchAttributes['message_id'] = $emailData['message_id'];
+                    } else {
+                        // Fallback compatible with old logic
+                        $matchAttributes['imap_uid'] = $emailData['imap_uid'] ?? null;
+                        $matchAttributes['folder'] = $folder;
                     }
-                } catch (\Throwable $e) {
-                    Log::warning('[EmailSync] Failed to store attachment', [
-                        'email_id' => $email->id,
-                        'attachment' => $attachment['name'] ?? 'unknown',
-                        'error' => $e->getMessage(),
+
+                    // [Sticky Folder Logic]
+                    // If the email already exists and is in a "special" folder (inbox, sent, etc),
+                    // don't let it be overwritten by 'archive'.
+                    $existingEmail = null;
+                    if (!empty($emailData['message_id'])) {
+                        $existingEmail = Email::where('email_account_id', $account->id)
+                            ->where('message_id', $emailData['message_id'])
+                            ->first();
+                    }
+
+                    if (!$existingEmail && !empty($emailData['imap_uid'])) {
+                        $existingEmail = Email::where('email_account_id', $account->id)
+                            ->where('imap_uid', $emailData['imap_uid'])
+                            ->where('folder', $folder)
+                            ->first();
+                    }
+
+                    $targetFolder = $folder;
+                    if ($existingEmail && $folder === EmailFolderType::Archive->value) {
+                         $currentFolder = $existingEmail->folder;
+                         if (in_array($currentFolder, [
+                             EmailFolderType::Inbox->value,
+                             EmailFolderType::Sent->value,
+                             EmailFolderType::Drafts->value,
+                             EmailFolderType::Trash->value,
+                             EmailFolderType::Spam->value
+                         ])) {
+                             $targetFolder = $currentFolder;
+                         }
+                    }
+
+                    $email = Email::updateOrCreate(
+                        $matchAttributes,
+                        [
+                            'user_id' => $account->user_id,
+                            'imap_uid' => $emailData['imap_uid'] ?? null,
+                            'folder' => $targetFolder,
+                            'thread_id' => $emailData['thread_id'] ?? null,
+                            'from_email' => $emailData['from_email'],
+                            'from_name' => $emailData['from_name'] ?? null,
+                            'to' => $emailData['to'] ?? [],
+                            'cc' => $emailData['cc'] ?? [],
+                            'bcc' => $emailData['bcc'] ?? [],
+                            'subject' => $emailData['subject'] ?? '(No Subject)',
+                            'preview' => $emailData['preview'] ?? '',
+                            'body_html' => $bodyHtml,
+                            'body_plain' => $emailData['body_plain'] ?? null,
+                            'body_raw' => $bodyRaw,
+                            'headers' => $emailData['headers'] ?? [],
+                            'is_read' => $emailData['is_read'] ?? false,
+                            'is_starred' => $emailData['is_starred'] ?? false,
+                            'has_attachments' => $emailData['has_attachments'] ?? false,
+                            'received_at' => $emailData['date'] ?? now(),
+                            'sanitized_at' => $bodyHtml ? now() : null,
+                        ]
+                    );
+
+                    $isNew = $email->wasRecentlyCreated;
+
+                    // Store attachments only for new emails
+                    if ($isNew && !empty($emailData['attachments'])) {
+                        $placeholders = [];
+
+                        foreach ($emailData['attachments'] as $attachment) {
+                            // If lazy, we gathered metadata but skipped the content
+                            if (!empty($attachment['is_lazy'])) {
+                                $placeholders[] = [
+                                    'name' => $attachment['name'] ?? 'attachment',
+                                    'mime' => $attachment['mime'] ?? 'application/octet-stream',
+                                    'size' => $attachment['size'] ?? 0,
+                                    'content_id' => $attachment['content_id'] ?? null,
+                                ];
+                                continue;
+                            }
+
+                            try {
+                                $media = $email->addMediaFromString($attachment['content'])
+                                    ->usingFileName($attachment['name'] ?? 'attachment')
+                                    ->usingName($attachment['name'] ?? 'Attachment')
+                                    ->toMediaCollection('attachments');
+
+                                // Store content_id in custom properties for inline image matching
+                                if (!empty($attachment['content_id'])) {
+                                    $media->setCustomProperty('content_id', $attachment['content_id']);
+                                    $media->save();
+                                }
+                            } catch (\Throwable $e) {
+                                Log::warning('[EmailSync] Failed to store attachment', [
+                                    'email_id' => $email->id,
+                                    'attachment' => $attachment['name'] ?? 'unknown',
+                                    'error' => $e->getMessage(),
+                                ]);
+                            }
+                        }
+
+                        // Store placeholders for on-demand downloading
+                        if (!empty($placeholders)) {
+                            $email->update(['attachment_placeholders' => $placeholders]);
+                        }
+
+                        // [Graphics Fix] Resolve inline images after all potential CID attachments are stored
+                        // This replaces cid: links with actual Media URLs on the server-side.
+                        if ($email->has_attachments) {
+                            $email->update([
+                                'body_html' => $sanitizer->resolveInlineImages($email)
+                            ]);
+                        }
+                    }
+
+                    // Broadcast only for new emails AND if broadcast is enabled
+                    // (backfill passes false to avoid spamming realtime updates)
+                    if ($isNew && $broadcast) {
+                        broadcast(new EmailReceived($email));
+                    }
+
+                    return $email;
+                });
+            } catch (\Illuminate\Database\DeadlockException $e) {
+                $attempt++;
+                if ($attempt >= $maxRetries) {
+                    Log::error('[EmailSync] Deadlock after max retries', [
+                        'email_account_id' => $account->id,
+                        'imap_uid' => $emailData['imap_uid'] ?? null,
+                        'attempts' => $attempt,
                     ]);
+                    throw $e;
                 }
+                Log::warning('[EmailSync] Deadlock, retrying', [
+                    'attempt' => $attempt,
+                    'imap_uid' => $emailData['imap_uid'] ?? null,
+                ]);
+                usleep(100000 * $attempt); // Exponential backoff: 100ms, 200ms, 300ms
             }
         }
 
-        // Broadcast new email
-        broadcast(new EmailReceived($email));
+        // Should never reach here, but satisfy return type
+        throw new \RuntimeException('Failed to store email after retries');
+    }
 
-        return $email;
+    /**
+     * Download a specific attachment from IMAP.
+     *
+     * @param  \App\Models\Email  $email
+     * @param  int  $placeholderIndex
+     * @return \Spatie\MediaLibrary\MediaCollections\Models\Media
+     */
+    public function downloadAttachment(Email $email, int $placeholderIndex)
+    {
+        $placeholders = $email->attachment_placeholders ?? [];
+        if (!isset($placeholders[$placeholderIndex])) {
+            throw new \InvalidArgumentException('Attachment placeholder not found.');
+        }
+
+        $placeholder = $placeholders[$placeholderIndex];
+        $account = $email->emailAccount;
+        $adapter = $this->getAdapterForAccount($account);
+
+        try {
+            $client = $adapter->getClient($account);
+            $client->connect();
+            
+            // Get the folder and the message
+            $folder = $client->getFolder($email->folder);
+            $message = $adapter->getMessageByUid($folder, $email->imap_uid);
+
+            if (!$message) {
+                throw new \RuntimeException("Message not found on IMAP server.");
+            }
+
+            // Find the attachment in the message by name and size (heuristic)
+            $targetAttachment = null;
+            if ($message->hasAttachments()) {
+                foreach ($message->getAttachments() as $attachment) {
+                    $name = $attachment->getName();
+                    $size = $attachment->getSize();
+                    $contentId = $attachment->id ? trim($attachment->id, '<>') : null;
+
+                    // Match by name and size or Content-ID
+                    if (($contentId && $contentId === $placeholder['content_id']) || 
+                        ($name === $placeholder['name'] && abs($size - $placeholder['size']) < 1024)) {
+                        $targetAttachment = $attachment;
+                        break;
+                    }
+                }
+            }
+
+            if (!$targetAttachment) {
+                throw new \RuntimeException("Attachment not found in message.");
+            }
+
+            // Store the attachment as Media
+            $media = $email->addMediaFromString($targetAttachment->getContent())
+                ->usingFileName($targetAttachment->getName() ?? 'attachment')
+                ->usingName($targetAttachment->getName() ?? 'Attachment')
+                ->toMediaCollection('attachments');
+
+            if ($contentId = $targetAttachment->id) {
+                $media->setCustomProperty('content_id', trim($contentId, '<>'));
+                $media->save();
+            }
+
+            // Remove from placeholders
+            unset($placeholders[$placeholderIndex]);
+            $email->update(['attachment_placeholders' => array_values($placeholders)]);
+
+            // If it was an inline image, resolve it now
+            if (!empty($placeholder['content_id'])) {
+                $sanitizer = app(EmailSanitizationService::class);
+                $email->update([
+                    'body_html' => $sanitizer->resolveInlineImages($email)
+                ]);
+            }
+
+            return $media;
+        } catch (\Throwable $e) {
+            Log::error('[EmailSync] Failed to download attachment on-demand', [
+                'email_id' => $email->id,
+                'placeholder_index' => $placeholderIndex,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    /**
+     * Get adapter for an account.
+     */
+    protected function getAdapterForAccount(EmailAccount $account)
+    {
+        return AdapterFactory::make($account);
     }
 }

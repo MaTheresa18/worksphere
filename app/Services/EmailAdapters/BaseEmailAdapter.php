@@ -137,6 +137,45 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
     }
 
     /**
+     * Get folder with fallback to alternatives.
+     * Tries primary folder name first, then alternatives if configured.
+     */
+    public function getFolderWithFallback(\Webklex\PHPIMAP\Client $client, string $folderType): ?\Webklex\PHPIMAP\Folder
+    {
+        $primaryName = $this->getFolderName($folderType);
+
+        // Try primary folder name
+        $folder = $client->getFolder($primaryName);
+        if ($folder) {
+            return $folder;
+        }
+
+        // Try alternative names if configured
+        $alternativesKey = $this->getProvider() . '_alternatives';
+        $alternatives = config("email.imap_folders.{$alternativesKey}.{$folderType}", []);
+
+        foreach ($alternatives as $altName) {
+            $folder = $client->getFolder($altName);
+            if ($folder) {
+                Log::debug("[{$this->getProvider()}Adapter] Using alternative folder name", [
+                    'folder_type' => $folderType,
+                    'primary_name' => $primaryName,
+                    'used_name' => $altName,
+                ]);
+                return $folder;
+            }
+        }
+
+        Log::warning("[{$this->getProvider()}Adapter] Folder not found", [
+            'folder_type' => $folderType,
+            'primary_name' => $primaryName,
+            'alternatives_tried' => $alternatives,
+        ]);
+
+        return null;
+    }
+
+    /**
      * Default: no OAuth support.
      */
     public function supportsOAuth(): bool
@@ -239,8 +278,8 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
         $messages = collect();
         foreach ($uids as $uid) {
             try {
-                // Fetch individual message with backoff
-                $msg = $this->executeWithBackoff(fn () => $folder->query()->getMessageByUid($uid));
+                // Fetch individual message with backoff using getMessageByUid
+                $msg = $this->executeWithBackoff(fn () => $this->getMessageByUid($folder, $uid));
                 if ($msg) {
                     $messages->push($msg);
                 }
@@ -252,5 +291,149 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
         }
 
         return $messages;
+    }
+
+    /**
+     * Parse IMAP message to email data array.
+     * Can be overridden by providers to add specific logic (e.g. Gmail labels).
+     */
+    /**
+     * Parse message attributes into a standardized array.
+     * 
+     * @param mixed $message The IMAP message
+     * @param bool $skipAttachments Whether to skip downloading attachment content
+     * @return array
+     */
+    public function parseMessage($message, bool $skipAttachments = false): array
+    {
+        try {
+            $from = @$message->getFrom()[0] ?? null;
+        } catch (\Throwable $e) {
+            $from = null;
+        }
+
+        $fromEmail = 'unknown@unknown.com';
+        $fromName = null;
+
+        if ($from && is_object($from)) {
+            $fromEmail = $from->mail ?? 'unknown@unknown.com';
+            $fromName = $from->personal ?? null;
+        } elseif (is_string($from)) {
+            $fromEmail = $from;
+        }
+
+        $textBody = $message->getTextBody() ?? '';
+        $bodyHtml = (string) ($message->getHTMLBody() ?? '');
+        $preview = \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/', ' ', $textBody)), 200);
+
+        // Process attachments
+        $attachments = [];
+        if ($message->hasAttachments()) {
+            foreach ($message->getAttachments() as $attachment) {
+                $contentId = $attachment->id ?? null;
+                if ($contentId) {
+                    $contentId = trim($contentId, '<>');
+                }
+
+                // [Graphics Fix] Check if attachment is inline (referenced in HTML)
+                // If so, we force download even in lazy mode to ensure graphics render correctly.
+                $isInline = false;
+                if ($contentId && $bodyHtml && str_contains($bodyHtml, 'cid:' . $contentId)) {
+                    $isInline = true;
+                }
+
+                $attachmentData = [
+                    'name' => $attachment->getName(),
+                    'mime' => $attachment->getMimeType(),
+                    'size' => $attachment->getSize(),
+                    'content_id' => $contentId,
+                    'is_inline' => $isInline,
+                    'is_lazy' => $isInline ? false : $skipAttachments,
+                ];
+
+                if (!$attachmentData['is_lazy']) {
+                    $attachmentData['content'] = $attachment->getContent();
+                }
+
+                $attachments[] = $attachmentData;
+            }
+        }
+
+        // Process headers
+        $headers = [];
+        try {
+            $rawHeaders = $message->getHeader()->getAttributes();
+            foreach ($rawHeaders as $key => $value) {
+                $headers[$key] = (string) $value;
+            }
+        } catch (\Throwable $e) {
+        }
+
+        return [
+            'message_id' => (string) ($message->getMessageId()?->first() ?? ''),
+            'from_email' => $fromEmail,
+            'from_name' => (string) ($fromName ?? $fromEmail),
+            'to' => $this->safeGetRecipients($message, 'getTo'),
+            'cc' => $this->safeGetRecipients($message, 'getCc'),
+            'bcc' => $this->safeGetRecipients($message, 'getBcc'),
+            'subject' => (string) ($message->getSubject()?->first() ?? '(No Subject)'),
+            'preview' => (string) $preview,
+            'body_html' => (string) $bodyHtml,
+            'body_plain' => (string) $textBody,
+            'headers' => $headers,
+            'is_read' => $message->getFlags()->contains('Seen'),
+            'is_starred' => $message->getFlags()->contains('Flagged'),
+            'has_attachments' => $message->hasAttachments(),
+            'attachments' => $attachments,
+            'imap_uid' => (int) $message->getUid(),
+            'date' => $message->getDate()?->first()?->toDate(),
+        ];
+    }
+
+    /**
+     * Format recipients to array of [name, email].
+     */
+    protected function formatRecipients($attribute): array
+    {
+        if (!$attribute || !method_exists($attribute, 'toArray')) {
+            return [];
+        }
+
+        $flattened = [];
+        foreach ($attribute->toArray() as $recipient) {
+            $flattened[] = [
+                'name' => $recipient->personal,
+                'email' => $recipient->mail,
+            ];
+        }
+
+        return $flattened;
+    }
+
+    /**
+     * Safely get recipients suppressing IMAP errors.
+     */
+    protected function safeGetRecipients($message, string $method): array
+    {
+        try {
+            // Suppress IMAP warnings that can cause fatal errors in Laravel (e.g. malformed addresses)
+            $recipients = @$message->$method();
+            return $this->formatRecipients($recipients);
+        } catch (\Throwable $e) {
+            Log::warning("[BaseEmailAdapter] Failed to parse recipients", [
+                'method' => $method,
+                'message_id' => $message->getUid(),
+                'error' => $e->getMessage(),
+            ]);
+            return [];
+        }
+    }
+
+    /**
+     * Fetch a single message by UID.
+     */
+    public function getMessageByUid(Folder $folder, int $uid)
+    {
+        return $folder->query()->getMessageByUid($uid);
     }
 }

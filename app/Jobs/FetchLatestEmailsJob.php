@@ -14,7 +14,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
+use App\Support\EmailSyncLogger as Log;
 
 /**
  * Forward Crawler - Fetches newest emails (UID > forward_uid_cursor).
@@ -30,16 +30,25 @@ class FetchLatestEmailsJob implements ShouldQueue, ShouldBeUnique
     use Queueable;
     use SerializesModels;
 
-    public int $tries = 3;
+    public int $tries = 5;
 
-    public int $timeout = 60;
+    public int $timeout = 180; // 3 minutes for bootstrap/large batches
 
-    public int $maxExceptions = 2;
+    public int $maxExceptions = 3;
+
+    /**
+     * Exponential backoff for retries.
+     * Starts at 60s, then 5m, 10m, 20m.
+     */
+    public function backoff(): array
+    {
+        return [60, 300, 600, 1200];
+    }
 
     /**
      * The number of seconds after which the job's unique lock will be released.
      */
-    public int $uniqueFor = 120;
+    public int $uniqueFor = 600;
 
     public function __construct(
         public int $accountId
@@ -57,12 +66,19 @@ class FetchLatestEmailsJob implements ShouldQueue, ShouldBeUnique
 
     public function handle(EmailSyncService $syncService): void
     {
+        $startTime = microtime(true);
         $account = EmailAccount::find($this->accountId);
 
         if (!$account) {
             Log::warning('[FetchLatestEmailsJob] Account not found', ['account_id' => $this->accountId]);
             return;
         }
+
+        Log::info('[FetchLatestEmailsJob] Starting forward sync', [
+            'account_id' => $this->accountId,
+            'email' => $account->email,
+            'forward_cursor' => $account->forward_uid_cursor,
+        ]);
 
         // Check if forward crawler can run (active, verified, and in valid status)
         if (!$account->canRunForwardCrawler()) {
@@ -73,7 +89,6 @@ class FetchLatestEmailsJob implements ShouldQueue, ShouldBeUnique
             return;
         }
 
-        $startTime = microtime(true);
         $totalFetched = 0;
 
         try {
@@ -81,8 +96,15 @@ class FetchLatestEmailsJob implements ShouldQueue, ShouldBeUnique
             $client = $adapter->createClient($account);
             $client->connect();
 
-            // Only fetch from priority folders (inbox, sent, drafts, trash)
-            foreach (EmailFolderType::priorityFolders() as $folderType) {
+
+            // [CRITICAL FIX] Only fetch from INBOX for forward sync.
+            // For Gmail, we sync [Gmail]/All Mail (mapped to Archive) to get ALL updates (Sent, Inbox, etc) with correct labels.
+            // For others, we sync INBOX.
+            $folders = $adapter->getProvider() === 'gmail'
+                ? [EmailFolderType::Archive]
+                : [EmailFolderType::Inbox];
+            
+            foreach ($folders as $folderType) {
                 $fetched = $this->fetchForwardForFolder(
                     $client,
                     $adapter,
@@ -117,12 +139,25 @@ class FetchLatestEmailsJob implements ShouldQueue, ShouldBeUnique
                 ]);
             }
         } catch (\Throwable $e) {
-            Log::error('[FetchLatestEmailsJob] Failed', [
-                'account_id' => $this->accountId,
-                'error' => $e->getMessage(),
-            ]);
+            $message = $e->getMessage();
+            $isRateLimit = str_contains(strtolower($message), 'rate limit') || 
+                           str_contains(strtolower($message), 'quota') ||
+                           str_contains(strtolower($message), 'too many requests');
 
-            throw $e;
+            if ($isRateLimit) {
+                Log::warning('[FetchLatestEmailsJob] Rate limit detected, failing to trigger backoff', [
+                    'account_id' => $this->accountId,
+                    'error' => $message
+                ]);
+                throw $e; // Throw to trigger exponential backoff
+            }
+
+            Log::error('[FetchLatestEmailsJob] Sync failed', [
+                'account_id' => $this->accountId,
+                'error' => $message,
+            ]);
+            
+            $account->update(['sync_error' => substr($message, 0, 255)]);
         }
     }
 
@@ -147,15 +182,34 @@ class FetchLatestEmailsJob implements ShouldQueue, ShouldBeUnique
             // Get the current forward cursor for this account
             $forwardCursor = $account->forward_uid_cursor ?? 0;
 
+
             // Get folder info
             $examine = $folder->examine();
             $uidNext = $examine['uidnext'] ?? 0;
 
+            // Check for UID reset (Server UIDNEXT < DB Cursor)
+            // This happens if the mailbox was recreated or UIDVALIDITY changed
+            if ($uidNext > 0 && $forwardCursor > 0 && $uidNext < $forwardCursor) {
+                Log::warning('[FetchLatestEmailsJob] UID Mismatch detected. Resetting cursors.', [
+                    'account_id' => $account->id,
+                    'uidnext' => $uidNext,
+                    'forward_cursor' => $forwardCursor,
+                ]);
+
+                $account->update([
+                    'forward_uid_cursor' => 0,
+                    'backfill_uid_cursor' => 0,
+                    'backfill_complete' => false,
+                ]);
+                $forwardCursor = 0; // Proceed to bootstrap
+            }
+
+
             // If cursor is 0, this is first run - set cursor to latest UID
             if ($forwardCursor === 0) {
-                // Fetch latest UIDs (max 50) to bootstrap
-                // Use adapter method if available, otherwise manual
-                $uids = $adapter->fetchLatestUids($folder, 50);
+                // Fetch latest UIDs (max 20) to bootstrap quickly
+                // Backfill will handle the rest
+                $uids = $adapter->fetchLatestUids($folder, 20);
                 
                 $fetched = 0;
                 $maxUid = 0;
@@ -171,10 +225,16 @@ class FetchLatestEmailsJob implements ShouldQueue, ShouldBeUnique
                             ->exists();
 
                         if (!$exists) {
-                            $message = $folder->query()->getMessageByUid($uid);
+                            $message = $adapter->getMessageByUid($folder, $uid);
                             if ($message) {
-                                $emailData = $this->parseMessage($message);
-                                $syncService->storeEmailFromImap($account, $emailData, $folderType->value);
+                                // delegate parsing to adapter (handles X-GM-LABELS for Gmail)
+                                // [Lazy Sync] Set skipAttachments to true
+                                $emailData = $adapter->parseMessage($message, true);
+                                
+                                // valid folder is either what adapter detected (from labels) or the current folder we are syncing
+                                $targetFolder = $emailData['folder'] ?? $folderType->value;
+                                
+                                $syncService->storeEmailFromImap($account, $emailData, $targetFolder);
                                 $fetched++;
                             }
                         }
@@ -235,10 +295,16 @@ class FetchLatestEmailsJob implements ShouldQueue, ShouldBeUnique
                         continue;
                     }
 
-                    $message = $folder->query()->getMessageByUid($uid);
+                    $message = $adapter->getMessageByUid($folder, $uid);
                     if ($message) {
-                        $emailData = $this->parseMessage($message);
-                        $syncService->storeEmailFromImap($account, $emailData, $folderType->value);
+                        // delegate parsing to adapter (handles X-GM-LABELS for Gmail)
+                        // [Lazy Sync] Set skipAttachments to true
+                        $emailData = $adapter->parseMessage($message, true);
+                        
+                        // valid folder is either what adapter detected (from labels) or the current folder we are syncing
+                        $targetFolder = $emailData['folder'] ?? $folderType->value;
+                        
+                        $syncService->storeEmailFromImap($account, $emailData, $targetFolder);
                         $fetched++;
                         $maxUid = max($maxUid, $uid);
                     }
@@ -265,94 +331,6 @@ class FetchLatestEmailsJob implements ShouldQueue, ShouldBeUnique
         }
     }
 
-    /**
-     * Parse IMAP message to email data array.
-     */
-    protected function parseMessage($message): array
-    {
-        $from = $message->getFrom()[0] ?? null;
-
-        $fromEmail = 'unknown@unknown.com';
-        $fromName = null;
-
-        if ($from && is_object($from)) {
-            $fromEmail = $from->mail ?? 'unknown@unknown.com';
-            $fromName = $from->personal ?? null;
-        } elseif (is_string($from)) {
-            $fromEmail = $from;
-        }
-
-        $textBody = $message->getTextBody() ?? '';
-        $preview = \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/', ' ', $textBody)), 200);
-
-        // Process attachments
-        $attachments = [];
-        if ($message->hasAttachments()) {
-            foreach ($message->getAttachments() as $attachment) {
-                $contentId = $attachment->id ?? null;
-                if ($contentId) {
-                    $contentId = trim($contentId, '<>');
-                }
-
-                $attachments[] = [
-                    'name' => $attachment->getName(),
-                    'content' => $attachment->getContent(),
-                    'mime' => $attachment->getMimeType(),
-                    'content_id' => $contentId,
-                ];
-            }
-        }
-
-        // Process headers
-        $headers = [];
-        try {
-            $rawHeaders = $message->getHeader()->getAttributes();
-            foreach ($rawHeaders as $key => $value) {
-                $headers[$key] = (string) $value;
-            }
-        } catch (\Throwable $e) {
-        }
-
-        return [
-            'message_id' => (string) ($message->getMessageId()?->first() ?? ''),
-            'from_email' => $fromEmail,
-            'from_name' => (string) ($fromName ?? $fromEmail),
-            'to' => $this->formatRecipients($message->getTo()),
-            'cc' => $this->formatRecipients($message->getCc()),
-            'bcc' => $this->formatRecipients($message->getBcc()),
-            'subject' => (string) ($message->getSubject()?->first() ?? '(No Subject)'),
-            'preview' => (string) $preview,
-            'body_html' => (string) ($message->getHTMLBody() ?? ''),
-            'body_plain' => (string) $textBody,
-            'headers' => $headers,
-            'is_read' => $message->getFlags()->contains('Seen'),
-            'is_starred' => $message->getFlags()->contains('Flagged'),
-            'has_attachments' => $message->hasAttachments(),
-            'attachments' => $attachments,
-            'imap_uid' => (int) $message->getUid(),
-            'date' => $message->getDate()?->first()?->toDate(),
-        ];
-    }
-
-    /**
-     * Format recipients to array of [name, email].
-     */
-    protected function formatRecipients($attribute): array
-    {
-        if (!$attribute || !method_exists($attribute, 'toArray')) {
-            return [];
-        }
-
-        $flattened = [];
-        foreach ($attribute->toArray() as $recipient) {
-            $flattened[] = [
-                'name' => $recipient->personal,
-                'email' => $recipient->mail,
-            ];
-        }
-
-        return $flattened;
-    }
 
     public function failed(\Throwable $exception): void
     {

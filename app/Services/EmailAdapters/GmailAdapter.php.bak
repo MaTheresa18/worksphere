@@ -1,0 +1,250 @@
+<?php
+
+namespace App\Services\EmailAdapters;
+
+use App\Models\EmailAccount;
+use App\Services\EmailAccountService;
+use Illuminate\Support\Facades\Log;
+use Webklex\PHPIMAP\Client;
+
+/**
+ * Gmail-specific adapter with OAuth support and Gmail folder naming.
+ */
+class GmailAdapter extends BaseEmailAdapter
+{
+    public function getProvider(): string
+    {
+        return 'gmail';
+    }
+
+    /**
+     * Create Gmail IMAP client with OAuth authentication.
+     */
+    public function createClient(EmailAccount $account): Client
+    {
+        // Always refresh token before connecting
+        $this->refreshTokenIfNeeded($account);
+
+        $config = $this->buildBaseConfig($account);
+        $config['authentication'] = 'oauth';
+        $config['password'] = $account->access_token;
+
+        Log::debug('[GmailAdapter] Creating client', [
+            'account_id' => $account->id,
+            'email' => $account->email,
+            'has_token' => ! empty($account->access_token),
+        ]);
+
+        $config['extensions'] = ['X-GM-LABELS', 'X-GM-MSGID', 'X-GM-THRID'];
+
+        return $this->clientManager->make($config);
+    }
+
+    /**
+     * Gmail folder mapping.
+     */
+    public function getFolderMapping(): array
+    {
+        return config('email.imap_folders.gmail', [
+            'inbox' => 'INBOX',
+            'sent' => '[Gmail]/Sent Mail',
+            'drafts' => '[Gmail]/Drafts',
+            'trash' => '[Gmail]/Trash',
+            'spam' => '[Gmail]/Spam',
+            'archive' => '[Gmail]/All Mail',
+        ]);
+    }
+
+    public function supportsOAuth(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Refresh Gmail OAuth token if expired or expiring soon.
+     */
+    public function refreshTokenIfNeeded(EmailAccount $account): bool
+    {
+        if (! $account->needsTokenRefresh()) {
+            return true;
+        }
+
+        Log::info('[GmailAdapter] Refreshing OAuth token', [
+            'account_id' => $account->id,
+            'expires_at' => $account->token_expires_at,
+        ]);
+
+        try {
+            $service = app(EmailAccountService::class);
+            $result = $service->refreshToken($account);
+
+            if ($result) {
+                $account->refresh(); // Reload model with new token
+                Log::info('[GmailAdapter] Token refreshed successfully', [
+                    'account_id' => $account->id,
+                    'new_expires_at' => $account->token_expires_at,
+                ]);
+            } else {
+                Log::error('[GmailAdapter] Token refresh failed', [
+                    'account_id' => $account->id,
+                ]);
+            }
+
+            return $result;
+        } catch (\Throwable $e) {
+            Log::error('[GmailAdapter] Token refresh exception', [
+                'account_id' => $account->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    public function getMaxParallelFolders(): int
+    {
+        // Gmail is stricter about concurrent connections
+        return config('email.max_parallel_folders.gmail', 2);
+    }
+
+    /**
+     * Gmail doesn't support LIMIT queries, so we must fetch by UID.
+     */
+    public function fetchLatestMessages(\Webklex\PHPIMAP\Folder $folder, int $count): \Illuminate\Support\Collection
+    {
+        // Gmail works well with overview() - use UIDs from there
+        $uids = $this->fetchLatestUids($folder, $count);
+
+        if (empty($uids)) {
+            Log::warning('[GmailAdapter] No UIDs from overview, folder may be empty', [
+                'folder' => $folder->path,
+            ]);
+
+            return collect();
+        }
+
+        Log::debug('[GmailAdapter] Fetching messages by UID', [
+            'folder' => $folder->path,
+            'uid_count' => count($uids),
+        ]);
+
+        // Fetch messages one by one by UID
+        $messages = collect();
+        foreach ($uids as $uid) {
+            try {
+                $msg = $this->getMessageByUid($folder, $uid);
+                if ($msg) {
+                    $messages->push($msg);
+                }
+            } catch (\Throwable $e) {
+                Log::debug("[GmailAdapter] Failed to fetch UID {$uid}", [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $messages;
+    }
+
+    /**
+     * Parse Gmail message, extracting folder from X-GM-LABELS.
+     */
+    public function parseMessage($message): array
+    {
+        $data = parent::parseMessage($message);
+
+        // Extract Gmail Labels from multiple possible sources (extensions, attributes, header)
+        $attributes = $message->getAttributes();
+        $labels = $attributes['X-GM-LABELS'] ?? 
+                 $attributes['x-gm-labels'] ?? 
+                 $message->getHeader()->get('X-GM-LABELS') ?? 
+                 $message->getHeader()->get('x-gm-labels') ?? 
+                 [];
+                 
+        if ($labels instanceof \Webklex\PHPIMAP\Attribute) {
+            $labels = $labels->toArray();
+        }
+        $labels = (array) ($labels ?: []);
+
+        // Unquote and clean labels
+        $labels = array_map(function($l) {
+            return trim(str_replace('"', '', (string)$l));
+        }, $labels);
+
+        $folder = \App\Enums\EmailFolderType::Archive->value; // Default
+        $normalizedLabels = array_map('strtolower', $labels);
+
+        Log::debug('[GmailAdapter] Parsing Message Labels', [
+            'uid' => $data['imap_uid'] ?? 'unknown',
+            'subject' => substr($data['subject'] ?? '', 0, 30),
+            'labels' => $labels,
+            'folder_path' => $message->getFolder() ? $message->getFolder()->path : 'unknown',
+        ]);
+        
+        if ($this->hasLabel($normalizedLabels, '\inbox') || $this->hasLabel($normalizedLabels, 'inbox')) {
+            $folder = \App\Enums\EmailFolderType::Inbox->value;
+            Log::info('[GmailAdapter] Mapped to INBOX');
+        } elseif ($this->hasLabel($normalizedLabels, '\sent') || $this->hasLabel($normalizedLabels, 'sent')) {
+            $folder = \App\Enums\EmailFolderType::Sent->value;
+            Log::info('[GmailAdapter] Mapped to SENT');
+        } elseif ($this->hasLabel($normalizedLabels, '\trash') || $this->hasLabel($normalizedLabels, '\bin') || $this->hasLabel($normalizedLabels, 'trash')) {
+            $folder = \App\Enums\EmailFolderType::Trash->value;
+            Log::info('[GmailAdapter] Mapped to TRASH');
+        } elseif ($this->hasLabel($normalizedLabels, '\spam') || $this->hasLabel($normalizedLabels, '\junk') || $this->hasLabel($normalizedLabels, 'spam')) {
+            $folder = \App\Enums\EmailFolderType::Spam->value;
+            Log::info('[GmailAdapter] Mapped to SPAM');
+        } elseif ($this->hasLabel($normalizedLabels, '\draft') || $this->hasLabel($normalizedLabels, 'drafts')) {
+            $folder = \App\Enums\EmailFolderType::Drafts->value;
+            Log::info('[GmailAdapter] Mapped to DRAFTS');
+        } else {
+             // Fallback to current folder name if no specific Gmail labels match
+             $currentFolderPath = $message->getFolder() ? strtolower($message->getFolder()->path) : '';
+             
+             if (str_contains($currentFolderPath, 'inbox')) {
+                 $folder = \App\Enums\EmailFolderType::Inbox->value;
+                 Log::info('[GmailAdapter] Mapped to INBOX via folder path');
+             } elseif (str_contains($currentFolderPath, 'sent')) {
+                 $folder = \App\Enums\EmailFolderType::Sent->value;
+                 Log::info('[GmailAdapter] Mapped to SENT via folder path');
+             } elseif (str_contains($currentFolderPath, 'trash') || str_contains($currentFolderPath, 'bin')) {
+                 $folder = \App\Enums\EmailFolderType::Trash->value;
+                 Log::info('[GmailAdapter] Mapped to TRASH via folder path');
+             } elseif (str_contains($currentFolderPath, 'spam') || str_contains($currentFolderPath, 'junk')) {
+                 $folder = \App\Enums\EmailFolderType::Spam->value;
+                 Log::info('[GmailAdapter] Mapped to SPAM via folder path');
+             } elseif (str_contains($currentFolderPath, 'draft')) {
+                 $folder = \App\Enums\EmailFolderType::Drafts->value;
+                 Log::info('[GmailAdapter] Mapped to DRAFTS via folder path');
+             } else {
+                 $folder = \App\Enums\EmailFolderType::Archive->value;
+                 Log::info('[GmailAdapter] Fallback to ARCHIVE');
+             }
+        }
+
+        $data['folder'] = $folder; // Inject detected folder
+        
+        return $data;
+    }
+
+    private function hasLabel(array $labels, string $search): bool
+    {
+        foreach ($labels as $label) {
+            if (str_contains($label, $search)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Fetch a single message by UID with Gmail labels.
+     */
+    public function getMessageByUid(\Webklex\PHPIMAP\Folder $folder, int $uid)
+    {
+        // Use whereUid and setExtensions to get X-GM-LABELS
+        // This is the correct way to get provider-specific attributes in Webklex/php-imap
+        return $folder->query()
+            ->whereUid($uid)
+            ->setExtensions(['X-GM-LABELS', 'X-GM-MSGID', 'X-GM-THRID'])
+            ->get()
+            ->first();
+    }
+}

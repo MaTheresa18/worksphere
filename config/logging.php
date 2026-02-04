@@ -151,6 +151,14 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'email-sync' => [
+            'driver' => 'daily',
+            'path' => storage_path('app/private/sys/logs/email-sync.log'),
+            'level' => 'debug',
+            'days' => 7,
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];

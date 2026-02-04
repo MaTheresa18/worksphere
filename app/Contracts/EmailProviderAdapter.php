@@ -97,4 +97,13 @@ interface EmailProviderAdapter
      * @return \Illuminate\Support\Collection Collection of messages
      */
     public function fetchLatestMessages(Folder $folder, int $count): \Illuminate\Support\Collection;
+
+    /**
+     * Fetch a single message by UID, applying provider-specific modifiers (e.g. Gmail labels).
+     *
+     * @param  Folder  $folder  The IMAP folder
+     * @param  int  $uid  The message UID
+     * @return mixed The message object or null if not found
+     */
+    public function getMessageByUid(Folder $folder, int $uid);
 }

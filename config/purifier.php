@@ -37,10 +37,10 @@ return [
         // Email-specific sanitization rules
         'email' => [
             'HTML.Doctype' => 'HTML 4.01 Transitional',
-            'HTML.Allowed' => 'div,p,span,br,hr,a[href|title|target],strong,b,em,i,u,s,del,ins,ul,ol,li,blockquote,pre,code,h1,h2,h3,h4,h5,h6,table[border|cellpadding|cellspacing|width],thead,tbody,tr,th[align|valign|width],td[align|valign|width],img[src|alt|width|height|style]',
-            'CSS.AllowedProperties' => 'color,background-color,font-size,font-family,font-weight,font-style,text-align,text-decoration,padding,margin,border,width,height,max-width',
-            'AutoFormat.RemoveEmpty' => true,
-            'AutoFormat.RemoveEmpty.RemoveNbsp' => true,
+            'HTML.Allowed' => 'div[style|class],p[style|class],span[style|class],br,hr,a[href|title|target|style|class],strong,b,em,i,u,s,del,ins,ul,ol,li[style],blockquote,pre,code,h1,h2,h3,h4,h5,h6,table[border|cellpadding|cellspacing|width|height|style|class|align],thead,tbody,tr[style|class|align|valign],th[align|valign|width|height|style|class],td[align|valign|width|height|style|class],img[src|alt|width|height|style|class|align|hspace|vspace],center,font[color|size|face]',
+            'CSS.AllowedProperties' => 'color,background-color,background,font-size,font-family,font-weight,font-style,text-align,text-decoration,padding,padding-top,padding-right,padding-bottom,padding-left,margin,margin-top,margin-right,margin-bottom,margin-left,border,border-top,border-right,border-bottom,border-left,border-collapse,border-spacing,width,height,max-width,min-width,max-height,min-height,display,float,clear,vertical-align,line-height,letter-spacing,text-transform,list-style-type',
+            'AutoFormat.RemoveEmpty' => false,
+            'AutoFormat.RemoveEmpty.RemoveNbsp' => false,
             'Attr.AllowedFrameTargets' => ['_blank'],
             'URI.AllowedSchemes' => ['http' => true, 'https' => true, 'mailto' => true, 'cid' => true],
         ],

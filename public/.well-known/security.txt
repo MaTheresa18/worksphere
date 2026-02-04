@@ -1,0 +1,41 @@
+# Security Policy for WorkSphere
+
+Contact: mailto:ev.ryann.olaso@gmail.com
+Expires: 2027-02-04T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://worksphere.app/.well-known/security.txt
+
+# Acknowledgments
+Acknowledgments: https://worksphere.app/hall-of-fame
+
+# Policy
+Policy: https://worksphere.app/security-policy
+
+# Guidelines for Security Researchers
+
+## Scope
+We welcome responsible disclosure of security vulnerabilities in our application.
+Please report any issues you find to the email above.
+
+## Rules of Engagement
+1. DO NOT perform denial-of-service (DoS/DDoS) attacks against our infrastructure.
+2. DO NOT access, modify, or delete user data beyond what is necessary to demonstrate the vulnerability.
+3. DO NOT share vulnerability details publicly until we have had reasonable time to address the issue (minimum 90 days).
+4. DO NOT use automated vulnerability scanners that generate excessive traffic.
+5. Focus only on security vulnerabilities - do not report spam, phishing, or social engineering issues.
+
+## What We Promise
+1. We will acknowledge receipt of your report within 48 hours.
+2. We will provide an estimated timeline for resolution.
+3. We will not pursue legal action against researchers who follow these guidelines.
+4. We will credit you in our Hall of Fame (with your permission).
+5. We can provide links to your LinkedIn or portfolio as proof of your contribution.
+
+## Out of Scope
+- Vulnerabilities in third-party libraries (please report those to the library maintainers)
+- Issues that require physical access to user devices
+- Social engineering attacks against our team members
+
+## Thank You
+We appreciate the security research community's efforts to help keep WorkSphere secure.
+Your contributions help protect our users and improve our platform.

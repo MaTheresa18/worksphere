@@ -190,6 +190,45 @@ class EmailSanitizationService
     }
 
     /**
+     * Resolve CID (Content-ID) references in email HTML to actual Media URLs.
+     *
+     * @param  \App\Models\Email  $email
+     * @return string Updated HTML with resolved image sources
+     */
+    public function resolveInlineImages(\App\Models\Email $email): string
+    {
+        $html = $email->body_html;
+        if (empty($html) || ! $email->has_attachments) {
+            return (string) $html;
+        }
+
+        $attachments = $email->getMedia('attachments');
+        if ($attachments->isEmpty()) {
+            return (string) $html;
+        }
+
+        foreach ($attachments as $media) {
+            $contentId = $media->getCustomProperty('content_id');
+            if (! $contentId) {
+                continue;
+            }
+
+            // Match src="cid:content_id" patterns (case insensitive)
+            // We handle both src="cid:..." and src='cid:...'
+            $pattern = '/src\s*=\s*(["\'])cid:'.preg_quote($contentId, '/').'\1/i';
+            $replacement = 'src="'.$media->getUrl().'"';
+            
+            $html = preg_replace($pattern, $replacement, $html);
+
+            // Also handle cases with angle brackets in CID
+            $patternWithBrackets = '/src\s*=\s*(["\'])cid:'.preg_quote('<'.$contentId.'>', '/').'\1/i';
+            $html = preg_replace($patternWithBrackets, $replacement, $html);
+        }
+
+        return $html;
+    }
+
+    /**
      * Extract Content-ID from attachment for inline image matching.
      *
      * @param  mixed  $attachment  IMAP attachment object

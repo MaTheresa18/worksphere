@@ -98,11 +98,7 @@ const routes: RouteRecordRaw[] = [
             transition: "fade",
         },
     },
-    {
-        path: "/:pathMatch(.*)*",
-        component: () => import("@/views/errors/ErrorView.vue"),
-        props: { code: "404" },
-    },
+
     {
         path: "/",
         name: "landing",
@@ -1182,6 +1178,23 @@ const routes: RouteRecordRaw[] = [
                 },
             },
         ],
+    },
+    // Independent Route for Email Popup (No Layout)
+    {
+        path: "/email/popup/:id",
+        name: "email-popup",
+        component: () => import("@/views/Email/EmailPopupView.vue"),
+        meta: {
+            title: "Email",
+            requiresAuth: true,
+            layout: "none", // Assuming 'none' or leaving undefined renders without AppLayout if controlled in App.vue
+        },
+    },
+    // Wildcard - must be last
+    {
+        path: "/:pathMatch(.*)*",
+        component: () => import("@/views/errors/ErrorView.vue"),
+        props: { code: "404" },
     },
 ];
 

@@ -259,7 +259,7 @@ return [
             'maxJobs' => 0,
             'memory' => 256,
             'tries' => 3,
-            'timeout' => 60,
+            'timeout' => 180, // Match job timeout for bootstrap
             'nice' => 0,
         ],
         // Backfill crawler - low priority, throttled for historical emails
@@ -275,6 +275,19 @@ return [
             'timeout' => 180,
             'nice' => 0,
             'sleep' => 3, // Throttle between batches
+        ],
+        // Media library conversions - separate from email sync
+        'supervisor-media' => [
+            'connection' => 'redis',
+            'queue' => ['media-conversions'],
+            'balance' => 'simple',
+            'maxProcesses' => 2,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 3,
+            'timeout' => 120,
+            'nice' => 0,
         ],
     ],
 

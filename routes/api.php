@@ -443,6 +443,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce', 'demo'])->grou
         // Attachments
         Route::get('attachments/{media}/download', [\App\Http\Controllers\Api\AttachmentController::class, 'download']);
         Route::post('attachments/download-batch', [\App\Http\Controllers\Api\AttachmentController::class, 'downloadBatch']);
+        Route::post('{email}/attachments/{index}/download', [\App\Http\Controllers\Api\EmailAttachmentController::class, 'download']);
 
         // Emails
         Route::get('/', [\App\Http\Controllers\Api\EmailController::class, 'index']);
