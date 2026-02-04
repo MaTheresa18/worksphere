@@ -70,6 +70,38 @@ class EmailSanitizationService
 
             return $html;
         } catch (\Throwable $e) {
+            // Check if this is a CSS property warning (non-critical)
+            $message = $e->getMessage();
+            if (str_contains($message, 'Style attribute') && str_contains($message, 'is not supported')) {
+                // CSS property not supported - log as warning, not error
+                // This is non-critical; the email will render without that specific style
+                Log::warning('[EmailSanitizationService] Unsupported CSS property stripped', [
+                    'source' => $source,
+                    'warning' => $message,
+                ]);
+                
+                // Try to purify without throwing - remove the problematic inline styles
+                try {
+                    // Strip style attributes entirely and re-purify
+                    $htmlWithoutStyles = preg_replace('/\s+style\s*=\s*(["\'])[^"\']*\1/i', '', $html);
+                    $html = $this->purify($htmlWithoutStyles, $source);
+                    
+                    // Restore CID images
+                    foreach ($cidPlaceholders ?? [] as $index => $originalImg) {
+                        $placeholder = '[[CID_PLACEHOLDER_'.$index.']]';
+                        $html = str_replace($placeholder, $originalImg, $html);
+                    }
+                    
+                    return $this->postProcess($html);
+                } catch (\Throwable $retryError) {
+                    // If still failing, just return the pre-processed HTML without purification
+                    Log::warning('[EmailSanitizationService] Fallback: skipping purification', [
+                        'source' => $source,
+                    ]);
+                    return $this->postProcess($html);
+                }
+            }
+
             Log::error('[EmailSanitizationService] Failed to sanitize email', [
                 'source' => $source,
                 'error' => $e->getMessage(),
