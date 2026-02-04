@@ -603,6 +603,8 @@ class EmailSyncService implements EmailSyncServiceContract
             ]);
             throw $e;
         }
+    }
+
     /**
      * Get adapter for an account.
      */
