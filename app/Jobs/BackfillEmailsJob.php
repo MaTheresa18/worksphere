@@ -33,7 +33,7 @@ class BackfillEmailsJob implements ShouldQueue, ShouldBeUnique
 
     public int $tries = 5;
 
-    public int $timeout = 300;
+    public int $timeout = 420;
 
     /**
      * Exponential backoff for retries.

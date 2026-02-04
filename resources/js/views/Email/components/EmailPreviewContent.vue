@@ -206,13 +206,19 @@
                     <button
                         v-if="selectedAttachments.size > 0"
                         @click="downloadSelected"
+                        :disabled="!allSelectedDownloaded"
                         class="text-xs font-medium text-[var(--interactive-primary)] hover:underline flex items-center gap-1"
+                        :class="{ 'opacity-50 cursor-not-allowed': !allSelectedDownloaded }"
+                        :title="allSelectedDownloaded ? 'Download selected' : 'Some attachments not yet downloaded'"
                     >
                         Download Selected ({{ selectedAttachments.size }})
                     </button>
                     <button
                         @click="downloadAll"
+                        :disabled="hasPlaceholderAttachments"
                         class="text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1 ml-2"
+                        :class="{ 'opacity-50 cursor-not-allowed hover:no-underline': hasPlaceholderAttachments }"
+                        :title="hasPlaceholderAttachments ? 'Download each attachment first' : 'Download all attachments'"
                     >
                         Download All
                     </button>
@@ -484,6 +490,21 @@ watch(
         selectedAttachments.value.clear();
     },
 );
+
+// Check if any attachments are still in cloud (placeholders)
+const hasPlaceholderAttachments = computed(() => {
+    if (!props.email?.attachments?.length) return false;
+    return props.email.attachments.some((att: any) => att.is_downloaded === false);
+});
+
+// Check if all selected attachments are downloaded
+const allSelectedDownloaded = computed(() => {
+    if (selectedAttachments.value.size === 0) return true;
+    return Array.from(selectedAttachments.value).every((id) => {
+        const att = props.email?.attachments?.find((a: any) => a.id === id);
+        return att?.is_downloaded !== false;
+    });
+});
 
 const sanitizedBody = computed(() => {
     if (!props.email?.body_html) return "";

@@ -19,6 +19,8 @@ use App\Services\EmailAdapters\AdapterFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Enums\AuditAction;
+use App\Enums\AuditCategory;
 
 class EmailSyncService implements EmailSyncServiceContract
 {
@@ -619,6 +621,19 @@ class EmailSyncService implements EmailSyncServiceContract
                 'placeholder_index' => $placeholderIndex,
                 'error' => $e->getMessage(),
             ]);
+
+            // Log to audit trail for visibility
+            app(AuditService::class)->log(
+                action: AuditAction::SystemError,
+                category: AuditCategory::System,
+                context: [
+                    'error_type' => 'email_sync_failure',
+                    'email_id' => $email->id,
+                    'account_id' => $email->email_account_id,
+                    'error' => $e->getMessage(),
+                ]
+            );
+
             throw $e;
         }
     }

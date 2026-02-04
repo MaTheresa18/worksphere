@@ -13,9 +13,17 @@ class AttachmentController extends Controller
     /**
      * Download a single attachment.
      */
-    public function download(int $mediaId): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    public function download(int $mediaId): \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\JsonResponse
     {
         $media = Media::findOrFail($mediaId);
+
+        // Check if file exists (not just a placeholder)
+        if (!file_exists($media->getPath())) {
+            return response()->json([
+                'message' => 'Attachment not yet downloaded from cloud. Please use the on-demand download feature.',
+                'is_placeholder' => true,
+            ], 422);
+        }
 
         // TODO: Add authorization check (verify user owns the email)
 
@@ -25,7 +33,7 @@ class AttachmentController extends Controller
     /**
      * Download multiple attachments as a ZIP stream.
      */
-    public function downloadBatch(Request $request): StreamedResponse
+    public function downloadBatch(Request $request): StreamedResponse|\Illuminate\Http\JsonResponse
     {
         $request->validate([
             'ids' => ['required', 'array', 'min:1'],
@@ -36,6 +44,15 @@ class AttachmentController extends Controller
 
         if ($mediaItems->isEmpty()) {
             abort(404, 'No attachments found');
+        }
+
+        // Check for placeholder attachments (files not yet downloaded)
+        $placeholders = $mediaItems->filter(fn ($media) => !file_exists($media->getPath()));
+        if ($placeholders->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Some attachments are not yet downloaded from cloud. Please download them individually first.',
+                'placeholder_ids' => $placeholders->pluck('id')->toArray(),
+            ], 422);
         }
 
         // TODO: Add authorization check
