@@ -142,6 +142,9 @@ class EmailAccountController extends Controller
             'is_default' => 'boolean',
             'is_system' => 'boolean',
             'system_usage' => 'nullable|string|in:support,notification,noreply',
+            // Folder sync settings - array of folder type strings to disable
+            'disabled_folders' => 'nullable|array',
+            'disabled_folders.*' => 'string|in:inbox,sent,drafts,trash,spam,archive',
         ]);
 
         // If setting as default, unset other defaults
@@ -309,6 +312,7 @@ class EmailAccountController extends Controller
             'storage_used' => $account->storage_used,
             'storage_limit' => $account->storage_limit,
             'storage_updated_at' => $account->storage_updated_at?->toIso8601String(),
+            'disabled_folders' => $account->disabled_folders ?? [],
             'created_at' => $account->created_at->toIso8601String(),
         ];
     }

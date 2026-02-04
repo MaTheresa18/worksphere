@@ -18,12 +18,14 @@ class EmailFolder extends Model
         'slug',
         'color',
         'sort_order',
+        'sync_enabled',
     ];
 
     protected function casts(): array
     {
         return [
             'sort_order' => 'integer',
+            'sync_enabled' => 'boolean',
         ];
     }
 

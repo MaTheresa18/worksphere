@@ -75,8 +75,16 @@ class EmailSyncService implements EmailSyncServiceContract
 
         // Find next folder that needs syncing
         $nextFolder = null;
+        $disabledFolders = $account->disabled_folders ?? [];
+        
         foreach (EmailFolderType::syncOrder() as $folderType) {
             $folderKey = $folderType->value;
+            
+            // Skip if folder is disabled by user
+            if (in_array($folderKey, $disabledFolders)) {
+                continue;
+            }
+            
             $folderData = $folders[$folderKey] ?? [];
 
             // Skip if completed

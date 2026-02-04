@@ -61,6 +61,8 @@ class EmailAccount extends Model
         'backfill_complete',
         'last_backfill_at',
         'sync_started_at',
+        // Folder sync settings
+        'disabled_folders',
     ];
 
     protected $casts = [
@@ -89,6 +91,8 @@ class EmailAccount extends Model
         'backfill_complete' => 'boolean',
         'last_backfill_at' => 'datetime',
         'sync_started_at' => 'datetime',
+        // Folder sync settings
+        'disabled_folders' => 'array',
     ];
 
     protected static function boot()
