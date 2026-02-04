@@ -13,31 +13,21 @@ class EmailSyncWatchdog extends Command
 
     public function handle(EmailSyncService $syncService): int
     {
-        $accounts = $syncService->getAccountsNeedingSync();
+        $this->info("Starting Email Sync Watchdog...");
 
-        if ($accounts->isEmpty()) {
-            $this->line('No accounts need syncing.');
-
-            return self::SUCCESS;
+        // 1. Kickstart any brand new accounts (Pending)
+        $pendingAccounts = \App\Models\EmailAccount::where('sync_status', \App\Enums\EmailSyncStatus::Pending)->get();
+        
+        foreach ($pendingAccounts as $account) {
+            $this->info("Starting initial seed for: {$account->email}");
+            $syncService->startSeed($account);
         }
 
-        $this->info("Found {$accounts->count()} account(s) needing sync.");
+        // 2. Rescue stuck jobs (Self-healing)
+        // This checks timestamps and restarts Backfill/Forward jobs if they died.
+        $syncService->rescueStuckAccounts();
 
-        foreach ($accounts as $account) {
-            $this->line("Processing account #{$account->id} ({$account->email})...");
-
-            try {
-                match ($account->sync_status->value) {
-                    'pending' => $syncService->startSeed($account),
-                    'seeding', 'syncing' => $syncService->continueSync($account),
-                    default => null,
-                };
-
-                $this->info("  → Dispatched sync for {$account->email}");
-            } catch (\Throwable $e) {
-                $this->error("  → Failed: {$e->getMessage()}");
-            }
-        }
+        $this->info('Watchdog cycle completed. Checked for stuck accounts.');
 
         return self::SUCCESS;
     }

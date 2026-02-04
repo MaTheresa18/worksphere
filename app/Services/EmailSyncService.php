@@ -241,6 +241,65 @@ class EmailSyncService implements EmailSyncServiceContract
     }
 
     /**
+     * Rescue stuck sync jobs (Watchdog).
+     * Checks for accounts that are supposed to be syncing but have no recent activity.
+     */
+    public function rescueStuckAccounts(): void
+    {
+        // 1. Rescue Stuck Backfills
+        // Accounts that are active, verified, backfill NOT complete, but haven't updated 'last_backfill_at' in 15 mins
+        $stuckBackfills = EmailAccount::query()
+            ->active()
+            ->verified()
+            ->where('backfill_complete', false)
+            ->where(function ($q) {
+                $q->where('last_backfill_at', '<', now()->subMinutes(15))
+                  ->orWhereNull('last_backfill_at');
+            })
+            // Only rescue if we actually started syncing recently (don't rescue ancient abandoned accounts? or do?)
+            // Let's rely on is_active = true
+            ->get();
+
+        foreach ($stuckBackfills as $account) {
+            // Check if job is actually queued? It's hard to check Redis from here reliably without overhead.
+            // We just assume if DB timestamp is old, the job is dead or stuck.
+            
+            Log::warning('[EmailSyncWatchdog] Rescuing stuck backfill', [
+                'account_id' => $account->id,
+                'last_backfill_at' => $account->last_backfill_at,
+            ]);
+
+            BackfillEmailsJob::dispatch($account->id);
+            
+            // Update timestamp to prevent immediate re-dispatch next minute if queue is slow
+            $account->update(['last_backfill_at' => now()]);
+        }
+
+        // 2. Rescue Stuck Forward Syncs
+        // Accounts that are active, verified, but haven't updated 'last_forward_sync_at' in 10 mins
+        // (Forward sync runs every 2 mins usually)
+        $stuckForward = EmailAccount::query()
+            ->active()
+            ->verified()
+            ->where(function ($q) {
+                $q->where('last_forward_sync_at', '<', now()->subMinutes(10))
+                  ->orWhereNull('last_forward_sync_at');
+            })
+            ->get();
+
+        foreach ($stuckForward as $account) {
+            Log::warning('[EmailSyncWatchdog] Rescuing stuck forward sync', [
+                'account_id' => $account->id,
+                'last_forward_sync_at' => $account->last_forward_sync_at,
+            ]);
+
+            FetchLatestEmailsJob::dispatch($account->id);
+            
+            $account->update(['last_forward_sync_at' => now()]);
+        }
+    }
+
+    /**
      * Get accounts ready for forward sync (incremental).
      * Now works during seeding, syncing, or completed status.
      */

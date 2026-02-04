@@ -77,6 +77,13 @@ Schedule::command('email:sync-incremental')
     ->withoutOverlapping()
     ->onOneServer();
 
+// Watchdog to rescue stuck email sync jobs
+Schedule::command('email:sync-watchdog')
+    ->everyTenMinutes()
+    ->name('email-sync-watchdog')
+    ->withoutOverlapping()
+    ->onOneServer();
+
 // Schedule maintenance tasks streaming
 Schedule::command('maintenance:stream-cache-stats')->everyMinute()->runInBackground();
 Schedule::command('monitor:stream')->everyMinute()->runInBackground();

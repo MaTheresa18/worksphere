@@ -185,6 +185,16 @@ export const useEmailStore = defineStore('email', () => {
         }
     }
 
+    async function fetchThread(threadId: string) {
+        try {
+            const response = await emailService.getThread(threadId);
+            return response.data; // Return the array of emails
+        } catch (error) {
+            console.error('Failed to fetch thread:', error);
+            return [];
+        }
+    }
+
     async function loadMore() {
         if (currentPage.value < lastPage.value && !isLoadingMore.value && !loading.value) {
             await fetchEmails(currentPage.value + 1);
@@ -513,6 +523,7 @@ export const useEmailStore = defineStore('email', () => {
 
         // Actions
         fetchEmails,
+        fetchThread,
         fetchInitialData,
         loadMore,
         selectFolder,

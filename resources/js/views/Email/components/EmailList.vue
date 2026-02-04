@@ -287,6 +287,12 @@
                             <span
                                 class="text-xs text-[var(--text-muted)] whitespace-nowrap"
                             >
+                                <span
+                                    v-if="email.thread_count > 1"
+                                    class="mr-1 inline-flex items-center justify-center bg-[var(--surface-tertiary)] text-[var(--text-secondary)] rounded-full px-1.5 min-w-[1.25rem] h-5 text-[10px] font-bold"
+                                >
+                                    {{ email.thread_count }}
+                                </span>
                                 {{ formatDate(email.date) }}
                             </span>
                         </div>

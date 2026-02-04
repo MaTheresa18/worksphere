@@ -24,6 +24,9 @@ class EmailResource extends JsonResource
             'body_plain' => $this->body_plain,
             'date' => $this->received_at ? $this->received_at->toIso8601String() : ($this->created_at ? $this->created_at->toIso8601String() : now()->toIso8601String()),
 
+            // Threading
+            'thread_count' => $this->thread_count ?? 1,
+
             // Revert to flat structure matching Model
             'from_name' => $this->from_name,
             'from_email' => $this->from_email,

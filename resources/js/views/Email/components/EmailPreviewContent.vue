@@ -595,8 +595,10 @@ watch(
         // Only way to know if we BLOCKED images is if we found them AND showImages is false.
         // Let's parse the original body or use a temporary div to check for img tags.
         if (props.email?.body_html && !showImages.value) {
-            // Simple heuristic: does contain <img src="http... ?
-            const hasImg = /<img[^>]+src=["'](http|\/\/)/i.test(
+            // Simple heuristic check for potentially blocked images
+            // Matches http, // (protocol relative), and cid: (inline attachments)
+            // Note: data-original-src also matches src= due to the attribute suffix
+            const hasImg = /<img[^>]+src=["'](http|\/\/|cid:)/i.test(
                 props.email.body_html,
             );
             hasBlockedImages.value = hasImg;

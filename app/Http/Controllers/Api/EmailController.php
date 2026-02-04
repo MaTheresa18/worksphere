@@ -20,25 +20,22 @@ class EmailController extends Controller
     /**
      * Display a listing of the resource.
      */
+    /**
+     * Display a listing of the resource (Threaded View).
+     */
     public function index(Request $request)
     {
-        $query = Email::query()
-            ->forUser(auth()->id()) // CRITICAL: Scope to authenticated user's emails only
-            ->with(['labels', 'emailAccount', 'media']) // Eager load relationships
-            ->orderBy('received_at', 'desc');
+        // Base constraints
+        $query = Email::query()->forUser(auth()->id());
+
+        // --- Apply Filters to Base Query ---
 
         // Filter by Email Account
         if ($request->filled('email_account_id')) {
             $accountId = $request->email_account_id;
-            // If it's a UUID, resolve to internal ID
             if (\Illuminate\Support\Str::isUuid($accountId)) {
                 $account = \App\Models\EmailAccount::where('public_id', $accountId)->first();
-                if ($account) {
-                    $query->where('email_account_id', $account->id);
-                } else {
-                    // Invalid UUID provided, return none?
-                    $query->where('email_account_id', -1);
-                }
+                $query->where('email_account_id', $account ? $account->id : -1);
             } else {
                 $query->where('email_account_id', $accountId);
             }
@@ -53,13 +50,12 @@ class EmailController extends Controller
         } else {
             // Filter by Folder (default to 'inbox')
             $folder = $request->input('folder', 'inbox');
-
             if ($folder !== 'all') {
                 $query->where('folder', $folder);
             }
         }
 
-        // Search (support both 'q' and 'search')
+        // Search
         if ($request->filled('q')) {
             $query->search($request->q);
         } elseif ($request->filled('search')) {
@@ -74,10 +70,71 @@ class EmailController extends Controller
             $query->whereDate('received_at', '<=', $request->date_to);
         }
 
-        // Use EmailResource collection to ensure consistent structure
-        return EmailResource::collection(
-            $query->paginate($request->integer('per_page', 25))
-        );
+        // --- Threading Logic ---
+        // We group by thread_id (or id if null) to get distinct conversations.
+        // We emulate a "Thread" entity by creating a query that returns the stats of the thread.
+        
+        $threadQuery = $query->clone()
+            ->selectRaw('
+                COALESCE(thread_id, CAST(id AS CHAR)) as thread_key,
+                MAX(received_at) as last_activity,
+                COUNT(*) as thread_count,
+                MAX(id) as latest_email_id
+            ')
+            ->groupBy('thread_key')
+            ->orderBy('last_activity', 'desc');
+
+        // Paginate the THREADS, not the emails
+        $threads = $threadQuery->paginate($request->integer('per_page', 25));
+
+        // Now verify/hydrate the actual email models for the "latest" in each thread
+        $latestIds = $threads->pluck('latest_email_id');
+        
+        $emails = Email::whereIn('id', $latestIds)
+            ->with(['labels', 'emailAccount', 'media'])
+            ->get()
+            ->keyBy('id');
+
+        // Map the results back to the paginator, injecting thread_count
+        $resourceCollection = $threads->getCollection()->map(function ($threadStat) use ($emails) {
+            $email = $emails->get($threadStat->latest_email_id);
+            if (!$email) return null;
+
+            $email->thread_count = $threadStat->thread_count;
+            return $email;
+        })->filter();
+
+        $threads->setCollection($resourceCollection);
+
+        return EmailResource::collection($threads);
+    }
+
+    /**
+     * Get all emails in a thread.
+     */
+    public function thread(Request $request, string $threadId): JsonResponse
+    {
+        // If threadId looks like an integer, it might be a single email fallback.
+        // But our logic uses valid thread_ids usually.
+        
+        $emails = Email::query()
+            ->forUser(auth()->id())
+            ->where('thread_id', $threadId)
+            ->with(['labels', 'emailAccount', 'media'])
+            ->orderBy('received_at', 'asc') // Oldest first for reading flow
+            ->get();
+
+        // Fallback: if no emails found by thread_id, maybe it was a single email ID passed as thread key?
+        // (Scenario: thread_id was null, so we used ID as key)
+        if ($emails->isEmpty() && is_numeric($threadId)) {
+             $emails = Email::query()
+                ->forUser(auth()->id())
+                ->where('id', $threadId)
+                ->with(['labels', 'emailAccount', 'media'])
+                ->get();
+        }
+
+        return response()->json(EmailResource::collection($emails));
     }
 
     /**

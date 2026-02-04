@@ -52,7 +52,7 @@ class BackfillEmailsJob implements ShouldQueue, ShouldBeUnique
     /**
      * Number of emails to fetch per batch.
      */
-    protected int $batchSize = 25; 
+    protected int $batchSize = 50; 
 
     public function __construct(
         public int $accountId,
@@ -286,7 +286,7 @@ class BackfillEmailsJob implements ShouldQueue, ShouldBeUnique
             // Sliding Window Strategy:
             // Instead of fetching 1:$backfillCursor (which can cause timeouts/memory issues),
             // we fetch a small window below the cursor.
-            $windowSize = 50; 
+            $windowSize = 100; 
             $startUid = max(1, $backfillCursor - $windowSize);
             $endUid = $backfillCursor - 1;
             

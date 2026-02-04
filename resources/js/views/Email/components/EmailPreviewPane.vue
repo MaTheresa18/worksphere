@@ -4,27 +4,53 @@
     >
         <!-- Email Content Area -->
         <div class="flex-1 overflow-hidden min-h-0 relative flex flex-col">
-            <EmailPreviewContent
-                v-if="email && activeTab === 'read'"
-                :email="email"
-                @reply="openTab('reply')"
-                @reply-all="openTab('reply-all')"
-                @forward="openTab('forward')"
-                @forward-as-attachment="openTab('forward-as-attachment')"
-            />
+            <!-- Loading State -->
+            <div v-if="loadingThread" class="p-8 flex justify-center">
+                 <LoaderIcon class="w-6 h-6 animate-spin text-[var(--text-muted)]" />
+            </div>
+
+            <!-- Thread View -->
+            <div v-else-if="threadMessages.length > 0 && activeTab === 'read'" class="flex-1 overflow-y-auto">
+                <div 
+                    v-for="(msg, index) in threadMessages" 
+                    :key="msg.id"
+                    class="border-b border-[var(--border-default)] last:border-0"
+                >
+                    <!-- Collapsed Header -->
+                    <div 
+                        v-if="!msg.isExpanded" 
+                        @click="toggleExpand(index)"
+                        class="px-6 py-3 bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] cursor-pointer flex items-center gap-4 transition-colors"
+                    >
+                        <p class="font-medium text-sm text-[var(--text-primary)] w-48 truncate">{{ msg.from_name }}</p>
+                        <p class="text-sm text-[var(--text-secondary)] flex-1 truncate">{{ msg.preview }}</p>
+                        <span class="text-xs text-[var(--text-muted)] whitespace-nowrap">{{ formatDate(msg.date) }}</span>
+                    </div>
+
+                    <!-- Expanded Content -->
+                    <EmailPreviewContent
+                        v-else
+                        :email="msg"
+                        @reply="openTab('reply', msg)"
+                        @reply-all="openTab('reply-all', msg)"
+                        @forward="openTab('forward', msg)"
+                        @forward-as-attachment="openTab('forward-as-attachment', msg)"
+                    />
+                </div>
+            </div>
 
             <!-- Inline Composer -->
             <EmailInlineComposer
                 v-else-if="activeTab !== 'read'"
                 :mode="activeTab"
-                :reply-to="email"
+                :reply-to="replyTargetEmail || email"
                 @close="closeActiveTab"
                 @send="handleSend"
             />
 
             <!-- Empty State -->
             <div
-                v-if="!email && activeTab === 'read'"
+                v-else
                 class="flex-1 flex flex-col items-center justify-center text-[var(--text-muted)] h-full"
             >
                 <MailIcon class="w-16 h-16 mb-4 text-[var(--text-tertiary)]" />
@@ -91,10 +117,13 @@ import {
     PaperclipIcon,
     PencilIcon,
     InboxIcon,
+    LoaderIcon
 } from "lucide-vue-next";
 import EmailPreviewContent from "./EmailPreviewContent.vue";
 import EmailInlineComposer from "./EmailInlineComposer.vue";
 import type { Email } from "@/types/models/email";
+import { useEmailStore } from "@/stores/emailStore";
+import { isToday, format } from "date-fns";
 
 interface Tab {
     id: string;
@@ -112,20 +141,70 @@ const emit = defineEmits<{
     "tab-closed": [tabId: string];
 }>();
 
+const store = useEmailStore();
 const activeTab = ref<string>("read");
 const tabs = ref<Tab[]>([
     { id: "read", label: "Read", icon: markRaw(InboxIcon), closable: false },
 ]);
 
-// Watch for email changes to reset to read view
+// Threading State
+const threadMessages = ref<any[]>([]);
+const loadingThread = ref(false);
+const replyTargetEmail = ref<Email | null>(null); // Specific email being replied to in thread
+
+// Watch for email changes to fetch thread
 watch(
     () => props.email,
-    (newEmail) => {
+    async (newEmail) => {
         if (newEmail) {
             activeTab.value = "read";
+            
+            // If it's part of a thread, fetch the whole conversation
+            if (newEmail.thread_count && newEmail.thread_count > 1) {
+                loadingThread.value = true;
+                // Use thread_id if available, otherwise fallback to finding by ID (but backend logic handles this)
+                // We assume newEmail has thread_id or the ID acts as key.
+                const threadId = newEmail.thread_id || newEmail.id;
+                
+                try {
+                    const messages = await store.fetchThread(threadId);
+                    
+                    // Process messages for UI (add isExpanded)
+                    // Expand the LAST message by default, collapse others
+                    threadMessages.value = messages.map((msg: any, index: number) => ({
+                        ...msg,
+                        isExpanded: index === messages.length - 1
+                    }));
+                } catch (e) {
+                    // Fallback to single email if fetch fails
+                    threadMessages.value = [{ ...newEmail, isExpanded: true }];
+                } finally {
+                    loadingThread.value = false;
+                }
+            } else {
+                // Single email
+                threadMessages.value = [{ ...newEmail, isExpanded: true }];
+                loadingThread.value = false;
+            }
+        } else {
+            threadMessages.value = [];
         }
     },
+    { immediate: true } 
 );
+
+function toggleExpand(index: number) {
+    if (threadMessages.value[index]) {
+        threadMessages.value[index].isExpanded = !threadMessages.value[index].isExpanded;
+    }
+}
+
+function formatDate(dateString: string) {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "";
+    return isToday(date) ? format(date, "h:mm a") : format(date, "MMM d");
+}
 
 // Listen for postMessage from popup windows
 onMounted(() => {
@@ -143,7 +222,8 @@ function handlePopupMessage(event: MessageEvent) {
             event.data.type,
         )
     ) {
-        openTab(event.data.type as any);
+        // Default to latest message if not specified? 
+        openTab(event.data.type as any, props.email);
     }
 }
 
@@ -154,13 +234,17 @@ function openTab(
         | "forward"
         | "compose"
         | "forward-as-attachment",
+    targetEmail: Email | null = null
 ) {
+    const emailToUse = targetEmail || props.email;
+    replyTargetEmail.value = emailToUse; // Set context for composer
+
     const id = `${type}-${Date.now()}`;
     const labels = {
-        reply: `Re: ${props.email?.subject || "Reply"}`,
-        "reply-all": `Re All: ${props.email?.subject || "Reply All"}`,
-        forward: `Fwd: ${props.email?.subject || "Forward"}`,
-        "forward-as-attachment": `Fwd(Att): ${props.email?.subject || "Forward"}`,
+        reply: `Re: ${emailToUse?.subject || "Reply"}`,
+        "reply-all": `Re All: ${emailToUse?.subject || "Reply All"}`,
+        forward: `Fwd: ${emailToUse?.subject || "Forward"}`,
+        "forward-as-attachment": `Fwd(Att): ${emailToUse?.subject || "Forward"}`,
         compose: "New Email",
     };
     const icons = {
@@ -188,9 +272,12 @@ function closeTab(id: string) {
         // If closing active tab, switch to read
         if (activeTab.value === id) {
             activeTab.value = "read";
+            replyTargetEmail.value = null;
         }
         // Notify parent that a tab was closed
         emit("tab-closed", id);
+        
+        // Refresh?
     }
 }
 
