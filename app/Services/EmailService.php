@@ -268,7 +268,7 @@ class EmailService implements EmailServiceContract
     ): Email {
         $body = $data['body'] ?? '';
 
-        return $emailModel = Email::create([
+        $emailModel = Email::create([
             'public_id' => (string) Str::uuid(),
             'email_account_id' => $account->id,
             'user_id' => $user->id,
