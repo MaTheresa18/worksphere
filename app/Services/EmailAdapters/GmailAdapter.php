@@ -235,11 +235,22 @@ class GmailAdapter extends BaseEmailAdapter
     protected function parseGmailMessage(\Google\Service\Gmail\Message $message): array
     {
         $payload = $message->getPayload();
-        $headers = collect($payload->getHeaders());
+        $headers = collect($payload->getHeaders() ?: []);
         
         $getHeader = function($name) use ($headers) {
             $header = $headers->first(fn($h) => strtolower($h->getName()) === strtolower($name));
-            return $header ? $header->getValue() : null;
+            $value = $header ? $header->getValue() : null;
+            
+            // Decode MIME encoded headers (e.g. =?UTF-8?Q?...?=)
+            if ($value && str_contains($value, '=?')) {
+                try {
+                    $decoded = iconv_mime_decode($value, ICONV_MIME_DECODE_CONTINUE_ON_ERROR, 'UTF-8');
+                    return $decoded ?: $value;
+                } catch (\Throwable $e) {
+                    return $value;
+                }
+            }
+            return $value;
         };
 
         $from = $getHeader('From');
@@ -272,7 +283,7 @@ class GmailAdapter extends BaseEmailAdapter
             'is_read' => !in_array('UNREAD', $message->getLabelIds() ?? []),
             'is_starred' => in_array('STARRED', $message->getLabelIds() ?? []),
             'has_attachments' => $this->hasGmailAttachments($payload),
-            'imap_uid' => null, // Gmail API doesn't use IMAP UIDs in the same way
+            'imap_uid' => null,
             'date' => $message->getInternalDate() ? date('Y-m-d H:i:s', $message->getInternalDate() / 1000) : now(),
         ];
     }
@@ -287,11 +298,11 @@ class GmailAdapter extends BaseEmailAdapter
             $data = $part->getBody()->getData();
             
             if ($data !== null) {
-                $data = strtr($data, '-_', '+/'); // Gmail base64url to base64
+                $decoded = $this->base64url_decode($data);
                 if ($mimeType === 'text/html') {
-                    $html .= base64_decode($data);
+                    $html .= $decoded;
                 } elseif ($mimeType === 'text/plain') {
-                    $plain .= base64_decode($data);
+                    $plain .= $decoded;
                 }
             }
 
@@ -305,6 +316,19 @@ class GmailAdapter extends BaseEmailAdapter
         $processPart($payload);
 
         return ['html' => $html, 'plain' => $plain];
+    }
+
+    /**
+     * Robust base64url decoding with padding.
+     */
+    protected function base64url_decode(string $data): string
+    {
+        $base64 = strtr($data, '-_', '+/');
+        $padding = strlen($base64) % 4;
+        if ($padding) {
+            $base64 .= str_repeat('=', 4 - $padding);
+        }
+        return (string) base64_decode($base64);
     }
 
     protected function parseGmailRecipients($header): array
@@ -373,7 +397,8 @@ class GmailAdapter extends BaseEmailAdapter
                     $emailData = $this->parseGmailMessage($fullMsg);
                     
                     // Store using sync service (provider agnostic)
-                    app(EmailSyncService::class)->storeEmail($account, $emailData, $labelId);
+                    // We explicitly disable broadcasting for backfill
+                    app(EmailSyncService::class)->storeEmail($account, $emailData, $labelId, false);
                     $fetched++;
                 } catch (\Throwable $e) {
                     Log::warning('[GmailAdapter] Failed to process single message during backfill', [

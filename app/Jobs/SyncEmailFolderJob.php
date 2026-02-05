@@ -105,7 +105,7 @@ class SyncEmailFolderJob implements ShouldQueue
 
                 if (! $exists) {
                     try {
-                        $syncService->storeEmail($account, $emailData, $this->folder);
+                        $syncService->storeEmail($account, $emailData, $this->folder, false);
                         $fetchedCount++;
                     } catch (\Throwable $e) {
                         Log::warning('[SyncEmailFolderJob] Failed to store email', [

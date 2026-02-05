@@ -170,7 +170,7 @@ class SeedEmailAccountJob implements ShouldQueue
             $seededCount = 0;
             foreach ($messages as $emailData) {
                 try {
-                    $syncService->storeEmail($account, $emailData, $folderType->value);
+                    $syncService->storeEmail($account, $emailData, $folderType->value, false);
                     $seededCount++;
                 } catch (\Throwable $e) {
                     Log::warning('[SeedEmailAccountJob] Failed to store email', [

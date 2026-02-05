@@ -315,7 +315,7 @@ class EmailSyncService implements EmailSyncServiceContract
         
         $count = 0;
         foreach ($messages as $emailData) {
-            $this->storeEmail($account, $emailData, $emailData['folder'] ?? EmailFolderType::Inbox->value);
+            $this->storeEmail($account, $emailData, $emailData['folder'] ?? EmailFolderType::Inbox->value, true);
             $count++;
         }
 
@@ -444,7 +444,7 @@ class EmailSyncService implements EmailSyncServiceContract
         EmailAccount $account,
         array $emailData,
         string $folder,
-        bool $broadcast = true
+        bool $broadcast = false
     ): Email {
         $maxRetries = 3;
         $attempt = 0;
