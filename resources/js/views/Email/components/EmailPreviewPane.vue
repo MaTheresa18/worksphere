@@ -159,31 +159,22 @@ watch(
         if (newEmail) {
             activeTab.value = "read";
             
-            // If it's part of a thread, fetch the whole conversation
-            if (newEmail.thread_count && newEmail.thread_count > 1) {
-                loadingThread.value = true;
-                // Use thread_id if available, otherwise fallback to finding by ID (but backend logic handles this)
-                // We assume newEmail has thread_id or the ID acts as key.
-                const threadId = newEmail.thread_id || newEmail.id;
+            loadingThread.value = true;
+            const threadId = newEmail.thread_id || newEmail.id;
+            
+            try {
+                const messages = await store.fetchThread(threadId);
                 
-                try {
-                    const messages = await store.fetchThread(threadId);
-                    
-                    // Process messages for UI (add isExpanded)
-                    // Expand the LAST message by default, collapse others
-                    threadMessages.value = messages.map((msg: any, index: number) => ({
-                        ...msg,
-                        isExpanded: index === messages.length - 1
-                    }));
-                } catch (e) {
-                    // Fallback to single email if fetch fails
-                    threadMessages.value = [{ ...newEmail, isExpanded: true }];
-                } finally {
-                    loadingThread.value = false;
-                }
-            } else {
-                // Single email
+                // Process messages for UI (add isExpanded)
+                // Expand the LAST message by default, collapse others
+                threadMessages.value = messages.map((msg: any, index: number) => ({
+                    ...msg,
+                    isExpanded: index === messages.length - 1
+                }));
+            } catch (e) {
+                // Fallback to single email if fetch fails
                 threadMessages.value = [{ ...newEmail, isExpanded: true }];
+            } finally {
                 loadingThread.value = false;
             }
         } else {
