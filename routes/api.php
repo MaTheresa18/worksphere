@@ -90,6 +90,7 @@ Route::middleware(['throttle:guest'])->group(function () {
 
     // Webhooks
     Route::post('/webhooks/twilio/debugger', [\App\Http\Controllers\Api\TwilioWebhookController::class, 'handleDebugger']);
+    Route::post('/webhooks/google/pubsub', [\App\Http\Controllers\Webhooks\GooglePubSubController::class, 'handle']);
 });
 
 // Public Content Routes (Higher Rate Limit for Browsing)

@@ -80,21 +80,11 @@ class SeedEmailAccountJob implements ShouldQueue
                 throw new \RuntimeException('Failed to refresh OAuth token');
             }
 
-            // Create and connect client using adapter
-            $client = $this->adapter->createClient($account);
-            $client->connect();
-
-            Log::info('[SeedEmailAccountJob] Connected to IMAP', [
-                'account_id' => $this->accountId,
-                'provider' => $account->provider,
-            ]);
-
             $priorityFolders = EmailFolderType::priorityFolders();
             $totalSeeded = 0;
 
             foreach ($priorityFolders as $folderType) {
                 $seededInFolder = $this->seedFolder(
-                    $client,
                     $account,
                     $folderType,
                     $seedCount,
@@ -102,8 +92,6 @@ class SeedEmailAccountJob implements ShouldQueue
                 );
                 $totalSeeded += $seededInFolder;
             }
-
-            $client->disconnect();
 
             // Log completion
             $durationMs = (int) ((microtime(true) - $startTime) * 1000);
@@ -143,30 +131,15 @@ class SeedEmailAccountJob implements ShouldQueue
      * Seed a single folder using the adapter.
      */
     protected function seedFolder(
-        \Webklex\PHPIMAP\Client $client,
         EmailAccount $account,
         EmailFolderType $folderType,
         int $seedCount,
         EmailSyncService $syncService
     ): int {
-        $imapFolderName = $this->adapter->getFolderName($folderType->value);
-
         try {
-            $folder = $client->getFolder($imapFolderName);
-
-            if (! $folder) {
-                Log::warning('[SeedEmailAccountJob] Folder not found', [
-                    'account_id' => $this->accountId,
-                    'folder' => $imapFolderName,
-                    'provider' => $account->provider,
-                ]);
-
-                return 0;
-            }
-
-            // Get folder info
-            $totalInfo = $folder->examine();
-            $totalMessages = $totalInfo['exists'] ?? 0;
+            // Get folder status using agnostic method
+            $status = $this->adapter->getFolderStatus($account, $folderType->value);
+            $totalMessages = $status['exists'] ?? 0;
 
             if ($totalMessages === 0) {
                 $syncService->updateSyncCursor($account, $folderType->value, 0, 0);
@@ -178,8 +151,8 @@ class SeedEmailAccountJob implements ShouldQueue
                 return 0;
             }
 
-            // Use adapter to fetch latest messages directly
-            $messages = $this->adapter->fetchLatestMessages($folder, $seedCount);
+            // Use adapter to fetch latest messages directly (parsed to array)
+            $messages = $this->adapter->fetchLatestMessagesForAccount($account, $folderType->value, $seedCount);
 
             if ($messages->isEmpty()) {
                 Log::warning('[SeedEmailAccountJob] No messages fetched', [
@@ -195,10 +168,9 @@ class SeedEmailAccountJob implements ShouldQueue
 
             // Store each message
             $seededCount = 0;
-            foreach ($messages as $message) {
+            foreach ($messages as $emailData) {
                 try {
-                    $emailData = $this->parseMessage($message);
-                    $syncService->storeEmailFromImap($account, $emailData, $folderType->value);
+                    $syncService->storeEmail($account, $emailData, $folderType->value);
                     $seededCount++;
                 } catch (\Throwable $e) {
                     Log::warning('[SeedEmailAccountJob] Failed to store email', [
@@ -229,146 +201,6 @@ class SeedEmailAccountJob implements ShouldQueue
 
             return 0;
         }
-    }
-
-    /**
-     * Fallback method using query with limit.
-     */
-    protected function seedFolderFallback(
-        \Webklex\PHPIMAP\Folder $folder,
-        EmailAccount $account,
-        EmailFolderType $folderType,
-        int $seedCount,
-        int $totalMessages,
-        EmailSyncService $syncService
-    ): int {
-        try {
-            $messages = $folder->query()->limit($seedCount)->get();
-            $seededCount = 0;
-
-            foreach ($messages as $message) {
-                try {
-                    $emailData = $this->parseMessage($message);
-                    $syncService->storeEmailFromImap($account, $emailData, $folderType->value);
-                    $seededCount++;
-                } catch (\Throwable $e) {
-                    Log::warning('[SeedEmailAccountJob] Fallback: Failed to store email', [
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
-
-            $syncService->updateSyncCursor($account, $folderType->value, $seededCount, $totalMessages);
-
-            Log::info('[SeedEmailAccountJob] Fallback seeded folder', [
-                'account_id' => $this->accountId,
-                'folder' => $folderType->value,
-                'seeded' => $seededCount,
-            ]);
-
-            return $seededCount;
-        } catch (\Throwable $e) {
-            Log::error('[SeedEmailAccountJob] Fallback query failed', [
-                'folder' => $folderType->value,
-                'error' => $e->getMessage(),
-            ]);
-
-            $syncService->updateSyncCursor($account, $folderType->value, 0, $totalMessages);
-
-            return 0;
-        }
-    }
-
-    /**
-     * Parse IMAP message to email data array.
-     */
-    protected function parseMessage($message): array
-    {
-        $from = $message->getFrom()[0] ?? null;
-
-        $fromEmail = 'unknown@unknown.com';
-        $fromName = null;
-
-        if ($from && is_object($from)) {
-            $fromEmail = $from->mail ?? 'unknown@unknown.com';
-            $fromName = $from->personal ?? null;
-        } elseif (is_string($from)) {
-            $fromEmail = $from;
-        }
-
-        // Get preview text (first 200 chars of plain text)
-        $textBody = $message->getTextBody() ?? '';
-        $preview = \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/', ' ', $textBody)), 200);
-
-        // Process attachments
-        $attachments = [];
-        if ($message->hasAttachments()) {
-            foreach ($message->getAttachments() as $attachment) {
-                $contentId = $attachment->id ?? null;
-
-                if ($contentId) {
-                    $contentId = trim($contentId, '<>');
-                }
-
-                $attachments[] = [
-                    'name' => $attachment->getName(),
-                    'content' => $attachment->getContent(),
-                    'mime' => $attachment->getMimeType(),
-                    'content_id' => $contentId,
-                ];
-            }
-        }
-
-        // Process headers
-        $headers = [];
-        try {
-            $rawHeaders = $message->getHeader()->getAttributes();
-            foreach ($rawHeaders as $key => $value) {
-                $headers[$key] = (string) $value;
-            }
-        } catch (\Throwable) {
-            // Fallback empty
-        }
-
-        return [
-            'message_id' => (string) ($message->getMessageId()?->first() ?? ''),
-            'from_email' => $fromEmail,
-            'from_name' => (string) ($fromName ?? $fromEmail),
-            'to' => $this->formatRecipients($message->getTo()),
-            'cc' => $this->formatRecipients($message->getCc()),
-            'bcc' => $this->formatRecipients($message->getBcc()),
-            'subject' => (string) ($message->getSubject()?->first() ?? '(No Subject)'),
-            'preview' => (string) $preview,
-            'body_html' => (string) ($message->getHTMLBody() ?? ''),
-            'body_plain' => (string) $textBody,
-            'headers' => $headers,
-            'is_read' => $message->getFlags()->contains('Seen'),
-            'is_starred' => $message->getFlags()->contains('Flagged'),
-            'has_attachments' => $message->hasAttachments(),
-            'attachments' => $attachments,
-            'imap_uid' => (int) $message->getUid(),
-            'date' => $message->getDate()?->first()?->toDate(),
-        ];
-    }
-
-    /**
-     * Format recipients to array of [name, email].
-     */
-    protected function formatRecipients($attribute): array
-    {
-        if (! $attribute || ! method_exists($attribute, 'toArray')) {
-            return [];
-        }
-
-        $flattened = [];
-        foreach ($attribute->toArray() as $recipient) {
-            $flattened[] = [
-                'name' => $recipient->personal ?? null,
-                'email' => $recipient->mail ?? '',
-            ];
-        }
-
-        return $flattened;
     }
 
     public function failed(\Throwable $exception): void

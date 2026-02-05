@@ -1,5 +1,5 @@
 <template>
-    <div 
+    <div
         class="flex flex-col h-full overflow-hidden"
         :class="{ 'max-h-[calc(100vh-110px)]': !isPopup }"
     >
@@ -51,12 +51,20 @@
             >
                 <!-- Metadata details... reusing existing structure if possible, but for brevity using simplified -->
                 <div class="grid grid-cols-[120px_1fr] gap-y-2">
-                    <div class="font-semibold text-[var(--text-primary)]">Message-ID:</div>
+                    <div class="font-semibold text-[var(--text-primary)]">
+                        Message-ID:
+                    </div>
                     <div class="select-all">{{ email.message_id }}</div>
-                    <div class="font-semibold text-[var(--text-primary)]">Date:</div>
+                    <div class="font-semibold text-[var(--text-primary)]">
+                        Date:
+                    </div>
                     <div>{{ email.date }}</div>
-                    <div class="font-semibold text-[var(--text-primary)]">From:</div>
-                    <div class="select-all">{{ email.from_name }} &lt;{{ email.from_email }}&gt;</div>
+                    <div class="font-semibold text-[var(--text-primary)]">
+                        From:
+                    </div>
+                    <div class="select-all">
+                        {{ email.from_name }} &lt;{{ email.from_email }}&gt;
+                    </div>
                 </div>
             </div>
 
@@ -68,55 +76,103 @@
                             class="w-11 h-11 rounded-full ring-2 ring-[var(--border-default)] ring-offset-2 ring-offset-[var(--surface-primary)]"
                             alt=""
                         />
-                         <div class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-[var(--surface-primary)]"></div>
+                        <div
+                            class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-[var(--surface-primary)]"
+                        ></div>
                     </div>
                     <div class="ml-4">
-                         <p class="text-sm font-semibold text-[var(--text-primary)]">{{ email.from_name }}</p>
-                         <p class="text-xs text-[var(--text-muted)]"><span>&lt;{{ email.from_email }}&gt;</span></p>
+                        <p
+                            class="text-sm font-semibold text-[var(--text-primary)]"
+                        >
+                            {{ email.from_name }}
+                        </p>
+                        <p class="text-xs text-[var(--text-muted)]">
+                            <span>&lt;{{ email.from_email }}&gt;</span>
+                        </p>
                     </div>
                 </div>
                 <div class="text-right">
-                    <p class="text-sm text-[var(--text-secondary)]">{{ formatDate(email.date) }}</p>
-                    <p class="text-xs text-[var(--text-muted)]">{{ formatRelative(email.date) }}</p>
+                    <p class="text-sm text-[var(--text-secondary)]">
+                        {{ formatDate(email.date) }}
+                    </p>
+                    <p class="text-xs text-[var(--text-muted)]">
+                        {{ formatRelative(email.date) }}
+                    </p>
                 </div>
             </div>
         </div>
 
         <!-- Popup Header -->
-        <div v-else class="p-4 border-b border-[var(--border-default)] bg-[var(--surface-primary)] sticky top-0 z-10 shadow-sm">
-             <div class="flex justify-between items-start mb-4">
-                <h1 class="text-xl font-semibold text-[var(--text-primary)] leading-tight truncate pr-4">{{ email.subject }}</h1>
+        <div
+            v-else
+            class="p-4 border-b border-[var(--border-default)] bg-[var(--surface-primary)] sticky top-0 z-10 shadow-sm"
+        >
+            <div class="flex justify-between items-start mb-4">
+                <h1
+                    class="text-xl font-semibold text-[var(--text-primary)] leading-tight truncate pr-4"
+                >
+                    {{ email.subject }}
+                </h1>
                 <div class="flex items-center gap-2">
-                     <button @click="printEmail" class="p-2 text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] rounded-lg" title="Print"><PrinterIcon class="w-4 h-4" /></button>
+                    <button
+                        @click="printEmail"
+                        class="p-2 text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] rounded-lg"
+                        title="Print"
+                    >
+                        <PrinterIcon class="w-4 h-4" />
+                    </button>
                 </div>
-             </div>
-             
-             <!-- Meta & Actions Row -->
-             <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-3">
-                       <img :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(email.from_name)}&background=6366f1&color=fff`" class="w-8 h-8 rounded-full" alt="" />
-                       <div>
-                            <div class="text-sm font-medium text-[var(--text-primary)]">{{ email.from_name }}</div>
-                            <div class="text-xs text-[var(--text-secondary)]">{{ formatDate(email.date) }}</div>
-                       </div>
-                  </div>
-                  
-                  <div class="flex gap-2">
-                       <button @click="emit('reply')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--interactive-primary)] text-white hover:bg-[var(--interactive-primary)]/90 transition-colors">
-                           <ReplyIcon class="w-3.5 h-3.5" /> Reply
-                       </button>
-                       <button @click="emit('reply-all')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-default)] text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] transition-colors">
-                           <ReplyAllIcon class="w-3.5 h-3.5" /> Reply All
-                       </button>
-                       <button @click="emit('forward')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-default)] text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] transition-colors">
-                           <ForwardIcon class="w-3.5 h-3.5" /> Forward
-                       </button>
-                       <div class="h-4 w-px bg-[var(--border-default)] mx-1"></div>
-                        <button @click="exportAsEml" class="p-1.5 text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] rounded-lg transition-colors" title="Export .eml">
-                            <DownloadIcon class="w-4 h-4" />
-                        </button>
-                  </div>
-             </div>
+            </div>
+
+            <!-- Meta & Actions Row -->
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <img
+                        :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(email.from_name)}&background=6366f1&color=fff`"
+                        class="w-8 h-8 rounded-full"
+                        alt=""
+                    />
+                    <div>
+                        <div
+                            class="text-sm font-medium text-[var(--text-primary)]"
+                        >
+                            {{ email.from_name }}
+                        </div>
+                        <div class="text-xs text-[var(--text-secondary)]">
+                            {{ formatDate(email.date) }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-2">
+                    <button
+                        @click="emit('reply')"
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--interactive-primary)] text-white hover:bg-[var(--interactive-primary)]/90 transition-colors"
+                    >
+                        <ReplyIcon class="w-3.5 h-3.5" /> Reply
+                    </button>
+                    <button
+                        @click="emit('reply-all')"
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-default)] text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] transition-colors"
+                    >
+                        <ReplyAllIcon class="w-3.5 h-3.5" /> Reply All
+                    </button>
+                    <button
+                        @click="emit('forward')"
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-default)] text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] transition-colors"
+                    >
+                        <ForwardIcon class="w-3.5 h-3.5" /> Forward
+                    </button>
+                    <div class="h-4 w-px bg-[var(--border-default)] mx-1"></div>
+                    <button
+                        @click="exportAsEml"
+                        class="p-1.5 text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] rounded-lg transition-colors"
+                        title="Export .eml"
+                    >
+                        <DownloadIcon class="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Body -->
@@ -208,8 +264,15 @@
                         @click="downloadSelected"
                         :disabled="!allSelectedDownloaded"
                         class="text-xs font-medium text-[var(--interactive-primary)] hover:underline flex items-center gap-1"
-                        :class="{ 'opacity-50 cursor-not-allowed': !allSelectedDownloaded }"
-                        :title="allSelectedDownloaded ? 'Download selected' : 'Some attachments not yet downloaded'"
+                        :class="{
+                            'opacity-50 cursor-not-allowed':
+                                !allSelectedDownloaded,
+                        }"
+                        :title="
+                            allSelectedDownloaded
+                                ? 'Download selected'
+                                : 'Some attachments not yet downloaded'
+                        "
                     >
                         Download Selected ({{ selectedAttachments.size }})
                     </button>
@@ -217,8 +280,15 @@
                         @click="downloadAll"
                         :disabled="hasPlaceholderAttachments"
                         class="text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline flex items-center gap-1 ml-2"
-                        :class="{ 'opacity-50 cursor-not-allowed hover:no-underline': hasPlaceholderAttachments }"
-                        :title="hasPlaceholderAttachments ? 'Download each attachment first' : 'Download all attachments'"
+                        :class="{
+                            'opacity-50 cursor-not-allowed hover:no-underline':
+                                hasPlaceholderAttachments,
+                        }"
+                        :title="
+                            hasPlaceholderAttachments
+                                ? 'Download each attachment first'
+                                : 'Download all attachments'
+                        "
                     >
                         Download All
                     </button>
@@ -388,6 +458,55 @@
             </div>
         </div>
     </div>
+
+    <!-- External Link Warning Modal -->
+    <Modal
+        v-model:open="showLinkWarning"
+        title="Security Warning"
+        description="You are about to leave the application and open an external link."
+        size="md"
+    >
+        <div class="flex flex-col items-center py-4 text-center">
+            <div class="p-3 rounded-full bg-amber-500/10 mb-4 animate-pulse">
+                <ShieldAlertIcon class="w-12 h-12 text-amber-500" />
+            </div>
+
+            <h3 class="text-lg font-semibold text-[var(--text-primary)] mb-2">
+                Leaving WorkSphere
+            </h3>
+            <p class="text-sm text-[var(--text-secondary)] mb-6 max-w-sm">
+                For your security, please verify that you trust this link before
+                proceeding. External links can sometimes lead to malicious
+                websites.
+            </p>
+
+            <div
+                class="w-full p-3 rounded-xl bg-[var(--surface-secondary)] border border-[var(--border-default)] mb-6 overflow-hidden"
+            >
+                <p
+                    class="text-xs font-mono text-[var(--text-primary)] break-all text-left line-clamp-2"
+                    :title="pendingLink"
+                >
+                    {{ pendingLink }}
+                </p>
+            </div>
+        </div>
+
+        <template #footer>
+            <div class="flex gap-3 w-full">
+                <Button
+                    variant="ghost"
+                    class="flex-1"
+                    @click="showLinkWarning = false"
+                    >Cancel</Button
+                >
+                <Button variant="primary" class="flex-1" @click="proceedToLink">
+                    Proceed to Link
+                    <ExternalLinkIcon class="w-4 h-4 ml-2" />
+                </Button>
+            </div>
+        </template>
+    </Modal>
 </template>
 
 <script setup lang="ts">
@@ -415,11 +534,14 @@ import {
     PaperclipIcon,
     DownloadIcon,
     ExternalLinkIcon,
+    ShieldAlertIcon,
 } from "lucide-vue-next";
 import { format, formatDistanceToNow } from "date-fns";
 import type { Email } from "@/types/models/email";
 import { animate, stagger } from "animejs";
 import { sanitizeHtml } from "@/utils/sanitize";
+import Modal from "@/components/ui/Modal.vue";
+import Button from "@/components/ui/Button.vue";
 
 const props = defineProps<{
     email: Email;
@@ -440,6 +562,10 @@ const isAttachmentsExpanded = ref(false);
 const showMetadata = ref(false);
 const shadowHost = ref<HTMLElement | null>(null);
 const shadowRoot = ref<ShadowRoot | null>(null);
+
+// External Link Warning
+const showLinkWarning = ref(false);
+const pendingLink = ref("");
 
 // On-Demand Downloading State
 const isDownloading = ref<Record<string, boolean>>({});
@@ -499,7 +625,9 @@ const visibleAttachments = computed(() => {
 // Check if any attachments are still in cloud (placeholders)
 const hasPlaceholderAttachments = computed(() => {
     if (!visibleAttachments.value.length) return false;
-    return visibleAttachments.value.some((att: any) => att.is_downloaded === false);
+    return visibleAttachments.value.some(
+        (att: any) => att.is_downloaded === false,
+    );
 });
 
 // Check if all selected attachments are downloaded
@@ -675,16 +803,47 @@ watch(
                     resizeObserver.observe(body);
                 }
 
-                // Make all links open in new tab
+                // Make all links open in new tab (safety fallback)
                 shadowRoot.value?.querySelectorAll("a").forEach((link) => {
                     link.setAttribute("target", "_blank");
                     link.setAttribute("rel", "noopener noreferrer");
                 });
+
+                // Add click listener for external link warning
+                shadowRoot.value?.addEventListener("click", handleLinkClick);
             });
         }
     },
     { immediate: true },
 );
+
+function handleLinkClick(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    const link = target.closest("a");
+    if (link) {
+        const href = link.getAttribute("href");
+        // Intercept all external links (zero-trust)
+        // We skip anchors and common non-web schemes
+        if (
+            href &&
+            !href.startsWith("#") &&
+            !href.startsWith("mailto:") &&
+            !href.startsWith("tel:")
+        ) {
+            event.preventDefault();
+            pendingLink.value = href;
+            showLinkWarning.value = true;
+        }
+    }
+}
+
+function proceedToLink() {
+    if (pendingLink.value) {
+        window.open(pendingLink.value, "_blank");
+        showLinkWarning.value = false;
+        pendingLink.value = "";
+    }
+}
 
 function formatDate(dateStr: string) {
     if (!dateStr) return "";
@@ -848,17 +1007,17 @@ function expandEmail() {
     const height = 700;
     const left = (window.screen.width - width) / 2;
     const top = (window.screen.height - height) / 2;
-    
+
     window.open(
         `/email/popup/${props.email.id}`,
         "_blank",
-        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`,
     );
 }
 
 // --- Export as EML ---
 function exportAsEml() {
-    window.open(`/api/emails/${props.email.id}/export`, '_blank');
+    window.open(`/api/emails/${props.email.id}/export`, "_blank");
 }
 
 // --- Animation ---
@@ -896,5 +1055,4 @@ onMounted(() => {
 onBeforeUnmount(() => {
     if (animation) animation.pause();
 });
-
 </script>

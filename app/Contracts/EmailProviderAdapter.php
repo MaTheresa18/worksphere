@@ -106,4 +106,36 @@ interface EmailProviderAdapter
      * @return mixed The message object or null if not found
      */
     public function getMessageByUid(Folder $folder, int $uid);
+
+    /**
+     * Get high-level folder status (message count, etc.) without exposing IMAP objects.
+     */
+    public function getFolderStatus(EmailAccount $account, string $folderType): array;
+
+    /**
+     * Fetch a chunk of messages for a folder.
+     */
+    public function fetchMessages(EmailAccount $account, string $folderType, int $offset, int $limit): \Illuminate\Support\Collection;
+
+    /**
+     * Fetch the latest N messages for a folder (for seeding).
+     */
+    public function fetchLatestMessagesForAccount(EmailAccount $account, string $folderType, int $count): \Illuminate\Support\Collection;
+
+    /**
+     * Fetch new messages since the last sync cursor (incremental).
+     */
+    public function fetchIncrementalUpdates(EmailAccount $account): \Illuminate\Support\Collection;
+
+    /**
+     * Subscribe to real-time notifications.
+     */
+    public function subscribeToNotifications(EmailAccount $account): bool;
+
+    /**
+     * Run a backfill batch for the account.
+     * 
+     * @return array{fetched: int, has_more: bool, new_cursor: mixed}
+     */
+    public function backfill(EmailAccount $account, ?string $folderType, int $batchSize): array;
 }

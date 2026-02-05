@@ -65,42 +65,19 @@ class SyncEmailFolderJob implements ShouldQueue
             return;
         }
 
-        // Get provider-specific adapter
-        $this->adapter = AdapterFactory::make($account);
-
-        $startTime = microtime(true);
-        $chunkSize = config('email.chunk_size', 100);
-        $cursor = $account->sync_cursor ?? [];
-        $folderData = $cursor['folders'][$this->folder] ?? ['synced' => 0, 'total' => 0];
-        $offset = $folderData['synced'] ?? 0;
-
         try {
-            // Refresh token if needed (for OAuth providers)
-            if (! $this->adapter->refreshTokenIfNeeded($account)) {
-                throw new \RuntimeException('Failed to refresh OAuth token');
-            }
+            // Get provider-specific adapter
+            $this->adapter = AdapterFactory::make($account);
 
-            // Create and connect client using adapter
-            $client = $this->adapter->createClient($account);
-            $client->connect();
+            $startTime = microtime(true);
+            $chunkSize = config('email.chunk_size', 100);
+            $cursor = $account->sync_cursor ?? [];
+            $folderData = $cursor['folders'][$this->folder] ?? ['synced' => 0, 'total' => 0];
+            $offset = $folderData['synced'] ?? 0;
 
-            $imapFolderName = $this->adapter->getFolderName($this->folder);
-            $folder = $client->getFolder($imapFolderName);
-
-            if (! $folder) {
-                Log::warning('[SyncEmailFolderJob] Folder not found', [
-                    'account_id' => $this->accountId,
-                    'folder' => $imapFolderName,
-                ]);
-
-                // Skip to next folder
-                $syncService->updateSyncCursor($account, $this->folder, 0, 0);
-                $syncService->continueSync($account);
-
-                return;
-            }
-
-            $totalMessages = $folder->examine()['exists'] ?? 0;
+            // Get folder status using agnostic method
+            $status = $this->adapter->getFolderStatus($account, $this->folder);
+            $totalMessages = $status['exists'] ?? 0;
 
             // If we've already synced all, move to next folder
             if ($offset >= $totalMessages) {
@@ -109,56 +86,26 @@ class SyncEmailFolderJob implements ShouldQueue
                     'folder' => $this->folder,
                 ]);
 
+                $syncService->updateSyncCursor($account, $this->folder, $totalMessages, $totalMessages);
                 $syncService->continueSync($account);
 
                 return;
             }
 
-            // Fetch next chunk using adapter
-            $start = $offset + 1;
-            $end = min($offset + $chunkSize, $totalMessages);
-
-            $uidsToFetch = $this->adapter->fetchUidRange($folder, $start, $end);
-
-            $messages = collect();
-            if (! empty($uidsToFetch)) {
-                // Fetch messages individually to handle library limitations and avoid "BAD command" errors
-                foreach ($uidsToFetch as $uid) {
-                    try {
-                        $msg = $folder->query()->getMessageByUid($uid);
-                        if ($msg) {
-                            $messages->push($msg);
-                        }
-                    } catch (\Throwable $e) {
-                        // One bad UID shouldn't fail the whole chunk
-                        Log::warning("[SyncEmailFolderJob] Failed to fetch UID {$uid}", ['error' => $e->getMessage()]);
-                    }
-                }
-            } else {
-                // Fallback query
-                try {
-                    $messages = $folder->query()
-                        ->limit($chunkSize)
-                        ->setOffset($offset)
-                        ->get();
-                } catch (\Throwable $e) {
-                    Log::error('[SyncEmailFolderJob] Fallback query failed', ['error' => $e->getMessage()]);
-                    $messages = collect([]);
-                }
-            }
+            // Fetch next chunk using adapter (parsed to array)
+            $messages = $this->adapter->fetchMessages($account, $this->folder, $offset, $chunkSize);
 
             $fetchedCount = 0;
-            foreach ($messages as $message) {
+            foreach ($messages as $emailData) {
                 // Skip if already exists (by imap_uid)
                 $exists = $account->emails()
-                    ->where('imap_uid', $message->getUid())
+                    ->where('imap_uid', $emailData['imap_uid'] ?? null)
                     ->where('folder', $this->folder)
                     ->exists();
 
                 if (! $exists) {
                     try {
-                        $emailData = $this->parseMessage($message);
-                        $syncService->storeEmailFromImap($account, $emailData, $this->folder);
+                        $syncService->storeEmail($account, $emailData, $this->folder);
                         $fetchedCount++;
                     } catch (\Throwable $e) {
                         Log::warning('[SyncEmailFolderJob] Failed to store email', [
@@ -168,33 +115,21 @@ class SyncEmailFolderJob implements ShouldQueue
                 }
             }
 
-            $client->disconnect();
-
             $newSynced = min($offset + $chunkSize, $totalMessages);
             $durationMs = (int) ((microtime(true) - $startTime) * 1000);
-
-            // Update cursor
-            $syncService->updateSyncCursor($account, $this->folder, $newSynced, $totalMessages);
 
             // Log
             EmailSyncLog::logChunkCompleted($account->id, $this->folder, $offset, $fetchedCount, $durationMs);
 
-            Log::info('[SyncEmailFolderJob] Chunk completed', [
-                'account_id' => $this->accountId,
-                'folder' => $this->folder,
-                'offset' => $offset,
-                'fetched' => $fetchedCount,
-                'progress' => "{$newSynced}/{$totalMessages}",
-            ]);
+            $syncService->updateSyncCursor($account, $this->folder, $newSynced, $totalMessages);
 
-            // Check if folder is complete
-            if ($newSynced >= $totalMessages) {
-                // Move to next folder
-                $syncService->continueSync($account);
-            } else {
+            if ($newSynced < $totalMessages) {
                 // Continue with next chunk
                 self::dispatch($this->accountId, $this->folder)
                     ->delay(now()->addSeconds(2));
+            } else {
+                // Move to next folder
+                $syncService->continueSync($account);
             }
         } catch (\Throwable $e) {
             Log::error('[SyncEmailFolderJob] Sync failed', [
@@ -203,69 +138,10 @@ class SyncEmailFolderJob implements ShouldQueue
                 'error' => $e->getMessage(),
             ]);
 
-            EmailSyncLog::logError($account->id, $e->getMessage(), $this->folder);
-
-            throw $e;
+            if (isset($account)) {
+                $syncService->markSyncFailed($account, $e->getMessage());
+            }
         }
-    }
-
-    /**
-     * Parse IMAP message to email data array.
-     */
-    protected function parseMessage($message): array
-    {
-        $from = $message->getFrom()[0] ?? null;
-
-        $fromEmail = 'unknown@unknown.com';
-        $fromName = null;
-
-        if ($from && is_object($from)) {
-            $fromEmail = $from->mail ?? 'unknown@unknown.com';
-            $fromName = $from->personal ?? null;
-        } elseif (is_string($from)) {
-            $fromEmail = $from;
-        }
-
-        $textBody = $message->getTextBody() ?? '';
-        $preview = \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/', ' ', $textBody)), 200);
-
-        return [
-            'message_id' => $message->getMessageId()?->first(),
-            'from_email' => $fromEmail,
-            'from_name' => $fromName ?? $fromEmail,
-            'to' => $this->formatRecipients($message->getTo()),
-            'cc' => $this->formatRecipients($message->getCc()),
-            'bcc' => [],
-            'subject' => $message->getSubject()?->first() ?? '(No Subject)',
-            'preview' => $preview,
-            'body_html' => $message->getHTMLBody(),
-            'body_plain' => $textBody,
-            'is_read' => $message->getFlags()->contains('Seen'),
-            'is_starred' => $message->getFlags()->contains('Flagged'),
-            'has_attachments' => $message->hasAttachments(),
-            'imap_uid' => $message->getUid(),
-            'date' => $message->getDate()?->first()?->toDate(),
-        ];
-    }
-
-    /**
-     * Format recipients to array of [name, email].
-     */
-    protected function formatRecipients($attribute): array
-    {
-        if (! $attribute || ! method_exists($attribute, 'toArray')) {
-            return [];
-        }
-
-        $flattened = [];
-        foreach ($attribute->toArray() as $recipient) {
-            $flattened[] = [
-                'name' => $recipient->personal ?? null,
-                'email' => $recipient->mail ?? '',
-            ];
-        }
-
-        return $flattened;
     }
 
     public function failed(\Throwable $exception): void

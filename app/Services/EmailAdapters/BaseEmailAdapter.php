@@ -3,7 +3,10 @@
 namespace App\Services\EmailAdapters;
 
 use App\Contracts\EmailProviderAdapter;
+use App\Enums\EmailFolderType;
+use App\Models\Email;
 use App\Models\EmailAccount;
+use App\Services\EmailSyncService;
 use Illuminate\Support\Facades\Log;
 use Webklex\PHPIMAP\Client;
 use Webklex\PHPIMAP\ClientManager;
@@ -435,5 +438,254 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
     public function getMessageByUid(Folder $folder, int $uid)
     {
         return $folder->query()->getMessageByUid($uid);
+    }
+
+    /**
+     * Get high-level folder status (IMAP implementation).
+     */
+    public function getFolderStatus(EmailAccount $account, string $folderType): array
+    {
+        $this->refreshTokenIfNeeded($account);
+        $client = $this->createClient($account);
+        $client->connect();
+
+        $folder = $this->getFolderWithFallback($client, $folderType);
+        $status = ['exists' => 0];
+
+        if ($folder) {
+            $examine = $folder->examine();
+            $status = [
+                'exists' => $examine['exists'] ?? 0,
+                'uidnext' => $examine['uidnext'] ?? 0,
+            ];
+        }
+
+        $client->disconnect();
+
+        return $status;
+    }
+
+    /**
+     * Fetch a chunk of messages (IMAP implementation).
+     */
+    public function fetchMessages(EmailAccount $account, string $folderType, int $offset, int $limit): \Illuminate\Support\Collection
+    {
+        $this->refreshTokenIfNeeded($account);
+        $client = $this->createClient($account);
+        $client->connect();
+
+        $folder = $this->getFolderWithFallback($client, $folderType);
+        if (!$folder) {
+            return collect();
+        }
+
+        $totalMessages = $folder->examine()['exists'] ?? 0;
+        $start = $offset + 1;
+        $end = min($offset + $limit, $totalMessages);
+
+        $uidsToFetch = $this->fetchUidRange($folder, $start, $end);
+        $messages = collect();
+
+        foreach ($uidsToFetch as $uid) {
+            try {
+                $msg = $this->executeWithBackoff(fn () => $this->getMessageByUid($folder, $uid));
+                if ($msg) {
+                    $messages->push($this->parseMessage($msg));
+                }
+            } catch (\Throwable $e) {
+                Log::warning("[BaseEmailAdapter] Failed to fetch UID {$uid}", ['error' => $e->getMessage()]);
+            }
+        }
+
+        $client->disconnect();
+
+        return $messages;
+    }
+
+    /**
+     * Fetch the latest N messages for a folder (IMAP implementation).
+     */
+    public function fetchLatestMessagesForAccount(EmailAccount $account, string $folderType, int $count): \Illuminate\Support\Collection
+    {
+        $this->refreshTokenIfNeeded($account);
+        $client = $this->createClient($account);
+        $client->connect();
+
+        $folder = $this->getFolderWithFallback($client, $folderType);
+        if (!$folder) {
+            return collect();
+        }
+
+        $messages = $this->fetchLatestMessages($folder, $count);
+        $parsed = $messages->map(fn ($msg) => $this->parseMessage($msg, true));
+
+        $client->disconnect();
+
+        return $parsed;
+    }
+
+    /**
+     * Fetch incremental updates (IMAP implementation).
+     * For IMAP, this falls back to fetching latest FROM INBOX compared to a cursor.
+     */
+    public function fetchIncrementalUpdates(EmailAccount $account): \Illuminate\Support\Collection
+    {
+        // For now, IMAP doesn't have a standardized efficient incremental sync like Gmail API.
+        // SyncEmailFolderJob handles the UID-based increment for full synced folders.
+        // We return empty here to let the legacy jobs handle it, or we could implement a basic 'check inbox' here.
+        return collect();
+    }
+
+    /**
+     * Subscribe to notifications (IMAP implementation).
+     */
+    public function subscribeToNotifications(EmailAccount $account): bool
+    {
+        return false; // IMAP doesn't support Pub/Sub notifications
+    }
+
+    /**
+     * Create and configure an IMAP client for the account.
+     */
+    public function createClient(EmailAccount $account): Client
+    {
+        $config = $this->buildBaseConfig($account);
+        return $this->clientManager->make($config);
+    }
+
+    /**
+     * Default backfill implementation (IMAP UID crawling).
+     * Providers should override this if they have a better way (e.g. Gmail API).
+     */
+    public function backfill(EmailAccount $account, ?string $folderType, int $batchSize): array
+    {
+        $client = $this->createClient($account);
+        $client->connect();
+
+        $folders = $folderType
+            ? [EmailFolderType::from($folderType)]
+            : ($this->getProvider() === 'gmail' ? [EmailFolderType::Archive] : [EmailFolderType::Inbox]);
+
+        $totalFetched = 0;
+        $hasMoreToFetch = false;
+        $folderResults = [];
+        $syncService = app(EmailSyncService::class);
+
+        foreach ($folders as $type) {
+            $result = $this->backfillFolder($client, $account, $type, $syncService, $batchSize);
+            $folderResults[$type->value] = $result;
+            $totalFetched += $result['fetched'];
+            if ($result['has_more']) {
+                $hasMoreToFetch = true;
+            }
+        }
+
+        $client->disconnect();
+
+        return [
+            'fetched' => $totalFetched,
+            'has_more' => $hasMoreToFetch,
+            'details' => $folderResults,
+            'new_cursor' => $account->backfill_uid_cursor, // IMAP updates cursor in account model directly for now
+        ];
+    }
+
+    /**
+     * Internal IMAP backfill for a specific folder.
+     */
+    protected function backfillFolder(Client $client, EmailAccount $account, EmailFolderType $folderType, EmailSyncService $syncService, int $batchSize): array
+    {
+        $folder = $this->getFolderWithFallback($client, $folderType->value);
+        if (!$folder) {
+            return ['fetched' => 0, 'has_more' => false];
+        }
+
+        try {
+            $examine = $folder->examine();
+            $totalMessages = $examine['exists'] ?? 0;
+            if ($totalMessages === 0) {
+                return ['fetched' => 0, 'has_more' => false];
+            }
+
+            $backfillCursor = $account->backfill_uid_cursor;
+            $forwardCursor = $account->forward_uid_cursor;
+
+            if ($backfillCursor === null || $backfillCursor === 0) {
+                if ($forwardCursor && $forwardCursor > 0) {
+                    $backfillCursor = $forwardCursor;
+                } else {
+                    $latestUids = $this->fetchLatestUids($folder, 1);
+                    $backfillCursor = !empty($latestUids) ? max($latestUids) : $totalMessages;
+                }
+            }
+
+            if ($backfillCursor <= 1) {
+                return ['fetched' => 0, 'has_more' => false, 'new_cursor' => 1];
+            }
+
+            $windowSize = 100;
+            $startUid = max(1, $backfillCursor - $windowSize);
+            $endUid = $backfillCursor - 1;
+
+            $allUids = $this->fetchUidRange($folder, $startUid, $endUid);
+            if (empty($allUids)) {
+                return [
+                    'fetched' => 0,
+                    'has_more' => $startUid > 1,
+                    'new_cursor' => $startUid
+                ];
+            }
+
+            rsort($allUids);
+            $uidsToProcess = array_slice($allUids, 0, $batchSize);
+            
+            $fetched = 0;
+            $minUid = $backfillCursor;
+
+            foreach ($uidsToProcess as $uid) {
+                try {
+                    $exists = Email::where('email_account_id', $account->id)
+                        ->where('imap_uid', $uid)
+                        ->where('folder', $folderType->value)
+                        ->exists();
+
+                    if ($exists) {
+                        $minUid = min($minUid, $uid);
+                        continue;
+                    }
+
+                    $message = $this->getMessageByUid($folder, $uid);
+                    if ($message) {
+                        $emailData = $this->parseMessage($message, true);
+                        $targetFolder = $emailData['folder'] ?? $folderType->value;
+                        $syncService->storeEmail($account, $emailData, $targetFolder, false);
+                        $fetched++;
+                        $minUid = min($minUid, $uid);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("[{$this->getProvider()}Adapter] Failed to fetch UID {$uid} during backfill", ['error' => $e->getMessage()]);
+                    $minUid = min($minUid, $uid);
+                }
+            }
+
+            if ($minUid < $backfillCursor) {
+                $account->update(['backfill_uid_cursor' => $minUid]);
+            }
+
+            $remainingInWindow = count($allUids) - count($uidsToProcess);
+            $hasMore = $remainingInWindow > 0 || $startUid > 1;
+
+            return [
+                'fetched' => $fetched,
+                'has_more' => $hasMore,
+                'new_cursor' => $minUid,
+            ];
+        } catch (\Throwable $e) {
+            Log::error("[{$this->getProvider()}Adapter] Folder backfill exception", [
+                'folder' => $folderType->value,
+                'error' => $e->getMessage(),
+            ]);
+            return ['fetched' => 0, 'has_more' => false];
+        }
     }
 }

@@ -4,76 +4,51 @@ namespace App\Services\EmailAdapters;
 
 use App\Enums\EmailFolderType;
 use App\Models\EmailAccount;
+use App\Services\EmailSyncService;
+use App\Services\GmailApiService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Webklex\PHPIMAP\Client;
 use Webklex\PHPIMAP\Folder;
 
 /**
- * Optimized Gmail Adapter.
- * 
- * Uses X-GM-LABELS for accurate folder mapping and batch fetching for performance.
+ * Modern Gmail Adapter using Gmail API.
  */
 class GmailAdapter extends BaseEmailAdapter
 {
-    /**
-     * Build IMAP client with Gmail-specific extensions.
-     */
-    public function createClient(EmailAccount $account): \Webklex\PHPIMAP\Client
+    protected GmailApiService $apiService;
+
+    public function __construct()
     {
-        // Always refresh token before connecting
-        $this->refreshTokenIfNeeded($account);
+        parent::__construct();
+        $this->apiService = app(GmailApiService::class);
+    }
 
-        $config = $this->buildBaseConfig($account);
-        $config['authentication'] = 'oauth';
-        $config['password'] = $account->access_token;
-        
-        // Always request Gmail extensions
-        $config['extensions'] = ['X-GM-LABELS', 'X-GM-MSGID', 'X-GM-THRID'];
-        
-        Log::debug('[GmailAdapter] Creating client', [
-            'account_id' => $account->id,
-            'email' => $account->email,
-            'has_token' => !empty($account->access_token),
-        ]);
-
-        return $this->clientManager->make($config);
+    public function getProvider(): string
+    {
+        return 'gmail';
     }
 
     /**
-     * Gmail supports OAuth2 token refresh.
+     * Gmail API doesn't use the IMAP client, but we keep this for interface compatibility
+     * and potential fallback if needed, though we primarily use the API now.
      */
-    public function refreshTokenIfNeeded(EmailAccount $account): bool
+    public function createClient(EmailAccount $account): Client
     {
-        if (!$account->needsTokenRefresh()) {
-            return true;
-        }
-
-        try {
-            $service = app(\App\Services\EmailAccountService::class);
-            return $service->refreshToken($account);
-        } catch (\Throwable $e) {
-            Log::error('[GmailAdapter] Token refresh exception', [
-                'account_id' => $account->id,
-                'error' => $e->getMessage(),
-            ]);
-            return false;
-        }
-    }
-
-    public function getMaxParallelFolders(): int
-    {
-        // Gmail is strict about concurrent connections
-        return config('email.max_parallel_folders.gmail', 2);
+        // For Gmail, we prefer the API service. 
+        // We only implement this if some part of the system still strictly requires an IMAP Client object.
+        return parent::createClient($account);
     }
 
     public function getFolderName(string $folderType): string
     {
         return match ($folderType) {
             EmailFolderType::Inbox->value => 'INBOX',
-            EmailFolderType::Sent->value => '[Gmail]/Sent Mail',
-            EmailFolderType::Drafts->value => '[Gmail]/Drafts',
-            EmailFolderType::Trash->value => '[Gmail]/Trash',
-            EmailFolderType::Spam->value => '[Gmail]/Spam',
-            EmailFolderType::Archive->value => '[Gmail]/All Mail',
+            EmailFolderType::Sent->value => 'SENT',
+            EmailFolderType::Drafts->value => 'DRAFT',
+            EmailFolderType::Trash->value => 'TRASH',
+            EmailFolderType::Spam->value => 'SPAM',
+            EmailFolderType::Archive => 'ALL', // Special mapping or handled by lack of labels
             default => 'INBOX',
         };
     }
@@ -82,145 +57,366 @@ class GmailAdapter extends BaseEmailAdapter
     {
         return [
             EmailFolderType::Inbox->value => 'INBOX',
-            EmailFolderType::Sent->value => '[Gmail]/Sent Mail',
-            EmailFolderType::Drafts->value => '[Gmail]/Drafts',
-            EmailFolderType::Trash->value => '[Gmail]/Trash',
-            EmailFolderType::Spam->value => '[Gmail]/Spam',
-            EmailFolderType::Archive->value => '[Gmail]/All Mail',
+            EmailFolderType::Sent->value => 'SENT',
+            EmailFolderType::Drafts->value => 'DRAFT',
+            EmailFolderType::Trash->value => 'TRASH',
+            EmailFolderType::Spam->value => 'SPAM',
         ];
     }
 
     /**
-     * Efficiently fetch the latest N messages from a folder using batch fetch.
+     * Get high-level folder status via API.
      */
-    public function fetchLatestMessages(Folder $folder, int $count): \Illuminate\Support\Collection
+    public function getFolderStatus(EmailAccount $account, string $folderType): array
     {
-        $uids = $this->fetchLatestUids($folder, $count);
-        
-        if (empty($uids)) {
+        try {
+            $labelId = $this->getFolderName($folderType);
+            $label = $this->apiService->getLabel($account, $labelId);
+
+            return [
+                'exists' => $label->getMessagesTotal() ?? 0,
+                'unread' => $label->getMessagesUnread() ?? 0,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('[GmailAdapter] Failed to get folder status', [
+                'account_id' => $account->id,
+                'folder' => $folderType,
+                'error' => $e->getMessage(),
+            ]);
+            return ['exists' => 0];
+        }
+    }
+
+    /**
+     * Fetch a chunk of messages via API.
+     */
+    public function fetchMessages(EmailAccount $account, string $folderType, int $offset, int $limit): Collection
+    {
+        try {
+            $labelId = $this->getFolderName($folderType);
+            
+            // Gmail API uses page tokens instead of numeric offsets.
+            // For the initial implementation, we'll fetch the first batch.
+            // Improvement: Store page tokens in sync_cursor if offset > limit.
+            $result = $this->apiService->listMessages($account, $labelId, $limit);
+            $messages = collect($result['messages'] ?? []);
+
+            return $messages->map(function ($msgSummary) use ($account) {
+                $fullMsg = $this->apiService->getMessage($account, $msgSummary->getId());
+                return $this->parseGmailMessage($fullMsg);
+            });
+        } catch (\Throwable $e) {
+            Log::error('[GmailAdapter] Failed to fetch messages', [
+                'account_id' => $account->id,
+                'folder' => $folderType,
+                'error' => $e->getMessage(),
+            ]);
             return collect();
         }
-
-        Log::debug('[GmailAdapter] Batch fetching messages', [
-            'folder' => $folder->path,
-            'count' => count($uids),
-        ]);
-
-        // Use range query with extensions to get everything in one go
-        $range = min($uids) . ":" . max($uids);
-        
-        return $folder->query()
-            ->whereUid($range)
-            ->setExtensions(['X-GM-LABELS', 'X-GM-MSGID', 'X-GM-THRID'])
-            ->get();
     }
 
     /**
-     * Fetch a single message by UID with extensions.
+     * Fetch latest messages for a folder (Gmail API implementation).
      */
-    public function getMessageByUid(Folder $folder, int $uid)
+    public function fetchLatestMessagesForAccount(EmailAccount $account, string $folderType, int $count): Collection
     {
-        return $folder->query()
-            ->whereUid($uid)
-            ->setExtensions(['X-GM-LABELS', 'X-GM-MSGID', 'X-GM-THRID'])
-            ->get()
-            ->first();
+        try {
+            $labelId = $this->getFolderName($folderType);
+            $result = $this->apiService->listMessages($account, $labelId, $count);
+            
+            $messages = collect();
+            foreach ($result['messages'] as $msg) {
+                $fullMsg = $this->apiService->getMessage($account, $msg->getId());
+                $messages->push($this->parseGmailMessage($fullMsg));
+            }
+
+            return $messages;
+        } catch (\Throwable $e) {
+            Log::error('[GmailAdapter] Failed to fetch latest messages', [
+                'account_id' => $account->id,
+                'folder' => $folderType,
+                'error' => $e->getMessage(),
+            ]);
+            return collect();
+        }
     }
 
     /**
-     * Parse Gmail message, extracting folder from X-GM-LABELS.
+     * Fetch incremental updates (Gmail API implementation).
+     */
+    public function fetchIncrementalUpdates(EmailAccount $account): Collection
+    {
+        $cursor = $account->sync_cursor ?? [];
+        $startHistoryId = $cursor['history_id'] ?? null;
+
+        if (!$startHistoryId) {
+            // No history ID yet, fallback to fetching latest from Inbox
+            return $this->fetchLatestMessagesForAccount($account, 'inbox', 50);
+        }
+
+        try {
+            $result = $this->apiService->listHistory($account, (string)$startHistoryId);
+            $newMessages = collect();
+
+            if (!empty($result['history'])) {
+                foreach ($result['history'] as $historyRecord) {
+                    $messagesAdded = $historyRecord->getMessagesAdded();
+                    if ($messagesAdded) {
+                        foreach ($messagesAdded as $msgAdded) {
+                            $msg = $msgAdded->getMessage();
+                            $fullMsg = $this->apiService->getMessage($account, $msg->getId());
+                            $newMessages->push($this->parseGmailMessage($fullMsg));
+                        }
+                    }
+                }
+            }
+
+            return $newMessages;
+        } catch (\Throwable $e) {
+            Log::error('[GmailAdapter] Failed to fetch incremental updates', [
+                'account_id' => $account->id,
+                'error' => $e->getMessage(),
+            ]);
+            
+            // If history ID is expired, fallback
+            if (str_contains(strtolower($e->getMessage()), 'expired')) {
+                return $this->fetchLatestMessagesForAccount($account, 'inbox', 50);
+            }
+            
+            return collect();
+        }
+    }
+
+    /**
+     * Subscribe to real-time notifications (Gmail API implementation).
+     */
+    public function subscribeToNotifications(EmailAccount $account): bool
+    {
+        $topicName = config('services.google.pubsub_topic');
+        if (!$topicName) {
+            Log::warning('[GmailAdapter] Pub/Sub topic not configured');
+            return false;
+        }
+
+        try {
+            $result = $this->apiService->watch($account, $topicName);
+            
+            // Store the initial historyId
+            $cursor = $account->sync_cursor ?? [];
+            $cursor['history_id'] = $result['historyId'];
+            $account->update(['sync_cursor' => $cursor]);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('[GmailAdapter] Failed to setup watch', [
+                'account_id' => $account->id,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Standardized parseMessage for unified interface.
      */
     public function parseMessage($message, bool $skipAttachments = false): array
     {
-        $data = parent::parseMessage($message, $skipAttachments);
+        return $this->parseGmailMessage($message);
+    }
 
-        // Extract and clean Gmail Labels
-        $labels = $this->extractLabels($message);
-        $normalizedLabels = array_map('strtolower', $labels);
-
-        Log::debug('[GmailAdapter] Parsing Message Labels', [
-            'uid' => $data['imap_uid'] ?? 'unknown',
-            'subject' => substr($data['subject'] ?? '', 0, 30),
-            'labels' => $labels,
-            'folder_path' => $message->getFolder() ? $message->getFolder()->path : 'unknown',
-        ]);
-
-        $folder = $this->mapLabelsToFolder($normalizedLabels);
+    /**
+     * Parse Gmail API message to standardized array.
+     */
+    protected function parseGmailMessage(\Google\Service\Gmail\Message $message): array
+    {
+        $payload = $message->getPayload();
+        $headers = collect($payload->getHeaders());
         
-        // Fallback: If no labels match but we are INBOX, map to Inbox
-        if ($folder === EmailFolderType::Archive->value) {
-            $folderPath = $message->getFolder() ? strtolower($message->getFolder()->path) : '';
-            if (str_contains($folderPath, 'inbox')) {
-                $folder = EmailFolderType::Inbox->value;
+        $getHeader = function($name) use ($headers) {
+            $header = $headers->first(fn($h) => strtolower($h->getName()) === strtolower($name));
+            return $header ? $header->getValue() : null;
+        };
+
+        $from = $getHeader('From');
+        $fromEmail = 'unknown@unknown.com';
+        $fromName = $from;
+
+        if (preg_match('/^(.*?)\s*<(.*?)>$/', $from, $matches)) {
+            $fromName = trim($matches[1], '" ');
+            $fromEmail = $matches[2];
+        } else {
+            $fromEmail = $from;
+        }
+
+        $body = $this->extractGmailBody($payload);
+
+        return [
+            'message_id' => $getHeader('Message-ID'),
+            'thread_id' => $message->getThreadId(),
+            'gmail_id' => $message->getId(),
+            'from_email' => $fromEmail,
+            'from_name' => $fromName ?: $fromEmail,
+            'to' => $this->parseGmailRecipients($getHeader('To')),
+            'cc' => $this->parseGmailRecipients($getHeader('Cc')),
+            'bcc' => [],
+            'subject' => $getHeader('Subject') ?? '(No Subject)',
+            'preview' => trim(mb_substr(strip_tags($body['plain'] ?: $body['html']), 0, 200)),
+            'body_html' => $body['html'],
+            'body_plain' => $body['plain'],
+            'history_id' => $message->getHistoryId(),
+            'is_read' => !in_array('UNREAD', $message->getLabelIds() ?? []),
+            'is_starred' => in_array('STARRED', $message->getLabelIds() ?? []),
+            'has_attachments' => $this->hasGmailAttachments($payload),
+            'imap_uid' => null, // Gmail API doesn't use IMAP UIDs in the same way
+            'date' => $message->getInternalDate() ? date('Y-m-d H:i:s', $message->getInternalDate() / 1000) : now(),
+        ];
+    }
+
+    protected function extractGmailBody($payload): array
+    {
+        $html = '';
+        $plain = '';
+
+        $processPart = function($part) use (&$html, &$plain, &$processPart) {
+            $mimeType = $part->getMimeType();
+            $data = $part->getBody()->getData();
+            
+            if ($data !== null) {
+                $data = strtr($data, '-_', '+/'); // Gmail base64url to base64
+                if ($mimeType === 'text/html') {
+                    $html .= base64_decode($data);
+                } elseif ($mimeType === 'text/plain') {
+                    $plain .= base64_decode($data);
+                }
+            }
+
+            if ($part->getParts()) {
+                foreach ($part->getParts() as $subPart) {
+                    $processPart($subPart);
+                }
+            }
+        };
+
+        $processPart($payload);
+
+        return ['html' => $html, 'plain' => $plain];
+    }
+
+    protected function parseGmailRecipients($header): array
+    {
+        if (!$header) return [];
+        
+        $recipients = [];
+        $parts = explode(',', $header);
+        
+        foreach ($parts as $part) {
+            $part = trim($part);
+            if (preg_match('/^(.*?)\s*<(.*?)>$/', $part, $matches)) {
+                $recipients[] = [
+                    'name' => trim($matches[1], '" '),
+                    'email' => $matches[2]
+                ];
+            } else {
+                $recipients[] = ['name' => null, 'email' => $part];
             }
         }
-
-        $data['folder'] = $folder;
-        $data['thread_id'] = $message->getAttributes()['X-GM-THRID'] ?? null;
-        $data['message_id'] = $message->getAttributes()['X-GM-MSGID'] ?? $data['message_id'];
-
-        return $data;
+        
+        return $recipients;
     }
 
-    /**
-     * Extract labels from multiple source candidates.
-     */
-    protected function extractLabels($message): array
+    protected function hasGmailAttachments($payload): bool
     {
-        $attributes = $message->getAttributes();
-        $labels = $attributes['X-GM-LABELS'] ?? 
-                 $attributes['x-gm-labels'] ?? 
-                 $message->getHeader()->get('X-GM-LABELS') ?? 
-                 $message->getHeader()->get('x-gm-labels') ?? 
-                 [];
-                 
-        if ($labels instanceof \Webklex\PHPIMAP\Attribute) {
-            $labels = $labels->toArray();
-        }
-        $labels = (array) ($labels ?: []);
-
-        // Clean: unquote and trim
-        return array_map(function($l) {
-            return trim(str_replace('"', '', (string)$l));
-        }, $labels);
-    }
-
-    /**
-     * Map normalized labels to internal folder types.
-     */
-    protected function mapLabelsToFolder(array $normalizedLabels): string
-    {
-        if ($this->hasLabel($normalizedLabels, '\inbox') || $this->hasLabel($normalizedLabels, 'inbox')) {
-            return EmailFolderType::Inbox->value;
-        }
-        if ($this->hasLabel($normalizedLabels, '\sent') || $this->hasLabel($normalizedLabels, 'sent')) {
-            return EmailFolderType::Sent->value;
-        }
-        if ($this->hasLabel($normalizedLabels, '\trash') || $this->hasLabel($normalizedLabels, '\bin') || $this->hasLabel($normalizedLabels, 'trash')) {
-            return EmailFolderType::Trash->value;
-        }
-        if ($this->hasLabel($normalizedLabels, '\spam') || $this->hasLabel($normalizedLabels, '\junk') || $this->hasLabel($normalizedLabels, 'spam')) {
-            return EmailFolderType::Spam->value;
-        }
-        if ($this->hasLabel($normalizedLabels, '\draft') || $this->hasLabel($normalizedLabels, 'drafts')) {
-            return EmailFolderType::Drafts->value;
-        }
-
-        return EmailFolderType::Archive->value;
-    }
-
-    protected function hasLabel(array $labels, string $term): bool
-    {
-        foreach ($labels as $label) {
-            if ($label === $term || str_contains($label, $term)) {
-                return true;
+        if ($payload->getFilename()) return true;
+        
+        if ($payload->getParts()) {
+            foreach ($payload->getParts() as $part) {
+                if ($part->getFilename()) return true;
+                if ($this->hasGmailAttachments($part)) return true;
             }
         }
+        
         return false;
     }
 
-    public function getProvider(): string
+    /**
+     * Backfill implementation for Gmail using API.
+     */
+    public function backfill(EmailAccount $account, ?string $folderType, int $batchSize): array
     {
-        return 'gmail';
+        try {
+            $labelId = $this->getFolderName($folderType ?: EmailFolderType::Inbox->value);
+            $cursor = $account->sync_cursor ?? [];
+            $nextPageToken = $cursor['backfill_page_token'] ?? null;
+
+            $result = $this->apiService->listMessages($account, $labelId, $batchSize, $nextPageToken);
+            $messages = collect($result['messages'] ?? []);
+
+            if ($messages->isEmpty()) {
+                return ['fetched' => 0, 'has_more' => false];
+            }
+
+            // [NEW] Update backfill_page_token on the model immediately so storeEmail sees it and preserves it
+            $cursor = $account->sync_cursor ?? [];
+            $cursor['backfill_page_token'] = $result['nextPageToken'] ?? null;
+            $account->sync_cursor = $cursor;
+            $account->save();
+
+            $fetched = 0;
+            foreach ($messages as $msgSummary) {
+                try {
+                    $fullMsg = $this->apiService->getMessage($account, $msgSummary->getId());
+                    $emailData = $this->parseGmailMessage($fullMsg);
+                    
+                    // Store using sync service (provider agnostic)
+                    app(EmailSyncService::class)->storeEmail($account, $emailData, $labelId);
+                    $fetched++;
+                } catch (\Throwable $e) {
+                    Log::warning('[GmailAdapter] Failed to process single message during backfill', [
+                        'account_id' => $account->id,
+                        'message_id' => $msgSummary->getId(),
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Reload cursor from model to include any history_id updates from storeEmail
+            $cursor = $account->sync_cursor ?? [];
+            
+            if (empty($cursor['labels'][$labelId])) {
+                $cursor['labels'][$labelId] = [
+                    'total' => $result['resultSizeEstimate'] ?? 0,
+                    'synced' => 0,
+                    'priority' => 1,
+                ];
+            }
+            
+            $cursor['backfill_page_token'] = $result['nextPageToken'] ?? null;
+            $cursor['labels'][$labelId]['total'] = max($cursor['labels'][$labelId]['total'], $result['resultSizeEstimate'] ?? 0);
+            $cursor['labels'][$labelId]['synced'] += $fetched;
+            
+            $account->sync_cursor = $cursor;
+            $account->save();
+
+            Log::info('[GmailAdapter] Backfill batch completed', [
+                'account_id' => $account->id,
+                'folder' => $labelId,
+                'fetched' => $fetched,
+                'total_synced' => $cursor['labels'][$labelId]['synced'],
+                'estimated_total' => $cursor['labels'][$labelId]['total'],
+                'has_more' => !empty($result['nextPageToken']),
+            ]);
+
+            return [
+                'fetched' => $fetched,
+                'has_more' => !empty($result['nextPageToken']),
+                'new_cursor' => $cursor['backfill_page_token'],
+            ];
+        } catch (\Throwable $e) {
+            Log::error('[GmailAdapter] Backfill failed', [
+                'account_id' => $account->id,
+                'error' => $e->getMessage(),
+            ]);
+            return ['fetched' => 0, 'has_more' => false];
+        }
     }
 }

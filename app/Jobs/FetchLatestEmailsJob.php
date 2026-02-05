@@ -92,30 +92,32 @@ class FetchLatestEmailsJob implements ShouldQueue, ShouldBeUnique
         $totalFetched = 0;
 
         try {
-            $adapter = AdapterFactory::make($account);
-            $client = $adapter->createClient($account);
-            $client->connect();
+            if ($account->provider === 'gmail') {
+                $totalFetched = $syncService->syncIncrementalUpdates($account);
+                
+                // Also ensure watch is active
+                $this->ensureWatchIsActive($account);
+            } else {
+                $adapter = AdapterFactory::make($account);
+                $client = $adapter->createClient($account);
+                $client->connect();
 
+                // [CRITICAL FIX] Only fetch from INBOX for forward sync.
+                $folders = [EmailFolderType::Inbox];
+                
+                foreach ($folders as $folderType) {
+                    $fetched = $this->fetchForwardForFolder(
+                        $client,
+                        $adapter,
+                        $account,
+                        $folderType,
+                        $syncService
+                    );
+                    $totalFetched += $fetched;
+                }
 
-            // [CRITICAL FIX] Only fetch from INBOX for forward sync.
-            // For Gmail, we sync [Gmail]/All Mail (mapped to Archive) to get ALL updates (Sent, Inbox, etc) with correct labels.
-            // For others, we sync INBOX.
-            $folders = $adapter->getProvider() === 'gmail'
-                ? [EmailFolderType::Archive]
-                : [EmailFolderType::Inbox];
-            
-            foreach ($folders as $folderType) {
-                $fetched = $this->fetchForwardForFolder(
-                    $client,
-                    $adapter,
-                    $account,
-                    $folderType,
-                    $syncService
-                );
-                $totalFetched += $fetched;
+                $client->disconnect();
             }
-
-            $client->disconnect();
 
             // Update forward sync timestamp
             $account->update(['last_forward_sync_at' => now()]);
@@ -234,7 +236,7 @@ class FetchLatestEmailsJob implements ShouldQueue, ShouldBeUnique
                                 // valid folder is either what adapter detected (from labels) or the current folder we are syncing
                                 $targetFolder = $emailData['folder'] ?? $folderType->value;
                                 
-                                $syncService->storeEmailFromImap($account, $emailData, $targetFolder);
+                                $syncService->storeEmail($account, $emailData, $targetFolder);
                                 $fetched++;
                             }
                         }
@@ -304,7 +306,7 @@ class FetchLatestEmailsJob implements ShouldQueue, ShouldBeUnique
                         // valid folder is either what adapter detected (from labels) or the current folder we are syncing
                         $targetFolder = $emailData['folder'] ?? $folderType->value;
                         
-                        $syncService->storeEmailFromImap($account, $emailData, $targetFolder);
+                        $syncService->storeEmail($account, $emailData, $targetFolder);
                         $fetched++;
                         $maxUid = max($maxUid, $uid);
                     }
@@ -331,6 +333,27 @@ class FetchLatestEmailsJob implements ShouldQueue, ShouldBeUnique
         }
     }
 
+
+    /**
+     * Ensure Gmail watch is active (expires every 7 days).
+     * We renew it every 24 hours to be safe.
+     */
+    protected function ensureWatchIsActive(EmailAccount $account): void
+    {
+        $cursor = $account->sync_cursor ?? [];
+        $lastWatchAt = $cursor['last_watch_at'] ?? null;
+
+        if (!$lastWatchAt || now()->parse($lastWatchAt)->diffInHours(now()) >= 24) {
+            $adapter = AdapterFactory::make($account);
+            if ($adapter->subscribeToNotifications($account)) {
+                $cursor = $account->sync_cursor ?? [];
+                $cursor['last_watch_at'] = now()->toIso8601String();
+                $account->update(['sync_cursor' => $cursor]);
+                
+                Log::info('[FetchLatestEmailsJob] Renewed Gmail watch', ['account_id' => $account->id]);
+            }
+        }
+    }
 
     public function failed(\Throwable $exception): void
     {

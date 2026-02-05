@@ -150,7 +150,7 @@ class FetchNewEmailsJob implements ShouldQueue
 
                     foreach ($messages as $message) {
                         $emailData = $this->parseMessage($message);
-                        $syncService->storeEmailFromImap($account, $emailData, $folderType->value);
+                        $syncService->storeEmail($account, $emailData, $folderType->value);
                         $totalFetched++;
                     }
                 } catch (\Throwable $e) {

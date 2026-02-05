@@ -120,6 +120,10 @@ class EmailSyncService implements EmailSyncServiceContract
             return 0;
         }
 
+        if ($account->provider === 'gmail') {
+            return $this->syncIncrementalUpdates($account);
+        }
+
         // Dispatch forward crawler job
         FetchLatestEmailsJob::dispatch($account->id);
 
@@ -261,6 +265,7 @@ class EmailSyncService implements EmailSyncServiceContract
             ->get();
 
         foreach ($stuckBackfills as $account) {
+            /** @var \App\Models\EmailAccount $account */
             // Check if job is actually queued? It's hard to check Redis from here reliably without overhead.
             // We just assume if DB timestamp is old, the job is dead or stuck.
             
@@ -288,6 +293,7 @@ class EmailSyncService implements EmailSyncServiceContract
             ->get();
 
         foreach ($stuckForward as $account) {
+            /** @var \App\Models\EmailAccount $account */
             Log::warning('[EmailSyncWatchdog] Rescuing stuck forward sync', [
                 'account_id' => $account->id,
                 'last_forward_sync_at' => $account->last_forward_sync_at,
@@ -297,6 +303,23 @@ class EmailSyncService implements EmailSyncServiceContract
             
             $account->update(['last_forward_sync_at' => now()]);
         }
+    }
+
+    /**
+     * Fetch new emails since last sync (incremental).
+     */
+    public function syncIncrementalUpdates(EmailAccount $account): int
+    {
+        $adapter = AdapterFactory::make($account);
+        $messages = $adapter->fetchIncrementalUpdates($account);
+        
+        $count = 0;
+        foreach ($messages as $emailData) {
+            $this->storeEmail($account, $emailData, $emailData['folder'] ?? EmailFolderType::Inbox->value);
+            $count++;
+        }
+
+        return $count;
     }
 
     /**
@@ -410,14 +433,14 @@ class EmailSyncService implements EmailSyncServiceContract
     }
 
     /**
-     * Store fetched email from IMAP with transaction and deduplication.
+     * Store fetched email with transaction and deduplication.
      *
      * Uses updateOrCreate to prevent duplicates and DB::transaction for atomicity.
      * Retries up to 3 times on deadlock.
      *
      * @param bool $broadcast Whether to broadcast realtime event (false for backfill)
      */
-    public function storeEmailFromImap(
+    public function storeEmail(
         EmailAccount $account,
         array $emailData,
         string $folder,
@@ -444,6 +467,8 @@ class EmailSyncService implements EmailSyncServiceContract
                     
                     if (!empty($emailData['message_id'])) {
                         $matchAttributes['message_id'] = $emailData['message_id'];
+                    } elseif (!empty($emailData['gmail_id'])) {
+                        $matchAttributes['provider_id'] = $emailData['gmail_id'];
                     } else {
                         // Fallback compatible with old logic
                         $matchAttributes['imap_uid'] = $emailData['imap_uid'] ?? null;
@@ -467,6 +492,12 @@ class EmailSyncService implements EmailSyncServiceContract
                             ->first();
                     }
 
+                    if (!$existingEmail && !empty($emailData['gmail_id'])) {
+                        $existingEmail = Email::where('email_account_id', $account->id)
+                            ->where('provider_id', $emailData['gmail_id'])
+                            ->first();
+                    }
+
                     $targetFolder = $folder;
                     if ($existingEmail && $folder === EmailFolderType::Archive->value) {
                          $currentFolder = $existingEmail->folder;
@@ -481,31 +512,55 @@ class EmailSyncService implements EmailSyncServiceContract
                          }
                     }
 
+                    // [Security/Stability] Sanitize text fields for MySQL utf8mb4 compatibility
+                    $sanitize = function (?string $text) {
+                        if ($text === null) return null;
+                        
+                        // Use mb_convert_encoding with UTF-8 to UTF-8 to strip invalid bytes
+                        // This is more reliable across PHP versions than iconv //IGNORE
+                        $res = mb_convert_encoding($text, 'UTF-8', 'UTF-8');
+                        
+                        // Strip NULL bytes which MySQL rejects in strings
+                        return str_replace("\0", "", $res);
+                    };
+
                     $email = Email::updateOrCreate(
                         $matchAttributes,
                         [
                             'user_id' => $account->user_id,
                             'imap_uid' => $emailData['imap_uid'] ?? null,
+                            'provider_id' => $emailData['gmail_id'] ?? null,
                             'folder' => $targetFolder,
                             'thread_id' => $emailData['thread_id'] ?? null,
                             'from_email' => $emailData['from_email'],
-                            'from_name' => $emailData['from_name'] ?? null,
+                            'from_name' => $sanitize($emailData['from_name'] ?? null),
                             'to' => $emailData['to'] ?? [],
                             'cc' => $emailData['cc'] ?? [],
                             'bcc' => $emailData['bcc'] ?? [],
-                            'subject' => $emailData['subject'] ?? '(No Subject)',
-                            'preview' => $emailData['preview'] ?? '',
-                            'body_html' => $bodyHtml,
-                            'body_plain' => $emailData['body_plain'] ?? null,
-                            'body_raw' => $bodyRaw,
+                            'subject' => $sanitize($emailData['subject'] ?? '(No Subject)'),
+                            'preview' => $sanitize($emailData['preview'] ?? ''),
+                            'body_html' => $sanitize($bodyHtml),
+                            'body_plain' => $sanitize($emailData['body_plain'] ?? null),
+                            'body_raw' => $sanitize($bodyRaw),
                             'headers' => $emailData['headers'] ?? [],
                             'is_read' => $emailData['is_read'] ?? false,
                             'is_starred' => $emailData['is_starred'] ?? false,
                             'has_attachments' => $emailData['has_attachments'] ?? false,
+                            'sent_at' => $emailData['sent_at'] ?? null,
                             'received_at' => $emailData['date'] ?? now(),
                             'sanitized_at' => $bodyHtml ? now() : null,
                         ]
                     );
+
+                    // Update history_id in cursor if provided (Gmail API)
+                    if (!empty($emailData['history_id'])) {
+                        $cursor = $account->sync_cursor ?? [];
+                        if (empty($cursor['history_id']) || $emailData['history_id'] > ($cursor['history_id'] ?? 0)) {
+                            $cursor['history_id'] = $emailData['history_id'];
+                            $account->sync_cursor = $cursor;
+                            $account->save();
+                        }
+                    }
 
                     $isNew = $email->wasRecentlyCreated;
 

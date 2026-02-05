@@ -64,6 +64,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/two-factor-challenge',
             'api/two-factor-challenge/*',
             'api/email/verification-notification',
+            'api/webhooks/google/pubsub',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
