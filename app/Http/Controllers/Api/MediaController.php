@@ -170,13 +170,21 @@ class MediaController extends Controller
         }
 
         // 7. Draft FAQ Articles (Auth required)
+        // 7. Draft FAQ Articles (Auth required)
         if ($media->model_type === 'App\Models\FaqArticle') {
-            // We already loaded article above, can reuse if we refactor, but for clarity:
             $article = \App\Models\FaqArticle::find($media->model_id);
             if ($article && ! $article->is_published) {
                 if ($this->permissionService->hasPermission($user, 'faq.manage')) {
                     return;
                 }
+            }
+        }
+
+        // 8. Email Media (User Private)
+        if ($media->model_type === 'App\Models\Email') {
+            $model = \App\Models\Email::find($media->model_id);
+            if ($model && $model->user_id === $user->id) {
+                return;
             }
         }
 

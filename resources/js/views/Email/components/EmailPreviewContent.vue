@@ -647,16 +647,27 @@ const sanitizedBody = computed(() => {
     if (props.email.attachments?.length) {
         props.email.attachments.forEach((att) => {
             if (att.content_id && att.url) {
-                // Improved CID matching to handle optional angle brackets
                 const escapedCid = att.content_id.replace(
                     /[.*+?^${}()|[\]\\]/g,
                     "\\$&",
                 );
-                const cidPattern = new RegExp(
-                    `src=["']cid:(?:&lt;|<)?${escapedCid}(?:&gt;|>)?["']`,
-                    "gi",
-                );
-                html = html.replace(cidPattern, `src="${att.url}"`);
+                const cleanCid = escapedCid.replace(/^<|>$/g, "");
+
+                // Matches src="cid:...", src='cid:...', src=\"cid:...\", or src=cid:...
+                const patterns = [
+                    new RegExp(
+                        `src=[\\\\"]*cid:(?:&lt;|<)?${cleanCid}(?:&gt;|>)?([\\\\"]*)`,
+                        "gi",
+                    ),
+                    new RegExp(
+                        `src=[']cid:(?:&lt;|<)?${cleanCid}(?:&gt;|>)?[']`,
+                        "gi",
+                    ),
+                ];
+
+                patterns.forEach((pattern) => {
+                    html = html.replace(pattern, `src="${att.url}"$1`);
+                });
             }
         });
     }
@@ -686,7 +697,9 @@ const sanitizedBody = computed(() => {
                         src &&
                         !src.startsWith("data:") &&
                         !src.startsWith(window.location.origin) &&
-                        !src.startsWith("/storage");
+                        !src.startsWith("/") &&
+                        !src.includes("/storage/") &&
+                        !src.includes("/api/media/");
 
                     if (isExternal) {
                         if (showImages.value) {
@@ -773,6 +786,8 @@ watch(
                 text-align: left !important;
             }
             #email-body {
+                padding: 16px !important;
+                min-height: 200px !important;
                 color: #1f2937 !important;
                 background-color: #ffffff !important;
             }
@@ -781,19 +796,7 @@ watch(
                 color: inherit;
             }
             #email-body * {
-                max-width: 100% !important;
-                box-sizing: border-box !important;
-            }
-            #email-body {
-                padding: 16px !important;
-                min-height: 200px !important;
-                color: #1f2937 !important;
-                background-color: #ffffff !important;
-            }
-            /* Universal color inheritance from #email-body */
-            #email-body * {
-                color: inherit;
-                max-width: 100% !important;
+                max-width: 100%;
                 box-sizing: border-box !important;
             }
             img { max-width: 100%; height: auto; }

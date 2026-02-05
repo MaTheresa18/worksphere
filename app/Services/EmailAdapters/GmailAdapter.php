@@ -104,7 +104,7 @@ class GmailAdapter extends BaseEmailAdapter
 
             return $messages->map(function ($msgSummary) use ($account) {
                 $fullMsg = $this->apiService->getMessage($account, $msgSummary->getId());
-                return $this->parseGmailMessage($fullMsg);
+                return $this->parseGmailMessage($fullMsg, true, $account);
             });
         } catch (\Throwable $e) {
             Log::error('[GmailAdapter] Failed to fetch messages', [
@@ -128,7 +128,7 @@ class GmailAdapter extends BaseEmailAdapter
             $messages = collect();
             foreach ($result['messages'] as $msg) {
                 $fullMsg = $this->apiService->getMessage($account, $msg->getId());
-                $messages->push($this->parseGmailMessage($fullMsg));
+                $messages->push($this->parseGmailMessage($fullMsg, true, $account));
             }
 
             return $messages;
@@ -166,7 +166,7 @@ class GmailAdapter extends BaseEmailAdapter
                         foreach ($messagesAdded as $msgAdded) {
                             $msg = $msgAdded->getMessage();
                             $fullMsg = $this->apiService->getMessage($account, $msg->getId());
-                            $newMessages->push($this->parseGmailMessage($fullMsg));
+                            $newMessages->push($this->parseGmailMessage($fullMsg, true, $account));
                         }
                     }
                 }
@@ -225,15 +225,15 @@ class GmailAdapter extends BaseEmailAdapter
     /**
      * Standardized parseMessage for unified interface.
      */
-    public function parseMessage($message, bool $skipAttachments = false): array
+    public function parseMessage($message, bool $skipAttachments = false, ?EmailAccount $account = null): array
     {
-        return $this->parseGmailMessage($message, $skipAttachments);
+        return $this->parseGmailMessage($message, $skipAttachments, $account);
     }
 
     /**
      * Parse Gmail API message to standardized array.
      */
-    protected function parseGmailMessage(\Google\Service\Gmail\Message $message, bool $skipAttachments = false): array
+    protected function parseGmailMessage(\Google\Service\Gmail\Message $message, bool $skipAttachments = false, ?EmailAccount $account = null): array
     {
         $payload = $message->getPayload();
         $headers = collect($payload->getHeaders() ?: []);
@@ -266,7 +266,7 @@ class GmailAdapter extends BaseEmailAdapter
         }
 
         $body = $this->extractGmailBody($payload);
-        $attachments = $this->extractGmailAttachments($payload, $body['html'], $skipAttachments, $message->getId());
+        $attachments = $this->extractGmailAttachments($payload, $body['html'], $skipAttachments, $message->getId(), $account);
 
         return [
             'message_id' => $getHeader('Message-ID'),
@@ -325,11 +325,11 @@ class GmailAdapter extends BaseEmailAdapter
     /**
      * Extract attachments from Gmail payload.
      */
-    protected function extractGmailAttachments($payload, string $bodyHtml, bool $skipAttachments = false, ?string $messageId = null): array
+    protected function extractGmailAttachments($payload, string $bodyHtml, bool $skipAttachments = false, ?string $messageId = null, ?EmailAccount $account = null): array
     {
         $attachments = [];
 
-        $processPart = function($part) use (&$attachments, $bodyHtml, $skipAttachments, $messageId, &$processPart) {
+        $processPart = function($part) use (&$attachments, $bodyHtml, $skipAttachments, $messageId, $account, &$processPart) {
             $filename = $part->getFilename();
             $mimeType = $part->getMimeType();
             $body = $part->getBody();
@@ -364,6 +364,19 @@ class GmailAdapter extends BaseEmailAdapter
                 if (!$attachmentData['is_lazy']) {
                     if ($body->getData()) {
                         $attachmentData['content'] = $this->base64url_decode($body->getData());
+                    } elseif ($attachmentId && $messageId && $account) {
+                        try {
+                            $fullAttachment = $this->apiService->getAttachment($account, $messageId, $attachmentId);
+                            if ($fullAttachment->getData()) {
+                                $attachmentData['content'] = $this->base64url_decode($fullAttachment->getData());
+                            }
+                        } catch (\Throwable $e) {
+                            Log::warning('[GmailAdapter] Failed to fetch attachment content', [
+                                'message_id' => $messageId,
+                                'attachment_id' => $attachmentId,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
                     }
                 }
 

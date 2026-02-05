@@ -98,6 +98,7 @@ return [
         \App\Models\FaqArticle::class => \App\Support\MediaLibrary\FaqArticlePathGenerator::class,
         \App\Models\EmailTemplate::class => \App\Support\MediaLibrary\PrivatePathGenerator::class,
         \App\Models\EmailSignature::class => \App\Support\MediaLibrary\PrivatePathGenerator::class,
+        \App\Models\Email::class => \App\Support\MediaLibrary\EmailPathGenerator::class,
     ],
 
     /*

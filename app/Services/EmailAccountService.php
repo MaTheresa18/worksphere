@@ -375,11 +375,11 @@ class EmailAccountService
      */
     protected function getClientId(string $provider): string
     {
-        return match ($provider) {
+        return (string) match ($provider) {
             'gmail' => config('services.google.client_id'),
             'outlook' => config('services.microsoft.client_id', config('services.azure.client_id')),
             default => '',
-        };
+        } ?? '';
     }
 
     /**
@@ -387,11 +387,11 @@ class EmailAccountService
      */
     protected function getClientSecret(string $provider): string
     {
-        return match ($provider) {
+        return (string) match ($provider) {
             'gmail' => config('services.google.client_secret'),
             'outlook' => config('services.microsoft.client_secret', config('services.azure.client_secret')),
             default => '',
-        };
+        } ?? '';
     }
 
     /**

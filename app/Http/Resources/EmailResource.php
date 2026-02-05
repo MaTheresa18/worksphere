@@ -28,9 +28,15 @@ class EmailResource extends JsonResource
             'id' => $this->id,
             'public_id' => $this->public_id,
             'message_id' => $this->message_id,
-            'subject' => $this->subject,
+            'subject' => $this->subject ?: '(no subject)',
             'preview' => $this->preview,
-            'body_html' => $this->when(!$lite, $this->body_html ?? $this->body_plain ?? ''),
+            'body_html' => $this->when(!$lite, function () {
+                $html = $this->body_html ?? $this->body_plain ?? '';
+                if ($this->has_attachments && $this->body_html) {
+                    return app(\App\Services\EmailSanitizationService::class)->resolveInlineImages($this->resource);
+                }
+                return $html;
+            }),
             'body_plain' => $this->when(!$lite, $this->body_plain),
             'date' => $this->received_at ? $this->received_at->toIso8601String() : ($this->created_at ? $this->created_at->toIso8601String() : now()->toIso8601String()),
 

@@ -581,7 +581,15 @@ class EmailSyncService implements EmailSyncServiceContract
                             }
 
                             try {
-                                $media = $email->addMediaFromString($attachment['content'])
+                                if (empty($attachment['content'])) {
+                                    Log::warning('[EmailSync] Skipping attachment with empty content', [
+                                        'email_id' => $email->id,
+                                        'attachment' => $attachment['name'] ?? 'unknown',
+                                    ]);
+                                    continue;
+                                }
+
+                                $media = $email->addMediaFromString((string) $attachment['content'])
                                     ->usingFileName($attachment['name'] ?? 'attachment')
                                     ->usingName($attachment['name'] ?? 'Attachment')
                                     ->toMediaCollection('attachments');

@@ -257,6 +257,15 @@ class Email extends Model implements HasMedia
     }
 
     /**
+     * Register media collections.
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('attachments')
+             ->useDisk('private');
+    }
+
+    /**
      * Get attachments from media library and placeholders.
      */
     public function getAttachmentsAttribute(): array
@@ -267,7 +276,7 @@ class Email extends Model implements HasMedia
                 'name' => $media->file_name,
                 'size' => $media->human_readable_size,
                 'type' => $media->mime_type,
-                'url' => $media->getUrl(),
+                'url' => route('api.media.show', ['media' => $media->id]),
                 'content_id' => $media->getCustomProperty('content_id'),
                 'is_inline' => $media->getCustomProperty('is_inline', false),
                 'is_downloaded' => true,

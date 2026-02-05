@@ -60,7 +60,7 @@ class SecurityHeaders
         // Allow unsafe-eval in local development for Vue DevTools / Vite HMR
         $scriptSrc = "'self' 'nonce-{$nonce}'";
         $connectSrc = "'self'";
-        $styleSrc = "'self' 'unsafe-inline' https://fonts.bunny.net https://fonts.googleapis.com";
+        $styleSrc = "'self' 'unsafe-inline' https://fonts.bunny.net https://fonts.googleapis.com https://*.indeed.com";
 
         // Vite Dev Server Handling
         if (app()->isLocal()) {

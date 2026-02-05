@@ -269,38 +269,46 @@ class EmailSanitizationService
     public function resolveInlineImages(\App\Models\Email $email): string
     {
         $html = $email->body_html;
-        if (empty($html) || ! $email->has_attachments) {
+        if (empty($html)) {
             return (string) $html;
         }
 
-        // Refresh media relation to ensure we have the latest attachments
-        $email->load('media');
-        $attachments = $email->getMedia('attachments');
+        // Refresh media relation if not loaded
+        if (!$email->relationLoaded('media')) {
+            $email->load('media');
+        }
         
+        $attachments = $email->getMedia('attachments');
         if ($attachments->isEmpty()) {
             return (string) $html;
         }
 
         foreach ($attachments as $media) {
             $contentId = $media->getCustomProperty('content_id');
-            if (! $contentId) {
+            if (!$contentId) {
                 continue;
             }
 
-            $url = $media->getUrl();
-            $quotedCid = preg_quote($contentId, '/');
-
-            // 1. Standard quoted: src="cid:xyz" or src='cid:xyz'
-            $pattern = '/src\s*=\s*(["\'])cid:'.$quotedCid.'\1/i';
-            $html = preg_replace($pattern, 'src="'.$url.'"', $html);
-
-            // 2. Angle brackets in CID: src="cid:<xyz>"
-            $patternWithBrackets = '/src\s*=\s*(["\'])cid:'.preg_quote('<'.$contentId.'>', '/').'\1/i';
-            $html = preg_replace($patternWithBrackets, 'src="'.$url.'"', $html);
+            // Clean CID (remove brackets if present in stored value)
+            $cleanCid = trim($contentId, '<>');
+            $url = route('api.media.show', ['media' => $media->id]);
             
-            // 3. Unquoted (less common but valid in some clients): src=cid:xyz
-            $patternUnquoted = '/src\s*=\s*cid:'.$quotedCid.'(\s|>)/i';
-            $html = preg_replace($patternUnquoted, 'src="'.$url.'"\1', $html);
+            // Possible variants of the CID in the HTML
+            $variants = [
+                preg_quote($cleanCid, '/'),
+                preg_quote('<' . $cleanCid . '>', '/'),
+                preg_quote(urlencode($cleanCid), '/'),
+                preg_quote(urlencode('<' . $cleanCid . '>'), '/'),
+            ];
+
+            foreach ($variants as $variant) {
+                // 1. Double or single quotes
+                $html = preg_replace('/src\s*=\s*[\"\']cid:'.$variant.'[\"\']/i', 'src="'.$url.'"', $html);
+                
+                // 2. Unquoted or escaped quotes
+                $html = preg_replace('/src\s*=\s*cid:'.$variant.'(?=[\s>])/i', 'src="'.$url.'"', $html);
+                $html = preg_replace('/src\s*=\s*\\\\\"cid:'.$variant.'\\\\\"/i', 'src="'.$url.'"', $html);
+            }
         }
 
         return $html;
