@@ -106,7 +106,7 @@ class EmailController extends Controller
 
         $threads->setCollection($resourceCollection);
 
-        return EmailResource::collection($threads);
+        return EmailResource::collection($threads)->map(fn($e) => $e->lite());
     }
 
     /**

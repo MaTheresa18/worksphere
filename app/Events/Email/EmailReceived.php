@@ -29,7 +29,7 @@ class EmailReceived implements ShouldBroadcastNow
             'id' => $this->email->id,
             'public_id' => $this->email->public_id,
             'account_id' => $this->email->emailAccount->public_id,
-            'email' => (new EmailResource($this->email))->resolve(),
+            'email' => (new EmailResource($this->email))->lite()->resolve(),
         ];
     }
 }

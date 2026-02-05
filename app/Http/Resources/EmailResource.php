@@ -7,6 +7,14 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class EmailResource extends JsonResource
 {
+    protected bool $isLite = false;
+
+    public function lite(bool $isLite = true): self
+    {
+        $this->isLite = $isLite;
+        return $this;
+    }
+
     /**
      * Transform the resource into an array.
      *
@@ -14,14 +22,16 @@ class EmailResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $lite = $this->isLite || $request->boolean('lite') || $request->header('X-Lite-Resource');
+
         return [
             'id' => $this->id,
             'public_id' => $this->public_id,
             'message_id' => $this->message_id,
             'subject' => $this->subject,
             'preview' => $this->preview,
-            'body_html' => $this->body_html ?? $this->body_plain ?? '', // Map to 'body_html' to match model
-            'body_plain' => $this->body_plain,
+            'body_html' => $this->when(!$lite, $this->body_html ?? $this->body_plain ?? ''),
+            'body_plain' => $this->when(!$lite, $this->body_plain),
             'date' => $this->received_at ? $this->received_at->toIso8601String() : ($this->created_at ? $this->created_at->toIso8601String() : now()->toIso8601String()),
 
             // Threading
