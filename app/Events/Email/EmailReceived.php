@@ -3,6 +3,7 @@
 namespace App\Events\Email;
 
 use App\Models\Email;
+use App\Http\Resources\EmailResource;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
@@ -26,8 +27,9 @@ class EmailReceived implements ShouldBroadcastNow
     {
         return [
             'id' => $this->email->id,
-            'public_id' => $this->email->public_id, // Keep public_id for channel continuity if needed
+            'public_id' => $this->email->public_id,
             'account_id' => $this->email->emailAccount->public_id,
+            'email' => (new EmailResource($this->email))->resolve(),
         ];
     }
 }

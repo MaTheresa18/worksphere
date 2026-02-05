@@ -452,11 +452,22 @@ export const useEmailStore = defineStore('email', () => {
 
         echo.private(`email-account.${accountId}`)
             .listen('.App\\Events\\Email\\EmailReceived', (e: any) => {
-                // If the email belongs to the currently viewed folder, notify user
-                // For now, valid for Inbox/Priority. 
-                // We just increment counter and let user refresh regardless of folder 
-                // (or optimize to only if in inbox/folder matches).
-                newEmailCount.value++;
+                // Determine if we should prepend the email or just increment the counter
+                const isCorrectAccount = selectedAccountId.value === e.account_id;
+                const matchesFolder = selectedFolderId.value === e.email.folder || 
+                                    (selectedFolderId.value === 'inbox' && e.email.folder === 'inbox');
+                
+                if (isCorrectAccount && matchesFolder && currentPage.value === 1 && !hasActiveFilters.value) {
+                    // Prepend to the list if on page 1 and no search filters are active
+                    // We check if it already exists to avoid duplicates
+                    if (!emails.value.some(msg => msg.id === e.email.id)) {
+                        emails.value.unshift(e.email);
+                        totalEmails.value++;
+                    }
+                } else {
+                    // Otherwise just increment the notification counter
+                    newEmailCount.value++;
+                }
             })
             .listen('.App\\Events\\Email\\SyncStatusChanged', (e: any) => {
                 accountStatus.value = {
