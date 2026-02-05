@@ -686,8 +686,7 @@ const sanitizedBody = computed(() => {
                         src &&
                         !src.startsWith("data:") &&
                         !src.startsWith(window.location.origin) &&
-                        !src.startsWith("/storage") &&
-                        !src.startsWith("cid:");
+                        !src.startsWith("/storage");
 
                     if (isExternal) {
                         if (showImages.value) {
@@ -764,22 +763,43 @@ watch(
         // Reset Styles & Default Styles for Email Content (Force Light Theme like Gmail)
         const style = `
             :host {
-                display: block;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                color: #1f2937; /* Force dark text */
-                background-color: #ffffff; /* Force white background */
-                line-height: 1.5;
-                overflow-wrap: break-word; /* Prevent horizontal overflow */
-                word-wrap: break-word;
+                display: block !important;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+                color: #1f2937 !important; /* Force dark text */
+                background-color: #ffffff !important; /* Force white background */
+                line-height: 1.5 !important;
+                overflow-wrap: break-word !important; /* Prevent horizontal overflow */
+                word-wrap: break-word !important;
+                text-align: left !important;
             }
             #email-body {
-                padding: 16px; /* Add some padding around the content */
-                min-height: 200px;
+                color: #1f2937 !important;
+                background-color: #ffffff !important;
+            }
+            /* Reset all colors to inherit from our host unless explicitly set in the style tag */
+            * {
+                color: inherit;
+            }
+            #email-body * {
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            #email-body {
+                padding: 16px !important;
+                min-height: 200px !important;
+                color: #1f2937 !important;
+                background-color: #ffffff !important;
+            }
+            /* Universal color inheritance from #email-body */
+            #email-body * {
+                color: inherit;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
             }
             img { max-width: 100%; height: auto; }
-            a { color: #2563eb; text-decoration: underline; }
-            blockquote { margin: 1em 0; border-left: 4px solid #e5e7eb; padding-left: 1em; color: #6b7280; }
-            pre { background: #f3f4f6; padding: 1em; overflow-x: auto; border-radius: 0.5em; color: #1f2937; }
+            a { color: #2563eb !important; text-decoration: underline !important; }
+            blockquote { margin: 1em 0; border-left: 4px solid #e5e7eb; padding-left: 1em; color: #6b7280 !important; }
+            pre { background: #f3f4f6; padding: 1em; overflow-x: auto; border-radius: 0.5em; color: #1f2937 !important; }
             p { margin-bottom: 1em; }
             
             /* Scrollbar styling for shadow DOM - keeping it subtle */

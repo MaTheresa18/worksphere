@@ -4,17 +4,41 @@
         v-bind="$attrs"
     >
         <!-- Accounts Selector (Dropdown) & Sync -->
-        <div class="px-3 py-3 border-b border-[var(--border-default)] flex items-center gap-2">
-            <Dropdown :items="accountItems" align="start" class="flex-1 min-w-0">
+        <div
+            class="px-3 py-3 border-b border-[var(--border-default)] flex items-center gap-2"
+        >
+            <Dropdown
+                :items="accountItems"
+                align="start"
+                class="flex-1 min-w-0"
+            >
                 <template #trigger>
                     <button
                         class="flex items-center w-full px-2.5 py-2 text-sm font-medium text-left bg-[var(--surface-elevated)] border border-[var(--border-default)] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--interactive-primary)] hover:bg-[var(--surface-tertiary)] transition-all hover:border-[var(--interactive-primary)]/30"
                     >
-                        <div class="w-6 h-6 rounded-full mr-2 ring-1 ring-white/20 flex items-center justify-center text-[10px] font-bold text-white shrink-0" :style="{ background: selectedAccount ? '#6366f1' : '#9ca3af' }">
-                            {{ selectedAccount ? selectedAccount.email.charAt(0).toUpperCase() : '?' }}
+                        <div
+                            class="w-6 h-6 rounded-full mr-2 ring-1 ring-white/20 flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                            :style="{
+                                background: selectedAccount
+                                    ? '#6366f1'
+                                    : '#9ca3af',
+                            }"
+                        >
+                            {{
+                                selectedAccount
+                                    ? selectedAccount.email
+                                          .charAt(0)
+                                          .toUpperCase()
+                                    : "?"
+                            }}
                         </div>
-                        <span class="flex-1 truncate text-[var(--text-primary)] leading-tight">{{ selectedAccount?.email || 'No account' }}</span>
-                        <ChevronDownIcon class="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 ml-1.5" />
+                        <span
+                            class="flex-1 truncate text-[var(--text-primary)] leading-tight"
+                            >{{ selectedAccount?.email || "No account" }}</span
+                        >
+                        <ChevronDownIcon
+                            class="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 ml-1.5"
+                        />
                     </button>
                 </template>
             </Dropdown>
@@ -22,13 +46,16 @@
 
         <!-- Compose Button -->
         <div class="p-4 pt-3 flex items-center gap-2">
-                      <button 
+            <button
                 @click="handleSync"
                 :disabled="isSyncing || !selectedAccount"
                 class="flex items-center justify-center w-8 h-8 flex-shrink-0 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--interactive-primary)] hover:border-[var(--interactive-primary)]/30 hover:bg-[var(--surface-tertiary)] transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
                 title="Sync Account"
             >
-                <RotateCwIcon class="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" :class="{ 'animate-spin': isSyncing }" />
+                <RotateCwIcon
+                    class="w-4 h-4 group-hover:rotate-180 transition-transform duration-500"
+                    :class="{ 'animate-spin': isSyncing }"
+                />
             </button>
 
             <button
@@ -102,10 +129,38 @@
                 </div>
             </template>
 
+            <!-- Provider Folders (Subscribed Labels) -->
+            <template v-if="subscribedRemoteFolders.length > 0">
+                <div class="pt-2 border-t border-[var(--border-default)] mt-2">
+                    <div
+                        class="px-3 py-2 text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider"
+                    >
+                        Provider Folders
+                    </div>
+                    <a
+                        v-for="folder in subscribedRemoteFolders"
+                        :key="folder.id"
+                        href="#"
+                        @click.prevent="handleFolderClick(folder.id)"
+                        :class="[
+                            selectedFolderId === folder.id
+                                ? 'bg-[var(--interactive-primary)]/10 text-[var(--interactive-primary)] border-l-2 border-[var(--interactive-primary)]'
+                                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-tertiary)] border-l-2 border-transparent',
+                            'group flex items-center px-3 py-2 text-sm font-medium rounded-r-lg transition-all',
+                        ]"
+                    >
+                        <FolderIcon
+                            class="mr-3 flex-shrink-0 h-4 w-4 text-[var(--text-muted)]"
+                        />
+                        <span class="truncate">{{ folder.name }}</span>
+                    </a>
+                </div>
+            </template>
+
             <!-- New Folder Button -->
             <button
                 @click="showCreateFolderModal = true"
-                class="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] rounded-lg transition-colors"
+                class="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] rounded-lg transition-colors border-t border-[var(--border-default)] mt-2 pt-2"
             >
                 <PlusIcon class="w-4 h-4" />
                 New Folder
@@ -114,7 +169,9 @@
             <!-- Labels Section -->
             <div class="mt-6 pt-4 border-t border-[var(--border-default)]">
                 <div class="flex items-center justify-between px-3 mb-2">
-                    <h3 class="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
+                    <h3
+                        class="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider"
+                    >
                         Labels
                     </h3>
                     <button
@@ -133,7 +190,10 @@
                         @click.prevent="handleLabelClick(label.id)"
                         class="group flex items-center px-3 py-2 text-sm font-medium text-[var(--text-secondary)] rounded-lg hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] transition-all"
                     >
-                        <span class="w-2.5 h-2.5 rounded-full mr-3" :class="label.color"></span>
+                        <span
+                            class="w-2.5 h-2.5 rounded-full mr-3"
+                            :class="label.color"
+                        ></span>
                         <span class="truncate">{{ label.name }}</span>
                     </a>
                 </div>
@@ -157,7 +217,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted } from "vue";
 import {
     ChevronDownIcon,
     PencilIcon,
@@ -165,57 +225,40 @@ import {
     PlusIcon,
     SettingsIcon,
     RotateCwIcon,
+    FolderIcon,
 } from "lucide-vue-next";
 
 defineOptions({
-    inheritAttrs: false
+    inheritAttrs: false,
 });
 import Dropdown, { type DropdownItem } from "@/components/ui/Dropdown.vue";
 import CreateFolderModal from "./CreateFolderModal.vue";
 import CreateLabelModal from "./CreateLabelModal.vue";
-import { useEmailStore } from '@/stores/emailStore';
-import { storeToRefs } from 'pinia';
-import { emailAccountService, type EmailAccount } from '@/services/email-account.service';
+import { useEmailStore } from "@/stores/emailStore";
+import { storeToRefs } from "pinia";
+import {
+    emailAccountService,
+    type EmailAccount,
+} from "@/services/email-account.service";
 
-import { useRouter } from 'vue-router';
+import { useRouter } from "vue-router";
 
 const router = useRouter();
 const emit = defineEmits(["compose"]);
 
 const store = useEmailStore();
-const { systemFolders, customFolders, labels, selectedFolderId } = storeToRefs(store);
-
-// Email Accounts State
-const accounts = ref<EmailAccount[]>([]);
-const selectedAccount = ref<EmailAccount | null>(null);
-
-async function fetchAccounts() {
-    try {
-        const data = await emailAccountService.list();
-        if (data && data.length > 0) {
-            accounts.value = data;
-            
-            // Try to restore selection from store persistence
-            if (store.selectedAccountId) {
-                const persisted = data.find(a => a.id === store.selectedAccountId);
-                if (persisted) {
-                    selectedAccount.value = persisted;
-                }
-            }
-            
-            // Fallback to default or first
-            if (!selectedAccount.value) {
-                selectedAccount.value = data.find(a => a.is_default) || data[0];
-                store.setSelectedAccount(selectedAccount.value.id);
-            }
-        }
-    } catch (e) {
-        console.error('Failed to fetch email accounts', e);
-    }
-}
+const {
+    systemFolders,
+    customFolders,
+    subscribedRemoteFolders,
+    labels,
+    selectedFolderId,
+    accounts,
+    selectedAccount,
+} = storeToRefs(store);
 
 onMounted(() => {
-    fetchAccounts();
+    store.fetchInitialData();
 });
 
 const showCreateFolderModal = ref(false);
@@ -241,20 +284,28 @@ function handleLabelCreated(_labelId: string) {
 
 // Dynamic accountItems computed from fetched accounts
 const accountItems = computed<DropdownItem[]>(() => {
-    const items: DropdownItem[] = accounts.value.map(account => ({
+    const items: DropdownItem[] = (accounts.value || []).map((account) => ({
         label: `${account.name || account.email}`,
         icon: UserIcon,
         action: () => {
             selectAccount(account);
-        }
+        },
     }));
-    
+
     // Add static actions
     items.push(
-        { label: "Add account", icon: PlusIcon, action: () => router.push('/email/settings?tab=accounts') },
-        { label: "Settings", icon: SettingsIcon, action: () => router.push('/email/settings') }
+        {
+            label: "Add account",
+            icon: PlusIcon,
+            action: () => router.push("/email/settings?tab=accounts"),
+        },
+        {
+            label: "Settings",
+            icon: SettingsIcon,
+            action: () => router.push("/email/settings"),
+        },
     );
-    
+
     return items;
 });
 
@@ -262,7 +313,7 @@ const isSyncing = ref(false);
 
 async function handleSync() {
     if (!selectedAccount.value || isSyncing.value) return;
-    
+
     isSyncing.value = true;
     try {
         await emailAccountService.sync(selectedAccount.value.id);
@@ -271,15 +322,13 @@ async function handleSync() {
             store.fetchEmails(1);
         }, 2000);
     } catch (e) {
-        console.error('Sync failed', e);
+        console.error("Sync failed", e);
     } finally {
         isSyncing.value = false;
     }
 }
 
-function selectAccount(account: EmailAccount) {
-    selectedAccount.value = account;
-    // @ts-ignore
+function selectAccount(account: any) {
     store.setSelectedAccount(account.id);
 }
 </script>

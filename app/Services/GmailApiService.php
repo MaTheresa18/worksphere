@@ -140,4 +140,26 @@ class GmailApiService
             'nextPageToken' => $results->getNextPageToken(),
         ];
     }
+
+    /**
+     * List all labels for the account.
+     */
+    public function listLabels(EmailAccount $account): \Google\Service\Gmail\ListLabelsResponse
+    {
+        $this->setupForAccount($account);
+        $gmail = new Gmail($this->client);
+
+        return $gmail->users_labels->listUsersLabels('me');
+    }
+
+    /**
+     * Get attachment data.
+     */
+    public function getAttachment(EmailAccount $account, string $messageId, string $attachmentId): \Google\Service\Gmail\MessagePartBody
+    {
+        $this->setupForAccount($account);
+        $gmail = new Gmail($this->client);
+
+        return $gmail->users_messages_attachments->get('me', $messageId, $attachmentId);
+    }
 }

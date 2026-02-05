@@ -142,9 +142,10 @@ class EmailAccountController extends Controller
             'is_default' => 'boolean',
             'is_system' => 'boolean',
             'system_usage' => 'nullable|string|in:support,notification,noreply',
-            // Folder sync settings - array of folder type strings to disable
+            // Folder sync settings - array of folder names to disable
+            // Loosened validation to allow custom provider folder names/labels
             'disabled_folders' => 'nullable|array',
-            'disabled_folders.*' => 'string|in:inbox,sent,drafts,trash,spam,archive',
+            'disabled_folders.*' => 'string',
         ]);
 
         // If setting as default, unset other defaults
@@ -280,6 +281,21 @@ class EmailAccountController extends Controller
         }
 
         return response()->json(['data' => $providers]);
+    }
+
+    /**
+     * Get remote folders from the provider for subscription management.
+     */
+    public function remoteFolders(EmailAccount $emailAccount): JsonResponse
+    {
+        $this->authorize('update', $emailAccount);
+
+        $adapter = app(\App\Services\EmailAdapters\AdapterFactory::class)->make($emailAccount);
+        $folders = $adapter->listFolders($emailAccount);
+
+        return response()->json([
+            'data' => $folders,
+        ]);
     }
 
     /**

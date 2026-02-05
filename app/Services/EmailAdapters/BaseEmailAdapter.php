@@ -7,6 +7,7 @@ use App\Enums\EmailFolderType;
 use App\Models\Email;
 use App\Models\EmailAccount;
 use App\Services\EmailSyncService;
+use App\Services\EmailSanitizationService;
 use Illuminate\Support\Facades\Log;
 use Webklex\PHPIMAP\Client;
 use Webklex\PHPIMAP\ClientManager;
@@ -327,7 +328,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
 
         $textBody = $message->getTextBody() ?? '';
         $bodyHtml = (string) ($message->getHTMLBody() ?? '');
-        $preview = \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/', ' ', $textBody)), 200);
+        $preview = app(EmailSanitizationService::class)->generatePreview($bodyHtml ?: $textBody);
 
         // Process attachments
         $attachments = [];
@@ -687,5 +688,109 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
             ]);
             return ['fetched' => 0, 'has_more' => false];
         }
+    }
+
+    public function listFolders(EmailAccount $account): \Illuminate\Support\Collection
+    {
+        $this->refreshTokenIfNeeded($account);
+        $client = $this->createClient($account);
+        $client->connect();
+
+        $folders = $client->getFolders(false);
+        $result = collect();
+
+        foreach ($folders as $folder) {
+            $result->push([
+                'id' => $folder->path,
+                'name' => $folder->name,
+                'path' => $folder->path,
+                'type' => strtolower($folder->name) === 'inbox' ? 'system' : 'user',
+            ]);
+        }
+
+        $client->disconnect();
+
+        return $result;
+    }
+
+    /**
+     * Download a specific attachment from IMAP.
+     */
+    public function downloadAttachment(Email $email, int $placeholderIndex): \Spatie\MediaLibrary\MediaCollections\Models\Media
+    {
+        $placeholders = $email->attachment_placeholders ?? [];
+        if (!isset($placeholders[$placeholderIndex])) {
+            throw new \InvalidArgumentException('Attachment placeholder not found.');
+        }
+
+        $placeholder = $placeholders[$placeholderIndex];
+        $account = $email->emailAccount;
+        
+        $client = $this->createClient($account);
+        $client->connect();
+        
+        // For Gmail, always use [Gmail]/All Mail since UIDs are folder-specific
+        // and All Mail contains all messages. For other providers, use the stored folder.
+        $imapFolderName = $this->getProvider() === 'gmail' 
+            ? '[Gmail]/All Mail'
+            : $this->getFolderName($email->folder);
+        
+        $folder = $client->getFolder($imapFolderName);
+        
+        if (!$folder) {
+            throw new \RuntimeException("Folder '{$imapFolderName}' not found on IMAP server.");
+        }
+        
+        $message = $this->getMessageByUid($folder, $email->imap_uid);
+
+        if (!$message) {
+            throw new \RuntimeException("Message not found on IMAP server.");
+        }
+
+        // Find the attachment in the message by name and size (heuristic)
+        $targetAttachment = null;
+        if ($message->hasAttachments()) {
+            foreach ($message->getAttachments() as $attachment) {
+                $name = $attachment->getName();
+                $size = $attachment->getSize();
+                $contentId = $attachment->id ? trim($attachment->id, '<>') : null;
+
+                // Match by name and size or Content-ID
+                if (($contentId && $contentId === $placeholder['content_id']) || 
+                    ($name === $placeholder['name'] && abs($size - $placeholder['size']) < 1024)) {
+                    $targetAttachment = $attachment;
+                    break;
+                }
+            }
+        }
+
+        if (!$targetAttachment) {
+            throw new \RuntimeException("Attachment not found in message.");
+        }
+
+        // Store the attachment as Media
+        $media = $email->addMediaFromString($targetAttachment->getContent())
+            ->usingFileName($targetAttachment->getName() ?? 'attachment')
+            ->usingName($targetAttachment->getName() ?? 'Attachment')
+            ->toMediaCollection('attachments');
+
+        if ($contentId = $targetAttachment->id) {
+            $media->setCustomProperty('content_id', trim($contentId, '<>'));
+            $media->save();
+        }
+
+        // Remove from placeholders
+        unset($placeholders[$placeholderIndex]);
+        $email->update(['attachment_placeholders' => array_values($placeholders)]);
+
+        // If it was an inline image, resolve it now
+        if (!empty($placeholder['content_id'])) {
+            $sanitizer = app(\App\Services\EmailSanitizationService::class);
+            $email->update([
+                'body_html' => $sanitizer->resolveInlineImages($email)
+            ]);
+        }
+
+        return $media;
     }
 }

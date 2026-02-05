@@ -106,7 +106,11 @@ class EmailController extends Controller
 
         $threads->setCollection($resourceCollection);
 
-        return EmailResource::collection($threads)->map(fn($e) => $e->lite());
+        // We use a header to tell the resource to use "lite" mode 
+        // without needing every frontend call to explicitly add ?lite=1
+        $request->merge(['lite' => true]);
+
+        return EmailResource::collection($threads);
     }
 
     /**

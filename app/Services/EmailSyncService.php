@@ -656,82 +656,11 @@ class EmailSyncService implements EmailSyncServiceContract
      */
     public function downloadAttachment(Email $email, int $placeholderIndex)
     {
-        $placeholders = $email->attachment_placeholders ?? [];
-        if (!isset($placeholders[$placeholderIndex])) {
-            throw new \InvalidArgumentException('Attachment placeholder not found.');
-        }
-
-        $placeholder = $placeholders[$placeholderIndex];
         $account = $email->emailAccount;
         $adapter = $this->getAdapterForAccount($account);
 
         try {
-            $client = $adapter->createClient($account);
-            $client->connect();
-            
-            // For Gmail, always use [Gmail]/All Mail since UIDs are folder-specific
-            // and All Mail contains all messages. For other providers, use the stored folder.
-            $imapFolderName = $adapter->getProvider() === 'gmail' 
-                ? '[Gmail]/All Mail'
-                : $adapter->getFolderName($email->folder);
-            
-            $folder = $client->getFolder($imapFolderName);
-            
-            if (!$folder) {
-                throw new \RuntimeException("Folder '{$imapFolderName}' not found on IMAP server.");
-            }
-            
-            $message = $adapter->getMessageByUid($folder, $email->imap_uid);
-
-            if (!$message) {
-                throw new \RuntimeException("Message not found on IMAP server.");
-            }
-
-            // Find the attachment in the message by name and size (heuristic)
-            $targetAttachment = null;
-            if ($message->hasAttachments()) {
-                foreach ($message->getAttachments() as $attachment) {
-                    $name = $attachment->getName();
-                    $size = $attachment->getSize();
-                    $contentId = $attachment->id ? trim($attachment->id, '<>') : null;
-
-                    // Match by name and size or Content-ID
-                    if (($contentId && $contentId === $placeholder['content_id']) || 
-                        ($name === $placeholder['name'] && abs($size - $placeholder['size']) < 1024)) {
-                        $targetAttachment = $attachment;
-                        break;
-                    }
-                }
-            }
-
-            if (!$targetAttachment) {
-                throw new \RuntimeException("Attachment not found in message.");
-            }
-
-            // Store the attachment as Media
-            $media = $email->addMediaFromString($targetAttachment->getContent())
-                ->usingFileName($targetAttachment->getName() ?? 'attachment')
-                ->usingName($targetAttachment->getName() ?? 'Attachment')
-                ->toMediaCollection('attachments');
-
-            if ($contentId = $targetAttachment->id) {
-                $media->setCustomProperty('content_id', trim($contentId, '<>'));
-                $media->save();
-            }
-
-            // Remove from placeholders
-            unset($placeholders[$placeholderIndex]);
-            $email->update(['attachment_placeholders' => array_values($placeholders)]);
-
-            // If it was an inline image, resolve it now
-            if (!empty($placeholder['content_id'])) {
-                $sanitizer = app(EmailSanitizationService::class);
-                $email->update([
-                    'body_html' => $sanitizer->resolveInlineImages($email)
-                ]);
-            }
-
-            return $media;
+            return $adapter->downloadAttachment($email, $placeholderIndex);
         } catch (\Throwable $e) {
             Log::error('[EmailSync] Failed to download attachment on-demand', [
                 'email_id' => $email->id,

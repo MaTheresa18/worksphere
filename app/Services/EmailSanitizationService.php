@@ -307,33 +307,35 @@ class EmailSanitizationService
     }
 
     /**
-     * Extract Content-ID from attachment for inline image matching.
-     *
-     * @param  mixed  $attachment  IMAP attachment object
-     * @return string|null Content-ID without angle brackets
+     * Generate a clean text preview from HTML content.
      */
-    public function extractContentId($attachment): ?string
+    public function generatePreview(?string $html, int $limit = 200): string
     {
-        if (! $attachment) {
-            return null;
+        if (empty($html)) {
+            return '';
         }
 
-        $contentId = null;
+        // 1. Remove script and style tags WITH their content
+        $text = preg_replace([
+            '/<script\b[^>]*>.*?<\/script>/is',
+            '/<style\b[^>]*>.*?<\/style>/is',
+        ], '', $html);
 
-        // Try different methods to get Content-ID
-        if (method_exists($attachment, 'getContentId')) {
-            $contentId = $attachment->getContentId();
-        } elseif (method_exists($attachment, 'getId')) {
-            $contentId = $attachment->getId();
+        // 2. Strip all other tags
+        $text = strip_tags($text);
+
+        // 3. Decode HTML entities (handles &#10; etc.)
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // 4. Normalize whitespace
+        $text = preg_replace('/\s+/', ' ', $text);
+        $text = trim($text);
+
+        // 5. Limit length
+        if (mb_strlen($text) > $limit) {
+            $text = mb_substr($text, 0, $limit) . '...';
         }
 
-        if (! $contentId) {
-            return null;
-        }
-
-        // Remove angle brackets if present
-        $contentId = trim($contentId, '<>');
-
-        return $contentId ?: null;
+        return $text;
     }
 }

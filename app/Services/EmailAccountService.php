@@ -68,11 +68,29 @@ class EmailAccountService
         return $account;
     }
 
-    /**
-     * Test connection for an email account (both SMTP and IMAP).
-     */
     public function testConnection(EmailAccount $account): array
     {
+        // For Gmail, we use the API to verify connectivity
+        if ($account->provider === 'gmail') {
+            try {
+                $gmailApi = app(\App\Services\GmailApiService::class);
+                $gmailApi->listLabels($account); // This triggers token refresh and basic API check
+                
+                $account->markAsVerified();
+                return [
+                    'success' => true,
+                    'message' => 'Gmail API connection successful',
+                ];
+            } catch (\Throwable $e) {
+                $error = $e->getMessage();
+                $account->markAsError($error);
+                return [
+                    'success' => false,
+                    'message' => 'Gmail API: ' . $error,
+                ];
+            }
+        }
+
         // 1. Test SMTP
         $smtpResult = $this->testSmtpConnection($account);
         if (! $smtpResult['success']) {

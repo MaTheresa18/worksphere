@@ -5,6 +5,7 @@ namespace App\Services\EmailAdapters;
 use App\Enums\EmailFolderType;
 use App\Models\EmailAccount;
 use App\Services\EmailSyncService;
+use App\Services\EmailSanitizationService;
 use App\Services\GmailApiService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -226,13 +227,13 @@ class GmailAdapter extends BaseEmailAdapter
      */
     public function parseMessage($message, bool $skipAttachments = false): array
     {
-        return $this->parseGmailMessage($message);
+        return $this->parseGmailMessage($message, $skipAttachments);
     }
 
     /**
      * Parse Gmail API message to standardized array.
      */
-    protected function parseGmailMessage(\Google\Service\Gmail\Message $message): array
+    protected function parseGmailMessage(\Google\Service\Gmail\Message $message, bool $skipAttachments = false): array
     {
         $payload = $message->getPayload();
         $headers = collect($payload->getHeaders() ?: []);
@@ -265,6 +266,7 @@ class GmailAdapter extends BaseEmailAdapter
         }
 
         $body = $this->extractGmailBody($payload);
+        $attachments = $this->extractGmailAttachments($payload, $body['html'], $skipAttachments, $message->getId());
 
         return [
             'message_id' => $getHeader('Message-ID'),
@@ -276,13 +278,14 @@ class GmailAdapter extends BaseEmailAdapter
             'cc' => $this->parseGmailRecipients($getHeader('Cc')),
             'bcc' => [],
             'subject' => $getHeader('Subject') ?? '(No Subject)',
-            'preview' => trim(mb_substr(strip_tags($body['plain'] ?: $body['html']), 0, 200)),
+            'preview' => app(EmailSanitizationService::class)->generatePreview($body['plain'] ?: $body['html']),
             'body_html' => $body['html'],
             'body_plain' => $body['plain'],
             'history_id' => $message->getHistoryId(),
             'is_read' => !in_array('UNREAD', $message->getLabelIds() ?? []),
             'is_starred' => in_array('STARRED', $message->getLabelIds() ?? []),
-            'has_attachments' => $this->hasGmailAttachments($payload),
+            'has_attachments' => !empty($attachments) || $this->hasGmailAttachments($payload),
+            'attachments' => $attachments,
             'imap_uid' => null,
             'date' => $message->getInternalDate() ? date('Y-m-d H:i:s', $message->getInternalDate() / 1000) : now(),
         ];
@@ -295,9 +298,10 @@ class GmailAdapter extends BaseEmailAdapter
 
         $processPart = function($part) use (&$html, &$plain, &$processPart) {
             $mimeType = $part->getMimeType();
-            $data = $part->getBody()->getData();
+            $body = $part->getBody();
+            $data = $body->getData();
             
-            if ($data !== null) {
+            if ($data !== null && !$part->getFilename()) {
                 $decoded = $this->base64url_decode($data);
                 if ($mimeType === 'text/html') {
                     $html .= $decoded;
@@ -316,6 +320,66 @@ class GmailAdapter extends BaseEmailAdapter
         $processPart($payload);
 
         return ['html' => $html, 'plain' => $plain];
+    }
+
+    /**
+     * Extract attachments from Gmail payload.
+     */
+    protected function extractGmailAttachments($payload, string $bodyHtml, bool $skipAttachments = false, ?string $messageId = null): array
+    {
+        $attachments = [];
+
+        $processPart = function($part) use (&$attachments, $bodyHtml, $skipAttachments, $messageId, &$processPart) {
+            $filename = $part->getFilename();
+            $mimeType = $part->getMimeType();
+            $body = $part->getBody();
+            $attachmentId = $body->getAttachmentId();
+            $contentId = null;
+
+            // Extract Content-ID from headers
+            $headers = collect($part->getHeaders() ?: []);
+            $cidHeader = $headers->first(fn($h) => strtolower($h->getName()) === 'content-id');
+            if ($cidHeader) {
+                $contentId = trim($cidHeader->getValue(), '<>');
+            }
+
+            if ($filename || $attachmentId) {
+                $isInline = false;
+                if ($contentId && $bodyHtml && str_contains($bodyHtml, 'cid:' . $contentId)) {
+                    $isInline = true;
+                }
+
+                $attachmentData = [
+                    'id' => $attachmentId ?: uniqid('gmail_att_'),
+                    'name' => $filename ?: 'unnamed_attachment',
+                    'mime' => $mimeType,
+                    'size' => $body->getSize() ?? 0,
+                    'content_id' => $contentId,
+                    'is_inline' => $isInline,
+                    'attachment_id' => $attachmentId,
+                    // Force download for inline images, otherwise respect skipAttachments
+                    'is_lazy' => $isInline ? false : $skipAttachments,
+                ];
+
+                if (!$attachmentData['is_lazy']) {
+                    if ($body->getData()) {
+                        $attachmentData['content'] = $this->base64url_decode($body->getData());
+                    }
+                }
+
+                $attachments[] = $attachmentData;
+            }
+
+            if ($part->getParts()) {
+                foreach ($part->getParts() as $subPart) {
+                    $processPart($subPart);
+                }
+            }
+        };
+
+        $processPart($payload);
+
+        return $attachments;
     }
 
     /**
@@ -447,6 +511,97 @@ class GmailAdapter extends BaseEmailAdapter
                 'error' => $e->getMessage(),
             ]);
             return ['fetched' => 0, 'has_more' => false];
+        }
+    }
+
+    /**
+     * List all labels as folders for Gmail.
+     */
+    public function listFolders(EmailAccount $account): \Illuminate\Support\Collection
+    {
+        try {
+            $response = $this->apiService->listLabels($account);
+            $labels = collect($response->getLabels() ?? []);
+
+            return $labels->map(function ($label) {
+                return [
+                    'id' => $label->getId(),
+                    'name' => $label->getName(),
+                    'type' => $label->getType(), // system or user
+                    'messages_total' => $label->getMessagesTotal(),
+                    'messages_unread' => $label->getMessagesUnread(),
+                ];
+            });
+        } catch (\Throwable $e) {
+            Log::error('[GmailAdapter] Failed to list labels', [
+                'account_id' => $account->id,
+                'error' => $e->getMessage(),
+            ]);
+            return collect();
+        }
+    }
+
+    /**
+     * Download a specific attachment for a Gmail email using the API.
+     */
+    public function downloadAttachment(\App\Models\Email $email, int $placeholderIndex): \Spatie\MediaLibrary\MediaCollections\Models\Media
+    {
+        $placeholders = $email->attachment_placeholders ?? [];
+        if (!isset($placeholders[$placeholderIndex])) {
+            throw new \InvalidArgumentException('Attachment placeholder not found.');
+        }
+
+        $placeholder = $placeholders[$placeholderIndex];
+        $account = $email->emailAccount;
+
+        if (empty($placeholder['attachment_id'])) {
+            // If No attachment_id, fallback to parent IMAP implementation
+            // This might happen for old placeholders or if metadata failed
+            return parent::downloadAttachment($email, $placeholderIndex);
+        }
+
+        try {
+            $attachmentData = $this->apiService->getAttachment(
+                $account,
+                $email->provider_id, // Gmail Message ID
+                $placeholder['attachment_id']
+            );
+
+            $content = $this->base64url_decode($attachmentData->getData());
+
+            // Store the attachment as Media
+            $media = $email->addMediaFromString($content)
+                ->usingFileName($placeholder['name'] ?? 'attachment')
+                ->usingName($placeholder['name'] ?? 'Attachment')
+                ->toMediaCollection('attachments');
+
+            if (!empty($placeholder['content_id'])) {
+                $media->setCustomProperty('content_id', $placeholder['content_id']);
+                $media->save();
+            }
+
+            // Remove from placeholders
+            unset($placeholders[$placeholderIndex]);
+            $email->update(['attachment_placeholders' => array_values($placeholders)]);
+
+            // If it was an inline image, resolve it now
+            if (!empty($placeholder['content_id'])) {
+                $sanitizer = app(\App\Services\EmailSanitizationService::class);
+                $email->update([
+                    'body_html' => $sanitizer->resolveInlineImages($email)
+                ]);
+            }
+
+            return $media;
+        } catch (\Throwable $e) {
+            Log::error('[GmailAdapter] API attachment download failed', [
+                'email_id' => $email->id,
+                'attachment_id' => $placeholder['attachment_id'],
+                'error' => $e->getMessage(),
+            ]);
+            
+            // Fallback to IMAP if API fails
+            return parent::downloadAttachment($email, $placeholderIndex);
         }
     }
 }

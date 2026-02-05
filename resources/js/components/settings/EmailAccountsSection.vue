@@ -53,7 +53,6 @@ const form = ref({
     disabled_folders: [],
 });
 
-// Available folder types for sync settings
 const folderTypes = [
     { value: "inbox", label: "Inbox", description: "Primary incoming emails" },
     { value: "sent", label: "Sent", description: "Sent emails" },
@@ -62,6 +61,23 @@ const folderTypes = [
     { value: "spam", label: "Spam", description: "Spam/junk emails" },
     { value: "archive", label: "Archive", description: "Gmail All Mail / Archived" },
 ];
+
+const remoteFolders = ref([]);
+const isLoadingRemoteFolders = ref(false);
+
+const fetchRemoteFolders = async (accountId) => {
+    isLoadingRemoteFolders.value = true;
+    remoteFolders.value = [];
+    try {
+        const response = await axios.get(`/api/email-accounts/${accountId}/remote-folders`);
+        remoteFolders.value = response.data.data;
+    } catch (error) {
+        console.error("Failed to fetch remote folders:", error);
+        toast.error("Failed to fetch folders from server");
+    } finally {
+        isLoadingRemoteFolders.value = false;
+    }
+};
 
 const toggleFolderSync = (folderValue) => {
     const idx = form.value.disabled_folders.indexOf(folderValue);
@@ -109,6 +125,7 @@ const fetchProviders = async () => {
 const openModal = (account = null) => {
     editingAccount.value = account;
     if (account) {
+        fetchRemoteFolders(account.id);
         form.value = {
             name: account.name,
             email: account.email,
@@ -404,27 +421,40 @@ onMounted(async () => {
                             >
                             <span
                                 v-if="account.is_shared"
-                                class="px-1.5 py-0.5 text-xs bg-purple-500/10 text-purple-600 rounded"
+                                class="px-1.5 py-0.5 text-[10px] font-bold bg-purple-500/10 text-purple-600 rounded uppercase tracking-wider border border-purple-500/20"
                                 >Shared</span
                             >
+                            <!-- Badges -->
+                            <span 
+                                v-if="account.auth_type === 'oauth'"
+                                class="px-1.5 py-0.5 text-[10px] font-bold bg-indigo-500/10 text-indigo-600 rounded uppercase tracking-wider border border-indigo-500/20"
+                            >
+                                OAuth
+                            </span>
+                            <span 
+                                v-else
+                                class="px-1.5 py-0.5 text-[10px] font-bold bg-gray-500/10 text-gray-600 rounded uppercase tracking-wider border border-gray-500/20"
+                            >
+                                IMAP
+                            </span>
                         </div>
                         <p class="text-sm text-[var(--text-secondary)]">
                             {{ account.email }}
                         </p>
-                        <div class="flex items-center gap-2 mt-1">
+                        <div class="flex items-center gap-3 mt-1.5">
                             <span
                                 :class="[
-                                    'inline-flex items-center gap-1 text-xs',
+                                    'inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-full border',
                                     account.is_verified
-                                        ? 'text-green-600'
-                                        : 'text-amber-600',
+                                        ? 'text-emerald-600 bg-emerald-500/5 border-emerald-500/20'
+                                        : 'text-amber-600 bg-amber-500/5 border-amber-500/20',
                                 ]"
                             >
                                 <CheckCircle
                                     v-if="account.is_verified"
-                                    class="w-3 h-3"
+                                    class="w-2.5 h-2.5"
                                 />
-                                <AlertCircle v-else class="w-3 h-3" />
+                                <AlertCircle v-else class="w-2.5 h-2.5" />
                                 {{
                                     account.is_verified
                                         ? "Verified"
@@ -432,10 +462,11 @@ onMounted(async () => {
                                 }}
                             </span>
                             <span
-                                class="text-xs text-[var(--text-muted)] capitalize"
-                                >{{ account.provider }} ·
-                                {{ account.auth_type }}</span
+                                class="text-[11px] text-[var(--text-muted)] font-medium capitalize flex items-center gap-1"
                             >
+                                <span class="w-1 h-1 rounded-full bg-[var(--border-default)]"></span>
+                                {{ account.provider }}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -812,24 +843,55 @@ onMounted(async () => {
                         Toggle which folders to sync. Disabled folders won't be downloaded.
                     </p>
                     <div class="grid grid-cols-2 gap-2">
-                        <div
-                            v-for="folder in folderTypes"
-                            :key="folder.value"
-                            class="flex items-center justify-between p-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)]"
-                        >
-                            <div class="flex flex-col">
-                                <span class="text-sm font-medium text-[var(--text-primary)]">
-                                    {{ folder.label }}
-                                </span>
-                                <span class="text-xs text-[var(--text-muted)]">
-                                    {{ folder.description }}
-                                </span>
-                            </div>
-                            <Switch
-                                :checked="!form.disabled_folders.includes(folder.value)"
-                                @update:checked="toggleFolderSync(folder.value)"
-                            />
+                        <!-- Loading State -->
+                        <div v-if="isLoadingRemoteFolders && editingAccount" class="col-span-2 flex items-center justify-center py-4">
+                            <RefreshCw class="w-5 h-5 animate-spin text-[var(--text-muted)]" />
+                            <span class="ml-2 text-sm text-[var(--text-muted)]">Fetching folders...</span>
                         </div>
+
+                        <!-- Fallback to hardcoded types if not editing or fetch failed -->
+                        <template v-else-if="!remoteFolders.length">
+                            <div
+                                v-for="folder in folderTypes"
+                                :key="folder.value"
+                                class="flex items-center justify-between p-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)]"
+                            >
+                                <div class="flex flex-col">
+                                    <span class="text-sm font-medium text-[var(--text-primary)]">
+                                        {{ folder.label }}
+                                    </span>
+                                    <span class="text-xs text-[var(--text-muted)]">
+                                        {{ folder.description }}
+                                    </span>
+                                </div>
+                                <Switch
+                                    :checked="!form.disabled_folders.includes(folder.value)"
+                                    @update:checked="toggleFolderSync(folder.value)"
+                                />
+                            </div>
+                        </template>
+
+                        <!-- Display Remote Folders -->
+                        <template v-else>
+                            <div
+                                v-for="folder in remoteFolders"
+                                :key="folder.id"
+                                class="flex items-center justify-between p-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)]"
+                            >
+                                <div class="flex flex-col overflow-hidden">
+                                    <span class="text-sm font-medium text-[var(--text-primary)] truncate" :title="folder.name">
+                                        {{ folder.name }}
+                                    </span>
+                                    <span class="text-xs text-[var(--text-muted)] truncate" :title="folder.id">
+                                        {{ folder.type === 'system' ? 'System Folder' : 'Label' }}
+                                    </span>
+                                </div>
+                                <Switch
+                                    :checked="!form.disabled_folders.includes(folder.id)"
+                                    @update:checked="toggleFolderSync(folder.id)"
+                                />
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>

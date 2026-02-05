@@ -138,4 +138,21 @@ interface EmailProviderAdapter
      * @return array{fetched: int, has_more: bool, new_cursor: mixed}
      */
     public function backfill(EmailAccount $account, ?string $folderType, int $batchSize): array;
+
+    /**
+     * List all available folders/labels from the provider.
+     *
+     * @param EmailAccount $account
+     * @return \Illuminate\Support\Collection Collection of folder data arrays
+     */
+    public function listFolders(EmailAccount $account): \Illuminate\Support\Collection;
+
+    /**
+     * Download a specific attachment for an email on-demand.
+     *
+     * @param  \App\Models\Email  $email
+     * @param  int  $placeholderIndex
+     * @return \Spatie\MediaLibrary\MediaCollections\Models\Media
+     */
+    public function downloadAttachment(\App\Models\Email $email, int $placeholderIndex): \Spatie\MediaLibrary\MediaCollections\Models\Media;
 }

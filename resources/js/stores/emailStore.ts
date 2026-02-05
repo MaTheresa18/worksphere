@@ -12,6 +12,7 @@ import {
 } from 'lucide-vue-next';
 import { emailService } from '@/services/email.service';
 import { startEcho } from '@/echo';
+import axios from 'axios';
 import { useAuthStore } from '@/stores/auth';
 import type { Email, EmailFolder, EmailLabel } from '@/types/models/email';
 
@@ -43,6 +44,8 @@ export const useEmailStore = defineStore('email', () => {
     const emails = ref<Email[]>([]);
     const folders = ref<EmailFolder[]>([...defaultFolders]);
     const labels = ref<EmailLabel[]>([]);
+    const remoteFolders = ref<any[]>([]);
+    const accounts = ref<any[]>([]);
     const loading = ref(false);
     
     // Pagination
@@ -88,11 +91,29 @@ export const useEmailStore = defineStore('email', () => {
     });
 
     // Getters
-    const systemFolders = computed(() => folders.value.filter(f => f.type === 'system'));
+    const selectedAccount = computed(() => accounts.value.find(a => a.id === selectedAccountId.value));
+
+    const systemFolders = computed(() => {
+        const baseFolders = folders.value.filter(f => f.type === 'system');
+        if (!selectedAccount.value) return baseFolders;
+
+        const disabled = selectedAccount.value.disabled_folders || [];
+        // Map common system folders to their logical types for filtering
+        return baseFolders.filter(f => !disabled.includes(f.id));
+    });
+
     const customFolders = computed(() => folders.value.filter(f => f.type === 'custom'));
-    
-    const selectedFolder = computed(() => 
-        folders.value.find(f => f.id === selectedFolderId.value) || folders.value[0]
+
+    const subscribedRemoteFolders = computed(() => {
+        if (!selectedAccount.value) return [];
+        const disabled = selectedAccount.value.disabled_folders || [];
+        return remoteFolders.value.filter(f => !disabled.includes(f.id));
+    });
+
+    const selectedFolder = computed(() =>
+        folders.value.find(f => f.id === selectedFolderId.value) || 
+        subscribedRemoteFolders.value.find(f => f.id === selectedFolderId.value) ||
+        folders.value[0]
     );
 
     const filteredEmails = computed(() => {
@@ -156,7 +177,8 @@ export const useEmailStore = defineStore('email', () => {
             const response = await emailService.list(params);
             
             if (response) {
-                const mappedEmails: Email[] = response.data.map((e: any) => ({
+                const data = Array.isArray(response) ? response : (response.data || []);
+                const mappedEmails: Email[] = data.map((e: any) => ({
                     id: e.id,
                     public_id: e.public_id,
                     message_id: e.message_id,
@@ -209,6 +231,16 @@ export const useEmailStore = defineStore('email', () => {
         }
     }
 
+    async function fetchAccountFolders(accountId: string) {
+        try {
+            const response = await axios.get(`/api/email-accounts/${accountId}/remote-folders`);
+            remoteFolders.value = response.data.data;
+        } catch (error) {
+            console.error('Failed to fetch account folders:', error);
+            remoteFolders.value = [];
+        }
+    }
+
     async function fetchThread(threadId: string) {
         try {
             const response = await emailService.getThread(threadId);
@@ -228,10 +260,13 @@ export const useEmailStore = defineStore('email', () => {
     async function fetchInitialData() {
         // Fetch custom folders and labels
         try {
-            const [customFoldersRes, labelsRes] = await Promise.all([
+            const [customFoldersRes, labelsRes, accountsRes] = await Promise.all([
                 emailService.getFolders(),
-                emailService.getLabels()
+                emailService.getLabels(),
+                axios.get('/api/email-accounts').then(res => res.data.data)
             ]);
+
+            accounts.value = accountsRes;
             
             // Map folders
             const mappedFolders: EmailFolder[] = customFoldersRes.map((f: any) => ({
@@ -252,6 +287,12 @@ export const useEmailStore = defineStore('email', () => {
             // Merge with system folders, keeping system ones first
             folders.value = [...defaultFolders, ...mappedFolders];
             labels.value = mappedLabels;
+
+            // Set default account if none selected
+            if (!selectedAccountId.value && accountsRes.length > 0) {
+                const defaultAcc = accountsRes.find((a: any) => a.is_default) || accountsRes[0];
+                selectedAccountId.value = defaultAcc.id;
+            }
         } catch (e) {
             console.error(e);
         }
@@ -423,6 +464,11 @@ export const useEmailStore = defineStore('email', () => {
     // These now trigger a fetch rather than filtering locally
     function setSelectedAccount(id: string | null) {
         selectedAccountId.value = id;
+        if (id) {
+            fetchAccountFolders(id);
+        } else {
+            remoteFolders.value = [];
+        }
         fetchEmails(1);
     }
 
@@ -541,6 +587,8 @@ export const useEmailStore = defineStore('email', () => {
         selectedEmailId,
         selectedEmailIds,
         selectedAccountId,
+        accounts,
+        remoteFolders,
         searchQuery,
         filterDateFrom,
         filterDateTo,
@@ -549,8 +597,10 @@ export const useEmailStore = defineStore('email', () => {
         accountStatus,
         
         // Getters
+        selectedAccount,
         systemFolders,
         customFolders,
+        subscribedRemoteFolders,
         selectedFolder,
         filteredEmails,
         hasActiveFilters,
@@ -578,6 +628,7 @@ export const useEmailStore = defineStore('email', () => {
         sendEmail,
         applyFilters,
         loadNewEmails,
+        fetchAccountFolders,
         
         // Sort Actions
         sortField,

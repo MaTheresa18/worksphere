@@ -81,6 +81,12 @@ class SecurityHeaders
             }
         }
 
+        // Allow images from self, data URIs (base64), and S3/R2 (https)
+        $imgSrc = "'self' data: https: blob: cid:";
+        if (app()->isLocal()) {
+            $imgSrc .= " http:";
+        }
+
         // Definitions
         $policy = [
             "default-src 'self'",
@@ -89,9 +95,10 @@ class SecurityHeaders
             // Fonts.bunny.net is used for Inter font
             "style-src {$styleSrc}",
             // Allow data: fonts (often used by icon sets or inline fonts)
+            // Using quote to match the exact string from view_file
             "font-src 'self' https://fonts.bunny.net https://fonts.gstatic.com data:",
             // Allow images from self, data URIs (base64), and S3/R2 (https)
-            "img-src 'self' data: https: blob:",
+            "img-src {$imgSrc}",
             // Connect to self, Vite HMR, and Reverb WebSockets (port 9000 usually)
             // Adding ws: and wss: schemes generally to allow websocket connections
             "connect-src {$connectSrc} ws: wss: https://www.google.com",
