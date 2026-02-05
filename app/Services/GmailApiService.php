@@ -44,7 +44,7 @@ class GmailApiService
     /**
      * List messages in a folder (label).
      */
-    public function listMessages(EmailAccount $account, string $labelId, int $maxResults = 100, string $pageToken = null): array
+    public function listMessages(EmailAccount $account, string $labelId, int $maxResults = 100, ?string $pageToken = null): array
     {
         $this->setupForAccount($account);
         $gmail = new Gmail($this->client);
@@ -123,7 +123,7 @@ class GmailApiService
     /**
      * List history (what changed since historyId).
      */
-    public function listHistory(EmailAccount $account, string $startHistoryId, string $pageToken = null): array
+    public function listHistory(EmailAccount $account, string $startHistoryId, ?string $pageToken = null): array
     {
         $this->setupForAccount($account);
         $gmail = new Gmail($this->client);
