@@ -10,6 +10,7 @@ class ResetEmailSyncCommand extends Command
     protected $signature = 'email:reset 
         {--account= : The email account ID to reset}
         {--all : Reset all email accounts}
+        {--force : Force the operation without confirmation}
         {--keep-account : Only delete emails, keep the account and credentials}';
 
     protected $description = 'Reset email sync for an account (deletes emails, resets cursors)';
@@ -54,7 +55,7 @@ class ResetEmailSyncCommand extends Command
             ]
         );
 
-        if (!$this->confirm('Are you sure you want to reset this account?')) {
+        if (!$this->option('force') && !$this->option('no-interaction') && !$this->confirm('Are you sure you want to reset this account?')) {
             $this->info('Operation cancelled.');
             return self::SUCCESS;
         }
@@ -108,7 +109,7 @@ class ResetEmailSyncCommand extends Command
 
         $this->warn("This will reset {$accounts->count()} email account(s).");
         
-        if (!$this->confirm('Are you sure you want to proceed?')) {
+        if (!$this->option('force') && !$this->option('no-interaction') && !$this->confirm('Are you sure you want to proceed?')) {
             $this->info('Operation cancelled.');
             return self::SUCCESS;
         }
