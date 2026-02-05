@@ -637,6 +637,8 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce', 'demo'])->grou
         Route::post('/upload-favicon', [\App\Http\Controllers\Api\SettingsController::class, 'uploadFavicon']);
         Route::post('/upload-opengraph', [\App\Http\Controllers\Api\SettingsController::class, 'uploadOpengraph']);
         Route::post('/verify-demo', [\App\Http\Controllers\Api\SettingsController::class, 'verifyDemoAccess']);
+        Route::post('/test-smtp', [\App\Http\Controllers\Api\SettingsController::class, 'testSmtp']);
+        Route::post('/test-imap', [\App\Http\Controllers\Api\SettingsController::class, 'testImap']);
     });
 
     // Announcements - Public (for viewing/dismissing)

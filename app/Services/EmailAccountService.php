@@ -69,12 +69,40 @@ class EmailAccountService
     }
 
     /**
-     * Test SMTP connection for an email account.
+     * Test connection for an email account (both SMTP and IMAP).
      */
+    public function testConnection(EmailAccount $account): array
+    {
+        // 1. Test SMTP
+        $smtpResult = $this->testSmtpConnection($account);
+        if (! $smtpResult['success']) {
+            return [
+                'success' => false,
+                'message' => 'SMTP: '.$smtpResult['message'],
+            ];
+        }
+
+        // 2. Test IMAP
+        $imapResult = $this->testImapConnection($account);
+        if (! $imapResult['success']) {
+            return [
+                'success' => false,
+                'message' => 'IMAP: '.$imapResult['message'],
+            ];
+        }
+
+        $account->markAsVerified();
+
+        return [
+            'success' => true,
+            'message' => 'Connection successful (SMTP and IMAP)',
+        ];
+    }
+
     /**
      * Test SMTP connection for an email account.
      */
-    public function testConnection(EmailAccount $account): array
+    public function testSmtpConnection(EmailAccount $account): array
     {
         try {
             // Refresh token if needed for OAuth accounts
@@ -92,15 +120,8 @@ class EmailAccountService
 
             $transport = new EsmtpTransport($host, $port, $useTls);
 
-            // Note: detailed stream timeout configuration omitted for compatibility
-
             if ($account->isOAuth()) {
-                // Symfony's EsmtpTransport includes XOAuth2Authenticator by default.
-                // It will automatically use XOAUTH2 if the server advertises it in EHLO.
-                // We just need to set the username to the email and password to the access_token.
                 $transport->setUsername($account->email);
-
-                // Ensure we have a valid access token
                 if (! $account->access_token) {
                     throw new \Exception('No access token available for OAuth account.');
                 }
@@ -110,28 +131,66 @@ class EmailAccountService
                 $transport->setPassword($account->password ?? '');
             }
 
-            // Start the transport to trigger connection and Hello/Auth handshake
             $transport->start();
             $transport->stop();
 
-            $account->markAsVerified();
-
             return [
                 'success' => true,
-                'message' => 'Connection successful',
+                'message' => 'SMTP connection successful',
             ];
         } catch (\Throwable $e) {
             $error = $e->getMessage();
             $account->markAsError($error);
 
-            Log::warning('Email account connection test failed', [
+            Log::warning('SMTP connection test failed', [
                 'account_id' => $account->id,
                 'error' => $error,
             ]);
 
             return [
                 'success' => false,
-                'message' => 'Connection failed: '.$error,
+                'message' => $error,
+            ];
+        }
+    }
+
+    /**
+     * Test IMAP connection for an email account.
+     */
+    public function testImapConnection(EmailAccount $account): array
+    {
+        try {
+            // Refresh token if needed for OAuth accounts
+            if ($account->isOAuth() && $account->needsTokenRefresh()) {
+                $this->refreshToken($account);
+            }
+
+            $adapter = \App\Services\EmailAdapters\AdapterFactory::make($account);
+            $client = $adapter->createClient($account);
+
+            $client->connect();
+
+            // Try to list folders to ensure account is fully accessible
+            $client->getFolders(false);
+
+            $client->disconnect();
+
+            return [
+                'success' => true,
+                'message' => 'IMAP connection successful',
+            ];
+        } catch (\Throwable $e) {
+            $error = $e->getMessage();
+            $account->markAsError($error);
+
+            Log::warning('IMAP connection test failed', [
+                'account_id' => $account->id,
+                'error' => $error,
+            ]);
+
+            return [
+                'success' => false,
+                'message' => $error,
             ];
         }
     }

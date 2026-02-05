@@ -201,6 +201,48 @@ class SettingsController extends Controller
     }
 
     /**
+     * Test IMAP connection with provided settings.
+     */
+    public function testImap(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'settings' => 'required|array',
+        ]);
+
+        $settings = $validated['settings'];
+
+        // Build config for test IMAP
+        $accountData = [
+            'provider' => 'custom',
+            'auth_type' => 'password',
+            'email' => $settings['mail.from_address'] ?? 'system@example.com',
+            'username' => $settings['mail.imap_username'] ?? $settings['mail.username'] ?? '',
+            'password' => $settings['mail.imap_password'] ?? $settings['mail.password'] ?? '',
+            'imap_host' => $settings['mail.imap_host'] ?? '',
+            'imap_port' => (int) ($settings['mail.imap_port'] ?? 993),
+            'imap_encryption' => $settings['mail.imap_encryption'] ?? 'ssl',
+        ];
+
+        // Create a temporary instance (not saved)
+        $account = new \App\Models\EmailAccount($accountData);
+        if (! empty($accountData['password'])) {
+            $account->password = $accountData['password'];
+        }
+
+        try {
+            $service = app(\App\Services\EmailAccountService::class);
+            $result = $service->testImapConnection($account);
+
+            return response()->json($result);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * Upload application logo.
      */
     public function uploadLogo(Request $request): JsonResponse

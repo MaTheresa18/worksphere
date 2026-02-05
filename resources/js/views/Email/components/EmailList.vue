@@ -399,7 +399,6 @@ import { debounce } from "lodash";
 
 type SortField = "date" | "sender" | "subject";
 type SortOrder = "asc" | "desc";
-
 const emit = defineEmits(["toggle-sidebar", "select", "compose"]);
 
 const store = useEmailStore();
@@ -416,6 +415,9 @@ const {
     newEmailCount,
     accountStatus,
     totalEmails,
+    sortField,
+    sortOrder,
+    sortedEmails,
 } = storeToRefs(store);
 
 // Track total email count from store
@@ -423,8 +425,6 @@ const {
 const listRef = ref<HTMLElement | null>(null);
 let animation: any = null;
 
-const sortField = ref<SortField>("date");
-const sortOrder = ref<SortOrder>("desc");
 const showFilters = ref(false);
 
 // Filter Watcher
@@ -434,28 +434,6 @@ const debouncedFilter = debounce(() => {
 
 watch([searchQuery, filterDateFrom, filterDateTo], () => {
     debouncedFilter();
-});
-
-const sortedEmails = computed(() => {
-    // Take the filtered emails from store and apply sorting
-    let result = [...filteredEmails.value];
-
-    return result.sort((a, b) => {
-        let comparison = 0;
-        switch (sortField.value) {
-            case "date":
-                comparison =
-                    new Date(a.date).getTime() - new Date(b.date).getTime();
-                break;
-            case "sender":
-                comparison = a.from_name.localeCompare(b.from_name);
-                break;
-            case "subject":
-                comparison = a.subject.localeCompare(b.subject);
-                break;
-        }
-        return sortOrder.value === "asc" ? comparison : -comparison;
-    });
 });
 
 const sortLabel = computed(() => {
@@ -534,14 +512,23 @@ function handleSelect(email: any) {
     emit("select", email);
 }
 
-function animateList() {
+function animateList(isAppend = false) {
     if (!listRef.value) return;
 
-    // Stop any previous animation
-    if (animation) animation.pause();
+    const allItems = listRef.value.querySelectorAll(".email-item");
+    if (allItems.length === 0) return;
 
-    const targets = listRef.value.querySelectorAll(".email-item");
-    if (targets.length === 0) return;
+    let targets: NodeListOf<Element> | Element[];
+    
+    if (isAppend) {
+        // Only target the last 20 items (default per_page)
+        const batchSize = 20;
+        targets = Array.from(allItems).slice(-batchSize);
+    } else {
+        // Full list animation (e.g. folder change)
+        if (animation) animation.pause();
+        targets = allItems;
+    }
 
     animation = animate(targets, {
         opacity: [0, 1],
@@ -553,10 +540,11 @@ function animateList() {
 }
 
 // Watchers
-watch(sortedEmails, () => {
-    // Only animate on mount or filtered list changes
-    // Debounce a bit or allow Vue to render first
-    nextTick(() => animateList());
+watch(sortedEmails, (newVal, oldVal) => {
+    // Detect if this was an append or a reset
+    const isAppend = oldVal && newVal.length > oldVal.length && newVal[0]?.id === oldVal[0]?.id;
+    
+    nextTick(() => animateList(isAppend));
 });
 
 watch(loading, (newVal) => {

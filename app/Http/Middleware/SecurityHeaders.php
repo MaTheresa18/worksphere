@@ -45,8 +45,8 @@ class SecurityHeaders
         // Permissions Policy (formerly Feature Policy)
         $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
 
-        // Content Security Policy (skip for Horizon which uses inline scripts)
-        if (!$request->is('horizon*')) {
+        // Content Security Policy (skip for Horizon and Pulse which use inline scripts/Livewire)
+        if (!$request->is('horizon*', 'pulse*')) {
             $this->addCspHeader($response);
         }
 

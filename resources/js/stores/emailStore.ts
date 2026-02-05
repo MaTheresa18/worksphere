@@ -56,6 +56,10 @@ export const useEmailStore = defineStore('email', () => {
     const selectedEmailId = ref<string | null>(null);
     const selectedEmailIds = ref<Set<string>>(new Set());
     
+    // Sorting
+    const sortField = ref<'date' | 'sender' | 'subject'>('date');
+    const sortOrder = ref<'asc' | 'desc'>('desc');
+    
     // Filters
     const searchQuery = ref('');
     const filterDateFrom = ref('');
@@ -99,6 +103,26 @@ export const useEmailStore = defineStore('email', () => {
     });
 
     const hasActiveFilters = computed(() => !!(filterDateFrom.value || filterDateTo.value || searchQuery.value));
+
+    const sortedEmails = computed(() => {
+        let result = [...emails.value];
+        
+        return result.sort((a, b) => {
+            let comparison = 0;
+            switch (sortField.value) {
+                case 'date':
+                    comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
+                    break;
+                case 'sender':
+                    comparison = (a.from_name || '').localeCompare(b.from_name || '');
+                    break;
+                case 'subject':
+                    comparison = (a.subject || '').localeCompare(b.subject || '');
+                    break;
+            }
+            return sortOrder.value === 'asc' ? comparison : -comparison;
+        });
+    });
 
     // Actions
     async function fetchEmails(page = 1) {
@@ -542,6 +566,11 @@ export const useEmailStore = defineStore('email', () => {
         getEmailById,
         sendEmail,
         applyFilters,
-        loadNewEmails
+        loadNewEmails,
+        
+        // Sort Actions
+        sortField,
+        sortOrder,
+        sortedEmails
     };
 });

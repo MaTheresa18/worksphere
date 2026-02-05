@@ -242,6 +242,9 @@ class EmailAccountController extends Controller
             'smtp_host' => 'required|string',
             'smtp_port' => 'required|integer',
             'smtp_encryption' => 'required|string|in:ssl,tls,none',
+            'imap_host' => 'sometimes|required|string',
+            'imap_port' => 'sometimes|required|integer',
+            'imap_encryption' => 'sometimes|required|string|in:ssl,tls,none',
             'access_token' => 'nullable|string',
         ]);
 

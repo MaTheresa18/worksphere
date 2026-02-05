@@ -41,28 +41,61 @@ class EmailSanitizationService
             // Step 2: Source-specific pre-processing
             $html = $this->preProcess($html, $source);
 
-            // Step 3: Preserve CID images before purification (HTMLPurifier strips them)
-            $cidPlaceholders = [];
+            // Step 3: Preserve CID images and STYLE tags before purification (HTMLPurifier strips them)
+            $placeholders = [];
+            
+            // 3a: Preserve CID images
             $html = preg_replace_callback(
                 '/<img\s+[^>]*src\s*=\s*(["\'])cid:([^"\']+)\1[^>]*>/i',
-                function ($matches) use (&$cidPlaceholders) {
-                    // Use text placeholder that survives HTMLPurifier
-                    $index = count($cidPlaceholders);
-                    $placeholder = '[[CID_PLACEHOLDER_'.$index.']]';
-                    $cidPlaceholders[$index] = $matches[0];
-
+                function ($matches) use (&$placeholders) {
+                    $index = count($placeholders);
+                    $placeholder = 'IMG_CID_PLACEHOLDER_'.$index;
+                    $placeholders[$placeholder] = $matches[0];
                     return $placeholder;
                 },
                 $html
             );
 
+            // 3b: Preserve STYLE tags (already cleaned of dangerous patterns in preProcess)
+            $html = preg_replace_callback(
+                '/<style\b[^>]*>(.*?)<\/style>/is',
+                function ($matches) use (&$placeholders) {
+                    $index = count($placeholders);
+                    $placeholder = 'STYLE_TAG_PLACEHOLDER_'.$index;
+                    $placeholders[$placeholder] = $matches[0];
+                    // Wrap in div and add a marker so we can move it to the body easily
+                    return "[[[MOVE_TO_BODY:<div>{$placeholder}</div>]]]";
+                },
+                $html
+            );
+
+            // Step 3c: Move all placeholders to the body (Purifier strips anything in <head>)
+            if (str_contains($html, '[[[MOVE_TO_BODY:')) {
+                $foundPlaceholders = [];
+                $html = preg_replace_callback('/\[\[\[MOVE_TO_BODY:(.*?)\]\]\]/is', function($m) use (&$foundPlaceholders) {
+                    $foundPlaceholders[] = $m[1];
+                    return '';
+                }, $html);
+
+                $allPlaceholders = implode("\n", $foundPlaceholders);
+                if (str_contains($html, '<body')) {
+                    $html = preg_replace('/<body([^>]*)>/i', '<body$1>' . $allPlaceholders, $html);
+                } else {
+                    $html = $allPlaceholders . $html;
+                }
+            }
+
             // Step 4: HTMLPurifier sanitization
+            $htmlBeforePurify = $html;
             $html = $this->purify($html, $source);
 
-            // Step 5: Restore CID images
-            foreach ($cidPlaceholders as $index => $originalImg) {
-                $placeholder = '[[CID_PLACEHOLDER_'.$index.']]';
-                $html = str_replace($placeholder, $originalImg, $html);
+            // Step 5: Restore preserved elements
+            if (!empty($placeholders)) {
+                $html = str_replace(array_keys($placeholders), array_values($placeholders), $html);
+            }
+
+            if (empty($html) && !empty($htmlBeforePurify)) {
+                $html = $htmlBeforePurify;
             }
 
             // Step 6: Post-processing (external image blocking, etc.)
@@ -70,45 +103,34 @@ class EmailSanitizationService
 
             return $html;
         } catch (\Throwable $e) {
+            $errMessage = $e->getMessage();
+            
             // Check if this is a CSS property warning (non-critical)
-            $message = $e->getMessage();
-            if (str_contains($message, 'Style attribute') && str_contains($message, 'is not supported')) {
-                // CSS property not supported - log as warning, not error
-                // This is non-critical; the email will render without that specific style
-                Log::warning('[EmailSanitizationService] Unsupported CSS property stripped', [
+            if (str_contains($errMessage, 'Style attribute') && str_contains($errMessage, 'is not supported')) {
+                Log::warning('[EmailSanitizationService] Unsupported CSS property found, using fallback', [
                     'source' => $source,
-                    'warning' => $message,
+                    'warning' => $errMessage,
                 ]);
-                
-                // Try to purify without throwing - remove the problematic inline styles
-                try {
-                    // Strip style attributes entirely and re-purify
-                    $htmlWithoutStyles = preg_replace('/\s+style\s*=\s*(["\'])[^"\']*\1/i', '', $html);
-                    $html = $this->purify($htmlWithoutStyles, $source);
-                    
-                    // Restore CID images
-                    foreach ($cidPlaceholders ?? [] as $index => $originalImg) {
-                        $placeholder = '[[CID_PLACEHOLDER_'.$index.']]';
-                        $html = str_replace($placeholder, $originalImg, $html);
-                    }
-                    
-                    return $this->postProcess($html);
-                } catch (\Throwable $retryError) {
-                    // If still failing, just return the pre-processed HTML without purification
-                    Log::warning('[EmailSanitizationService] Fallback: skipping purification', [
-                        'source' => $source,
-                    ]);
-                    return $this->postProcess($html);
+            } else {
+                Log::error('[EmailSanitizationService] Failed to sanitize email', [
+                    'source' => $source,
+                    'error' => $errMessage,
+                ]);
+            }
+            
+            // If we have the pre-processed version, use that
+            $html = (isset($htmlBeforePurify) && !empty($htmlBeforePurify)) ? $htmlBeforePurify : $html;
+
+            // ALWAYS restore placeholders if they exist
+            if (!empty($placeholders)) {
+                foreach ($placeholders as $placeholder => $original) {
+                    // Try to restore with and without the div wrapper we added in Step 3
+                    $html = str_replace("<div>{$placeholder}</div>", $original, $html);
+                    $html = str_replace($placeholder, $original, $html);
                 }
             }
 
-            Log::error('[EmailSanitizationService] Failed to sanitize email', [
-                'source' => $source,
-                'error' => $e->getMessage(),
-            ]);
-
-            // Return safe fallback (strip all HTML)
-            return strip_tags($html);
+            return $this->postProcess($html);
         }
     }
 
@@ -168,8 +190,20 @@ class EmailSanitizationService
         // Remove script tags and content
         $html = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $html);
 
-        // Remove style tags with dangerous content
-        $html = preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $html);
+        // Remove style tags ONLY if they contain obviously dangerous content
+        $html = preg_replace_callback('/<style\b[^>]*>(.*?)<\/style>/is', function($matches) {
+            $content = $matches[1];
+            
+            // Highly suspicious keywords that shouldn't be in CSS
+            $dangerous = ['javascript:', 'expression(', 'vbscript:', 'url("data:', 'url(\'data:'];
+            foreach ($dangerous as $bad) {
+                if (stripos($content, $bad) !== false) {
+                    return ''; // Strip dangerous style block
+                }
+            }
+            
+            return $matches[0]; // Keep safe style block
+        }, $html);
 
         // Remove event handlers (onclick, onerror, onload, etc.)
         $html = preg_replace('/\s+on\w+\s*=\s*(["\'])[^"\']*\1/i', '', $html);
@@ -186,6 +220,11 @@ class EmailSanitizationService
         // Use the 'email' config from config/purifier.php
         // If not defined, use 'default'
         $configName = config('purifier.settings.email') ? 'email' : 'default';
+
+        Log::debug('[EmailSanitizationService] Purifying HTML', [
+            'config' => $configName,
+            'html_length' => strlen($html),
+        ]);
 
         return Purifier::clean($html, $configName);
     }
