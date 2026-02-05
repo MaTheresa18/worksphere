@@ -178,10 +178,15 @@ class GmailAdapter extends BaseEmailAdapter
                 'error' => $e->getMessage(),
             ]);
             
-            // If history ID is expired, fallback
-            if (str_contains(strtolower($e->getMessage()), 'expired')) {
-                return $this->fetchLatestMessagesForAccount($account, 'inbox', 50);
-            }
+            // If history ID is expired or not found, fallback to fetching latest
+        $errorMsg = strtolower($e->getMessage());
+        if (str_contains($errorMsg, 'expired') || str_contains($errorMsg, 'not found') || str_contains($errorMsg, 'notfound')) {
+            Log::info('[GmailAdapter] History ID expired or not found, falling back to latest fetch', [
+                'account_id' => $account->id,
+                'history_id' => $startHistoryId,
+            ]);
+            return $this->fetchLatestMessagesForAccount($account, 'inbox', 50);
+        }
             
             return collect();
         }
