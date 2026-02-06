@@ -25,6 +25,7 @@ import EmailAccountsSection from "@/components/settings/EmailAccountsSection.vue
 import { emailAccountService } from "@/services/email-account.service";
 import { RichTextEditor } from "@/components/ui";
 import { useDebounceFn } from "@vueuse/core";
+import { toast } from "vue-sonner";
 import api from "@/lib/api";
 
 // Auto-save debounced handlers
@@ -380,6 +381,24 @@ const handleDrop = (e) => {
 
 onMounted(async () => {
     await Promise.all([fetchSignatures(), fetchTemplates()]);
+
+    // Check URL for OAuth result
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has("email_connected")) {
+        const status = urlParams.get("email_connected");
+        if (status === "success") {
+            toast.success("Email account connected successfully!");
+        } else if (status === "updated") {
+            toast.success("Email account tokens updated!");
+        }
+        // Auto-switch to accounts tab to show the result
+        activeTab.value = "accounts";
+        // Clean URL
+        window.history.replaceState({}, "", window.location.pathname);
+    } else if (urlParams.has("error")) {
+        toast.error(urlParams.get("error"));
+        window.history.replaceState({}, "", window.location.pathname);
+    }
 
     // Select first item by default if available and nothing selected
     if (

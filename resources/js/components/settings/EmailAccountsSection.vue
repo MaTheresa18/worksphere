@@ -285,22 +285,6 @@ const connectOAuth = async (provider) => {
 
 // Check for OAuth callback result
 onMounted(async () => {
-    // Check URL for OAuth result
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has("email_connected")) {
-        const status = urlParams.get("email_connected");
-        if (status === "success") {
-            toast.success("Email account connected successfully!");
-        } else if (status === "updated") {
-            toast.success("Email account tokens updated!");
-        }
-        // Clean URL
-        window.history.replaceState({}, "", window.location.pathname);
-    } else if (urlParams.has("error")) {
-        toast.error(urlParams.get("error"));
-        window.history.replaceState({}, "", window.location.pathname);
-    }
-
     try {
         await Promise.all([fetchAccounts(), fetchProviders()]);
     } finally {

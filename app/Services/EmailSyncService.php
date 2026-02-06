@@ -564,19 +564,28 @@ class EmailSyncService implements EmailSyncServiceContract
 
                     $isNew = $email->wasRecentlyCreated;
 
-                    // Store attachments only for new emails
-                    if ($isNew && !empty($emailData['attachments'])) {
+                    // Store attachments if they are provided in sync data
+                    if (!empty($emailData['attachments'])) {
                         $placeholders = [];
-
+                        $existingMedia = $email->getMedia('attachments');
+                        
                         foreach ($emailData['attachments'] as $attachment) {
+                            // Skip if already in Media Library (by name and approximate size)
+                            $alreadyStored = $existingMedia->contains(function ($m) use ($attachment) {
+                                return $m->file_name === ($attachment['name'] ?? '') && 
+                                       abs($m->size - ($attachment['size'] ?? 0)) < 1024;
+                            });
+
+                            if ($alreadyStored) {
+                                continue;
+                            }
+
                             // If lazy, we gathered metadata but skipped the content
                             if (!empty($attachment['is_lazy'])) {
-                                $placeholders[] = [
-                                    'name' => $attachment['name'] ?? 'attachment',
-                                    'mime' => $attachment['mime'] ?? 'application/octet-stream',
-                                    'size' => $attachment['size'] ?? 0,
-                                    'content_id' => $attachment['content_id'] ?? null,
-                                ];
+                                // Preserve all metadata (id, attachment_id, etc.) except the content
+                                $placeholder = $attachment;
+                                unset($placeholder['content']);
+                                $placeholders[] = $placeholder;
                                 continue;
                             }
 
@@ -611,17 +620,17 @@ class EmailSyncService implements EmailSyncServiceContract
                             }
                         }
 
-                        // Store placeholders for on-demand downloading
-                        if (!empty($placeholders)) {
-                            $email->update(['attachment_placeholders' => $placeholders]);
-                        }
+                        // Update placeholders: remove old ones if we have new sync data
+                        // or merge them if appropriate. For now, we trust the latest sync data.
+                        $email->update(['attachment_placeholders' => $placeholders]);
+                    }
 
-                        // [Graphics Fix] Resolve inline images after all potential CID attachments are stored
-                        // This replaces cid: links with actual Media URLs on the server-side.
-                        if ($email->has_attachments) {
-                            $email->update([
-                                'body_html' => $sanitizer->resolveInlineImages($email)
-                            ]);
+                    // [Graphics Fix] Resolve inline images if we have attachments and HTML body
+                    // This replaces cid: links with actual Media URLs on the server-side.
+                    if ($email->has_attachments && !empty($email->body_html)) {
+                        $resolvedHtml = $sanitizer->resolveInlineImages($email);
+                        if ($resolvedHtml !== $email->body_html) {
+                            $email->update(['body_html' => $resolvedHtml]);
                         }
                     }
 

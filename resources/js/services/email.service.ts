@@ -38,7 +38,7 @@ export class EmailService extends BaseService {
   async getThread(threadId: string): Promise<PaginatedResponse<Email>> { // Returns list
       try {
           const response = await this.api.get(`/api/emails/thread/${threadId}`);
-          return response;
+          return response.data;
       } catch (error) {
           this.handleError(error);
           return { data: [] };

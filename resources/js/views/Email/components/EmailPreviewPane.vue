@@ -6,25 +6,41 @@
         <div class="flex-1 overflow-hidden min-h-0 relative flex flex-col">
             <!-- Loading State -->
             <div v-if="loadingThread" class="p-8 flex justify-center">
-                 <LoaderIcon class="w-6 h-6 animate-spin text-[var(--text-muted)]" />
+                <LoaderIcon
+                    class="w-6 h-6 animate-spin text-[var(--text-muted)]"
+                />
             </div>
 
             <!-- Thread View -->
-            <div v-else-if="threadMessages.length > 0 && activeTab === 'read'" class="flex-1 overflow-y-auto">
-                <div 
-                    v-for="(msg, index) in threadMessages" 
+            <div
+                v-else-if="threadMessages.length > 0 && activeTab === 'read'"
+                class="flex-1 overflow-y-auto"
+            >
+                <div
+                    v-for="(msg, index) in threadMessages"
                     :key="msg.id"
                     class="border-b border-[var(--border-default)] last:border-0"
                 >
                     <!-- Collapsed Header -->
-                    <div 
-                        v-if="!msg.isExpanded" 
+                    <div
+                        v-if="!msg.isExpanded"
                         @click="toggleExpand(index)"
                         class="px-6 py-3 bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] cursor-pointer flex items-center gap-4 transition-colors"
                     >
-                        <p class="font-medium text-sm text-[var(--text-primary)] w-48 truncate">{{ msg.from_name }}</p>
-                        <p class="text-sm text-[var(--text-secondary)] flex-1 truncate">{{ msg.preview }}</p>
-                        <span class="text-xs text-[var(--text-muted)] whitespace-nowrap">{{ formatDate(msg.date) }}</span>
+                        <p
+                            class="font-medium text-sm text-[var(--text-primary)] w-48 truncate"
+                        >
+                            {{ msg.from_name }}
+                        </p>
+                        <p
+                            class="text-sm text-[var(--text-secondary)] flex-1 truncate"
+                        >
+                            {{ msg.preview }}
+                        </p>
+                        <span
+                            class="text-xs text-[var(--text-muted)] whitespace-nowrap"
+                            >{{ formatDate(msg.date) }}</span
+                        >
                     </div>
 
                     <!-- Expanded Content -->
@@ -34,7 +50,9 @@
                         @reply="openTab('reply', msg)"
                         @reply-all="openTab('reply-all', msg)"
                         @forward="openTab('forward', msg)"
-                        @forward-as-attachment="openTab('forward-as-attachment', msg)"
+                        @forward-as-attachment="
+                            openTab('forward-as-attachment', msg)
+                        "
                     />
                 </div>
             </div>
@@ -55,6 +73,125 @@
             >
                 <MailIcon class="w-16 h-16 mb-4 text-[var(--text-tertiary)]" />
                 <p>Select an email to read</p>
+            </div>
+        </div>
+
+        <!-- Anchored Attachments Bar (Pinned above Action Bar) -->
+        <div
+            v-if="
+                props.email &&
+                activeTab === 'read' &&
+                visibleAttachments.length > 0
+            "
+            class="px-4 py-2 bg-(--surface-secondary) border-t border-(--border-default) flex items-center gap-2 overflow-x-auto scrollbar-none"
+        >
+            <div
+                v-for="att in visibleAttachments"
+                :key="att.id"
+                class="flex items-center gap-2 px-2 py-1 bg-(--surface-primary) border border-(--border-default) rounded-md text-xs text-(--text-secondary) whitespace-nowrap hover:bg-(--surface-tertiary) transition-colors cursor-default group"
+                :title="att.name"
+            >
+                <component
+                    :is="getAttachmentIcon(att.type)"
+                    class="w-3.5 h-3.5 text-blue-500"
+                />
+                <span class="max-w-[120px] truncate">{{ att.name }}</span>
+                <span class="text-[10px] text-(--text-muted)">{{
+                    formatSize(att.size)
+                }}</span>
+                <button
+                    v-if="att.is_downloaded === false"
+                    class="ml-1 p-0.5 hover:text-(--interactive-primary) transition-colors"
+                >
+                    <DownloadIcon class="w-3 h-3" />
+                </button>
+            </div>
+        </div>
+
+        <!-- Docked Action Bar (Clamped on top of Tab Bar) -->
+        <div
+            v-if="props.email && activeTab === 'read'"
+            class="px-4 py-2.5 border-t border-(--border-default) bg-(--surface-primary) flex items-center justify-between"
+        >
+            <div class="flex items-center gap-1.5">
+                <!-- Main Replies -->
+                <div
+                    class="flex items-center gap-1 p-0.5 bg-(--surface-secondary) rounded-lg border border-(--border-default)"
+                >
+                    <button
+                        @click="
+                            openTab('reply', replyTargetEmail || props.email)
+                        "
+                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold tracking-tight text-white bg-(--interactive-primary) hover:bg-(--interactive-primary-hover) transition-all shadow-sm"
+                    >
+                        <ReplyIcon class="w-3.5 h-3.5" />
+                        REPLY
+                    </button>
+                    <button
+                        @click="
+                            openTab(
+                                'reply-all',
+                                replyTargetEmail || props.email,
+                            )
+                        "
+                        class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold text-(--text-primary) hover:bg-(--surface-tertiary) transition-all shadow-sm border border-transparent hover:border-(--border-default)"
+                        title="Reply All"
+                    >
+                        <ReplyAllIcon class="w-3.5 h-3.5" />
+                        REP-ALL
+                    </button>
+                    <button
+                        @click="
+                            openTab('forward', replyTargetEmail || props.email)
+                        "
+                        class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold text-(--text-primary) hover:bg-(--surface-tertiary) transition-all shadow-sm border border-transparent hover:border-(--border-default)"
+                        title="Forward"
+                    >
+                        <ForwardIcon class="w-3.5 h-3.5" />
+                        FWD
+                    </button>
+                </div>
+
+                <!-- Secondary Actions -->
+                <div
+                    class="flex items-center gap-1 px-1 border-l border-(--border-default) ml-1"
+                >
+                    <button
+                        @click="
+                            openTab(
+                                'forward-as-attachment',
+                                replyTargetEmail || props.email,
+                            )
+                        "
+                        class="p-2 text-(--text-secondary) hover:bg-(--surface-secondary) hover:text-(--text-primary) rounded-md transition-colors"
+                        title="Forward as attachment"
+                    >
+                        <PaperclipIcon class="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        @click="exportAsEml"
+                        class="p-2 text-(--text-secondary) hover:bg-(--surface-secondary) hover:text-(--text-primary) rounded-md transition-colors"
+                        title="Download as .eml"
+                    >
+                        <DownloadIcon class="w-3.5 h-3.5" />
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-1">
+                <button
+                    class="p-2 text-(--text-secondary) hover:bg-(--color-error)/10 hover:text-(--color-error) rounded-md transition-colors"
+                    title="Delete"
+                >
+                    <TrashIcon class="w-3.5 h-3.5" />
+                </button>
+                <div class="w-px h-4 bg-(--border-default) mx-1"></div>
+                <button
+                    class="p-2 text-(--text-secondary) hover:bg-(--surface-secondary) rounded-md transition-colors"
+                    title="More actions"
+                >
+                    <MoreHorizontalIcon class="w-3.5 h-3.5" />
+                </button>
             </div>
         </div>
 
@@ -117,7 +254,13 @@ import {
     PaperclipIcon,
     PencilIcon,
     InboxIcon,
-    LoaderIcon
+    LoaderIcon,
+    TrashIcon,
+    MoreHorizontalIcon,
+    DownloadIcon,
+    FileIcon,
+    ImageIcon,
+    ExternalLinkIcon,
 } from "lucide-vue-next";
 import EmailPreviewContent from "./EmailPreviewContent.vue";
 import EmailInlineComposer from "./EmailInlineComposer.vue";
@@ -146,6 +289,29 @@ const activeTab = ref<string>("read");
 const tabs = ref<Tab[]>([
     { id: "read", label: "Read", icon: markRaw(InboxIcon), closable: false },
 ]);
+// --- Export as EML ---
+function exportAsEml() {
+    if (!props.email) return;
+    window.open(`/api/emails/${props.email.id}/export`, "_blank");
+}
+
+const visibleAttachments = computed(() => {
+    if (!props.email?.attachments) return [];
+    return props.email.attachments.filter((att: any) => !att.is_inline);
+});
+
+function getAttachmentIcon(type: string) {
+    if (type?.startsWith("image/")) return ImageIcon;
+    return FileIcon;
+}
+
+function formatSize(bytes: number) {
+    if (!bytes) return "";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
 
 // Threading State
 const threadMessages = ref<any[]>([]);
@@ -158,19 +324,21 @@ watch(
     async (newEmail) => {
         if (newEmail) {
             activeTab.value = "read";
-            
+
             loadingThread.value = true;
             const threadId = newEmail.thread_id || newEmail.id;
-            
+
             try {
                 const messages = await store.fetchThread(threadId);
+
+                const messageList = Array.isArray(messages) ? messages : (messages?.data || []);
                 
-                // Process messages for UI (add isExpanded)
-                // Expand the LAST message by default, collapse others
-                threadMessages.value = messages.map((msg: any, index: number) => ({
-                    ...msg,
-                    isExpanded: index === messages.length - 1
-                }));
+                threadMessages.value = messageList.map(
+                    (msg: any, index: number) => ({
+                        ...msg,
+                        isExpanded: index === messageList.length - 1,
+                    }),
+                );
             } catch (e) {
                 // Fallback to single email if fetch fails
                 threadMessages.value = [{ ...newEmail, isExpanded: true }];
@@ -181,12 +349,13 @@ watch(
             threadMessages.value = [];
         }
     },
-    { immediate: true } 
+    { immediate: true },
 );
 
 function toggleExpand(index: number) {
     if (threadMessages.value[index]) {
-        threadMessages.value[index].isExpanded = !threadMessages.value[index].isExpanded;
+        threadMessages.value[index].isExpanded =
+            !threadMessages.value[index].isExpanded;
     }
 }
 
@@ -213,7 +382,7 @@ function handlePopupMessage(event: MessageEvent) {
             event.data.type,
         )
     ) {
-        // Default to latest message if not specified? 
+        // Default to latest message if not specified?
         openTab(event.data.type as any, props.email);
     }
 }
@@ -225,7 +394,7 @@ function openTab(
         | "forward"
         | "compose"
         | "forward-as-attachment",
-    targetEmail: Email | null = null
+    targetEmail: Email | null = null,
 ) {
     const emailToUse = targetEmail || props.email;
     replyTargetEmail.value = emailToUse; // Set context for composer
@@ -267,7 +436,7 @@ function closeTab(id: string) {
         }
         // Notify parent that a tab was closed
         emit("tab-closed", id);
-        
+
         // Refresh?
     }
 }

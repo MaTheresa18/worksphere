@@ -70,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import EmailSidebar from "./components/EmailSidebar.vue";
 import EmailList from "./components/EmailList.vue";
 import EmailPreviewPane from "./components/EmailPreviewPane.vue";
@@ -78,15 +78,22 @@ import { useEmailStore, type Email } from "@/stores/emailStore";
 import { storeToRefs } from "pinia";
 
 const store = useEmailStore();
-const { emails, selectedEmailId } = storeToRefs(store);
-
-const isMobileSidebarOpen = ref(false);
-const isComposing = ref(false);
-const previewPaneRef = ref<InstanceType<typeof EmailPreviewPane> | null>(null);
+const { emails, selectedEmailId, loading } = storeToRefs(store);
 
 const selectedEmail = computed(() => {
     return emails.value.find((e) => e.id === selectedEmailId.value) || null;
 });
+
+// Persistence: Handle case where selected email isn't in the initial fetched list (e.g., on refresh)
+watch([selectedEmailId, loading], async ([newId, isLoading]) => {
+    if (newId && !isLoading && !selectedEmail.value) {
+        await store.fetchEmailById(newId);
+    }
+}, { immediate: true });
+
+const isMobileSidebarOpen = ref(false);
+const isComposing = ref(false);
+const previewPaneRef = ref<InstanceType<typeof EmailPreviewPane> | null>(null);
 
 function handleSelectEmail(email: Email) {
     store.selectedEmailId = email.id;

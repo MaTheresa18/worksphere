@@ -566,55 +566,104 @@ class GmailAdapter extends BaseEmailAdapter
 
         $placeholder = $placeholders[$placeholderIndex];
         $account = $email->emailAccount;
+        $attachmentId = $placeholder['attachment_id'] ?? null;
 
-        if (empty($placeholder['attachment_id'])) {
-            // If No attachment_id, fallback to parent IMAP implementation
-            // This might happen for old placeholders or if metadata failed
-            return parent::downloadAttachment($email, $placeholderIndex);
+        // [Self-Healing] If attachment_id is missing, try to find it in the full message via API
+        if (empty($attachmentId) && !empty($email->provider_id)) {
+            try {
+                $fullMessage = $this->apiService->getMessage($account, $email->provider_id);
+                $foundAttachments = $this->extractGmailAttachments(
+                    $fullMessage->getPayload(),
+                    $email->body_html ?? '',
+                    false, // Don't skip, we specifically want the data
+                    $fullMessage->getId(),
+                    $account
+                );
+
+                foreach ($foundAttachments as $att) {
+                    $matchByName = ($att['name'] === ($placeholder['name'] ?? null) && abs($att['size'] - ($placeholder['size'] ?? 0)) < 1024);
+                    $matchByCid = (!empty($att['content_id']) && $att['content_id'] === ($placeholder['content_id'] ?? null));
+
+                    if ($matchByCid || $matchByName) {
+                        // Found it! If it already has content (small attachment), use it directly
+                        if (!empty($att['content'])) {
+                            return $this->storeFetchedAttachment($email, $att, $placeholders, $placeholderIndex);
+                        }
+                        
+                        $attachmentId = $att['attachment_id'] ?? null;
+                        break;
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('[GmailAdapter] Self-healing failed to find attachment_id', [
+                    'email_id' => $email->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if (empty($attachmentId)) {
+            // If still no attachment_id, fallback to parent IMAP if UID is available
+            if ($email->imap_uid) {
+                return parent::downloadAttachment($email, $placeholderIndex);
+            }
+            throw new \RuntimeException("Could not identify Gmail attachment ID for download.");
         }
 
         try {
             $attachmentData = $this->apiService->getAttachment(
                 $account,
                 $email->provider_id, // Gmail Message ID
-                $placeholder['attachment_id']
+                $attachmentId
             );
 
-            $content = $this->base64url_decode($attachmentData->getData());
-
-            // Store the attachment as Media
-            $media = $email->addMediaFromString($content)
-                ->usingFileName($placeholder['name'] ?? 'attachment')
-                ->usingName($placeholder['name'] ?? 'Attachment')
-                ->toMediaCollection('attachments');
-
-            if (!empty($placeholder['content_id'])) {
-                $media->setCustomProperty('content_id', $placeholder['content_id']);
-                $media->save();
-            }
-
-            // Remove from placeholders
-            unset($placeholders[$placeholderIndex]);
-            $email->update(['attachment_placeholders' => array_values($placeholders)]);
-
-            // If it was an inline image, resolve it now
-            if (!empty($placeholder['content_id'])) {
-                $sanitizer = app(\App\Services\EmailSanitizationService::class);
-                $email->update([
-                    'body_html' => $sanitizer->resolveInlineImages($email)
-                ]);
-            }
-
-            return $media;
+            $att = $placeholder;
+            $att['content'] = $this->base64url_decode($attachmentData->getData());
+            
+            return $this->storeFetchedAttachment($email, $att, $placeholders, $placeholderIndex);
         } catch (\Throwable $e) {
             Log::error('[GmailAdapter] API attachment download failed', [
                 'email_id' => $email->id,
-                'attachment_id' => $placeholder['attachment_id'],
+                'attachment_id' => $attachmentId,
                 'error' => $e->getMessage(),
             ]);
             
-            // Fallback to IMAP if API fails
-            return parent::downloadAttachment($email, $placeholderIndex);
+            // Fallback to IMAP if API fails and UID exists
+            if ($email->imap_uid) {
+                return parent::downloadAttachment($email, $placeholderIndex);
+            }
+            throw $e;
         }
+    }
+
+    /**
+     * Helper to store a downloaded attachment into Media Library and cleanup placeholders.
+     */
+    protected function storeFetchedAttachment(\App\Models\Email $email, array $att, array $placeholders, int $placeholderIndex): \Spatie\MediaLibrary\MediaCollections\Models\Media
+    {
+        // Store the attachment as Media
+        $media = $email->addMediaFromString($att['content'])
+            ->usingFileName($att['name'] ?? 'attachment')
+            ->usingName($att['name'] ?? 'Attachment')
+            ->toMediaCollection('attachments');
+
+        if (!empty($att['content_id'])) {
+            $media->setCustomProperty('content_id', $att['content_id']);
+            $media->save();
+        }
+
+        // Remove from placeholders
+        unset($placeholders[$placeholderIndex]);
+        $email->update(['attachment_placeholders' => array_values($placeholders)]);
+
+        // If it was an inline image, resolve it now
+        if (!empty($att['content_id'])) {
+            $sanitizer = app(\App\Services\EmailSanitizationService::class);
+            $email->update([
+                'body_html' => $sanitizer->resolveInlineImages($email)
+            ]);
+        }
+
+        return $media;
     }
 }

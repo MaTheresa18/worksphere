@@ -17,7 +17,7 @@
                         class="flex items-center w-full px-2.5 py-2 text-sm font-medium text-left bg-[var(--surface-elevated)] border border-[var(--border-default)] rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--interactive-primary)] hover:bg-[var(--surface-tertiary)] transition-all hover:border-[var(--interactive-primary)]/30"
                     >
                         <div
-                            class="w-6 h-6 rounded-full mr-2 ring-1 ring-white/20 flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                            class="w-6 h-6 rounded-full mr-2 ring-1 ring-white/20 flex items-center justify-center text-[10px] font-bold text-white shrink-0 relative"
                             :style="{
                                 background: selectedAccount
                                     ? '#6366f1'
@@ -31,6 +31,11 @@
                                           .toUpperCase()
                                     : "?"
                             }}
+                            <!-- Sync Indicator Badge -->
+                            <div
+                                v-if="isBackgroundSyncing"
+                                class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-[var(--surface-elevated)] animate-pulse"
+                            ></div>
                         </div>
                         <span
                             class="flex-1 truncate text-[var(--text-primary)] leading-tight"
@@ -48,13 +53,13 @@
         <div class="p-4 pt-3 flex items-center gap-2">
             <button
                 @click="handleSync"
-                :disabled="isSyncing || !selectedAccount"
-                class="flex items-center justify-center w-8 h-8 flex-shrink-0 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--interactive-primary)] hover:border-[var(--interactive-primary)]/30 hover:bg-[var(--surface-tertiary)] transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
-                title="Sync Account"
+                :disabled="isSyncing || isBackgroundSyncing || !selectedAccount"
+                class="flex items-center justify-center w-8 h-8 flex-shrink-0 rounded-lg bg-[var(--surface-elevated)] border border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--interactive-primary)] hover:border-[var(--interactive-primary)]/30 hover:bg-[var(--surface-tertiary)] transition-all disabled:opacity-50 disabled:cursor-not-allowed group relative"
+                :title="isBackgroundSyncing ? 'Syncing...' : 'Sync Account'"
             >
                 <RotateCwIcon
                     class="w-4 h-4 group-hover:rotate-180 transition-transform duration-500"
-                    :class="{ 'animate-spin': isSyncing }"
+                    :class="{ 'animate-spin': isSyncing || isBackgroundSyncing }"
                 />
             </button>
 
@@ -255,7 +260,15 @@ const {
     selectedFolderId,
     accounts,
     selectedAccount,
+    accountStatus,
 } = storeToRefs(store);
+
+const isBackgroundSyncing = computed(() => {
+    return (
+        accountStatus.value?.status === "syncing" ||
+        accountStatus.value?.status === "seeding"
+    );
+});
 
 onMounted(() => {
     store.fetchInitialData();

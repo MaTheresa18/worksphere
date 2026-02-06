@@ -289,26 +289,32 @@ class EmailSanitizationService
                 continue;
             }
 
-            // Clean CID (remove brackets if present in stored value)
+            // Possible variants of the CID in the HTML
             $cleanCid = trim($contentId, '<>');
             $url = route('api.media.show', ['media' => $media->id]);
             
-            // Possible variants of the CID in the HTML
             $variants = [
-                preg_quote($cleanCid, '/'),
-                preg_quote('<' . $cleanCid . '>', '/'),
-                preg_quote(urlencode($cleanCid), '/'),
-                preg_quote(urlencode('<' . $cleanCid . '>'), '/'),
+                $cleanCid,
+                '<' . $cleanCid . '>',
+                '&lt;' . $cleanCid . '&gt;',
             ];
 
             foreach ($variants as $variant) {
-                // 1. Double or single quotes
-                $html = preg_replace('/src\s*=\s*[\"\']cid:'.$variant.'[\"\']/i', 'src="'.$url.'"', $html);
+                $v = preg_quote($variant, '/');
+                $ev = preg_quote(urlencode($variant), '/');
                 
-                // 2. Unquoted or escaped quotes
-                $html = preg_replace('/src\s*=\s*cid:'.$variant.'(?=[\s>])/i', 'src="'.$url.'"', $html);
-                $html = preg_replace('/src\s*=\s*\\\\\"cid:'.$variant.'\\\\\"/i', 'src="'.$url.'"', $html);
+                // Matches src="cid:...", src='cid:...', src=\"cid:...\", src=\'cid:...\', or src=cid:...
+                $pattern = '/src\s*=\s*[\\\\\'"]*cid:('.$v.'|'.$ev.')[\\\\\'"]*/i';
+                $html = preg_replace($pattern, 'src="'.$url.'"', $html);
             }
+        }
+
+        // Final check: if there are still cid: references, try a more aggressive replacement
+        // but only for things that look like they are in a src attribute
+        if (str_contains($html, 'cid:')) {
+            $html = preg_replace('/(src\s*=\s*[\\\\\'"]*)cid:([^\\\\\'"\s>]+)/i', '$1' . route('api.media.show', ['media' => 'placeholder']) . '/$2', $html);
+            // Note: the above placeholder is just a fallback to show SOMETHING or allow debugging
+            // In practice, we want exact matches higher up.
         }
 
         return $html;

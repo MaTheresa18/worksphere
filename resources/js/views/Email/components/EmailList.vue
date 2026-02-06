@@ -82,15 +82,18 @@
         <div
             class="flex items-center justify-between gap-2 px-2 py-1.5 border-b border-[var(--border-default)] bg-[var(--surface-primary)]"
         >
-            <!-- Sort -->
+            <!-- Sort Toggle Button -->
             <Dropdown :items="sortItems" align="start">
                 <template #trigger>
                     <button
-                        class="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] transition-colors"
+                        class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-[var(--surface-elevated)] border border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--interactive-primary)]/30 transition-all shadow-sm"
                         title="Sort emails"
                     >
-                        <ArrowUpDownIcon class="w-3.5 h-3.5" />
-                        {{ sortLabel }}
+                        <component
+                            :is="sortOrder === 'desc' ? ArrowUpIcon : ArrowDownIcon"
+                            class="w-3.5 h-3.5 text-[var(--interactive-primary)]"
+                        />
+                        <span>{{ sortFieldLabel }}</span>
                     </button>
                 </template>
             </Dropdown>
@@ -164,20 +167,26 @@
             v-if="
                 accountStatus?.status === 'failed' && !accountStatus.needsReauth
             "
-            class="bg-red-50 text-red-700 px-3 py-2 text-xs flex items-center gap-2 border-b border-red-100"
+            class="bg-red-50 text-red-700 px-4 py-3 text-xs flex items-center gap-3 border-b border-red-100 animate-in slide-in-from-top duration-300"
         >
-            <AlertOctagonIcon class="w-3 h-3" />
-            <span>Sync failed: {{ accountStatus.error }}</span>
+            <AlertOctagonIcon class="w-4 h-4 shrink-0" />
+            <div class="flex-1 min-w-0">
+                <p class="font-semibold">Sync Failed</p>
+                <p class="truncate opacity-80">{{ accountStatus.error }}</p>
+            </div>
         </div>
         <div
             v-else-if="
                 accountStatus?.status === 'syncing' ||
                 accountStatus?.status === 'seeding'
             "
-            class="bg-blue-50 text-blue-700 px-3 py-2 text-xs flex items-center gap-2 border-b border-blue-100"
+            class="bg-blue-50 text-blue-700 px-4 py-3 text-xs flex items-center gap-3 border-b border-blue-100 animate-in slide-in-from-top duration-300"
         >
-            <LoaderIcon class="w-3 h-3 animate-spin" />
-            <span>Syncing emails...</span>
+            <LoaderIcon class="w-4 h-4 animate-spin shrink-0" />
+            <div class="flex-1 min-w-0">
+                <p class="font-semibold">Syncing Mailbox</p>
+                <p class="truncate opacity-80">Fetching your emails from the provider...</p>
+            </div>
         </div>
 
         <!-- Blocking View for Re-auth -->
@@ -228,6 +237,49 @@
                 </div>
             </div>
 
+            <!-- Empty State for Syncing -->
+            <div
+                v-else-if="
+                    sortedEmails.length === 0 &&
+                    (accountStatus?.status === 'syncing' ||
+                        accountStatus?.status === 'seeding')
+                "
+                class="flex flex-col items-center justify-center h-full p-8 text-center"
+            >
+                <div class="relative mb-4">
+                    <div
+                        class="absolute inset-0 bg-[var(--interactive-primary)]/10 rounded-full animate-ping"
+                    ></div>
+                    <div
+                        class="relative bg-[var(--interactive-primary)]/20 p-4 rounded-full"
+                    >
+                        <LoaderIcon
+                            class="w-10 h-10 text-[var(--interactive-primary)] animate-spin"
+                        />
+                    </div>
+                </div>
+                <h3 class="text-lg font-bold text-[var(--text-primary)] mb-2">
+                    Syncing Mailbox
+                </h3>
+                <p class="text-sm text-[var(--text-secondary)] max-w-[200px]">
+                    We're fetching your emails for the first time. This may take
+                    a few moments...
+                </p>
+            </div>
+
+            <div
+                v-else-if="sortedEmails.length === 0"
+                class="flex flex-col items-center justify-center h-full p-8 text-center"
+            >
+                <MailIcon class="w-12 h-12 text-[var(--text-muted)] mb-4" />
+                <h3 class="text-lg font-bold text-[var(--text-primary)] mb-1">
+                    No emails found
+                </h3>
+                <p class="text-sm text-[var(--text-secondary)]">
+                    This folder is empty.
+                </p>
+            </div>
+
             <ul v-else class="divide-y divide-[var(--border-subtle)]">
                 <li
                     v-for="email in sortedEmails"
@@ -239,10 +291,16 @@
                             ? 'bg-[var(--surface-tertiary)]'
                             : 'hover:bg-[var(--surface-secondary)]',
                         !email.is_read
-                            ? 'bg-[var(--surface-elevated)] font-semibold'
+                            ? 'bg-[var(--surface-elevated)]/50'
                             : 'bg-[var(--surface-primary)]',
                     ]"
                 >
+                    <!-- Unread Accent Bar -->
+                    <div
+                        v-if="!email.is_read"
+                        class="absolute left-0 top-0 bottom-0 w-1 bg-[var(--interactive-primary)]"
+                    ></div>
+
                     <!-- Checkbox -->
                     <div class="flex items-center h-5">
                         <input
@@ -276,8 +334,13 @@
                     <div class="min-w-0 flex-1">
                         <div class="flex justify-between items-baseline mb-1">
                             <p
-                                class="text-sm font-medium text-[var(--text-primary)] truncate pr-2"
+                                class="text-sm text-[var(--text-primary)] truncate pr-2 flex items-center gap-1.5"
+                                :class="{ 'font-bold': !email.is_read }"
                             >
+                                <span
+                                    v-if="!email.is_read"
+                                    class="w-2 h-2 shrink-0 rounded-full bg-[var(--interactive-primary)] shadow-[0_0_8px_var(--interactive-primary)] animate-pulse inline-block"
+                                ></span>
                                 {{
                                     email.from_name ||
                                     email.from_email ||
@@ -297,7 +360,8 @@
                             </span>
                         </div>
                         <p
-                            class="text-sm text-[var(--text-secondary)] truncate font-medium"
+                            class="text-sm text-[var(--text-secondary)] truncate"
+                            :class="!email.is_read ? 'font-bold' : 'font-medium'"
                         >
                             {{ email.subject }}
                         </p>
@@ -373,13 +437,15 @@ import {
     MailOpenIcon,
     MailIcon,
     MenuIcon,
-    ArrowUpDownIcon,
     StarIcon,
     FilterIcon,
     PaperclipIcon,
     AlertOctagonIcon,
     LoaderIcon,
     PlusIcon,
+    ArrowUpIcon,
+    ArrowDownIcon,
+    ArrowUpDownIcon,
 } from "lucide-vue-next";
 import { useEmailStore } from "@/stores/emailStore";
 import { storeToRefs } from "pinia";
@@ -436,30 +502,33 @@ watch([searchQuery, filterDateFrom, filterDateTo], () => {
     debouncedFilter();
 });
 
-const sortLabel = computed(() => {
+const sortFieldLabel = computed(() => {
     const fieldMap = { date: "Date", sender: "Sender", subject: "Subject" };
-    const orderArrow = sortOrder.value === "asc" ? "↑" : "↓";
-    return `${fieldMap[sortField.value]} ${orderArrow}`;
+    return fieldMap[sortField.value];
 });
 
 const unreadCount = computed(
     () => filteredEmails.value.filter((e) => !e.is_read).length,
 );
 
-const sortItems = [
-    { label: "Date", action: () => toggleSort("date") },
-    { label: "Sender", action: () => toggleSort("sender") },
-    { label: "Subject", action: () => toggleSort("subject") },
-];
+const sortItems = computed(() => [
+    {
+        label: "Date",
+        icon: sortField.value === "date" ? (sortOrder.value === "desc" ? ArrowUpIcon : ArrowDownIcon) : undefined,
+        action: () => store.toggleSort("date")
+    },
+    {
+        label: "Sender",
+        icon: sortField.value === "sender" ? (sortOrder.value === "asc" ? ArrowUpIcon : ArrowDownIcon) : undefined,
+        action: () => store.toggleSort("sender")
+    },
+    {
+        label: "Subject",
+        icon: sortField.value === "subject" ? (sortOrder.value === "asc" ? ArrowUpIcon : ArrowDownIcon) : undefined,
+        action: () => store.toggleSort("subject")
+    },
+]);
 
-function toggleSort(field: SortField) {
-    if (sortField.value === field) {
-        sortOrder.value = sortOrder.value === "asc" ? "desc" : "asc";
-    } else {
-        sortField.value = field;
-        sortOrder.value = "desc"; // Default to desc for new field
-    }
-}
 
 function clearFilters() {
     store.filterDateFrom = "";

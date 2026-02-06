@@ -5,61 +5,87 @@
     >
         <!-- Header -->
         <!-- Default Header (Inline Mode) -->
+        <!-- Default Header (Inline Mode) -->
         <div
             v-if="!isPopup"
-            class="p-6 border-b border-[var(--border-default)] bg-gradient-to-b from-[var(--surface-secondary)] to-transparent preview-animate-item"
+            class="border-b border-(--border-default) bg-gradient-to-b from-(--surface-secondary) to-transparent preview-animate-item transition-all duration-200"
+            :class="isHeaderExpanded ? 'p-6' : 'p-3'"
         >
-            <div class="flex justify-between items-start">
-                <h1
-                    class="text-2xl font-semibold text-[var(--text-primary)] leading-tight"
-                >
-                    {{ email.subject }}
-                </h1>
-                <div class="flex space-x-1">
+            <div class="flex justify-between items-start gap-4">
+                <div class="flex items-center gap-3 flex-1 min-w-0">
                     <button
-                        class="p-2 text-[var(--text-secondary)] hover:bg-[var(--surface-tertiary)] hover:text-[var(--text-primary)] rounded-lg transition-colors"
+                        @click="isHeaderExpanded = !isHeaderExpanded"
+                        class="p-1.5 rounded-lg hover:bg-(--surface-tertiary) text-(--text-secondary) transition-colors flex-shrink-0"
+                        :title="isHeaderExpanded ? 'Collapse' : 'Expand'"
+                    >
+                        <ChevronDownIcon
+                            class="w-5 h-5 transition-transform duration-200"
+                            :class="{ '-rotate-90': !isHeaderExpanded }"
+                        />
+                    </button>
+                    
+                    <h1
+                        v-if="isHeaderExpanded"
+                        class="text-2xl font-semibold text-(--text-primary) leading-tight truncate"
+                    >
+                        {{ email.subject }}
+                    </h1>
+                    <div v-else class="flex items-center gap-3 truncate">
+                        <span class="font-semibold text-sm text-(--text-primary) truncate">{{ email.from_name }}</span>
+                        <span class="text-xs text-(--text-muted) px-2 py-0.5 rounded bg-(--surface-tertiary)">Subject</span>
+                        <span class="text-sm text-(--text-secondary) truncate">{{ email.subject }}</span>
+                    </div>
+                </div>
+
+                <div class="flex space-x-1 flex-shrink-0">
+                    <button
+                        v-if="isHeaderExpanded"
+                        class="p-2 text-(--text-secondary) hover:bg-(--surface-tertiary) hover:text-(--text-primary) rounded-lg transition-colors"
                         title="Show Metadata"
                         @click="showMetadata = !showMetadata"
                         :class="{
-                            'bg-[var(--surface-tertiary)] text-[var(--text-primary)]':
+                            'bg-(--surface-tertiary) text-(--text-primary)':
                                 showMetadata,
                         }"
                     >
                         <InfoIcon class="w-5 h-5" />
                     </button>
                     <button
-                        class="p-2 text-[var(--text-secondary)] hover:bg-[var(--surface-tertiary)] hover:text-[var(--text-primary)] rounded-lg transition-colors"
+                        class="p-2 text-(--text-secondary) hover:bg-(--surface-tertiary) hover:text-(--text-primary) rounded-lg transition-colors"
                         title="Print"
                         @click="printEmail"
                     >
                         <PrinterIcon class="w-5 h-5" />
                     </button>
                     <button
-                        class="p-2 text-[var(--text-secondary)] hover:bg-[var(--surface-tertiary)] hover:text-[var(--text-primary)] rounded-lg transition-colors"
+                        v-if="isHeaderExpanded"
+                        class="p-2 text-(--text-secondary) hover:bg-(--surface-tertiary) hover:text-(--text-primary) rounded-lg transition-colors"
                         title="Expand"
                         @click="expandEmail"
                     >
                         <Maximize2Icon class="w-5 h-5" />
                     </button>
+                    <div v-else class="flex items-center ml-2 pl-2 border-l border-(--border-default)">
+                        <span class="text-xs text-(--text-muted) whitespace-nowrap">{{ formatDate(email.date) }}</span>
+                    </div>
                 </div>
             </div>
 
             <!-- Metadata Panel -->
             <div
-                v-if="showMetadata"
-                class="mt-4 p-4 rounded-xl bg-[var(--surface-tertiary)] text-xs font-mono text-[var(--text-secondary)] overflow-x-auto overflow-y-auto max-h-64 border border-[var(--border-default)]"
+                v-if="showMetadata && isHeaderExpanded"
+                class="mt-4 p-4 rounded-xl bg-(--surface-tertiary) text-xs font-mono text-(--text-secondary) overflow-x-auto overflow-y-auto max-h-64 border border-(--border-default)"
             >
-                <!-- Metadata details... reusing existing structure if possible, but for brevity using simplified -->
                 <div class="grid grid-cols-[120px_1fr] gap-y-2">
-                    <div class="font-semibold text-[var(--text-primary)]">
+                    <div class="font-semibold text-(--text-primary)">
                         Message-ID:
                     </div>
                     <div class="select-all">{{ email.message_id }}</div>
-                    <div class="font-semibold text-[var(--text-primary)]">
+                    <div class="font-semibold text-(--text-primary)">
                         Date:
                     </div>
                     <div>{{ email.date }}</div>
-                    <div class="font-semibold text-[var(--text-primary)]">
+                    <div class="font-semibold text-(--text-primary)">
                         From:
                     </div>
                     <div class="select-all">
@@ -68,34 +94,34 @@
                 </div>
             </div>
 
-            <div class="mt-4 flex items-center justify-between">
+            <div v-if="isHeaderExpanded" class="mt-4 flex items-center justify-between">
                 <div class="flex items-center">
                     <div class="relative">
                         <img
                             :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(email.from_name)}&background=6366f1&color=fff`"
-                            class="w-11 h-11 rounded-full ring-2 ring-[var(--border-default)] ring-offset-2 ring-offset-[var(--surface-primary)]"
+                            class="w-11 h-11 rounded-full ring-2 ring-(--border-default) ring-offset-2 ring-offset-(--surface-primary)"
                             alt=""
                         />
                         <div
-                            class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-[var(--surface-primary)]"
+                            class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-(--surface-primary)"
                         ></div>
                     </div>
                     <div class="ml-4">
                         <p
-                            class="text-sm font-semibold text-[var(--text-primary)]"
+                            class="text-sm font-semibold text-(--text-primary)"
                         >
                             {{ email.from_name }}
                         </p>
-                        <p class="text-xs text-[var(--text-muted)]">
+                        <p class="text-xs text-(--text-muted)">
                             <span>&lt;{{ email.from_email }}&gt;</span>
                         </p>
                     </div>
                 </div>
                 <div class="text-right">
-                    <p class="text-sm text-[var(--text-secondary)]">
+                    <p class="text-sm text-(--text-secondary)">
                         {{ formatDate(email.date) }}
                     </p>
-                    <p class="text-xs text-[var(--text-muted)]">
+                    <p class="text-xs text-(--text-muted)">
                         {{ formatRelative(email.date) }}
                     </p>
                 </div>
@@ -203,19 +229,19 @@
 
                 <div
                     v-if="hasBlockedImages"
-                    class="rounded-xl bg-[var(--surface-secondary)] border border-[var(--border-default)] p-3 flex items-center justify-between gap-3"
+                    class="rounded-xl bg-[var(--surface-secondary)] border border-[var(--border-default)] p-3 flex items-center justify-between gap-3 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300"
                 >
                     <div class="flex items-center gap-3">
                         <ImageIcon
-                            class="w-5 h-5 text-[var(--text-secondary)]"
+                            class="w-5 h-5 text-[var(--interactive-primary)]"
                         />
                         <div class="text-sm text-[var(--text-secondary)]">
-                            Images are hidden for your privacy.
+                            Tracking images are hidden for your privacy.
                         </div>
                     </div>
                     <button
                         @click="showImages = true"
-                        class="text-sm font-medium text-[var(--interactive-primary)] hover:underline"
+                        class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[var(--surface-elevated)] border border-[var(--border-default)] text-[var(--text-primary)] hover:border-[var(--interactive-primary)]/30 transition-all shadow-sm"
                     >
                         Show Images
                     </button>
@@ -234,7 +260,7 @@
             v-if="
                 email.has_attachments &&
                 email.attachments &&
-                email.attachments.length
+                visibleAttachments.length > 0
             "
             class="border-t border-[var(--border-muted)] bg-[var(--surface-secondary)]/50 backdrop-blur-sm"
         >
@@ -251,13 +277,13 @@
                     <span
                         class="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-500 text-white"
                     >
-                        {{ email.attachments?.length || 0 }}
+                        {{ visibleAttachments.length }}
                     </span>
                 </button>
 
                 <div
                     class="flex items-center gap-2"
-                    v-if="email.attachments && email.attachments.length > 0"
+                    v-if="visibleAttachments.length > 0"
                 >
                     <button
                         v-if="selectedAttachments.size > 0"
@@ -399,64 +425,6 @@
             </div>
         </div>
 
-        <!-- Action Bar -->
-        <div
-            v-if="!isPopup"
-            class="p-4 border-t border-[var(--border-default)] bg-[var(--surface-secondary)] preview-animate-item"
-        >
-            <div class="flex gap-2">
-                <button
-                    @click="emit('reply')"
-                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-[var(--interactive-primary)] hover:bg-[var(--interactive-primary-hover)] shadow-lg shadow-[var(--interactive-primary)]/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                >
-                    <ReplyIcon class="w-4 h-4" />
-                    Reply
-                </button>
-                <button
-                    @click="emit('reply-all')"
-                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-[var(--text-primary)] bg-[var(--surface-elevated)] border border-[var(--border-default)] hover:bg-[var(--surface-tertiary)] transition-all hover:scale-[1.02] active:scale-[0.98]"
-                >
-                    <ReplyAllIcon class="w-4 h-4" />
-                    Reply All
-                </button>
-                <button
-                    @click="emit('forward')"
-                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-[var(--text-primary)] bg-[var(--surface-elevated)] border border-[var(--border-default)] hover:bg-[var(--surface-tertiary)] transition-all hover:scale-[1.02] active:scale-[0.98]"
-                >
-                    <ForwardIcon class="w-4 h-4" />
-                    Forward
-                </button>
-                <button
-                    @click="emit('forward-as-attachment')"
-                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-[var(--text-primary)] bg-[var(--surface-elevated)] border border-[var(--border-default)] hover:bg-[var(--surface-tertiary)] transition-all hover:scale-[1.02] active:scale-[0.98]"
-                    title="Forward as attachment (.eml)"
-                >
-                    <PaperclipIcon class="w-4 h-4" />
-                    Forward as Attachment
-                </button>
-                <button
-                    @click="exportAsEml"
-                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-[var(--text-primary)] bg-[var(--surface-elevated)] border border-[var(--border-default)] hover:bg-[var(--surface-tertiary)] transition-all hover:scale-[1.02] active:scale-[0.98]"
-                    title="Download as .eml file"
-                >
-                    <DownloadIcon class="w-4 h-4" />
-                    Export .eml
-                </button>
-                <div class="flex-1"></div>
-                <button
-                    class="p-2.5 rounded-xl text-[var(--text-secondary)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors"
-                    title="Delete"
-                >
-                    <TrashIcon class="w-4 h-4" />
-                </button>
-                <button
-                    class="p-2.5 rounded-xl text-[var(--text-secondary)] hover:bg-[var(--surface-tertiary)] transition-colors"
-                    title="More"
-                >
-                    <MoreHorizontalIcon class="w-4 h-4" />
-                </button>
-            </div>
-        </div>
     </div>
 
     <!-- External Link Warning Modal -->
@@ -530,6 +498,7 @@ import {
     ReplyAllIcon,
     ImageIcon,
     ChevronRightIcon,
+    ChevronDownIcon,
     InfoIcon,
     PaperclipIcon,
     DownloadIcon,
@@ -559,6 +528,7 @@ const emit = defineEmits<{
 const showImages = ref(false);
 const hasBlockedImages = ref(false);
 const isAttachmentsExpanded = ref(false);
+const isHeaderExpanded = ref(true);
 const showMetadata = ref(false);
 const shadowHost = ref<HTMLElement | null>(null);
 const shadowRoot = ref<ShadowRoot | null>(null);
@@ -696,6 +666,8 @@ const sanitizedBody = computed(() => {
                     const isExternal =
                         src &&
                         !src.startsWith("data:") &&
+                        !src.startsWith("blob:") &&
+                        !src.startsWith("cid:") &&
                         !src.startsWith(window.location.origin) &&
                         !src.startsWith("/") &&
                         !src.includes("/storage/") &&
@@ -729,19 +701,29 @@ const sanitizedBody = computed(() => {
 });
 
 // We need to update `hasBlockedImages` separately to avoid computed side-effects
+// Image Analysis
+const imageAnalysis = computed(() => {
+    if (!props.email?.body_html) return { hasCid: false, hasExternal: false };
+    
+    const html = props.email.body_html;
+    // Check for CID images in <img> tags
+    const hasCid = /<img[^>]+src=["']cid:/i.test(html);
+    
+    // Check for external images in <img> tags (http/https or proto-relative)
+    // We target only img tags and ignore data: / blob: / cid: paths
+    // We also exclude local origin URLs to avoid false positives
+    const hasExternal = /<img[^>]+src=["'](https?:\/\/|\/\/)/i.test(html) && 
+                       !html.includes('src="' + window.location.origin);
+    
+    return { hasCid, hasExternal };
+});
+
 watch(
-    sanitizedBody,
+    [() => props.email?.id, () => imageAnalysis.value, () => showImages.value],
     () => {
-        // Only way to know if we BLOCKED images is if we found them AND showImages is false.
-        // Let's parse the original body or use a temporary div to check for img tags.
-        if (props.email?.body_html && !showImages.value) {
-            // Simple heuristic check for potentially blocked images
-            // Matches http, // (protocol relative), and cid: (inline attachments)
-            // Note: data-original-src also matches src= due to the attribute suffix
-            const hasImg = /<img[^>]+src=["'](http|\/\/|cid:)/i.test(
-                props.email.body_html,
-            );
-            hasBlockedImages.value = hasImg;
+        // We only block if there are EXTERNAL images and the user hasn't opted to show them
+        if (imageAnalysis.value.hasExternal && !showImages.value) {
+            hasBlockedImages.value = true;
         } else {
             hasBlockedImages.value = false;
         }
