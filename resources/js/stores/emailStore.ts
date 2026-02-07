@@ -316,6 +316,23 @@ export const useEmailStore = defineStore("email", () => {
         }
     }
 
+    async function fetchEmailBody(id: string) {
+        try {
+            const response = await axios.get(`/api/emails/${id}/body`);
+            if (response.data) {
+                const email = emails.value.find((e) => e.id === id);
+                if (email) {
+                    email.body_html = response.data.body_html;
+                    email.body_plain = response.data.body_plain;
+                }
+                return response.data;
+            }
+        } catch (error) {
+            console.error("Failed to fetch email body:", error);
+        }
+        return null;
+    }
+
     async function fetchEmailById(id: string) {
         try {
             const email = await emailService.find(id);
@@ -750,6 +767,7 @@ export const useEmailStore = defineStore("email", () => {
         // Actions
         fetchEmails,
         fetchThread,
+        fetchEmailBody,
         fetchEmailById,
         fetchInitialData,
         loadMore,

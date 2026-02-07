@@ -176,6 +176,23 @@ class EmailController extends Controller
     }
 
     /**
+     * Get email body (on-demand fetch if missing).
+     */
+    public function body(Email $email)
+    {
+        $this->authorize('view', $email);
+
+        if (empty($email->body_html) && empty($email->body_plain)) {
+            $email = $this->emailService->fetchBody($email);
+        }
+
+        return response()->json([
+            'body_html' => $email->body_html,
+            'body_plain' => $email->body_plain,
+        ]);
+    }
+
+    /**
      * Send an email.
      */
     public function store(SendEmailRequest $request): JsonResponse
@@ -275,6 +292,11 @@ class EmailController extends Controller
     public function exportEml(Email $email)
     {
         $this->authorize('view', $email);
+
+        // Ensure we have the body content if it's missing (Headers-First sync)
+        if (empty($email->body_html) && empty($email->body_plain)) {
+            $email = $this->emailService->fetchBody($email);
+        }
 
         // Build EML content
         $eml = $this->buildEmlContent($email);

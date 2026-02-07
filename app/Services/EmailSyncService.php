@@ -311,7 +311,7 @@ class EmailSyncService implements EmailSyncServiceContract
     public function syncIncrementalUpdates(EmailAccount $account): int
     {
         $adapter = AdapterFactory::make($account);
-        $messages = $adapter->fetchIncrementalUpdates($account);
+        $messages = $adapter->fetchIncrementalUpdates($account, false);
         
         $count = 0;
         foreach ($messages as $emailData) {
@@ -524,6 +524,36 @@ class EmailSyncService implements EmailSyncServiceContract
                         return str_replace("\0", "", $res);
                     };
 
+                    $threadId = $emailData['thread_id'] ?? null;
+
+                    // [Threading Heuristic] If thread_id is missing (common for standard IMAP)
+                    if (!$threadId && !empty($emailData['headers'])) {
+                        $headers = $emailData['headers'];
+                        $references = $headers['references'] ?? $headers['References'] ?? '';
+                        $inReplyTo = $headers['in-reply-to'] ?? $headers['In-Reply-To'] ?? '';
+
+                        // Extract all message IDs from these headers
+                        preg_match_all('/<([^>]+)>/', $references . ' ' . $inReplyTo, $matches);
+                        $parentIds = array_unique($matches[1] ?? []);
+
+                        if (!empty($parentIds)) {
+                            // Find if any of our emails match these IDs
+                            $parent = Email::whereIn('message_id', $parentIds)
+                                ->where('user_id', $account->user_id)
+                                ->whereNotNull('thread_id')
+                                ->first();
+
+                            if ($parent) {
+                                $threadId = $parent->thread_id;
+                            }
+                        }
+
+                        // Fallback: If still no thread_id, use its own message_id as thread root
+                        if (!$threadId) {
+                            $threadId = $emailData['message_id'] ?? null;
+                        }
+                    }
+
                     $email = Email::updateOrCreate(
                         $matchAttributes,
                         [
@@ -531,7 +561,7 @@ class EmailSyncService implements EmailSyncServiceContract
                             'imap_uid' => $emailData['imap_uid'] ?? null,
                             'provider_id' => $emailData['gmail_id'] ?? null,
                             'folder' => $targetFolder,
-                            'thread_id' => $emailData['thread_id'] ?? null,
+                            'thread_id' => $threadId,
                             'from_email' => $emailData['from_email'],
                             'from_name' => $sanitize($emailData['from_name'] ?? null),
                             'to' => $emailData['to'] ?? [],
@@ -662,6 +692,44 @@ class EmailSyncService implements EmailSyncServiceContract
 
         // Should never reach here, but satisfy return type
         throw new \RuntimeException('Failed to store email after retries');
+    }
+
+
+
+    /**
+     * Fetch body for an email on-demand.
+     */
+    public function fetchBody(Email $email): Email
+    {
+        // If already has body, return it
+        if (!empty($email->body_html) || !empty($email->body_plain)) {
+            return $email;
+        }
+
+        $account = $email->emailAccount;
+        $adapter = $this->getAdapterForAccount($account);
+
+        try {
+            $emailData = $adapter->fetchFullMessage($email);
+            
+            // Update email with fetched data
+            // We use storeEmail but force update logic logic?
+            // Actually storeEmail uses updateOrCreate, so calling it with the data should work
+            // and merge the new body/attachments.
+            // Ensure we preserve existing ID/UID matching.
+            
+            // If Gmail, $emailData has 'gmail_id'. If IMAP, 'imap_uid'.
+            // storeEmail handles logic.
+            
+            return $this->storeEmail($account, $emailData, $email->folder, false); // broadcast=false
+            
+        } catch (\Throwable $e) {
+            Log::error('[EmailSync] Failed to fetch body on-demand', [
+                'email_id' => $email->id,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
     }
 
     /**

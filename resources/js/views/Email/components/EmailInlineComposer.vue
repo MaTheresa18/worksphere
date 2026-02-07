@@ -567,13 +567,12 @@ function removeAttachment(index: number) {
 
 async function fetchEmlAttachment(emailId: number | string, subject: string) {
     try {
-        const response = await fetch(`/api/emails/${emailId}/export`);
+        const response = await axios.get(`/api/emails/${emailId}/export`, {
+            responseType: 'blob'
+        });
 
-        if (!response.ok) throw new Error("Failed to export email");
-
-        const blob = await response.blob();
+        const blob = response.data;
         const safeName = subject.replace(/[^a-zA-Z0-9_-]/g, "_") + ".eml";
-
         const file = new File([blob], safeName, { type: "message/rfc822" });
 
         // Add to attachments if not already present
@@ -586,7 +585,6 @@ async function fetchEmlAttachment(emailId: number | string, subject: string) {
         }
     } catch (e) {
         console.error("Error fetching EML attachment:", e);
-        // Could add toast notification here
     }
 }
 
@@ -598,6 +596,18 @@ watch(
             subject.value = "";
             toEmails.value = [];
             return;
+        }
+
+        // Ensure we have the body for reply/forward
+        if (!props.replyTo.body_html && !props.replyTo.body_plain) {
+            store.fetchEmailBody(String(props.replyTo.id)).then(data => {
+                if (data && props.replyTo) {
+                    props.replyTo.body_html = data.body_html;
+                    props.replyTo.body_plain = data.body_plain;
+                    // Trigger editor update after body fetch
+                    setQuotedContent(mode);
+                }
+            });
         }
 
         const {
@@ -646,9 +656,38 @@ watch(
             toEmails.value = [];
             ccEmails.value = [];
         }
+
+        // Set initial quoted content
+        setQuotedContent(mode);
     },
     { immediate: true },
 );
+
+function setQuotedContent(mode: string) {
+    if (!props.replyTo || mode === 'compose' || mode === 'forward-as-attachment') return;
+    
+    const body = props.replyTo.body_html || props.replyTo.body_plain || "";
+    if (!body) return;
+
+    const date = props.replyTo.date ? formatDate(props.replyTo.date) : "Unknown date";
+    const sender = props.replyTo.from_name || props.replyTo.from_email || "Unknown";
+    
+    const quotedHtml = `
+        <br><br>
+        <div class="gmail_quote">
+            <div dir="ltr" class="gmail_attr">
+                On ${date}, ${sender} wrote:<br>
+            </div>
+            <blockquote class="gmail_quote" style="margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">
+                ${body}
+            </blockquote>
+        </div>
+    `;
+    
+    editor.value?.commands.setContent(quotedHtml);
+    // Focus at start
+    editor.value?.commands.focus('start');
+}
 
 const characterCount = computed(() => {
     return editor.value?.getText().length || 0;

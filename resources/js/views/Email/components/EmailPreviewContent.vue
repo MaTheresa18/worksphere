@@ -225,29 +225,36 @@
         >
             <!-- Security / Trust Banner -->
             <div
-                v-if="!isTrustedSource || hasBlockedImages"
-                class="mb-6 space-y-3"
+                v-if="(!isTrustedSource && !isUntrustedDismissed) || hasBlockedImages"
+                class="mb-6 space-y-4 p-3"
             >
                 <div
-                    v-if="!isTrustedSource"
-                    class="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 flex items-start gap-3"
+                    v-if="!isTrustedSource && !isUntrustedDismissed"
+                    class="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4 flex items-start gap-4 relative group"
                 >
                     <AlertTriangleIcon
                         class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5"
                     />
-                    <div>
+                    <div class="flex-1">
                         <p class="text-sm font-medium text-amber-500">
                             Untrusted Source
                         </p>
-                        <p class="text-xs text-amber-500/80 mt-0.5">
+                        <p class="text-xs text-amber-500/80 mt-1">
                             Use caution with links and attachments.
                         </p>
                     </div>
+                    <button 
+                        @click="dismissUntrusted"
+                        class="text-amber-500/60 hover:text-amber-500 hover:bg-amber-500/10 p-1.5 rounded-lg transition-colors"
+                        title="Dismiss for this email"
+                    >
+                        <XIcon class="w-4 h-4" />
+                    </button>
                 </div>
 
                 <div
                     v-if="hasBlockedImages"
-                    class="rounded-xl bg-(--surface-secondary) border border-(--border-default) p-3 flex items-center justify-between gap-3 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300"
+                    class="rounded-xl bg-(--surface-secondary) border border-(--border-default) p-4 flex items-center justify-between gap-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300"
                 >
                     <div class="flex items-center gap-3">
                         <ImageIcon
@@ -266,8 +273,15 @@
                 </div>
             </div>
 
+            <!-- Loading State -->
+            <div v-if="loadingBody" class="flex flex-col items-center justify-center py-20 animate-in fade-in duration-300">
+                <div class="w-8 h-8 border-3 border-(--surface-tertiary) border-t-(--interactive-primary) rounded-full animate-spin"></div>
+                <p class="mt-3 text-sm text-(--text-muted)">Loading content...</p>
+            </div>
+
             <!-- Email Content (Shadow DOM for Style Isolation) -->
             <div
+                v-else
                 class="email-content-wrapper w-full flex-1 overflow-hidden"
                 ref="shadowHost"
             ></div>
@@ -351,11 +365,13 @@ import {
     DownloadIcon,
     ExternalLinkIcon,
     ShieldAlertIcon,
+    XIcon,
 } from "lucide-vue-next";
 import { format, formatDistanceToNow } from "date-fns";
 import type { Email } from "@/types/models/email";
 import { animate, stagger } from "animejs";
 import { sanitizeHtml } from "@/utils/sanitize";
+import { useEmailStore } from "@/stores/emailStore";
 import Modal from "@/components/ui/Modal.vue";
 import Button from "@/components/ui/Button.vue";
 
@@ -364,6 +380,8 @@ const props = defineProps<{
     isPopup?: boolean;
     embedded?: boolean;
 }>();
+
+const store = useEmailStore();
 
 const emit = defineEmits<{
     reply: [];
@@ -375,6 +393,7 @@ const emit = defineEmits<{
 // --- Security & Privacy ---
 const showImages = ref(false);
 const hasBlockedImages = ref(false);
+const selectedAttachments = ref<Set<string>>(new Set());
 const isAttachmentsExpanded = ref(false);
 const isHeaderExpanded = ref(
     localStorage.getItem("email_header_expanded") !== "false",
@@ -431,6 +450,32 @@ async function downloadOnDemand(att: any, index: number) {
     }
 }
 
+// On-Demand Body Fetching
+const loadingBody = ref(false);
+
+async function checkAndFetchBody() {
+    if (!props.email) return;
+
+    // If we have no body content, fetch it
+    if (!props.email.body_html && !props.email.body_plain) {
+        loadingBody.value = true;
+        try {
+             const data = await store.fetchEmailBody(props.email.id);
+             if (data && (data.body_html || data.body_plain)) {
+                 // Update local object to trigger reactivity in this component
+                 props.email.body_html = data.body_html;
+                 props.email.body_plain = data.body_plain;
+             }
+        } catch (e) {
+            console.error("Failed to fetch email body", e);
+        } finally {
+            loadingBody.value = false;
+        }
+    } else {
+        loadingBody.value = false;
+    }
+}
+
 // Reset image state when email changes
 watch(
     () => props.email?.id,
@@ -438,7 +483,9 @@ watch(
         showImages.value = false;
         hasBlockedImages.value = false;
         selectedAttachments.value.clear();
+        checkAndFetchBody();
     },
+    { immediate: true }
 );
 
 const visibleAttachments = computed(() => {
@@ -459,7 +506,7 @@ const allSelectedDownloaded = computed(() => {
     if (selectedAttachments.value.size === 0) return true;
     return Array.from(selectedAttachments.value).every((id) => {
         const att = visibleAttachments.value.find((a: any) => a.id === id);
-        return att?.is_downloaded !== false;
+        return (att as any)?.is_downloaded !== false;
     });
 });
 
@@ -598,6 +645,24 @@ const isTrustedSource = computed(() => {
     const emailDomain = props.email.from_email.split("@")[1];
     return trustedDomains.includes(emailDomain);
 });
+
+// Untrusted Source Dismissal
+const isUntrustedDismissed = ref(false);
+
+function checkDismissedState() {
+    if (!props.email?.id) return;
+    const key = `untrusted_dismissed_${props.email.id}`;
+    isUntrustedDismissed.value = localStorage.getItem(key) === 'true';
+}
+
+function dismissUntrusted() {
+    if (!props.email?.id) return;
+    const key = `untrusted_dismissed_${props.email.id}`;
+    localStorage.setItem(key, 'true');
+    isUntrustedDismissed.value = true;
+}
+
+watch(() => props.email?.id, checkDismissedState, { immediate: true });
 
 // --- Shadow DOM Injection ---
 watch(
@@ -761,7 +826,6 @@ function formatRelative(dateStr: string) {
 }
 
 // --- Attachments ---
-const selectedAttachments = ref<Set<string>>(new Set());
 
 function toggleAttachment(id: string) {
     if (selectedAttachments.value.has(id)) {
