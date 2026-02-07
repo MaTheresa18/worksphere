@@ -1,8 +1,9 @@
 <template>
     <div class="email-popup-container" v-if="email">
-        <EmailPreviewContent 
-            :email="email" 
+        <EmailPreviewContent
+            :email="email"
             :is-popup="true"
+            :embedded="false"
             @reply="handleAction('reply')"
             @reply-all="handleAction('reply-all')"
             @forward="handleAction('forward')"
@@ -29,15 +30,22 @@ const route = useRoute();
 const email = ref<Email | null>(null);
 const loading = ref(true);
 
-function handleAction(action: 'reply' | 'reply-all' | 'forward' | 'forward-as-attachment') {
+function handleAction(
+    action: "reply" | "reply-all" | "forward" | "forward-as-attachment",
+) {
     if (window.opener && !window.opener.closed) {
-        window.opener.postMessage({
-            type: action,
-            emailId: email.value?.id
-        }, window.location.origin);
+        window.opener.postMessage(
+            {
+                type: action,
+                emailId: email.value?.id,
+            },
+            window.location.origin,
+        );
         window.opener.focus();
     } else {
-        alert("Please open the main application window to perform this action.");
+        alert(
+            "Please open the main application window to perform this action.",
+        );
     }
 }
 

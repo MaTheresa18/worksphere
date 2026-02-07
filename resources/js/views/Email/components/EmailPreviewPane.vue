@@ -14,12 +14,12 @@
             <!-- Thread View -->
             <div
                 v-else-if="threadMessages.length > 0 && activeTab === 'read'"
-                class="flex-1 overflow-y-auto"
+                class="flex-1 overflow-y-auto min-h-0 flex flex-col"
             >
                 <div
                     v-for="(msg, index) in threadMessages"
                     :key="msg.id"
-                    class="border-b border-[var(--border-default)] last:border-0"
+                    class="border-b border-[var(--border-default)] last:border-0 flex flex-col last:flex-1"
                 >
                     <!-- Collapsed Header -->
                     <div
@@ -47,6 +47,7 @@
                     <EmailPreviewContent
                         v-else
                         :email="msg"
+                        :embedded="true"
                         @reply="openTab('reply', msg)"
                         @reply-all="openTab('reply-all', msg)"
                         @forward="openTab('forward', msg)"
@@ -76,44 +77,126 @@
             </div>
         </div>
 
-        <!-- Anchored Attachments Bar (Pinned above Action Bar) -->
+        <!-- Anchored Attachments Bar (Clamped above Action Bar) -->
         <div
             v-if="
                 props.email &&
                 activeTab === 'read' &&
                 visibleAttachments.length > 0
             "
-            class="px-4 py-2 bg-(--surface-secondary) border-t border-(--border-default) flex items-center gap-2 overflow-x-auto scrollbar-none"
+            class="border-t border-(--border-default) bg-(--surface-secondary) backdrop-blur-sm"
         >
             <div
-                v-for="att in visibleAttachments"
-                :key="att.id"
-                class="flex items-center gap-2 px-2 py-1 bg-(--surface-primary) border border-(--border-default) rounded-md text-xs text-(--text-secondary) whitespace-nowrap hover:bg-(--surface-tertiary) transition-colors cursor-default group"
-                :title="att.name"
+                class="px-4 py-2 flex items-center justify-between border-b border-(--border-default)/50"
             >
-                <component
-                    :is="getAttachmentIcon(att.type)"
-                    class="w-3.5 h-3.5 text-blue-500"
-                />
-                <span class="max-w-[120px] truncate">{{ att.name }}</span>
-                <span class="text-[10px] text-(--text-muted)">{{
-                    formatSize(att.size)
-                }}</span>
                 <button
-                    v-if="att.is_downloaded === false"
-                    class="ml-1 p-0.5 hover:text-(--interactive-primary) transition-colors"
+                    @click="isAttachmentsExpanded = !isAttachmentsExpanded"
+                    class="text-[11px] font-bold tracking-tight text-(--text-primary) flex items-center gap-1.5 hover:text-(--interactive-primary) transition-colors select-none"
                 >
-                    <DownloadIcon class="w-3 h-3" />
+                    <ChevronRightIcon
+                        class="w-3.5 h-3.5 transition-transform duration-200"
+                        :class="{ 'rotate-90': isAttachmentsExpanded }"
+                    />
+                    ATTACHMENTS
+                    <span
+                        class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] bg-red-500 text-white"
+                    >
+                        {{ visibleAttachments.length }}
+                    </span>
                 </button>
+
+                <div class="flex items-center gap-3">
+                    <button
+                        v-if="selectedAttachments.size > 0"
+                        @click="downloadSelected"
+                        class="text-[10px] font-semibold text-(--interactive-primary) hover:underline"
+                    >
+                        {{
+                            isDownloadingCloud
+                                ? `Downloading ${downloadProgress.current}/${downloadProgress.total}...`
+                                : hasCloudSelected
+                                  ? "Download from Cloud"
+                                  : "Download Selected"
+                        }}
+                        ({{ selectedAttachments.size }})
+                    </button>
+                    <button
+                        @click="downloadAll"
+                        class="text-[10px] font-semibold text-(--text-secondary) hover:text-(--text-primary) hover:underline"
+                    >
+                        Download All
+                    </button>
+                </div>
+            </div>
+
+            <div
+                v-if="isAttachmentsExpanded"
+                class="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[180px] overflow-y-auto scrollbar-thin"
+            >
+                <div
+                    v-for="(att, idx) in visibleAttachments"
+                    :key="att.id"
+                    class="group relative flex items-center p-2 border border-(--border-default) rounded-lg bg-(--surface-primary) hover:bg-(--surface-tertiary) transition-all cursor-pointer select-none"
+                    :class="{
+                        'ring-1 ring-inset ring-(--interactive-primary) bg-(--interactive-primary)/5':
+                            selectedAttachments.has(att.id),
+                    }"
+                    @click="handleAttachmentClick(att)"
+                >
+                    <div class="p-1.5 rounded-md bg-(--interactive-primary)/10">
+                        <component
+                            :is="getAttachmentIcon(att.type)"
+                            class="w-4 h-4 text-(--interactive-primary)"
+                        />
+                    </div>
+                    <div class="ml-2.5 flex-1 min-w-0 pr-6">
+                        <p
+                            class="text-[11px] font-medium text-(--text-primary) truncate"
+                            :title="att.name"
+                        >
+                            {{ att.name }}
+                        </p>
+                        <p class="text-[10px] text-(--text-muted)">
+                            {{ formatSize(att.size) }}
+                            <span
+                                v-if="att.is_downloaded === false"
+                                class="ml-1 text-amber-500 opacity-80"
+                                >(Cloud)</span
+                            >
+                        </p>
+                    </div>
+
+                    <!-- Individual Download/Select Checkbox -->
+                    <div class="absolute right-2 flex items-center gap-1.5">
+                        <button
+                            v-if="att.is_downloaded === false"
+                            @click.stop="downloadOnDemand(att)"
+                            class="p-1 text-(--interactive-primary) hover:bg-(--interactive-primary)/10 rounded transition-colors"
+                        >
+                            <LoaderIcon
+                                v-if="isDownloading[att.id]"
+                                class="w-3 h-3 animate-spin"
+                            />
+                            <DownloadIcon v-else class="w-3 h-3" />
+                        </button>
+                        <input
+                            type="checkbox"
+                            :checked="selectedAttachments.has(att.id)"
+                            @change.stop="toggleAttachment(att.id)"
+                            @click.stop
+                            class="rounded border-(--border-default) text-(--interactive-primary) focus:ring-(--interactive-primary)/50 h-3.5 w-3.5"
+                        />
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- Docked Action Bar (Clamped on top of Tab Bar) -->
         <div
             v-if="props.email && activeTab === 'read'"
-            class="px-4 py-2.5 border-t border-(--border-default) bg-(--surface-primary) flex items-center justify-between"
+            class="px-4 py-2.5 border-t border-(--border-default) bg-(--surface-primary) flex items-center gap-3 overflow-x-auto"
         >
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 flex-shrink-0">
                 <!-- Main Replies -->
                 <div
                     class="flex items-center gap-1 p-0.5 bg-(--surface-secondary) rounded-lg border border-(--border-default)"
@@ -138,7 +221,7 @@
                         title="Reply All"
                     >
                         <ReplyAllIcon class="w-3.5 h-3.5" />
-                        REP-ALL
+                        Reply All
                     </button>
                     <button
                         @click="
@@ -148,7 +231,7 @@
                         title="Forward"
                     >
                         <ForwardIcon class="w-3.5 h-3.5" />
-                        FWD
+                        Forward
                     </button>
                 </div>
 
@@ -178,19 +261,47 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-1">
+            <!-- Toggles (Moved from Right) -->
+            <div class="flex items-center gap-1 flex-shrink-0">
+                <!-- Star Action -->
                 <button
+                    @click="store.toggleStar(props.email.id)"
+                    class="p-2 rounded-md transition-colors"
+                    :class="
+                        props.email.is_starred
+                            ? 'text-amber-400 hover:bg-amber-400/10'
+                            : 'text-(--text-secondary) hover:bg-(--surface-secondary) hover:text-(--text-primary)'
+                    "
+                    :title="props.email.is_starred ? 'Unstar' : 'Star'"
+                >
+                    <StarIcon
+                        class="w-3.5 h-3.5"
+                        :class="{ 'fill-current': props.email.is_starred }"
+                    />
+                </button>
+
+                <!-- Read/Unread Action -->
+                <button
+                    @click="
+                        store.markAsRead(props.email.id, !props.email.is_read)
+                    "
+                    class="p-2 text-(--text-secondary) hover:bg-(--surface-secondary) hover:text-(--text-primary) rounded-md transition-colors"
+                    :title="
+                        props.email.is_read ? 'Mark as Unread' : 'Mark as Read'
+                    "
+                >
+                    <MailIcon v-if="props.email.is_read" class="w-3.5 h-3.5" />
+                    <MailOpenIcon v-else class="w-3.5 h-3.5" />
+                </button>
+
+                <div class="w-px h-4 bg-(--border-default) mx-1"></div>
+
+                <button
+                    @click="deleteEmail"
                     class="p-2 text-(--text-secondary) hover:bg-(--color-error)/10 hover:text-(--color-error) rounded-md transition-colors"
                     title="Delete"
                 >
                     <TrashIcon class="w-3.5 h-3.5" />
-                </button>
-                <div class="w-px h-4 bg-(--border-default) mx-1"></div>
-                <button
-                    class="p-2 text-(--text-secondary) hover:bg-(--surface-secondary) rounded-md transition-colors"
-                    title="More actions"
-                >
-                    <MoreHorizontalIcon class="w-3.5 h-3.5" />
                 </button>
             </div>
         </div>
@@ -243,9 +354,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, markRaw, onMounted, onUnmounted } from "vue";
+import { ref, watch, computed, markRaw, onMounted, onUnmounted } from "vue";
 import {
     MailIcon,
+    MailOpenIcon,
     XIcon,
     PlusIcon,
     ReplyIcon,
@@ -260,10 +372,14 @@ import {
     DownloadIcon,
     FileIcon,
     ImageIcon,
-    ExternalLinkIcon,
+    ChevronRightIcon,
+    StarIcon,
+    MailIcon as MailUnreadIcon,
 } from "lucide-vue-next";
+import axios from "axios";
 import EmailPreviewContent from "./EmailPreviewContent.vue";
 import EmailInlineComposer from "./EmailInlineComposer.vue";
+import Dropdown from "@/components/ui/Dropdown.vue";
 import type { Email } from "@/types/models/email";
 import { useEmailStore } from "@/stores/emailStore";
 import { isToday, format } from "date-fns";
@@ -305,18 +421,203 @@ function getAttachmentIcon(type: string) {
     return FileIcon;
 }
 
-function formatSize(bytes: number) {
-    if (!bytes) return "";
+function formatSize(bytes: any) {
+    const b = parseInt(String(bytes), 10);
+    if (isNaN(b) || b <= 0) return "";
+
     const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+    const sizes = ["B", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(b) / Math.log(k));
+
+    // Safety check for index
+    if (i < 0) return b + " B";
+    if (i >= sizes.length)
+        return (
+            (b / Math.pow(k, sizes.length - 1)).toFixed(1) +
+            " " +
+            sizes[sizes.length - 1]
+        );
+
+    return parseFloat((b / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
-// Threading State
 const threadMessages = ref<any[]>([]);
 const loadingThread = ref(false);
 const replyTargetEmail = ref<Email | null>(null); // Specific email being replied to in thread
+
+// Attachment State
+const isAttachmentsExpanded = ref(
+    localStorage.getItem("email_attachments_expanded") !== "false",
+); // Default true
+const selectedAttachments = ref(new Set<string>());
+const isDownloading = ref<Record<string, boolean>>({});
+const isDownloadingCloud = ref(false);
+const downloadProgress = ref({ current: 0, total: 0 });
+
+watch(isAttachmentsExpanded, (val) => {
+    localStorage.setItem("email_attachments_expanded", String(val));
+});
+
+function toggleAttachment(id: string) {
+    if (selectedAttachments.value.has(id)) {
+        selectedAttachments.value.delete(id);
+    } else {
+        selectedAttachments.value.add(id);
+    }
+}
+
+const hasCloudSelected = computed(() => {
+    return Array.from(selectedAttachments.value).some((id) => {
+        const att = visibleAttachments.value.find((a: any) => a.id === id);
+        return att?.is_downloaded === false;
+    });
+});
+
+function handleAttachmentClick(att: any) {
+    const isImage =
+        att.type?.startsWith("image/") ||
+        /\.(jpg|jpeg|png|gif|webp)$/i.test(att.name);
+    const isVideo =
+        att.type?.startsWith("video/") || /\.(mp4|webm|ogg)$/i.test(att.name);
+
+    if ((isImage || isVideo) && att.url) {
+        // Collect all navigable media
+        const mediaList = visibleAttachments.value.filter(
+            (a: any) =>
+                (a.type?.startsWith("image/") ||
+                    /\.(jpg|jpeg|png|gif|webp)$/i.test(a.name) ||
+                    a.type?.startsWith("video/") ||
+                    /\.(mp4|webm|ogg)$/i.test(a.name)) &&
+                a.url,
+        );
+
+        const index = mediaList.findIndex((a: any) => a.id === att.id);
+
+        const sources = mediaList.map((a: any) => ({
+            src: a.url,
+            download: `/api/emails/attachments/${a.id}/download`,
+            type:
+                a.type?.startsWith("video/") ||
+                /\.(mp4|webm|ogg)$/i.test(a.name)
+                    ? "video"
+                    : "image",
+            name: a.name,
+            size: a.size,
+            id: a.id,
+            canDelete: false, // Hide delete button for email attachments
+        }));
+
+        window.dispatchEvent(
+            new CustomEvent("media-viewer:open", {
+                detail: { media: sources, index },
+            }),
+        );
+    } else {
+        toggleAttachment(att.id);
+    }
+}
+
+function deleteEmail() {
+    if (!props.email) return;
+    if (confirm("Are you sure you want to delete this email?")) {
+        store.deleteEmails([props.email.id]);
+        // Ideally navigate away or clear selection, handled by store/parent usually
+    }
+}
+
+async function downloadOnDemand(att: any) {
+    if (isDownloading.value[att.id]) return;
+    isDownloading.value[att.id] = true;
+    try {
+        const res = await axios.post(
+            `/api/emails/${props.email?.id}/attachments/${att.placeholder_index}/download`,
+        );
+        if (res.data.attachment) {
+            // Force cache bust to ensure image loads if previously 404
+            if (res.data.attachment.url) {
+                res.data.attachment.url += `?t=${new Date().getTime()}`;
+            }
+            Object.assign(att, res.data.attachment);
+        }
+    } catch (e) {
+        console.error("Download failed", e);
+    } finally {
+        isDownloading.value[att.id] = false;
+    }
+}
+
+async function downloadSelected() {
+    // Separate selected into cloud and local
+    const selected = Array.from(selectedAttachments.value)
+        .map((id) => visibleAttachments.value.find((a: any) => a.id === id))
+        .filter(Boolean);
+
+    const cloudItems = selected.filter((a: any) => a.is_downloaded === false);
+    const localItems = selected.filter((a: any) => a.is_downloaded !== false);
+
+    // Priority 1: Download from Cloud
+    if (cloudItems.length > 0) {
+        isDownloadingCloud.value = true;
+        downloadProgress.value = { current: 0, total: cloudItems.length };
+
+        // Trigger downloadOnDemand for each
+        for (const att of cloudItems) {
+            await downloadOnDemand(att);
+            downloadProgress.value.current++;
+        }
+
+        isDownloadingCloud.value = false;
+        return;
+    }
+
+    // Priority 2: Download Local (Zip or Single)
+    if (localItems.length === 0) return;
+
+    if (localItems.length === 1) {
+        // Single file - direct download
+        const att = localItems[0];
+        if (att.url) {
+            // Use API download endpoint to ensure headers force download/save dialog
+            window.open(`/api/emails/attachments/${att.id}/download`, "_blank");
+        }
+    } else {
+        // Multiple files - batch download as ZIP
+        const ids = localItems.map((a: any) => a.id);
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = "/api/emails/attachments/download-batch";
+        form.target = "_blank";
+
+        const csrfToken = document
+            .querySelector('meta[name="csrf-token"]')
+            ?.getAttribute("content");
+        if (csrfToken) {
+            const csrfInput = document.createElement("input");
+            csrfInput.type = "hidden";
+            csrfInput.name = "_token";
+            csrfInput.value = csrfToken;
+            form.appendChild(csrfInput);
+        }
+
+        ids.forEach((id: string) => {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = "ids[]";
+            input.value = id;
+            form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+    }
+}
+
+function downloadAll() {
+    visibleAttachments.value.forEach((att) => {
+        if (att.url) window.open(att.url, "_blank");
+    });
+}
 
 // Watch for email changes to fetch thread
 watch(
@@ -331,8 +632,10 @@ watch(
             try {
                 const messages = await store.fetchThread(threadId);
 
-                const messageList = Array.isArray(messages) ? messages : (messages?.data || []);
-                
+                const messageList = Array.isArray(messages)
+                    ? messages
+                    : messages?.data || [];
+
                 threadMessages.value = messageList.map(
                     (msg: any, index: number) => ({
                         ...msg,

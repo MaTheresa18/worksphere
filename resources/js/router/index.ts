@@ -1001,7 +1001,7 @@ const routes: RouteRecordRaw[] = [
                     breadcrumb: "Email",
                     transition: "none", // Explicitly disabled to prevent layout thrashing
                     layoutFullWidth: true,
-                    layoutFixed: false, // Changed for sanity check: allow page to grow
+                    layoutFixed: true,
                 },
             },
 

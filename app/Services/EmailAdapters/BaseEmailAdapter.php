@@ -781,7 +781,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
 
         // Remove from placeholders
         unset($placeholders[$placeholderIndex]);
-        $email->update(['attachment_placeholders' => array_values($placeholders)]);
+        $email->update(['attachment_placeholders' => $placeholders]);
 
         // If it was an inline image, resolve it now
         if (!empty($placeholder['content_id'])) {

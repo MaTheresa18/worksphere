@@ -178,33 +178,13 @@ export const useEmailStore = defineStore("email", () => {
             // Default newest first for date, alphabetical for others
             sortOrder.value = field === "date" ? "desc" : "asc";
         }
+        // Reset pagination and fetch
+        currentPage.value = 1;
+        fetchEmails(1);
     }
 
     const sortedEmails = computed(() => {
-        let result = [...emails.value];
-
-        return result.sort((a, b) => {
-            let comparison = 0;
-            switch (sortField.value) {
-                case "date": {
-                    const dateA = a.date ? new Date(a.date).getTime() : 0;
-                    const dateB = b.date ? new Date(b.date).getTime() : 0;
-                    comparison = dateA - dateB;
-                    break;
-                }
-                case "sender":
-                    comparison = (a.from_name || "").localeCompare(
-                        b.from_name || "",
-                    );
-                    break;
-                case "subject":
-                    comparison = (a.subject || "").localeCompare(
-                        b.subject || "",
-                    );
-                    break;
-            }
-            return sortOrder.value === "asc" ? comparison : -comparison;
-        });
+        return emails.value;
     });
 
     // Actions
@@ -223,6 +203,8 @@ export const useEmailStore = defineStore("email", () => {
                 folder: selectedFolderId.value,
                 search: searchQuery.value,
                 email_account_id: selectedAccountId.value,
+                sort_by: sortField.value,
+                order: sortOrder.value,
             };
 
             // Handle date filters if present
@@ -280,7 +262,10 @@ export const useEmailStore = defineStore("email", () => {
                 if (page === 1) {
                     emails.value = mappedEmails;
                 } else {
-                    emails.value = [...emails.value, ...mappedEmails];
+                    // Filter out duplicates when appending
+                    const existingIds = new Set(emails.value.map(e => e.id));
+                    const newUniqueEmails = mappedEmails.filter(e => !existingIds.has(e.id));
+                    emails.value = [...emails.value, ...newUniqueEmails];
                 }
 
                 // Handle both Laravel ResourceCollection (meta object) and standard pagination formats
@@ -630,11 +615,17 @@ export const useEmailStore = defineStore("email", () => {
                     currentPage.value === 1 &&
                     !hasActiveFilters.value
                 ) {
-                    // Prepend to the list if on page 1 and no search filters are active
-                    // We check if it already exists to avoid duplicates
-                    if (!emails.value.some((msg) => msg.id === e.email.id)) {
-                        emails.value.unshift(e.email);
-                        totalEmails.value++;
+                    // Only prepend if sorting by Date DESC (Newest First)
+                    if (sortField.value === 'date' && sortOrder.value === 'desc') {
+                        // Prepend to the list if on page 1 and no search filters are active
+                        // We check if it already exists to avoid duplicates
+                        if (!emails.value.some((msg) => msg.id === e.email.id)) {
+                            emails.value.unshift(e.email);
+                            totalEmails.value++;
+                        }
+                    } else {
+                         // Otherwise just increment the notification counter
+                         newEmailCount.value++;
                     }
                 } else {
                     // Otherwise just increment the notification counter
@@ -714,7 +705,14 @@ export const useEmailStore = defineStore("email", () => {
 
     function loadNewEmails() {
         if (newEmailCount.value > 0) {
-            fetchEmails(currentPage.value); // Refresh current page (usually page 1)
+            // Force switch to Date Desc so user sees the new emails
+            if (sortField.value !== 'date' || sortOrder.value !== 'desc') {
+                sortField.value = 'date';
+                sortOrder.value = 'desc';
+            }
+            
+            currentPage.value = 1;
+            fetchEmails(1); // Refresh page 1
             newEmailCount.value = 0;
         }
     }

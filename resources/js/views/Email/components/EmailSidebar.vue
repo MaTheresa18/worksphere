@@ -1,8 +1,5 @@
 <template>
-    <div
-        class="w-64 flex-shrink-0 bg-gradient-to-b from-[var(--surface-secondary)] to-[var(--surface-primary)] border-r border-[var(--border-default)] flex flex-col max-h-[calc(100dvh-4rem)]"
-        v-bind="$attrs"
-    >
+    <div class="flex flex-col h-full w-64" v-bind="$attrs">
         <!-- Accounts Selector (Dropdown) & Sync -->
         <div
             class="px-3 py-3 border-b border-[var(--border-default)] flex items-center gap-2"
@@ -59,7 +56,9 @@
             >
                 <RotateCwIcon
                     class="w-4 h-4 group-hover:rotate-180 transition-transform duration-500"
-                    :class="{ 'animate-spin': isSyncing || isBackgroundSyncing }"
+                    :class="{
+                        'animate-spin': isSyncing || isBackgroundSyncing,
+                    }"
                 />
             </button>
 
@@ -73,7 +72,7 @@
         </div>
 
         <!-- Navigation -->
-        <nav class="flex-1 overflow-y-auto px-3 space-y-1">
+        <nav class="flex-1 overflow-y-auto min-h-0 px-3 space-y-1">
             <!-- System Folders -->
             <a
                 v-for="folder in systemFolders"

@@ -135,7 +135,7 @@ function handleRoleChangeLogout() {
             <!-- Page Content -->
             <main
                 :class="[
-                    'flex-1 flex flex-col',
+                    'flex-1 flex flex-col min-h-0',
                     isFullWidth || isFullscreen ? 'p-0' : 'p-6',
                 ]"
             >

@@ -369,11 +369,15 @@ export function initMediaViewer() {
     if (!mv.videoEl) {
         mv.videoEl = document.createElement("video");
         mv.videoEl.id = "mv-video";
+        mv.videoEl.className = "mv-video"; // Apply CSS class for shadow/radius
         mv.videoEl.controls = true;
         mv.videoEl.style.maxWidth = "100%";
-        mv.videoEl.style.maxHeight = "90vh";
+        mv.videoEl.style.maxHeight = "100%"; // Fit within stage
+        mv.videoEl.style.maxHeight = "100%"; // Fit within stage
         mv.videoEl.style.display = "none";
-        mv.stageEl.appendChild(mv.videoEl);
+        // Append to image container if it exists to share centering logic
+        const container = mv.stageEl.querySelector('.mv-image-container') || mv.stageEl;
+        container.appendChild(mv.videoEl);
     }
 
     // Create play/pause button if it doesn't exist

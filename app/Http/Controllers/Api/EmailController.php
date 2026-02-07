@@ -82,7 +82,28 @@ class EmailController extends Controller
                 MAX(id) as latest_email_id
             ')
             ->groupBy('thread_key')
-            ->orderBy('last_activity', 'desc');
+            ->groupBy('thread_key');
+
+        // Apply Sorting
+        $sortBy = $request->input('sort_by', 'date');
+        $sortOrder = $request->input('order', 'desc');
+
+        switch ($sortBy) {
+            case 'sender':
+                // For threads, we can sort by the sender of the latest email
+                // or just MAX(from_name). Simplest is to sort by min/max based on order.
+                // However, without a join this is tricky in a pure aggregate query if we want meaningful thread sorting.
+                // But since we group by thread_key, we can aggregate.
+                $threadQuery->orderByRaw("MAX(from_name) $sortOrder");
+                break;
+            case 'subject':
+                $threadQuery->orderByRaw("MAX(subject) $sortOrder");
+                break;
+            case 'date':
+            default:
+                $threadQuery->orderBy('last_activity', $sortOrder);
+                break;
+        }
 
         // Paginate the THREADS, not the emails
         $threads = $threadQuery->paginate($request->integer('per_page', 25));
