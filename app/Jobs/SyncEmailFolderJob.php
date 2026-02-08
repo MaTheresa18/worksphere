@@ -93,7 +93,8 @@ class SyncEmailFolderJob implements ShouldQueue
             }
 
             // Fetch next chunk using adapter (parsed to array)
-            $messages = $this->adapter->fetchMessages($account, $this->folder, $offset, $chunkSize);
+            // Use fetchBody=false for headers-first sync
+            $messages = $this->adapter->fetchMessages($account, $this->folder, $offset, $chunkSize, false);
 
             $fetchedCount = 0;
             foreach ($messages as $emailData) {

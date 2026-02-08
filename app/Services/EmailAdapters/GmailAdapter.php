@@ -3,6 +3,7 @@
 namespace App\Services\EmailAdapters;
 
 use App\Enums\EmailFolderType;
+use App\Models\Email;
 use App\Models\EmailAccount;
 use App\Services\EmailSyncService;
 use App\Services\EmailSanitizationService;
@@ -34,11 +35,11 @@ class GmailAdapter extends BaseEmailAdapter
      * Gmail API doesn't use the IMAP client, but we keep this for interface compatibility
      * and potential fallback if needed, though we primarily use the API now.
      */
-    public function createClient(EmailAccount $account): Client
+    public function createClient(EmailAccount $account, bool $fetchBody = true): Client
     {
         // For Gmail, we prefer the API service. 
         // We only implement this if some part of the system still strictly requires an IMAP Client object.
-        return parent::createClient($account);
+        return parent::createClient($account, $fetchBody);
     }
 
     public function getFolderName(string $folderType): string
@@ -91,7 +92,7 @@ class GmailAdapter extends BaseEmailAdapter
     /**
      * Fetch a chunk of messages via API.
      */
-    public function fetchMessages(EmailAccount $account, string $folderType, int $offset, int $limit): Collection
+    public function fetchMessages(EmailAccount $account, string $folderType, int $offset, int $limit, bool $fetchBody = true): Collection
     {
         try {
             $labelId = $this->getFolderName($folderType);
@@ -101,10 +102,12 @@ class GmailAdapter extends BaseEmailAdapter
             // Improvement: Store page tokens in sync_cursor if offset > limit.
             $result = $this->apiService->listMessages($account, $labelId, $limit);
             $messages = collect($result['messages'] ?? []);
+            
+            $format = $fetchBody ? 'full' : 'metadata';
 
-            return $messages->map(function ($msgSummary) use ($account) {
-                $fullMsg = $this->apiService->getMessage($account, $msgSummary->getId());
-                return $this->parseGmailMessage($fullMsg, true, $account);
+            return $messages->map(function ($msgSummary) use ($account, $fetchBody, $format) {
+                $fullMsg = $this->apiService->getMessage($account, $msgSummary->getId(), $format);
+                return $this->parseGmailMessage($fullMsg, true, $account, $fetchBody);
             });
         } catch (\Throwable $e) {
             Log::error('[GmailAdapter] Failed to fetch messages', [
@@ -119,16 +122,18 @@ class GmailAdapter extends BaseEmailAdapter
     /**
      * Fetch latest messages for a folder (Gmail API implementation).
      */
-    public function fetchLatestMessagesForAccount(EmailAccount $account, string $folderType, int $count): Collection
+    public function fetchLatestMessagesForAccount(EmailAccount $account, string $folderType, int $count, bool $fetchBody = true): Collection
     {
         try {
             $labelId = $this->getFolderName($folderType);
             $result = $this->apiService->listMessages($account, $labelId, $count);
             
+            $format = $fetchBody ? 'full' : 'metadata';
             $messages = collect();
+            
             foreach ($result['messages'] as $msg) {
-                $fullMsg = $this->apiService->getMessage($account, $msg->getId());
-                $messages->push($this->parseGmailMessage($fullMsg, true, $account));
+                $fullMsg = $this->apiService->getMessage($account, $msg->getId(), $format);
+                $messages->push($this->parseGmailMessage($fullMsg, true, $account, $fetchBody));
             }
 
             return $messages;
@@ -145,14 +150,15 @@ class GmailAdapter extends BaseEmailAdapter
     /**
      * Fetch incremental updates (Gmail API implementation).
      */
-    public function fetchIncrementalUpdates(EmailAccount $account): Collection
+    public function fetchIncrementalUpdates(EmailAccount $account, bool $fetchBody = true): Collection
     {
         $cursor = $account->sync_cursor ?? [];
         $startHistoryId = $cursor['history_id'] ?? null;
+        $format = $fetchBody ? 'full' : 'metadata';
 
         if (!$startHistoryId) {
             // No history ID yet, fallback to fetching latest from Inbox
-            return $this->fetchLatestMessagesForAccount($account, 'inbox', 50);
+            return $this->fetchLatestMessagesForAccount($account, 'inbox', 50, $fetchBody);
         }
 
         try {
@@ -165,8 +171,8 @@ class GmailAdapter extends BaseEmailAdapter
                     if ($messagesAdded) {
                         foreach ($messagesAdded as $msgAdded) {
                             $msg = $msgAdded->getMessage();
-                            $fullMsg = $this->apiService->getMessage($account, $msg->getId());
-                            $newMessages->push($this->parseGmailMessage($fullMsg, true, $account));
+                            $fullMsg = $this->apiService->getMessage($account, $msg->getId(), $format);
+                            $newMessages->push($this->parseGmailMessage($fullMsg, true, $account, $fetchBody));
                         }
                     }
                 }
@@ -180,14 +186,14 @@ class GmailAdapter extends BaseEmailAdapter
             ]);
             
             // If history ID is expired or not found, fallback to fetching latest
-        $errorMsg = strtolower($e->getMessage());
-        if (str_contains($errorMsg, 'expired') || str_contains($errorMsg, 'not found') || str_contains($errorMsg, 'notfound')) {
-            Log::info('[GmailAdapter] History ID expired or not found, falling back to latest fetch', [
-                'account_id' => $account->id,
-                'history_id' => $startHistoryId,
-            ]);
-            return $this->fetchLatestMessagesForAccount($account, 'inbox', 50);
-        }
+            $errorMsg = strtolower($e->getMessage());
+            if (str_contains($errorMsg, 'expired') || str_contains($errorMsg, 'not found') || str_contains($errorMsg, 'notfound')) {
+                Log::info('[GmailAdapter] History ID expired or not found, falling back to latest fetch', [
+                    'account_id' => $account->id,
+                    'history_id' => $startHistoryId,
+                ]);
+                return $this->fetchLatestMessagesForAccount($account, 'inbox', 50, $fetchBody);
+            }
             
             return collect();
         }
@@ -225,15 +231,15 @@ class GmailAdapter extends BaseEmailAdapter
     /**
      * Standardized parseMessage for unified interface.
      */
-    public function parseMessage($message, bool $skipAttachments = false, ?EmailAccount $account = null): array
+    public function parseMessage($message, bool $skipAttachments = false, bool $fetchBody = true): array
     {
-        return $this->parseGmailMessage($message, $skipAttachments, $account);
+        return $this->parseGmailMessage($message, $skipAttachments, null, $fetchBody);
     }
 
     /**
      * Parse Gmail API message to standardized array.
      */
-    protected function parseGmailMessage(\Google\Service\Gmail\Message $message, bool $skipAttachments = false, ?EmailAccount $account = null): array
+    protected function parseGmailMessage(\Google\Service\Gmail\Message $message, bool $skipAttachments = false, ?EmailAccount $account = null, bool $fetchBody = true): array
     {
         $payload = $message->getPayload();
         $headers = collect($payload->getHeaders() ?: []);
@@ -265,8 +271,13 @@ class GmailAdapter extends BaseEmailAdapter
             $fromEmail = $from;
         }
 
-        $body = $this->extractGmailBody($payload);
-        $attachments = $this->extractGmailAttachments($payload, $body['html'], $skipAttachments, $message->getId(), $account);
+        $body = ['html' => '', 'plain' => ''];
+        $attachments = [];
+
+        if ($fetchBody) {
+            $body = $this->extractGmailBody($payload);
+            $attachments = $this->extractGmailAttachments($payload, $body['html'], $skipAttachments, $message->getId(), $account);
+        }
 
         return [
             'message_id' => $getHeader('Message-ID'),
@@ -278,13 +289,13 @@ class GmailAdapter extends BaseEmailAdapter
             'cc' => $this->parseGmailRecipients($getHeader('Cc')),
             'bcc' => [],
             'subject' => $getHeader('Subject') ?? '(No Subject)',
-            'preview' => app(EmailSanitizationService::class)->generatePreview($body['plain'] ?: $body['html']),
+            'preview' => $message->getSnippet() ?: app(EmailSanitizationService::class)->generatePreview($body['plain'] ?: $body['html']),
             'body_html' => $body['html'],
             'body_plain' => $body['plain'],
             'history_id' => $message->getHistoryId(),
             'is_read' => !in_array('UNREAD', $message->getLabelIds() ?? []),
             'is_starred' => in_array('STARRED', $message->getLabelIds() ?? []),
-            'has_attachments' => !empty($attachments) || $this->hasGmailAttachments($payload),
+            'has_attachments' => !empty($attachments) || ($fetchBody && $this->hasGmailAttachments($payload)),
             'attachments' => $attachments,
             'imap_uid' => null,
             'date' => $message->getInternalDate() ? date('Y-m-d H:i:s', $message->getInternalDate() / 1000) : now(),
@@ -447,7 +458,7 @@ class GmailAdapter extends BaseEmailAdapter
     /**
      * Backfill implementation for Gmail using API.
      */
-    public function backfill(EmailAccount $account, ?string $folderType, int $batchSize): array
+    public function backfill(EmailAccount $account, ?string $folderType, int $batchSize, bool $fetchBody = true): array
     {
         try {
             $labelId = $this->getFolderName($folderType ?: EmailFolderType::Inbox->value);
@@ -470,8 +481,8 @@ class GmailAdapter extends BaseEmailAdapter
             $fetched = 0;
             foreach ($messages as $msgSummary) {
                 try {
-                    $fullMsg = $this->apiService->getMessage($account, $msgSummary->getId());
-                    $emailData = $this->parseGmailMessage($fullMsg);
+                    $fullMsg = $this->apiService->getMessage($account, $msgSummary->getId(), $fetchBody ? 'full' : 'metadata');
+                    $emailData = $this->parseGmailMessage($fullMsg, true, $account, $fetchBody);
                     
                     // Store using sync service (provider agnostic)
                     // We explicitly disable broadcasting for backfill
@@ -552,6 +563,20 @@ class GmailAdapter extends BaseEmailAdapter
             ]);
             return collect();
         }
+    }
+
+    /**
+     * Fetch the full message (body and attachments) for an existing email.
+     */
+    public function fetchFullMessage(Email $email): array
+    {
+        // Use Gmail API if provider_id (gmail_id) is present
+        if ($email->provider_id) {
+             $fullMsg = $this->apiService->getMessage($email->emailAccount, $email->provider_id, 'full');
+             return $this->parseGmailMessage($fullMsg, true, $email->emailAccount, true);
+        }
+
+        return parent::fetchFullMessage($email);
     }
 
     /**

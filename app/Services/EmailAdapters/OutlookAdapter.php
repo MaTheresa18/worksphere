@@ -20,12 +20,12 @@ class OutlookAdapter extends BaseEmailAdapter
     /**
      * Create Outlook IMAP client with OAuth authentication.
      */
-    public function createClient(EmailAccount $account): Client
+    public function createClient(EmailAccount $account, bool $fetchBody = true): Client
     {
         // Always refresh token before connecting
         $this->refreshTokenIfNeeded($account);
 
-        $config = $this->buildBaseConfig($account);
+        $config = $this->buildBaseConfig($account, $fetchBody);
         $config['authentication'] = 'oauth';
         $config['password'] = $account->access_token;
 

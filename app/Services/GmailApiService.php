@@ -70,12 +70,12 @@ class GmailApiService
     /**
      * Get full message details.
      */
-    public function getMessage(EmailAccount $account, string $messageId): Gmail\Message
+    public function getMessage(EmailAccount $account, string $messageId, string $format = 'full'): Gmail\Message
     {
         $this->setupForAccount($account);
         $gmail = new Gmail($this->client);
 
-        return $gmail->users_messages->get('me', $messageId, ['format' => 'full']);
+        return $gmail->users_messages->get('me', $messageId, ['format' => $format]);
     }
 
     /**

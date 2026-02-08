@@ -103,7 +103,7 @@ class BackfillEmailsJob implements ShouldQueue
             $adapter = AdapterFactory::make($account);
             
             // Check if backfill is supported by adapter (interface now requires it)
-            $result = $adapter->backfill($account, $this->folderType, $this->batchSize);
+            $result = $adapter->backfill($account, $this->folderType, $this->batchSize, false);
 
             $totalFetched = $result['fetched'];
             $hasMoreToFetch = $result['has_more'];

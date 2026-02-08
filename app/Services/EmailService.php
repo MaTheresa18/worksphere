@@ -331,4 +331,12 @@ class EmailService implements EmailServiceContract
 
         RateLimiter::hit($key, 60); // 1 minute window
     }
+
+    /**
+     * Fetch the body content for an email if it was skipped during sync.
+     */
+    public function fetchBody(Email $email): Email
+    {
+        return app(\App\Services\EmailSyncService::class)->fetchBody($email);
+    }
 }

@@ -454,6 +454,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce', 'demo'])->grou
         Route::post('/bulk', [\App\Http\Controllers\Api\EmailController::class, 'storeBulk']); // Not implemented in controller yet, adding placeholder or omit
         Route::post('/bulk-delete', [\App\Http\Controllers\Api\EmailController::class, 'bulkDelete']);
         Route::get('/{email}', [\App\Http\Controllers\Api\EmailController::class, 'show']);
+        Route::get('/{email}/body', [\App\Http\Controllers\Api\EmailController::class, 'body']);
         Route::get('/{email}/export', [\App\Http\Controllers\Api\EmailController::class, 'exportEml']);
         Route::match(['put', 'patch'], '/{email}', [\App\Http\Controllers\Api\EmailController::class, 'update']);
         Route::delete('/{email}', [\App\Http\Controllers\Api\EmailController::class, 'destroy']);

@@ -170,4 +170,19 @@ return [
         // Incremental sync for completed accounts (legacy)
         'incremental_interval' => env('EMAIL_INCREMENTAL_INTERVAL', 5), // minutes
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Retention Policy
+    |--------------------------------------------------------------------------
+    */
+
+    'retention' => [
+        // Days to keep emails in Trash/Spam/Drafts before force deleting
+        'trash' => env('EMAIL_RETENTION_TRASH', 30),
+
+        // Days to keep body content for other folders before soft-pruning
+        // (Headers will be kept indefinitely)
+        'body' => env('EMAIL_RETENTION_BODY', 90),
+    ],
 ];

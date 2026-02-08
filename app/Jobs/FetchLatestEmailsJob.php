@@ -99,7 +99,7 @@ class FetchLatestEmailsJob implements ShouldQueue, ShouldBeUnique
                 $this->ensureWatchIsActive($account);
             } else {
                 $adapter = AdapterFactory::make($account);
-                $client = $adapter->createClient($account);
+                $client = $adapter->createClient($account, false);
                 $client->connect();
 
                 // [CRITICAL FIX] Only fetch from INBOX for forward sync.
@@ -230,8 +230,8 @@ class FetchLatestEmailsJob implements ShouldQueue, ShouldBeUnique
                             $message = $adapter->getMessageByUid($folder, $uid);
                             if ($message) {
                                 // delegate parsing to adapter (handles X-GM-LABELS for Gmail)
-                                // [Lazy Sync] Set skipAttachments to true
-                                $emailData = $adapter->parseMessage($message, true);
+                                // [Lazy Sync] Set skipAttachments to true, fetchBody to false
+                                $emailData = $adapter->parseMessage($message, true, false);
                                 
                                 // valid folder is either what adapter detected (from labels) or the current folder we are syncing
                                 $targetFolder = $emailData['folder'] ?? $folderType->value;
@@ -300,8 +300,8 @@ class FetchLatestEmailsJob implements ShouldQueue, ShouldBeUnique
                     $message = $adapter->getMessageByUid($folder, $uid);
                     if ($message) {
                         // delegate parsing to adapter (handles X-GM-LABELS for Gmail)
-                        // [Lazy Sync] Set skipAttachments to true
-                        $emailData = $adapter->parseMessage($message, true);
+                        // [Lazy Sync] Set skipAttachments to true, fetchBody to false
+                        $emailData = $adapter->parseMessage($message, true, false);
                         
                         // valid folder is either what adapter detected (from labels) or the current folder we are syncing
                         $targetFolder = $emailData['folder'] ?? $folderType->value;

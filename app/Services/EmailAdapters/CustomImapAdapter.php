@@ -20,9 +20,9 @@ class CustomImapAdapter extends BaseEmailAdapter
     /**
      * Create IMAP client with password authentication.
      */
-    public function createClient(EmailAccount $account): Client
+    public function createClient(EmailAccount $account, bool $fetchBody = true): Client
     {
-        $config = $this->buildBaseConfig($account);
+        $config = $this->buildBaseConfig($account, $fetchBody);
         $config['password'] = $account->password;
 
         Log::debug('[CustomImapAdapter] Creating client', [

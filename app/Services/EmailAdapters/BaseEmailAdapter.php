@@ -204,9 +204,9 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
     }
 
     /**
-     * Build base IMAP client configuration.
+     * Build base configuration for IMAP client.
      */
-    protected function buildBaseConfig(EmailAccount $account): array
+    protected function buildBaseConfig(EmailAccount $account, bool $fetchBody = true): array
     {
         return [
             'host' => $account->imap_host,
@@ -221,7 +221,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
             'options' => [
                 'fetch' => \Webklex\PHPIMAP\IMAP::FT_PEEK,
                 'sequence' => \Webklex\PHPIMAP\IMAP::ST_UID,
-                'fetch_body' => true,
+                'fetch_body' => $fetchBody,
                 'fetch_flags' => true,
                 'soft_fail' => true, // Ignore certain exceptions when fetching
             ],
@@ -306,9 +306,10 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
      * 
      * @param mixed $message The IMAP message
      * @param bool $skipAttachments Whether to skip downloading attachment content
+     * @param bool $fetchBody Whether to fetch body content (html/plain)
      * @return array
      */
-    public function parseMessage($message, bool $skipAttachments = false): array
+    public function parseMessage($message, bool $skipAttachments = false, bool $fetchBody = true): array
     {
         try {
             $from = @$message->getFrom()[0] ?? null;
@@ -326,9 +327,19 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
             $fromEmail = $from;
         }
 
-        $textBody = $message->getTextBody() ?? '';
-        $bodyHtml = (string) ($message->getHTMLBody() ?? '');
-        $preview = app(EmailSanitizationService::class)->generatePreview($bodyHtml ?: $textBody);
+        $textBody = '';
+        $bodyHtml = '';
+        $preview = '';
+
+        if ($fetchBody) {
+            $textBody = $message->getTextBody() ?? '';
+            $bodyHtml = (string) ($message->getHTMLBody() ?? '');
+            $preview = app(EmailSanitizationService::class)->generatePreview($bodyHtml ?: $textBody);
+        } else {
+            // Even if body is skipped, we might have a snippet/preview from headers in some providers,
+            // but for standard IMAP, we often need the body to get the preview. 
+            // We'll leave it empty or null for now.
+        }
 
         // Process attachments
         $attachments = [];
@@ -469,10 +480,10 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
     /**
      * Fetch a chunk of messages (IMAP implementation).
      */
-    public function fetchMessages(EmailAccount $account, string $folderType, int $offset, int $limit): \Illuminate\Support\Collection
+    public function fetchMessages(EmailAccount $account, string $folderType, int $offset, int $limit, bool $fetchBody = true): \Illuminate\Support\Collection
     {
         $this->refreshTokenIfNeeded($account);
-        $client = $this->createClient($account);
+        $client = $this->createClient($account, $fetchBody);
         $client->connect();
 
         $folder = $this->getFolderWithFallback($client, $folderType);
@@ -506,10 +517,10 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
     /**
      * Fetch the latest N messages for a folder (IMAP implementation).
      */
-    public function fetchLatestMessagesForAccount(EmailAccount $account, string $folderType, int $count): \Illuminate\Support\Collection
+    public function fetchLatestMessagesForAccount(EmailAccount $account, string $folderType, int $count, bool $fetchBody = true): \Illuminate\Support\Collection
     {
         $this->refreshTokenIfNeeded($account);
-        $client = $this->createClient($account);
+        $client = $this->createClient($account, $fetchBody);
         $client->connect();
 
         $folder = $this->getFolderWithFallback($client, $folderType);
@@ -518,7 +529,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
         }
 
         $messages = $this->fetchLatestMessages($folder, $count);
-        $parsed = $messages->map(fn ($msg) => $this->parseMessage($msg, true));
+        $parsed = $messages->map(fn ($msg) => $this->parseMessage($msg, true, $fetchBody));
 
         $client->disconnect();
 
@@ -529,7 +540,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
      * Fetch incremental updates (IMAP implementation).
      * For IMAP, this falls back to fetching latest FROM INBOX compared to a cursor.
      */
-    public function fetchIncrementalUpdates(EmailAccount $account): \Illuminate\Support\Collection
+    public function fetchIncrementalUpdates(EmailAccount $account, bool $fetchBody = true): \Illuminate\Support\Collection
     {
         // For now, IMAP doesn't have a standardized efficient incremental sync like Gmail API.
         // SyncEmailFolderJob handles the UID-based increment for full synced folders.
@@ -548,9 +559,9 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
     /**
      * Create and configure an IMAP client for the account.
      */
-    public function createClient(EmailAccount $account): Client
+    public function createClient(EmailAccount $account, bool $fetchBody = true): Client
     {
-        $config = $this->buildBaseConfig($account);
+        $config = $this->buildBaseConfig($account, $fetchBody);
         return $this->clientManager->make($config);
     }
 
@@ -558,9 +569,9 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
      * Default backfill implementation (IMAP UID crawling).
      * Providers should override this if they have a better way (e.g. Gmail API).
      */
-    public function backfill(EmailAccount $account, ?string $folderType, int $batchSize): array
+    public function backfill(EmailAccount $account, ?string $folderType, int $batchSize, bool $fetchBody = true): array
     {
-        $client = $this->createClient($account);
+        $client = $this->createClient($account, $fetchBody);
         $client->connect();
 
         $folders = $folderType
@@ -792,5 +803,48 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
         }
 
         return $media;
+    }
+
+    /**
+     * Fetch the full message (body and attachments) for an existing email.
+     */
+    public function fetchFullMessage(Email $email): array
+    {
+        // Force fetchBody=true
+        $client = $this->createClient($email->emailAccount, true);
+        $client->connect();
+
+        // Determine folder path
+        $folderName = $email->folder;
+        // Try to map if it's a standard folder
+        if (\App\Enums\EmailFolderType::tryFrom($folderName)) {
+            $folderName = $this->getFolderName($folderName);
+        }
+
+        // Try to get folder with fallback logic
+        $folder = $this->getFolderWithFallback($client, $email->folder);
+        
+        if (!$folder) {
+             // Fallback: try using the stored folder name directly if getFolderWithFallback failed with enum
+             try {
+                 $folder = $client->getFolder($folderName);
+             } catch (\Throwable $e) {
+                 // ignore, throw below
+             }
+        }
+
+        if (!$folder) {
+            throw new \Exception("Folder not found: {$email->folder}");
+        }
+
+        if ($email->imap_uid) {
+            $message = $this->getMessageByUid($folder, $email->imap_uid);
+            if ($message) {
+                 // skipAttachments=false, fetchBody=true
+                 return $this->parseMessage($message, false, true);
+            }
+        }
+
+        throw new \Exception("Message not found with UID {$email->imap_uid} in folder {$folder->path}");
     }
 }

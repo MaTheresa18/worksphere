@@ -25,7 +25,7 @@ interface EmailProviderAdapter
     /**
      * Create and configure an IMAP client for the account.
      */
-    public function createClient(EmailAccount $account): Client;
+    public function createClient(EmailAccount $account, bool $fetchBody = true): Client;
 
     /**
      * Get IMAP folder name for a logical folder type.
@@ -115,17 +115,17 @@ interface EmailProviderAdapter
     /**
      * Fetch a chunk of messages for a folder.
      */
-    public function fetchMessages(EmailAccount $account, string $folderType, int $offset, int $limit): \Illuminate\Support\Collection;
+    public function fetchMessages(EmailAccount $account, string $folderType, int $offset, int $limit, bool $fetchBody = true): \Illuminate\Support\Collection;
 
     /**
      * Fetch the latest N messages for a folder (for seeding).
      */
-    public function fetchLatestMessagesForAccount(EmailAccount $account, string $folderType, int $count): \Illuminate\Support\Collection;
+    public function fetchLatestMessagesForAccount(EmailAccount $account, string $folderType, int $count, bool $fetchBody = true): \Illuminate\Support\Collection;
 
     /**
      * Fetch new messages since the last sync cursor (incremental).
      */
-    public function fetchIncrementalUpdates(EmailAccount $account): \Illuminate\Support\Collection;
+    public function fetchIncrementalUpdates(EmailAccount $account, bool $fetchBody = true): \Illuminate\Support\Collection;
 
     /**
      * Subscribe to real-time notifications.
@@ -137,7 +137,7 @@ interface EmailProviderAdapter
      * 
      * @return array{fetched: int, has_more: bool, new_cursor: mixed}
      */
-    public function backfill(EmailAccount $account, ?string $folderType, int $batchSize): array;
+    public function backfill(EmailAccount $account, ?string $folderType, int $batchSize, bool $fetchBody = true): array;
 
     /**
      * List all available folders/labels from the provider.
@@ -155,4 +155,11 @@ interface EmailProviderAdapter
      * @return \Spatie\MediaLibrary\MediaCollections\Models\Media
      */
     public function downloadAttachment(\App\Models\Email $email, int $placeholderIndex): \Spatie\MediaLibrary\MediaCollections\Models\Media;
+
+    /**
+     * Fetch the full message (body and attachments) for an existing email.
+     *
+     * @return array The parsed email data including body and attachments.
+     */
+    public function fetchFullMessage(\App\Models\Email $email): array;
 }

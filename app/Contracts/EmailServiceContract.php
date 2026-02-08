@@ -98,4 +98,9 @@ interface EmailServiceContract
      * @return array<string, int>
      */
     public function getFolderCounts(User $user): array;
+
+    /**
+     * Fetch the body content for an email if it was skipped during sync.
+     */
+    public function fetchBody(Email $email): Email;
 }

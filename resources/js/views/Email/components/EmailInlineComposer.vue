@@ -372,6 +372,7 @@ import Dropdown from "@/components/ui/Dropdown.vue";
 import { useEmailSignatures } from "../composables/useEmailSignatures";
 import { useEmailTemplates } from "../composables/useEmailTemplates";
 import { emailAccountService } from "@/services/email-account.service";
+import axios from "axios";
 
 const props = defineProps<{
     mode: string;
@@ -412,7 +413,7 @@ onMounted(async () => {
     // Start parallel fetches for independent data
     fetchSignatures();
     fetchTemplates();
-    
+
     try {
         const response = await emailAccountService.list();
         accounts.value = response || [];
@@ -568,7 +569,7 @@ function removeAttachment(index: number) {
 async function fetchEmlAttachment(emailId: number | string, subject: string) {
     try {
         const response = await axios.get(`/api/emails/${emailId}/export`, {
-            responseType: 'blob'
+            responseType: "blob",
         });
 
         const blob = response.data;
@@ -588,6 +589,21 @@ async function fetchEmlAttachment(emailId: number | string, subject: string) {
     }
 }
 
+const editor = useEditor({
+    content: "",
+    extensions: [
+        StarterKit,
+        Placeholder.configure({
+            placeholder: "Write your message...",
+        }),
+    ],
+    editorProps: {
+        attributes: {
+            class: "prose dark:prose-invert max-w-none focus:outline-none min-h-[100px] text-[var(--text-primary)]",
+        },
+    },
+});
+
 // Initialize based on mode
 watch(
     actualMode,
@@ -600,7 +616,7 @@ watch(
 
         // Ensure we have the body for reply/forward
         if (!props.replyTo.body_html && !props.replyTo.body_plain) {
-            store.fetchEmailBody(String(props.replyTo.id)).then(data => {
+            store.fetchEmailBody(String(props.replyTo.id)).then((data) => {
                 if (data && props.replyTo) {
                     props.replyTo.body_html = data.body_html;
                     props.replyTo.body_plain = data.body_plain;
@@ -664,14 +680,22 @@ watch(
 );
 
 function setQuotedContent(mode: string) {
-    if (!props.replyTo || mode === 'compose' || mode === 'forward-as-attachment') return;
-    
+    if (
+        !props.replyTo ||
+        mode === "compose" ||
+        mode === "forward-as-attachment"
+    )
+        return;
+
     const body = props.replyTo.body_html || props.replyTo.body_plain || "";
     if (!body) return;
 
-    const date = props.replyTo.date ? formatDate(props.replyTo.date) : "Unknown date";
-    const sender = props.replyTo.from_name || props.replyTo.from_email || "Unknown";
-    
+    const date = props.replyTo.date
+        ? formatDate(props.replyTo.date)
+        : "Unknown date";
+    const sender =
+        props.replyTo.from_name || props.replyTo.from_email || "Unknown";
+
     const quotedHtml = `
         <br><br>
         <div class="gmail_quote">
@@ -683,10 +707,10 @@ function setQuotedContent(mode: string) {
             </blockquote>
         </div>
     `;
-    
+
     editor.value?.commands.setContent(quotedHtml);
     // Focus at start
-    editor.value?.commands.focus('start');
+    editor.value?.commands.focus("start");
 }
 
 const characterCount = computed(() => {
@@ -716,21 +740,6 @@ const signatureItems = computed(() =>
         },
     })),
 );
-
-const editor = useEditor({
-    content: "",
-    extensions: [
-        StarterKit,
-        Placeholder.configure({
-            placeholder: "Write your message...",
-        }),
-    ],
-    editorProps: {
-        attributes: {
-            class: "prose dark:prose-invert max-w-none focus:outline-none min-h-[100px] text-[var(--text-primary)]",
-        },
-    },
-});
 
 function applyTemplate(templateId: string) {
     const template = getTemplateById(templateId);
