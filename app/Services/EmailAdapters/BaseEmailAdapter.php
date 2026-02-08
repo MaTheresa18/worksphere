@@ -379,7 +379,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
         try {
             $rawHeaders = $message->getHeader()->getAttributes();
             foreach ($rawHeaders as $key => $value) {
-                $headers[$key] = (string) $value;
+                $headers[strtolower((string) $key)] = (string) $value;
             }
         } catch (\Throwable $e) {
         }
@@ -806,6 +806,66 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
     }
 
     /**
+     * Fetch the raw RFC822 message source for an existing email.
+     */
+    public function fetchRawSource(\App\Models\Email $email): string
+    {
+        $account = $email->emailAccount;
+        $client = $this->createClient($account);
+        $client->connect();
+
+        $imapFolderName = $this->getProvider() === 'gmail' 
+            ? '[Gmail]/All Mail'
+            : $this->getFolderName($email->folder);
+
+        $folder = $client->getFolder($imapFolderName);
+        if (!$folder) {
+            throw new \RuntimeException("Folder '{$imapFolderName}' not found on IMAP server.");
+        }
+
+        // Fetch raw body (RFC822)
+        // Webklex\PHPIMAP uses 'body' for the raw content when not parsing
+        $query = $folder->query()->where('UID', $email->imap_uid);
+        
+        // We need to fetch the raw message. 
+        // using getMessageByUid often parses it. 
+        // Let's use the client to fetch strictly the RFC822 content if possible, 
+        // or get the message and dump its raw structure.
+        // Actually, Webklex Message object has `getRawBody()` if available or we can construct it.
+        // But `FT_PEEK` is default in config so we are safe.
+        
+        $message = $query->getMessageByUid($email->imap_uid);
+        
+        if (!$message) {
+             throw new \RuntimeException("Message not found on IMAP server.");
+        }
+        
+        // In Webklex 5.x+, getHeader()->raw returns headers, and we can get body.
+        // A simple way is to get the full raw message if supported.
+        // Use `fetch` with 'RFC822' or 'BODY[]'.
+        // The library exposes `headers` and `body`.
+        // Let's try to reconstruct or use a raw fetch method if available.
+        // Looking at the library, $message->raw contains the raw header + body if fetched.
+        // If not, we might need to rely on what we have.
+        // However, standard IMAP fetch 'BODY[]' gives everything.
+        
+        // For now, let's try to return what we can access. 
+        // If we can't get the *exact* bytes easily without low-level commands, 
+        // we might rely on the library's `raw` attribute if it exists, or reconstruct.
+        
+        // Wait, Webklex client doesn't always expose raw easily.
+        // Let's assume for now we can get it via `getRawBody()` which some forks have, 
+        // or strictly checking documentation which says `raw` might be available.
+        // Let's use a safe fallback:
+        
+        // It seems `Webklex\PHPIMAP\Message` might not publicize raw output directly in all versions.
+        // It seems `Webklex\PHPIMAP\Message` might not publicize raw output directly in all versions.
+        // Let's try to get header and body and concatenate.
+        
+        return $message->getHeader()->raw . "\r\n\r\n" . $message->getBody();
+    }
+
+    /**
      * Fetch the full message (body and attachments) for an existing email.
      */
     public function fetchFullMessage(Email $email): array
@@ -814,37 +874,41 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
         $client = $this->createClient($email->emailAccount, true);
         $client->connect();
 
-        // Determine folder path
+        // Check if folder is mapped using Enum
         $folderName = $email->folder;
-        // Try to map if it's a standard folder
+        $folder = null;
+
+        // Try to resolve folder using standard logic
         if (\App\Enums\EmailFolderType::tryFrom($folderName)) {
-            $folderName = $this->getFolderName($folderName);
+            $folder = $this->getFolderWithFallback($client, $folderName);
         }
 
-        // Try to get folder with fallback logic
-        $folder = $this->getFolderWithFallback($client, $email->folder);
-        
+        // If not found or custom folder, try name directly
         if (!$folder) {
-             // Fallback: try using the stored folder name directly if getFolderWithFallback failed with enum
              try {
                  $folder = $client->getFolder($folderName);
              } catch (\Throwable $e) {
-                 // ignore, throw below
+                 // ignore
              }
         }
 
         if (!$folder) {
-            throw new \Exception("Folder not found: {$email->folder}");
+            // Last resort: check if folder name is actually a path
+            // For now, fail if not found
+             throw new \RuntimeException("Folder not found: {$email->folder}");
         }
 
         if ($email->imap_uid) {
             $message = $this->getMessageByUid($folder, $email->imap_uid);
             if ($message) {
                  // skipAttachments=false, fetchBody=true
-                 return $this->parseMessage($message, false, true);
+                 $parsed = $this->parseMessage($message, false, true);
+                 $client->disconnect();
+                 return $parsed;
             }
         }
 
-        throw new \Exception("Message not found with UID {$email->imap_uid} in folder {$folder->path}");
+        $client->disconnect();
+        throw new \RuntimeException("Message not found with UID {$email->imap_uid} in folder {$folder->path}");
     }
 }

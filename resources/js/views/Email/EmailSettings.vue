@@ -473,44 +473,62 @@ function getUsageDetails(account: any) {
 </script>
 
 <template>
-    <div class="p-6 space-y-6 w-full">
+    <div class="p-6 space-y-8 w-full mx-auto animate-in fade-in duration-500">
         <!-- Header -->
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-5">
             <Button
-                variant="ghost"
+                variant="secondary"
                 size="icon"
-                class="rounded-full"
+                class="rounded-xl h-12 w-12 bg-(--surface-primary) border-(--border-default) shadow-sm hover:shadow-md transition-all shrink-0"
                 @click="$router.push({ name: 'email' })"
             >
-                <ArrowLeftIcon class="w-5 h-5 text-[var(--text-secondary)]" />
+                <ArrowLeftIcon class="w-5 h-5 text-(--text-secondary)" />
             </Button>
-            <div>
-                <h1 class="text-2xl font-bold text-[var(--text-primary)]">
+            <div class="space-y-1">
+                <h1 class="text-3xl font-bold tracking-tight text-(--text-primary)">
                     Email Settings
                 </h1>
-                <p class="text-[var(--text-secondary)]">
-                    Manage your email signatures, templates, and connected accounts.
+                <p class="text-(--text-secondary) text-sm font-medium opacity-80">
+                    Configuration and management for your email experience.
                 </p>
             </div>
         </div>
 
         <div class="flex flex-col lg:flex-row gap-6">
             <!-- Sidebar Navigation -->
-            <div class="w-full lg:w-64 shrink-0">
-                <nav class="space-y-1">
+            <div class="w-full lg:w-72 shrink-0">
+                <nav class="space-y-2 p-1 bg-(--surface-secondary)/20 rounded-2xl border border-(--border-subtle) backdrop-blur-sm">
                     <button
                         v-for="tab in tabs"
                         :key="tab.id"
                         @click="activeTab = tab.id"
-                        class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors"
+                        class="w-full flex items-center gap-3.5 px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 group relative"
                         :class="[
                             activeTab === tab.id
-                                ? 'bg-[var(--surface-elevated)] text-[var(--brand-primary)] shadow-sm border border-[var(--border-default)]'
-                                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]',
+                                ? 'bg-(--surface-primary) text-(--brand-primary) shadow-sm border-(--border-default) scale-[1.02]'
+                                : 'text-(--text-secondary) hover:bg-(--surface-secondary)/50 hover:text-(--text-primary)',
                         ]"
                     >
-                        <component :is="tab.icon" class="w-4 h-4" />
-                        {{ tab.label }}
+                        <div 
+                            class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0"
+                            :class="activeTab === tab.id ? 'bg-(--brand-primary)/10' : 'bg-(--surface-tertiary)/50 group-hover:bg-(--surface-tertiary)'"
+                        >
+                            <component :is="tab.icon" class="w-4 h-4" />
+                        </div>
+                        <div class="flex flex-col items-start min-w-0">
+                            <span class="truncate">{{ tab.label }}</span>
+                            <span 
+                                v-if="tab.description" 
+                                class="text-[10px] opacity-60 font-normal truncate max-w-full"
+                                :class="activeTab === tab.id ? 'text-(--brand-primary)' : 'text-(--text-muted)'"
+                            >
+                                {{ tab.description }}
+                            </span>
+                        </div>
+                        <ChevronRightIcon 
+                            v-if="activeTab === tab.id"
+                            class="w-4 h-4 ml-auto"
+                        />
                     </button>
                 </nav>
             </div>
@@ -524,50 +542,44 @@ function getUsageDetails(account: any) {
                     "
                     class="overflow-hidden min-h-[500px] flex flex-col"
                 >
-                    <div
-                        class="border-b border-[var(--border-default)] p-4 flex items-center justify-between"
-                    >
+                    <div class="border-b border-(--border-default) p-5 flex items-center justify-between bg-(--surface-primary)">
                         <div class="flex items-center gap-3">
-                            <h2 class="font-semibold text-[var(--text-primary)]">
-                                {{
-                                    activeTab === "signatures"
-                                        ? "Signatures"
-                                        : "Templates"
-                                }}
+                            <h2 class="text-lg font-bold text-(--text-primary)">
+                                {{ activeTab === "signatures" ? "Signatures" : "Templates" }}
                             </h2>
                             <!-- Status Indicator -->
                              <div
                                 v-if="saveStatus === 'saved'"
-                                class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium border border-emerald-500/20"
+                                class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20"
                             >
                                 <CheckIcon class="w-3 h-3" />
                                 Saved
                             </div>
                             <div
                                 v-else-if="saveStatus === 'saving'"
-                                class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] text-xs font-medium border border-[var(--brand-primary)]/20"
+                                class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-(--brand-primary)/10 text-(--brand-primary) text-[10px] font-bold uppercase tracking-wider border border-(--brand-primary)/20"
                             >
-                                <div
-                                    class="w-3 h-3 border-2 border-[var(--brand-primary)] border-t-transparent rounded-full animate-spin"
-                                ></div>
-                                Saving...
+                                <Loader2 class="w-3 h-3 animate-spin" />
+                                Saving
                             </div>
                             <div
                                 v-else-if="saveStatus === 'error'"
-                                class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-medium border border-red-500/20"
+                                class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-bold uppercase tracking-wider border border-red-500/20"
                             >
                                 <AlertCircleIcon class="w-3 h-3" />
+                                Error
                             </div>
                         </div>
                         <Button
                             size="sm"
+                            class="rounded-xl shadow-sm hover:shadow-md transition-all font-semibold px-4"
                             @click="
                                 activeTab === 'signatures'
                                     ? handleNewSignature()
                                     : handleNewTemplate()
                             "
                         >
-                            <PlusIcon class="w-4 h-4 mr-1.5" />
+                            <PlusIcon class="w-4 h-4 mr-2" />
                             Create New
                         </Button>
                     </div>
@@ -575,40 +587,43 @@ function getUsageDetails(account: any) {
                     <div class="flex flex-1 flex-col md:flex-row h-full">
                         <!-- List Column -->
                         <div
-                            class="w-full md:w-64 border-b md:border-b-0 md:border-r border-[var(--border-default)] bg-[var(--surface-subtle)] flex flex-col shrink-0"
+                            class="w-full md:w-72 border-b md:border-b-0 md:border-r border-(--border-default) bg-(--surface-secondary)/20 flex flex-col shrink-0"
                         >
-                            <div class="p-3 border-b border-[var(--border-default)]">
+                            <div class="p-4 border-b border-(--border-default)">
                                 <div class="relative">
                                     <SearchIcon
-                                        class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]"
+                                        class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted)"
                                     />
                                     <input
                                         v-model="searchQuery"
                                         type="text"
                                         placeholder="Search..."
-                                        class="w-full pl-8 pr-3 py-1.5 text-xs bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-md focus:outline-none focus:ring-1 focus:ring-[var(--brand-primary)]"
+                                        class="w-full pl-9 pr-3 py-2 text-sm bg-(--surface-primary) border border-(--border-default) rounded-xl focus:outline-none focus:ring-2 focus:ring-(--brand-primary)/20 focus:border-(--brand-primary) transition-all"
                                     />
                                 </div>
                             </div>
-                            <div class="flex-1 overflow-y-auto p-2 space-y-1 max-h-[300px] md:max-h-[600px]">
+                            <div class="flex-1 overflow-y-auto p-3 space-y-1.5 max-h-[300px] md:max-h-[600px]">
                                 <template v-if="activeTab === 'signatures'">
                                     <button
                                         v-for="sig in filteredSignatures"
                                         :key="sig.id"
                                         @click="selectedSignatureId = sig.id"
-                                        class="w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center justify-between group"
+                                        class="w-full text-left px-3.5 py-3 rounded-xl text-sm transition-all flex items-center justify-between group relative overflow-hidden"
                                         :class="
                                             selectedSignatureId === sig.id
-                                                ? 'bg-[var(--surface-elevated)] shadow-sm text-[var(--text-primary)] font-medium ring-1 ring-[var(--border-default)]'
-                                                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text-primary)]'
+                                                ? 'bg-(--surface-primary) shadow-sm text-(--brand-primary) font-semibold border border-(--border-default) scale-[1.02]'
+                                                : 'text-(--text-secondary) hover:bg-(--surface-secondary)/50 hover:text-(--text-primary)'
                                         "
                                     >
-                                        <span class="truncate">{{ sig.name }}</span>
+                                        <div class="flex items-center gap-3 min-w-0">
+                                            <PenToolIcon class="w-4 h-4 shrink-0 opacity-50" />
+                                            <span class="truncate">{{ sig.name }}</span>
+                                        </div>
                                         <button
                                             @click.stop="handleDeleteSignature(sig.id)"
-                                            class="opacity-0 group-hover:opacity-100 p-1 text-[var(--text-muted)] hover:text-red-500 rounded transition-opacity"
+                                            class="opacity-0 group-hover:opacity-100 p-1.5 text-(--text-muted) hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
                                         >
-                                            <Trash2Icon class="w-3.5 h-3.5" />
+                                            <Trash2Icon class="w-4 h-4" />
                                         </button>
                                     </button>
                                 </template>
@@ -617,71 +632,84 @@ function getUsageDetails(account: any) {
                                         v-for="tpl in filteredTemplates"
                                         :key="tpl.id"
                                         @click="selectedTemplateId = tpl.id"
-                                        class="w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex flex-col gap-0.5 group"
+                                        class="w-full text-left px-3.5 py-3 rounded-xl text-sm transition-all flex flex-col gap-1 group relative overflow-hidden"
                                         :class="
                                             selectedTemplateId === tpl.id
-                                                ? 'bg-[var(--surface-elevated)] shadow-sm text-[var(--text-primary)] font-medium ring-1 ring-[var(--border-default)]'
-                                                : 'text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)] hover:text-[var(--text-primary)]'
+                                                ? 'bg-(--surface-primary) shadow-sm text-(--brand-primary) font-semibold border border-(--border-default) scale-[1.02]'
+                                                : 'text-(--text-secondary) hover:bg-(--surface-secondary)/50 hover:text-(--text-primary)'
                                         "
                                     >
-                                        <div class="flex items-center justify-between w-full">
-                                             <span class="truncate">{{ tpl.name }}</span>
-                                              <div
-                                                @click.stop="handleDeleteTemplate(tpl.id)"
-                                                class="opacity-0 group-hover:opacity-100 p-1 -mr-1 text-[var(--text-muted)] hover:text-red-500 rounded transition-opacity cursor-pointer"
-                                            >
-                                                <Trash2Icon class="w-3.5 h-3.5" />
+                                        <div class="flex items-center justify-between w-full min-w-0 gap-2">
+                                            <div class="flex items-center gap-3 min-w-0">
+                                                <FileTextIcon class="w-4 h-4 shrink-0 opacity-50" />
+                                                <span class="truncate font-semibold">{{ tpl.name }}</span>
                                             </div>
+                                            <button
+                                                @click.stop="handleDeleteTemplate(tpl.id)"
+                                                class="opacity-0 group-hover:opacity-100 p-1.5 text-(--text-muted) hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all shrink-0"
+                                            >
+                                                <Trash2Icon class="w-4 h-4" />
+                                            </button>
                                         </div>
-                                         <span class="text-xs text-[var(--text-muted)] truncate">{{ tpl.subject || '(No Subject)' }}</span>
+                                         <span 
+                                            class="text-xs font-normal truncate pl-7"
+                                            :class="selectedTemplateId === tpl.id ? 'text-(--brand-primary)/70' : 'text-(--text-muted)'"
+                                         >
+                                            {{ tpl.subject || '(No Subject)' }}
+                                         </span>
                                     </button>
                                 </template>
                             </div>
                         </div>
 
                         <!-- Editor Column -->
-                        <div class="flex-1 flex flex-col min-w-0 bg-[var(--surface-primary)]">
+                        <div class="flex-1 flex flex-col min-w-0 bg-(--surface-primary)">
                             <template
                                 v-if="
                                     (activeTab === 'signatures' && selectedSignatureId) ||
                                     (activeTab === 'templates' && selectedTemplateId)
                                 "
                             >
-                                <div class="p-4 border-b border-[var(--border-default)] space-y-3">
-                                    <div>
-                                        <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1">Name</label>
-                                        <Input
-                                            v-if="activeTab === 'signatures'"
-                                            v-model="signatureName"
-                                            @blur="handleSaveSignature"
-                                            placeholder="Signature Name"
-                                        />
-                                        <Input
-                                            v-else
-                                            v-model="templateName"
-                                            @blur="handleSaveTemplate"
-                                            placeholder="Template Name"
-                                        />
-                                    </div>
-                                    <div v-if="activeTab === 'templates'">
-                                         <label class="block text-xs font-medium text-[var(--text-secondary)] mb-1">Subject</label>
-                                        <Input
-                                            v-model="templateSubject"
-                                            @blur="handleSaveTemplate"
-                                            placeholder="Email Subject"
-                                        />
+                                <div class="p-6 border-b border-(--border-default) bg-(--surface-primary) space-y-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div class="space-y-1.5">
+                                            <label class="block text-[10px] font-bold uppercase tracking-wider text-(--text-muted) ml-1">Configuration Name</label>
+                                            <Input
+                                                v-if="activeTab === 'signatures'"
+                                                v-model="signatureName"
+                                                @blur="handleSaveSignature"
+                                                placeholder="e.g. Personal Signature"
+                                                class="bg-(--surface-secondary)/30 border-(--border-default) focus:bg-(--surface-primary) transition-all"
+                                            />
+                                            <Input
+                                                v-else
+                                                v-model="templateName"
+                                                @blur="handleSaveTemplate"
+                                                placeholder="e.g. Support Response"
+                                                class="bg-(--surface-secondary)/30 border-(--border-default) focus:bg-(--surface-primary) transition-all"
+                                            />
+                                        </div>
+                                        <div v-if="activeTab === 'templates'" class="space-y-1.5">
+                                             <label class="block text-[10px] font-bold uppercase tracking-wider text-(--text-muted) ml-1">Email Subject Line</label>
+                                            <Input
+                                                v-model="templateSubject"
+                                                @blur="handleSaveTemplate"
+                                                placeholder="Subject line for this template"
+                                                class="bg-(--surface-secondary)/30 border-(--border-default) focus:bg-(--surface-primary) transition-all"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-
-                                <div class="flex-1 flex flex-col relative min-h-[400px]">
+ 
+                                <div class="flex-1 flex flex-col relative min-h-[450px]">
                                      <!-- Toolbar / Media Toggle -->
-                                    <div class="px-4 py-2 border-b border-[var(--border-default)] bg-[var(--surface-subtle)] flex justify-end">
+                                    <div class="px-4 py-2 border-b border-(--border-default) bg-(--surface-secondary)/20 flex justify-end">
                                         <button
                                             @click="showMediaBar = !showMediaBar"
-                                            class="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium transition-colors"
+                                            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-(--text-secondary) hover:text-(--brand-primary) hover:bg-(--brand-primary)/5 font-semibold transition-all"
                                         >
-                                            <ImageIcon class="w-3.5 h-3.5" />
-                                            {{ showMediaBar ? 'Hide Media' : 'Show Media' }}
+                                            <ImageIcon class="w-4 h-4" />
+                                            {{ showMediaBar ? 'Close Media Library' : 'Insert Media' }}
                                         </button>
                                     </div>
 
@@ -711,10 +739,10 @@ function getUsageDetails(account: any) {
                                         <!-- Media Sidebar (Inline) -->
                                         <div 
                                             v-if="showMediaBar"
-                                            class="w-64 border-l border-[var(--border-default)] bg-[var(--surface-subtle)] flex flex-col"
+                                            class="w-72 border-l border-(--border-default) bg-(--surface-secondary)/10 flex flex-col animate-in slide-in-from-right duration-300"
                                         >
-                                            <div class="p-3 border-b border-[var(--border-default)]">
-                                                <h3 class="text-xs font-bold text-[var(--text-secondary)] uppercase">Media Library</h3>
+                                            <div class="p-4 border-b border-(--border-default)">
+                                                <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-widest">Media Assets</h3>
                                             </div>
                                             
                                             <div 
@@ -726,45 +754,48 @@ function getUsageDetails(account: any) {
                                                 <!-- Drop Zone Overlay -->
                                                  <div
                                                     v-if="isDragging"
-                                                    class="absolute inset-0 bg-[var(--brand-primary)]/10 z-50 flex items-center justify-center border-2 border-dashed border-[var(--brand-primary)] m-2 rounded-lg pointer-events-none"
+                                                    class="absolute inset-0 bg-(--brand-primary)/10 z-50 flex items-center justify-center border-2 border-dashed border-(--brand-primary) m-2 rounded-lg pointer-events-none"
                                                 >
-                                                    <span class="text-[var(--brand-primary)] font-bold">Drop files here</span>
+                                                    <span class="text-(--brand-primary) font-bold">Drop files here</span>
                                                 </div>
 
-                                                 <!-- Upload Button -->
-                                                <label class="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed border-[var(--border-default)] rounded-lg hover:border-[var(--brand-primary)] hover:bg-[var(--surface-elevated)] cursor-pointer transition-all mb-4 group">
+                                                  <!-- Upload Button -->
+                                                <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-(--border-default) rounded-2xl bg-(--surface-primary) hover:border-(--brand-primary) hover:bg-(--brand-primary)/5 cursor-pointer transition-all mb-5 group">
                                                     <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                                                        <PlusIcon class="w-6 h-6 text-[var(--text-muted)] group-hover:text-[var(--brand-primary)] mb-1" />
-                                                        <p class="text-[10px] text-[var(--text-muted)]">Upload Image</p>
+                                                        <PlusIcon class="w-7 h-7 text-(--text-muted) group-hover:text-(--brand-primary) mb-1.5 transition-colors" />
+                                                        <p class="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) group-hover:text-(--brand-primary)">Upload Asset</p>
                                                     </div>
                                                     <input type="file" class="hidden" multiple accept="image/*" @change="(e) => handleMediaUpload(Array.from(e.target.files))" />
                                                 </label>
 
                                                  <!-- Upload Queue -->
-                                                <div v-if="mediaUploadQueue.length > 0" class="space-y-2 mb-4">
-                                                    <div v-for="(item, idx) in mediaUploadQueue" :key="idx" class="text-xs bg-[var(--surface-elevated)] p-2 rounded border border-[var(--border-default)]">
-                                                        <div class="flex justify-between mb-1">
-                                                            <span class="truncate max-w-[100px]">{{ item.file.name }}</span>
-                                                            <span :class="{'text-[var(--brand-primary)]': item.status === 'uploading', 'text-red-500': item.status === 'error'}">
+                                                <div v-if="mediaUploadQueue.length > 0" class="space-y-2 mb-5">
+                                                    <div v-for="(item, idx) in mediaUploadQueue" :key="idx" class="text-[10px] bg-(--surface-secondary)/50 p-2.5 rounded-xl border border-(--border-subtle) animate-in slide-in-from-top-2">
+                                                        <div class="flex justify-between mb-1.5">
+                                                            <span class="truncate max-w-[120px] font-medium">{{ item.file.name }}</span>
+                                                            <span 
+                                                                class="font-bold uppercase tracking-tighter"
+                                                                :class="{'text-(--brand-primary)': item.status === 'uploading', 'text-red-500': item.status === 'error'}"
+                                                            >
                                                                 {{ item.status }}
                                                             </span>
                                                         </div>
-                                                        <div class="w-full bg-[var(--surface-tertiary)] rounded-full h-1">
-                                                            <div class="bg-[var(--brand-primary)] h-1 rounded-full transition-all" :style="{ width: item.progress + '%' }"></div>
+                                                        <div class="w-full bg-(--surface-tertiary) rounded-full h-1 overflow-hidden">
+                                                            <div class="bg-(--brand-primary) h-1 rounded-full transition-all duration-300" :style="{ width: item.progress + '%' }"></div>
                                                         </div>
                                                     </div>
                                                 </div>
 
                                                 <!-- Grid -->
                                                 <div v-if="mediaLoading" class="flex justify-center py-4">
-                                                    <Loader2 class="w-5 h-5 animate-spin text-[var(--text-muted)]" />
+                                                    <Loader2 class="w-5 h-5 animate-spin text-(--text-muted)" />
                                                 </div>
                                                 
                                                 <div v-else class="grid grid-cols-2 gap-2">
                                                     <div
                                                         v-for="media in mediaFiles"
                                                         :key="media.id"
-                                                        class="group relative aspect-square rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] overflow-hidden cursor-pointer hover:ring-2 hover:ring-[var(--brand-primary)]"
+                                                        class="group relative aspect-square rounded-md border border-(--border-default) bg-(--surface-primary) overflow-hidden cursor-pointer hover:ring-2 hover:ring-(--brand-primary)"
                                                         draggable="true"
                                                         @dragstart="(e) => {
                                                             e.dataTransfer.setData('text/plain', media.url);
@@ -789,7 +820,7 @@ function getUsageDetails(account: any) {
                                                     </div>
                                                 </div>
 
-                                                <div v-if="!mediaLoading && mediaFiles.length === 0" class="text-center py-8 text-[var(--text-muted)] text-xs">
+                                                <div v-if="!mediaLoading && mediaFiles.length === 0" class="text-center py-8 text-(--text-muted) text-xs">
                                                     No media found.
                                                 </div>
                                             </div>
@@ -797,12 +828,14 @@ function getUsageDetails(account: any) {
                                     </div>
                                 </div>
                             </template>
-                             <div v-else class="flex flex-col items-center justify-center p-12 text-center h-[400px]">
-                                <div class="w-12 h-12 rounded-full bg-[var(--surface-secondary)] flex items-center justify-center mb-3">
-                                    <SettingsIcon class="w-6 h-6 text-[var(--text-muted)]" />
+                             <div v-else class="flex flex-col items-center justify-center p-12 text-center h-full min-h-[450px] animate-in fade-in zoom-in duration-500">
+                                <div class="w-16 h-16 rounded-2xl bg-(--surface-secondary) flex items-center justify-center mb-4 shadow-sm">
+                                    <SettingsIcon class="w-8 h-8 text-(--text-muted) opacity-50" />
                                 </div>
-                                <h3 class="text-[var(--text-primary)] font-medium">Select an item to edit</h3>
-                                <p class="text-[var(--text-secondary)] text-sm mt-1">Or create a new one to get started.</p>
+                                <h3 class="text-(--text-primary) text-xl font-bold tracking-tight">Select an item to edit</h3>
+                                <p class="text-(--text-secondary) text-sm mt-2 max-w-xs mx-auto leading-relaxed">
+                                    Pick a signature or template from the sidebar to manage its content and assets.
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -814,61 +847,68 @@ function getUsageDetails(account: any) {
                 </div>
 
                 <!-- Storage Tab -->
-                <Card v-else-if="activeTab === 'storage'">
-                    <div class="p-6">
-                        <h2 class="text-lg font-bold text-[var(--text-primary)] mb-4">Storage Usage</h2>
-                        <div v-if="loadingStorage" class="flex justify-center py-12">
-                             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand-primary)]"></div>
+                <Card v-else-if="activeTab === 'storage'" class="overflow-hidden border-(--border-default) shadow-sm">
+                    <div class="p-8">
+                        <div class="flex items-center gap-3 mb-8">
+                            <div class="w-10 h-10 rounded-xl bg-(--brand-primary)/10 flex items-center justify-center">
+                                <HardDriveIcon class="w-5 h-5 text-(--brand-primary)" />
+                            </div>
+                            <h2 class="text-xl font-bold text-(--text-primary)">Storage Allocation</h2>
+                        </div>
+
+                        <div v-if="loadingStorage" class="flex flex-col items-center justify-center py-24 gap-4">
+                             <Loader2 class="w-10 h-10 animate-spin text-(--brand-primary)" />
+                             <p class="text-sm font-medium text-(--text-secondary)">Analyzing storage usage...</p>
                         </div>
                         <div v-else class="space-y-6">
                             <div
                                 v-if="storageAccounts.length === 0"
-                                class="text-center py-12"
+                                class="text-center py-20 bg-(--surface-secondary)/20 rounded-3xl border border-dashed border-(--border-default)"
                             >
                                 <div
-                                    class="w-16 h-16 mx-auto rounded-full bg-[var(--surface-secondary)] flex items-center justify-center mb-4"
+                                    class="w-20 h-20 mx-auto rounded-3xl bg-(--surface-secondary) flex items-center justify-center mb-6 shadow-sm"
                                 >
                                     <HardDriveIcon
-                                        class="w-8 h-8 text-[var(--text-muted)]"
+                                        class="w-10 h-10 text-(--text-muted) opacity-50"
                                     />
                                 </div>
                                 <h3
-                                    class="text-lg font-medium text-[var(--text-primary)]"
+                                    class="text-xl font-bold text-(--text-primary)"
                                 >
                                     No Connected Accounts
                                 </h3>
                                 <p
-                                    class="text-[var(--text-secondary)] mt-1 max-w-sm mx-auto"
+                                    class="text-(--text-secondary) mt-2 max-w-sm mx-auto leading-relaxed"
                                 >
                                     Connect an email account to view storage
-                                    usage statistics.
+                                    usage statistics and quotas.
                                 </p>
                                 <Button
-                                    variant="outline"
-                                    class="mt-6"
+                                    size="lg"
+                                    class="mt-8 px-8"
                                     @click="activeTab = 'accounts'"
                                 >
-                                    Connect Account
+                                    Connect Your First Account
                                 </Button>
                             </div>
                             <div
                                 v-else
                                 v-for="account in storageAccounts"
                                 :key="account.id"
-                                class="p-4 rounded-xl border border-[var(--border-default)] bg-[var(--surface-subtle)]"
+                                class="p-6 rounded-2xl border border-(--border-default) bg-(--surface-secondary)/10 hover:bg-(--surface-secondary)/20 transition-all group"
                             >
-                                <div class="flex items-center justify-between mb-4">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-xl shadow-sm">
+                                <div class="flex items-center justify-between mb-6">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-12 h-12 rounded-xl bg-(--surface-primary) flex items-center justify-center text-xl shadow-sm border border-(--border-subtle) group-hover:scale-110 transition-transform">
                                             {{ account.email[0].toUpperCase() }}
                                         </div>
                                         <div>
-                                            <div class="font-medium text-[var(--text-primary)]">{{ account.email }}</div>
-                                            <div class="text-xs text-[var(--text-secondary)] capitalize">{{ account.provider }}</div>
+                                            <div class="font-bold text-(--text-primary) text-lg">{{ account.email }}</div>
+                                            <div class="text-xs font-semibold text-(--text-muted) uppercase tracking-wider flex items-center gap-2">
+                                                <span class="w-2 h-2 rounded-full bg-(--brand-primary)"></span>
+                                                {{ account.provider }}
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div class="text-right">
-                                        <!-- Storage stats handled by component -->
                                     </div>
                                 </div>
                                 <EmailStorageStats :account-id="account.id" />

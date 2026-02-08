@@ -1,7 +1,7 @@
 <template>
     <div class="relative">
         <div
-            class="flex flex-wrap items-center gap-1.5 min-h-[38px] px-2 py-1.5 bg-[var(--surface-elevated)] border border-[var(--border-default)] rounded-lg focus-within:ring-2 focus-within:ring-[var(--interactive-primary)]/50 focus-within:border-[var(--interactive-primary)] transition-all cursor-text"
+            class="flex flex-wrap items-center gap-1.5 min-h-[38px] px-2 py-1.5 bg-(--surface-elevated) border border-(--border-default) rounded-lg focus-within:ring-2 focus-within:ring-(--interactive-primary)/50 focus-within:border-(--interactive-primary) transition-all cursor-text"
             :class="{ 'border-amber-500/50': warningMessage, 'border-red-500/50': errorMessage }"
             @click="focusInput"
         >
@@ -11,12 +11,12 @@
                     v-for="(email, index) in modelValue"
                     :key="email"
                     :title="email"
-                    class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-[var(--interactive-primary)]/10 text-[var(--interactive-primary)] border border-[var(--interactive-primary)]/20 cursor-default"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md bg-(--interactive-primary)/10 text-(--interactive-primary) border border-(--interactive-primary)/20 cursor-default"
                 >
                     <span class="max-w-[150px] truncate">{{ email }}</span>
                     <button
                         @click.stop="removeEmail(index)"
-                        class="p-0.5 rounded hover:bg-[var(--interactive-primary)]/20 transition-colors"
+                        class="p-0.5 rounded hover:bg-(--interactive-primary)/20 transition-colors"
                         type="button"
                         title="Remove"
                     >
@@ -30,7 +30,7 @@
                 ref="inputRef"
                 v-model="inputValue"
                 type="text"
-                class="flex-1 min-w-[120px] bg-transparent text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none"
+                class="flex-1 min-w-[120px] bg-transparent text-sm text-(--text-primary) placeholder-(--text-muted) focus:outline-none"
                 :placeholder="modelValue.length === 0 ? placeholder : ''"
                 :disabled="modelValue.length >= MAX_EMAILS"
                 @keydown="handleKeydown"
@@ -42,7 +42,7 @@
             <button
                 v-if="modelValue.length > 1"
                 @click.stop="clearAll"
-                class="p-1 rounded text-[var(--text-muted)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors"
+                class="p-1 rounded text-(--text-muted) hover:text-(--color-error) hover:bg-(--color-error)/10 transition-colors"
                 type="button"
                 title="Clear all"
             >

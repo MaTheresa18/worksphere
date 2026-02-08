@@ -70,9 +70,10 @@ Route::middleware(['throttle:guest'])->group(function () {
     Route::get('/public/announcements', [\App\Http\Controllers\Api\AnnouncementController::class, 'public']);
 
     // DEV DATA TOOLS (Local/Testing environment only - SECURITY CRITICAL)
-    // These routes are completely disabled in production
+    // These routes are completely disabled in production via conditional registration
+    // AND protected by DevAccessMiddleware for defense-in-depth.
     if (app()->environment('local', 'testing')) {
-        Route::prefix('dev')->middleware(['throttle:10,1'])->group(function () {
+        Route::prefix('dev')->middleware(['throttle:10,1', \App\Http\Middleware\DevAccessMiddleware::class])->group(function () {
             Route::get('/users', [\App\Http\Controllers\Api\DevController::class, 'getUsers']);
             Route::get('/chats', [\App\Http\Controllers\Api\DevController::class, 'getChats']);
             Route::post('/login-as', [\App\Http\Controllers\Api\DevController::class, 'loginAs']);
@@ -457,6 +458,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce', 'demo'])->grou
         Route::get('/{email}', [\App\Http\Controllers\Api\EmailController::class, 'show']);
         Route::get('/{email}/body', [\App\Http\Controllers\Api\EmailController::class, 'body']);
         Route::get('/{email}/export', [\App\Http\Controllers\Api\EmailController::class, 'exportEml']);
+        Route::get('/{email}/source', [\App\Http\Controllers\Api\EmailController::class, 'source']);
         Route::match(['put', 'patch'], '/{email}', [\App\Http\Controllers\Api\EmailController::class, 'update']);
         Route::delete('/{email}', [\App\Http\Controllers\Api\EmailController::class, 'destroy']);
     });

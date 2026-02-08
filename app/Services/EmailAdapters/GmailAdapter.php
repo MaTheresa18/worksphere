@@ -292,6 +292,7 @@ class GmailAdapter extends BaseEmailAdapter
             'preview' => $message->getSnippet() ?: app(EmailSanitizationService::class)->generatePreview($body['plain'] ?: $body['html']),
             'body_html' => $body['html'],
             'body_plain' => $body['plain'],
+            'headers' => $headers->mapWithKeys(fn($h) => [strtolower($h->getName()) => $h->getValue()])->toArray(),
             'history_id' => $message->getHistoryId(),
             'is_read' => !in_array('UNREAD', $message->getLabelIds() ?? []),
             'is_starred' => in_array('STARRED', $message->getLabelIds() ?? []),
@@ -690,5 +691,20 @@ class GmailAdapter extends BaseEmailAdapter
         }
 
         return $media;
+    }
+
+    /**
+     * Fetch the raw RFC822 message source for an existing email.
+     */
+    public function fetchRawSource(\App\Models\Email $email): string
+    {
+        // Use Gmail API if provider_id (gmail_id) is present
+        if ($email->provider_id) {
+            // 'raw' format returns the full RFC822 message in 'raw' field (base64url encoded)
+            $rawMsg = $this->apiService->getMessage($email->emailAccount, $email->provider_id, 'raw');
+            return $this->base64url_decode($rawMsg->getRaw());
+        }
+
+        return parent::fetchRawSource($email);
     }
 }

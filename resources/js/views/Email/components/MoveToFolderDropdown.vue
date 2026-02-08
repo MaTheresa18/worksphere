@@ -3,7 +3,7 @@
         <template #trigger>
             <slot name="trigger">
                 <button 
-                    class="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] rounded transition-colors"
+                    class="p-1.5 text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) rounded transition-colors"
                     title="Move to folder"
                 >
                     <FolderInputIcon class="w-4 h-4" />

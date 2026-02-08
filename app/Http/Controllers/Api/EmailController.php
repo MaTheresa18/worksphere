@@ -312,6 +312,21 @@ class EmailController extends Controller
     /**
      * Build EML content from Email model.
      */
+    public function source(Email $email) 
+    {
+        $cacheKey = "email_source:{$email->id}";
+
+        // Try to get from cache first (24 hours)
+        $source = \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addHours(24), function () use ($email) {
+            return app(\App\Services\EmailSyncService::class)->fetchRawSource($email);
+        });
+
+        return response()->json(['source' => $source]);
+    }
+
+    /**
+     * Build the EML content for download.
+     */
     protected function buildEmlContent(Email $email): string
     {
         $boundary = '----=_Part_'.md5(uniqid());

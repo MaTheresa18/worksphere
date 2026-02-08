@@ -1138,13 +1138,8 @@ const routes: RouteRecordRaw[] = [
                     _from: RouteLocationNormalized,
                     next: NavigationGuardNext,
                 ) => {
-                    const authStore = useAuthStore();
-                    // Check if user has 'administrator' role
-                    const isAdmin = authStore.user?.roles?.some(
-                        (r) => r.name === "administrator",
-                    );
-
-                    if (import.meta.env.DEV || isAdmin) {
+                    // Strictly allow only in DEV mode
+                    if (import.meta.env.DEV) {
                         next();
                     } else {
                         next({ name: "forbidden" });
@@ -1165,12 +1160,8 @@ const routes: RouteRecordRaw[] = [
                     _from: RouteLocationNormalized,
                     next: NavigationGuardNext,
                 ) => {
-                    const authStore = useAuthStore();
-                    const isAdmin = authStore.user?.roles?.some(
-                        (r) => r.name === "administrator",
-                    );
-
-                    if (import.meta.env.DEV || isAdmin) {
+                    // Strictly allow only in DEV mode
+                    if (import.meta.env.DEV) {
                         next();
                     } else {
                         next({ name: "forbidden" });

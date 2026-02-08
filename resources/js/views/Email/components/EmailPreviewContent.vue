@@ -30,6 +30,7 @@
                     <h1
                         v-if="isHeaderExpanded"
                         class="text-2xl font-semibold text-(--text-primary) leading-tight truncate"
+                        :title="email.subject"
                     >
                         {{ email.subject }}
                     </h1>
@@ -44,6 +45,7 @@
                         >
                         <span
                             class="text-sm text-(--text-secondary) truncate"
+                            :title="email.subject"
                             >{{ email.subject }}</span
                         >
                     </div>
@@ -53,7 +55,7 @@
                     <button
                         v-if="isHeaderExpanded"
                         class="p-2 text-(--text-secondary) hover:bg-(--surface-tertiary) hover:text-(--text-primary) rounded-lg transition-colors"
-                        title="Show Metadata"
+                        title="Show Details"
                         @click="showMetadata = !showMetadata"
                         :class="{
                             'bg-(--surface-tertiary) text-(--text-primary)':
@@ -89,22 +91,85 @@
                 </div>
             </div>
 
-            <!-- Metadata Panel -->
+            <!-- Redesigned Metadata Panel (Gmail Style) -->
             <div
                 v-if="showMetadata && isHeaderExpanded"
-                class="mt-4 p-4 rounded-xl bg-(--surface-tertiary) text-xs font-mono text-(--text-secondary) overflow-x-auto overflow-y-auto max-h-64 border border-(--border-default)"
+                class="mt-4 p-5 rounded-2xl bg-(--surface-secondary) border border-(--border-default) shadow-sm animate-in fade-in slide-in-from-top-2 duration-200"
             >
-                <div class="grid grid-cols-[120px_1fr] gap-y-2">
-                    <div class="font-semibold text-(--text-primary)">
-                        Message-ID:
+                <div class="flex justify-between items-start mb-4">
+                    <h3 class="text-xs font-bold text-(--text-primary) uppercase tracking-wider">Original Message Details</h3>
+                    <button 
+                        @click="openShowOriginal"
+                        class="text-[10px] font-bold text-(--interactive-primary) hover:underline flex items-center gap-1"
+                    >
+                        <FileCodeIcon class="w-3 h-3" />
+                        SHOW ORIGINAL
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-[110px_1fr] gap-y-3 text-[13px] leading-relaxed">
+                    <div class="text-(--text-muted) font-medium">Message ID</div>
+                    <div class="text-(--text-primary) break-all font-mono text-[11px] select-all">{{ email.message_id }}</div>
+                    
+                    <div class="text-(--text-muted) font-medium">Created at</div>
+                    <div v-if="email.date" class="text-(--text-primary)">
+                        {{ format(new Date(email.date), 'EEE, MMM d, yyyy') }} at {{ format(new Date(email.date), 'h:mm a') }}
+                        <span class="text-(--text-muted) ml-1">({{ formatDistanceToNow(new Date(email.date)) }} ago)</span>
                     </div>
-                    <div class="select-all">{{ email.message_id }}</div>
-                    <div class="font-semibold text-(--text-primary)">Date:</div>
-                    <div>{{ email.date }}</div>
-                    <div class="font-semibold text-(--text-primary)">From:</div>
-                    <div class="select-all">
-                        {{ email.from_name }} &lt;{{ email.from_email }}&gt;
+
+                    <div class="text-(--text-muted) font-medium">From</div>
+                    <div class="text-(--text-primary)">
+                        <span class="font-semibold">{{ email.from_name }}</span>
+                        <span class="text-(--text-muted) ml-1">&lt;{{ email.from_email }}&gt;</span>
                     </div>
+
+                    <div class="text-(--text-muted) font-medium">To</div>
+                    <div class="text-(--text-primary)">
+                        <div v-for="recipient in email.to" :key="recipient.email" class="flex items-center gap-1">
+                            <span v-if="recipient.name" class="font-medium">{{ recipient.name }}</span>
+                            <span class="text-(--text-muted)">&lt;{{ recipient.email }}&gt;</span>
+                        </div>
+                    </div>
+
+                    <div class="text-(--text-muted) font-medium">Subject</div>
+                    <div class="text-(--text-primary) font-semibold">{{ email.subject }}</div>
+
+                    <!-- Security Headers -->
+                    <template v-if="authInfo.spf || authInfo.dkim || authInfo.dmarc">
+                        <div class="col-span-2 my-1 border-t border-(--border-default)/50"></div>
+
+                        <div class="text-(--text-muted) font-medium">SPF</div>
+                        <div class="flex items-center gap-2">
+                            <span 
+                                class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight"
+                                :class="authInfo.spf === 'pass' ? 'bg-green-500/10 text-green-600' : 'bg-(--surface-tertiary) text-(--text-muted)'"
+                            >
+                                {{ authInfo.spf || 'NEUTRAL' }}
+                            </span>
+                            <span v-if="authInfo.spfDetails" class="text-xs text-(--text-secondary)">{{ authInfo.spfDetails }}</span>
+                        </div>
+
+                        <div class="text-(--text-muted) font-medium">DKIM</div>
+                        <div class="flex items-center gap-2">
+                            <span 
+                                class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight"
+                                :class="authInfo.dkim === 'pass' ? 'bg-green-500/10 text-green-600' : 'bg-(--surface-tertiary) text-(--text-muted)'"
+                            >
+                                {{ authInfo.dkim || 'NEUTRAL' }}
+                            </span>
+                            <span v-if="authInfo.dkimDetails" class="text-xs text-(--text-secondary)">{{ authInfo.dkimDetails }}</span>
+                        </div>
+
+                        <div class="text-(--text-muted) font-medium">DMARC</div>
+                        <div class="flex items-center gap-2">
+                            <span 
+                                class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight"
+                                :class="authInfo.dmarc === 'pass' ? 'bg-green-500/10 text-green-600' : 'bg-(--surface-tertiary) text-(--text-muted)'"
+                            >
+                                {{ authInfo.dmarc || 'NEUTRAL' }}
+                            </span>
+                        </div>
+                    </template>
                 </div>
             </div>
 
@@ -233,7 +298,7 @@
                     class="rounded-xl bg-amber-500/10 border border-amber-500/20 p-4 flex items-start gap-4 relative group"
                 >
                     <AlertTriangleIcon
-                        class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5"
+                        class="w-5 h-5 text-amber-500 shrink-0 mt-0.5"
                     />
                     <div class="flex-1">
                         <p class="text-sm font-medium text-amber-500">
@@ -300,10 +365,10 @@
                 <ShieldAlertIcon class="w-12 h-12 text-amber-500" />
             </div>
 
-            <h3 class="text-lg font-semibold text-[var(--text-primary)] mb-2">
+            <h3 class="text-lg font-semibold text-(--text-primary) mb-2">
                 Leaving WorkSphere
             </h3>
-            <p class="text-sm text-[var(--text-secondary)] mb-6 max-w-sm">
+            <p class="text-sm text-(--text-secondary) mb-6 max-w-sm">
                 For your security, please verify that you trust this link before
                 proceeding. External links can sometimes lead to malicious
                 websites.
@@ -336,6 +401,27 @@
             </div>
         </template>
     </Modal>
+
+    <!-- Show Original Modal -->
+    <Modal
+        v-model:open="showOriginalModal"
+        title="Original Message"
+        size="xl"
+    >
+        <div class="bg-(--surface-secondary) p-4 rounded-xl border border-(--border-default) overflow-hidden h-[70vh] flex flex-col">
+            <div class="flex items-center justify-between mb-4 shrink-0">
+                <span class="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Raw Message Source (RFC822)</span>
+                <Button variant="ghost" size="sm" @click="copyToClipboard(rawSource)" :disabled="loadingSource || !rawSource">
+                    Copy to Clipboard
+                </Button>
+            </div>
+            
+            <div v-if="loadingSource" class="flex-1 flex items-center justify-center">
+                 <div class="w-8 h-8 border-3 border-(--surface-tertiary) border-t-(--interactive-primary) rounded-full animate-spin"></div>
+            </div>
+            <pre v-else class="flex-1 overflow-auto text-[11px] font-mono text-(--text-secondary) leading-relaxed select-all whitespace-pre-wrap break-all"><code>{{ rawSource }}</code></pre>
+        </div>
+    </Modal>
 </template>
 
 <script setup lang="ts">
@@ -366,6 +452,7 @@ import {
     ExternalLinkIcon,
     ShieldAlertIcon,
     XIcon,
+    FileCodeIcon,
 } from "lucide-vue-next";
 import { format, formatDistanceToNow } from "date-fns";
 import type { Email } from "@/types/models/email";
@@ -403,8 +490,72 @@ watch(isHeaderExpanded, (val) => {
     localStorage.setItem("email_header_expanded", String(val));
 });
 const showMetadata = ref(false);
+const showOriginalModal = ref(false);
 const shadowHost = ref<HTMLElement | null>(null);
 const shadowRoot = ref<ShadowRoot | null>(null);
+
+// Authentication Header Parsing
+const authInfo = computed(() => {
+    const headers = props.email.headers || {};
+    // authentication-results header is the standard way to check SPF/DKIM/DMARC
+    const authResults = headers['authentication-results'] || headers['Authentication-Results'] || '';
+    
+    // Extract SPF
+    const spfMatch = authResults.match(/spf=([a-z]+)/i) || [];
+    const spfDetailsMatch = authResults.match(/spf=[a-z]+\s+\(([^)]+)\)/i) || [];
+    
+    // Extract DKIM
+    const dkimMatch = authResults.match(/dkim=([a-z]+)/i) || [];
+    const dkimDetailsMatch = authResults.match(/dkim=[a-z]+\s+header\.d=([^\s;]+)/i) || [];
+    
+    // Extract DMARC
+    const dmarcMatch = authResults.match(/dmarc=([a-z]+)/i) || [];
+
+    return {
+        spf: spfMatch[1]?.toLowerCase(),
+        spfDetails: spfDetailsMatch[1],
+        dkim: dkimMatch[1]?.toLowerCase(),
+        dkimDetails: dkimDetailsMatch[1],
+        dmarc: dmarcMatch[1]?.toLowerCase()
+    };
+});
+
+const rawSource = ref("");
+const loadingSource = ref(false);
+
+async function openShowOriginal() {
+    showOriginalModal.value = true;
+    
+    // If we already have it (maybe cache locally too? nah, allow refetch for now or rely on browser/redis)
+    if (rawSource.value && rawSource.value !== "Failed to load original message source.") return;
+
+    loadingSource.value = true;
+    rawSource.value = ""; 
+
+    try {
+        const response = await fetch(`/api/emails/${props.email.id}/source`, {
+             headers: {
+                 "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "",
+                 Accept: "application/json",
+             },
+        });
+        if (!response.ok) throw new Error("Failed to fetch source");
+        const data = await response.json();
+        rawSource.value = data.source;
+    } catch (e) {
+        console.error("Failed to fetch source", e);
+        rawSource.value = "Failed to load original message source.";
+    } finally {
+        loadingSource.value = false;
+    }
+}
+
+function copyToClipboard(text: string) {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+        // Maybe a toast here? For now just assume it works
+    });
+}
 
 // External Link Warning
 const showLinkWarning = ref(false);

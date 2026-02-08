@@ -38,6 +38,7 @@ class EmailResource extends JsonResource
                 return $html;
             }),
             'body_plain' => $this->when(!$lite, $this->body_plain),
+            'body_raw' => $this->when(!$lite, $this->body_raw),
             'date' => $this->received_at ? $this->received_at->toIso8601String() : ($this->created_at ? $this->created_at->toIso8601String() : now()->toIso8601String()),
 
             // Threading

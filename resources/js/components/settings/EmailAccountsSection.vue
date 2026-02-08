@@ -350,22 +350,9 @@ const onWizardSaved = () => {
                 Add an account to send emails from the application
             </p>
             <div class="flex items-center justify-center gap-2">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    @click="connectOAuth('gmail')"
-                >
-                    Connect Gmail
-                </Button>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    @click="connectOAuth('outlook')"
-                >
-                    Connect Outlook
-                </Button>
-                <Button variant="ghost" size="sm" @click="openModal()">
-                    Custom IMAP/SMTP
+                <Button variant="outline" size="sm" @click="openModal()">
+                    <Plus class="w-4 h-4 mr-2" />
+                    Connect Account
                 </Button>
             </div>
         </div>
@@ -504,25 +491,6 @@ const onWizardSaved = () => {
                 </div>
             </div>
 
-            <!-- Add More -->
-            <div class="flex items-center gap-2 pt-2">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    @click="connectOAuth('gmail')"
-                >
-                    <ExternalLink class="w-3 h-3" />
-                    Connect Gmail
-                </Button>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    @click="connectOAuth('outlook')"
-                >
-                    <ExternalLink class="w-3 h-3" />
-                    Connect Outlook
-                </Button>
-            </div>
         </div>
 
         <!-- Add/Edit Modal -->

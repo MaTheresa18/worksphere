@@ -554,17 +554,11 @@ class EmailSyncService implements EmailSyncServiceContract
                         }
                     }
 
-                    // Calculate approximate size
+                    // Calculate approximate size (text + headers only)
                     $sizeBytes = 0;
                     $sizeBytes += strlen($emailData['body_html'] ?? '');
                     $sizeBytes += strlen($emailData['body_plain'] ?? '');
                     $sizeBytes += strlen(json_encode($emailData['headers'] ?? []));
-                    
-                    if (!empty($emailData['attachments'])) {
-                        foreach ($emailData['attachments'] as $att) {
-                            $sizeBytes += ($att['size'] ?? 0);
-                        }
-                    }
 
                     $email = Email::updateOrCreate(
                         $matchAttributes,
@@ -743,6 +737,15 @@ class EmailSyncService implements EmailSyncServiceContract
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Fetch the raw RFC822 message source for an email.
+     */
+    public function fetchRawSource(Email $email): string
+    {
+        $adapter = $this->getAdapterForAccount($email->emailAccount);
+        return $adapter->fetchRawSource($email);
     }
 
     /**

@@ -162,4 +162,11 @@ interface EmailProviderAdapter
      * @return array The parsed email data including body and attachments.
      */
     public function fetchFullMessage(\App\Models\Email $email): array;
+
+    /**
+     * Fetch the raw RFC822 message source for an existing email.
+     *
+     * @return string The raw message content (headers + body).
+     */
+    public function fetchRawSource(\App\Models\Email $email): string;
 }

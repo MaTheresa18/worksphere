@@ -11,7 +11,8 @@ use Illuminate\Http\Request;
 class DashboardController extends Controller
 {
     public function __construct(
-        protected DashboardService $dashboardService
+        protected DashboardService $dashboardService,
+        protected \App\Services\PermissionService $permissionService
     ) {}
 
     /**
@@ -84,16 +85,21 @@ class DashboardController extends Controller
      */
     protected function resolveTeam(Request $request): ?Team
     {
+        $user = $request->user();
         $teamId = $request->input('team_id');
+        $team = null;
 
         if (! $teamId) {
             // Try to get the user's first team
-            $user = $request->user();
-            $firstTeam = $user->teams()->first();
-
-            return $firstTeam;
+            $team = $user->teams()->first();
+        } else {
+            $team = Team::where('public_id', $teamId)->first();
         }
 
-        return Team::where('public_id', $teamId)->first();
+        if ($team && ! $this->permissionService->isTeamMember($user, $team)) {
+            abort(403, 'You do not have access to this team dashboard.');
+        }
+
+        return $team;
     }
 }

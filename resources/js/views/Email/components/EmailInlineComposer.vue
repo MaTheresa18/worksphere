@@ -1,10 +1,10 @@
 <template>
     <div
-        class="flex flex-col h-full max-h-[calc(100vh-110px)] bg-[var(--surface-primary)] overflow-hidden"
+        class="flex flex-col h-full max-h-[calc(100vh-110px)] bg-(--surface-primary) overflow-hidden"
     >
         <!-- Compact Header -->
         <div
-            class="p-4 border-b border-[var(--border-default)] bg-gradient-to-r from-[var(--surface-secondary)] to-transparent"
+            class="p-4 border-b border-(--border-default) bg-gradient-to-r from-(--surface-secondary) to-transparent"
         >
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-2">
@@ -15,27 +15,27 @@
                         />
                     </div>
                     <span
-                        class="text-sm font-semibold text-[var(--text-primary)]"
+                        class="text-sm font-semibold text-(--text-primary)"
                         >{{ modeLabel }}</span
                     >
                 </div>
 
                 <!-- Action Buttons (Moved to Header) -->
                 <div class="flex items-center gap-3">
-                    <span class="text-xs text-[var(--text-muted)] tabular-nums"
+                    <span class="text-xs text-(--text-muted) tabular-nums"
                         >{{ characterCount }} chars</span
                     >
-                    <div class="h-4 w-px bg-[var(--border-default)]"></div>
+                    <div class="h-4 w-px bg-(--border-default)"></div>
                     <button
                         @click="emit('close')"
-                        class="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--color-error)] hover:bg-[var(--color-error)]/10 transition-colors"
+                        class="p-2 rounded-lg text-(--text-muted) hover:text-(--color-error) hover:bg-(--color-error)/10 transition-colors"
                         title="Discard"
                     >
                         <TrashIcon class="w-4 h-4" />
                     </button>
                     <button
                         @click="handleSend"
-                        class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-[var(--interactive-primary)] hover:bg-[var(--interactive-primary-hover)] shadow-lg shadow-[var(--interactive-primary)]/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-(--interactive-primary) hover:bg-(--interactive-primary-hover) shadow-lg shadow-(--interactive-primary)/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
                     >
                         Send
                         <SendIcon class="w-3.5 h-3.5" />
@@ -48,7 +48,7 @@
                 <!-- From Field -->
                 <div class="flex items-center gap-2">
                     <span
-                        class="text-xs text-[var(--text-muted)] w-12 flex-shrink-0"
+                        class="text-xs text-(--text-muted) w-12 flex-shrink-0"
                         >From</span
                     >
                     <div class="flex-1 relative">
@@ -59,7 +59,7 @@
                         >
                             <template #trigger>
                                 <button
-                                    class="flex items-center gap-2 w-full px-3 py-1.5 text-sm border border-[var(--border-default)] rounded-lg bg-[var(--surface-elevated)] hover:bg-[var(--surface-secondary)] transition-colors text-left"
+                                    class="flex items-center gap-2 w-full px-3 py-1.5 text-sm border border-(--border-default) rounded-lg bg-(--surface-elevated) hover:bg-(--surface-secondary) transition-colors text-left"
                                 >
                                     <span
                                         v-if="selectedAccount"
@@ -71,11 +71,11 @@
                                     </span>
                                     <span
                                         v-else
-                                        class="text-[var(--text-muted)]"
+                                        class="text-(--text-muted)"
                                         >Select account...</span
                                     >
                                     <ChevronDownIcon
-                                        class="w-4 h-4 text-[var(--text-muted)]"
+                                        class="w-4 h-4 text-(--text-muted)"
                                     />
                                 </button>
                             </template>
@@ -86,7 +86,7 @@
                 <!-- To Field -->
                 <div class="flex items-start gap-2">
                     <span
-                        class="text-xs text-[var(--text-muted)] w-12 pt-2.5 flex-shrink-0"
+                        class="text-xs text-(--text-muted) w-12 pt-2.5 flex-shrink-0"
                         >To</span
                     >
                     <div class="flex-1">
@@ -101,8 +101,8 @@
                             class="px-2 py-1 text-xs rounded-md transition-colors"
                             :class="
                                 showCc
-                                    ? 'bg-[var(--interactive-primary)]/10 text-[var(--interactive-primary)]'
-                                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)]'
+                                    ? 'bg-(--interactive-primary)/10 text-(--interactive-primary)'
+                                    : 'text-(--text-muted) hover:text-(--text-primary) hover:bg-(--surface-tertiary)'
                             "
                         >
                             Cc
@@ -112,8 +112,8 @@
                             class="px-2 py-1 text-xs rounded-md transition-colors"
                             :class="
                                 showBcc
-                                    ? 'bg-[var(--interactive-primary)]/10 text-[var(--interactive-primary)]'
-                                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)]'
+                                    ? 'bg-(--interactive-primary)/10 text-(--interactive-primary)'
+                                    : 'text-(--text-muted) hover:text-(--text-primary) hover:bg-(--surface-tertiary)'
                             "
                         >
                             Bcc
@@ -125,7 +125,7 @@
                 <Transition name="slide-fade">
                     <div v-if="showCc" class="flex items-start gap-2">
                         <span
-                            class="text-xs text-[var(--text-muted)] w-12 pt-2.5 flex-shrink-0"
+                            class="text-xs text-(--text-muted) w-12 pt-2.5 flex-shrink-0"
                             >Cc</span
                         >
                         <EmailTagInput
@@ -140,7 +140,7 @@
                 <Transition name="slide-fade">
                     <div v-if="showBcc" class="flex items-start gap-2">
                         <span
-                            class="text-xs text-[var(--text-muted)] w-12 pt-2.5 flex-shrink-0"
+                            class="text-xs text-(--text-muted) w-12 pt-2.5 flex-shrink-0"
                             >Bcc</span
                         >
                         <EmailTagInput
@@ -154,13 +154,13 @@
                 <!-- Subject Field (always shown) -->
                 <div class="flex items-center gap-2">
                     <span
-                        class="text-xs text-[var(--text-muted)] w-12 flex-shrink-0"
+                        class="text-xs text-(--text-muted) w-12 flex-shrink-0"
                         >Subject</span
                     >
                     <input
                         type="text"
                         v-model="subject"
-                        class="flex-1 bg-[var(--surface-elevated)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--interactive-primary)]/50 focus:border-[var(--interactive-primary)] transition-all"
+                        class="flex-1 bg-(--surface-elevated) border border-(--border-default) rounded-lg px-3 py-2 text-sm text-(--text-primary) placeholder-(--text-muted) focus:outline-none focus:ring-2 focus:ring-(--interactive-primary)/50 focus:border-(--interactive-primary) transition-all"
                         placeholder="Subject"
                     />
                 </div>
@@ -182,15 +182,15 @@
                 <div
                     v-for="(file, index) in attachments"
                     :key="index"
-                    class="flex items-center gap-2 px-3 py-1.5 bg-[var(--surface-tertiary)] rounded-full text-xs border border-[var(--border-default)]"
+                    class="flex items-center gap-2 px-3 py-1.5 bg-(--surface-tertiary) rounded-full text-xs border border-(--border-default)"
                 >
                     <span class="truncate max-w-[200px]">{{ file.name }}</span>
-                    <span class="text-[var(--text-muted)]"
+                    <span class="text-(--text-muted)"
                         >({{ formatFileSize(file.size) }})</span
                     >
                     <button
                         @click="removeAttachment(index)"
-                        class="p-0.5 rounded hover:bg-[var(--surface-secondary)] text-[var(--text-secondary)]"
+                        class="p-0.5 rounded hover:bg-(--surface-secondary) text-(--text-secondary)"
                     >
                         <XIcon class="w-3 h-3" />
                     </button>
@@ -199,13 +199,13 @@
             <!-- Signature Preview -->
             <div
                 v-if="selectedSignature?.content"
-                class="mt-4 pt-4 border-t border-dashed border-[var(--border-default)]"
+                class="mt-4 pt-4 border-t border-dashed border-(--border-default)"
             >
-                <div class="text-xs text-[var(--text-muted)] mb-2">
+                <div class="text-xs text-(--text-muted) mb-2">
                     Signature
                 </div>
                 <div
-                    class="text-sm text-[var(--text-secondary)]"
+                    class="text-sm text-(--text-secondary)"
                     v-html="selectedSignature.content"
                 ></div>
             </div>
@@ -216,15 +216,15 @@
                     replyTo &&
                     (actualMode === 'reply' || actualMode === 'forward')
                 "
-                class="mt-4 pt-4 border-t border-dashed border-[var(--border-default)]"
+                class="mt-4 pt-4 border-t border-dashed border-(--border-default)"
             >
-                <div class="text-xs text-[var(--text-muted)] mb-2">
+                <div class="text-xs text-(--text-muted) mb-2">
                     {{ actualMode === "reply" ? "On" : "Forwarded message" }}
                     {{ formatDate(replyTo.date) }},
                     {{ replyTo.from_name || replyTo.from_email }} wrote:
                 </div>
                 <div
-                    class="pl-3 border-l-2 border-[var(--border-default)] text-sm text-[var(--text-secondary)]"
+                    class="pl-3 border-l-2 border-(--border-default) text-sm text-(--text-secondary)"
                     v-html="replyTo.body_html || replyTo.body_plain"
                 ></div>
             </div>
@@ -232,7 +232,7 @@
 
         <!-- Action Bar -->
         <div
-            class="p-3 border-t border-[var(--border-default)] bg-[var(--surface-secondary)]"
+            class="p-3 border-t border-(--border-default) bg-(--surface-secondary)"
         >
             <div
                 class="flex items-center overflow-x-auto scrollbar-hide -mx-3 px-3 gap-1"
@@ -247,14 +247,14 @@
                 />
                 <button
                     @click="fileInput?.click()"
-                    class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] transition-colors shrink-0"
+                    class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors shrink-0"
                     title="Attach file"
                 >
                     <PaperclipIcon class="w-4 h-4" />
                 </button>
 
                 <div
-                    class="w-px h-5 bg-[var(--border-default)] mx-1 shrink-0"
+                    class="w-px h-5 bg-(--border-default) mx-1 shrink-0"
                 ></div>
 
                 <!-- Formatting -->
@@ -262,10 +262,10 @@
                     @click="editor?.chain().focus().toggleBold().run()"
                     :class="[
                         editor?.isActive('bold')
-                            ? 'bg-[var(--surface-tertiary)] text-[var(--text-primary)]'
-                            : 'text-[var(--text-secondary)]',
+                            ? 'bg-(--surface-tertiary) text-(--text-primary)'
+                            : 'text-(--text-secondary)',
                     ]"
-                    class="p-2 rounded-lg hover:bg-[var(--surface-tertiary)] transition-colors shrink-0"
+                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
                 >
                     <BoldIcon class="w-4 h-4" />
                 </button>
@@ -273,10 +273,10 @@
                     @click="editor?.chain().focus().toggleItalic().run()"
                     :class="[
                         editor?.isActive('italic')
-                            ? 'bg-[var(--surface-tertiary)] text-[var(--text-primary)]'
-                            : 'text-[var(--text-secondary)]',
+                            ? 'bg-(--surface-tertiary) text-(--text-primary)'
+                            : 'text-(--text-secondary)',
                     ]"
-                    class="p-2 rounded-lg hover:bg-[var(--surface-tertiary)] transition-colors shrink-0"
+                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
                 >
                     <ItalicIcon class="w-4 h-4" />
                 </button>
@@ -284,23 +284,23 @@
                     @click="editor?.chain().focus().toggleBulletList().run()"
                     :class="[
                         editor?.isActive('bulletList')
-                            ? 'bg-[var(--surface-tertiary)] text-[var(--text-primary)]'
-                            : 'text-[var(--text-secondary)]',
+                            ? 'bg-(--surface-tertiary) text-(--text-primary)'
+                            : 'text-(--text-secondary)',
                     ]"
-                    class="p-2 rounded-lg hover:bg-[var(--surface-tertiary)] transition-colors shrink-0"
+                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
                 >
                     <ListIcon class="w-4 h-4" />
                 </button>
 
                 <div
-                    class="w-px h-5 bg-[var(--border-default)] mx-1 shrink-0"
+                    class="w-px h-5 bg-(--border-default) mx-1 shrink-0"
                 ></div>
 
                 <!-- Template Selector -->
                 <Dropdown :items="templateItems" align="start">
                     <template #trigger>
                         <button
-                            class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] transition-colors shrink-0"
+                            class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors shrink-0"
                             title="Insert template"
                         >
                             <FileTextIcon class="w-4 h-4" />
@@ -312,7 +312,7 @@
                 <Dropdown :items="signatureItems" align="start">
                     <template #trigger>
                         <button
-                            class="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] transition-colors shrink-0"
+                            class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors shrink-0"
                             title="Select signature"
                         >
                             <PenToolIcon class="w-4 h-4" />
@@ -321,13 +321,13 @@
                 </Dropdown>
 
                 <div
-                    class="w-px h-5 bg-[var(--border-default)] mx-1 shrink-0"
+                    class="w-px h-5 bg-(--border-default) mx-1 shrink-0"
                 ></div>
 
                 <!-- AI Assist (Future Feature) -->
                 <button
                     @click="handleAiAssist"
-                    class="p-1.5 rounded-lg text-[var(--accent-primary)] hover:bg-[var(--surface-active)] transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+                    class="p-1.5 rounded-lg text-(--accent-primary) hover:bg-(--surface-active) transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap"
                     title="AI Assist (Coming Soon)"
                 >
                     <SparklesIcon class="w-4 h-4" />
@@ -599,7 +599,7 @@ const editor = useEditor({
     ],
     editorProps: {
         attributes: {
-            class: "prose dark:prose-invert max-w-none focus:outline-none min-h-[100px] text-[var(--text-primary)]",
+            class: "prose dark:prose-invert max-w-none focus:outline-none min-h-[100px] text-(--text-primary)",
         },
     },
 });

@@ -1,13 +1,13 @@
 <template>
     <div
-        class="flex-1 flex flex-col h-full bg-[var(--surface-primary)] overflow-hidden min-h-0"
+        class="flex-1 flex flex-col h-full bg-(--surface-primary) overflow-hidden min-h-0"
     >
         <!-- Email Content Area -->
         <div class="flex-1 overflow-hidden min-h-0 relative flex flex-col">
             <!-- Loading State -->
             <div v-if="loadingThread" class="p-8 flex justify-center">
                 <LoaderIcon
-                    class="w-6 h-6 animate-spin text-[var(--text-muted)]"
+                    class="w-6 h-6 animate-spin text-(--text-muted)"
                 />
             </div>
 
@@ -19,26 +19,26 @@
                 <div
                     v-for="(msg, index) in threadMessages"
                     :key="msg.id"
-                    class="border-b border-[var(--border-default)] last:border-0 flex flex-col last:flex-1"
+                    class="border-b border-(--border-default) last:border-0 flex flex-col last:flex-1"
                 >
                     <!-- Collapsed Header -->
                     <div
                         v-if="!msg.isExpanded"
                         @click="toggleExpand(index)"
-                        class="px-6 py-3 bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] cursor-pointer flex items-center gap-4 transition-colors"
+                        class="px-6 py-3 bg-(--surface-secondary) hover:bg-(--surface-tertiary) cursor-pointer flex items-center gap-4 transition-colors"
                     >
                         <p
-                            class="font-medium text-sm text-[var(--text-primary)] w-48 truncate"
+                            class="font-medium text-sm text-(--text-primary) w-48 truncate"
                         >
                             {{ msg.from_name }}
                         </p>
                         <p
-                            class="text-sm text-[var(--text-secondary)] flex-1 truncate"
+                            class="text-sm text-(--text-secondary) flex-1 truncate"
                         >
                             {{ msg.preview }}
                         </p>
                         <span
-                            class="text-xs text-[var(--text-muted)] whitespace-nowrap"
+                            class="text-xs text-(--text-muted) whitespace-nowrap"
                             >{{ formatDate(msg.date) }}</span
                         >
                     </div>
@@ -70,9 +70,9 @@
             <!-- Empty State -->
             <div
                 v-else
-                class="flex-1 flex flex-col items-center justify-center text-[var(--text-muted)] h-full"
+                class="flex-1 flex flex-col items-center justify-center text-(--text-muted) h-full"
             >
-                <MailIcon class="w-16 h-16 mb-4 text-[var(--text-tertiary)]" />
+                <MailIcon class="w-16 h-16 mb-4 text-(--text-tertiary)" />
                 <p>Select an email to read</p>
             </div>
         </div>
@@ -309,7 +309,7 @@
         <!-- Tab Bar -->
         <div
             v-if="tabs.length > 0"
-            class="border-t border-[var(--border-default)] bg-[var(--surface-secondary)]"
+            class="border-t border-(--border-default) bg-(--surface-secondary)"
         >
             <div class="flex items-center gap-1 px-2 py-1.5 overflow-x-auto">
                 <button
@@ -319,8 +319,8 @@
                     class="group flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-all duration-150"
                     :class="[
                         activeTab === tab.id
-                            ? 'bg-[var(--interactive-primary)] text-white shadow-sm'
-                            : 'text-[var(--text-secondary)] hover:bg-[var(--surface-tertiary)] hover:text-[var(--text-primary)]',
+                            ? 'bg-(--interactive-primary) text-white shadow-sm'
+                            : 'text-(--text-secondary) hover:bg-(--surface-tertiary) hover:text-(--text-primary)',
                     ]"
                 >
                     <component :is="tab.icon" class="w-3.5 h-3.5" />
@@ -332,7 +332,7 @@
                         :class="
                             activeTab === tab.id
                                 ? 'text-white/70 hover:text-white'
-                                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                                : 'text-(--text-muted) hover:text-(--text-primary)'
                         "
                     >
                         <XIcon class="w-3 h-3" />
@@ -342,7 +342,7 @@
                 <!-- New Compose Button -->
                 <button
                     @click="openTab('compose')"
-                    class="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--interactive-primary)] hover:bg-[var(--surface-tertiary)] rounded-md transition-colors"
+                    class="flex items-center gap-1.5 px-3 py-1.5 text-sm text-(--interactive-primary) hover:bg-(--surface-tertiary) rounded-md transition-colors"
                     title="New Email"
                 >
                     <PlusIcon class="w-3.5 h-3.5" />

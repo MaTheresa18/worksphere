@@ -1,66 +1,66 @@
 <script setup>
-import { computed } from 'vue';
-import { Check } from 'lucide-vue-next';
-import { cn } from '@/lib/utils';
+import { computed } from "vue";
+import { CheckboxRoot, CheckboxIndicator } from "reka-ui";
+import { Check } from "lucide-vue-next";
+import { cn } from "@/lib/utils";
 
 const props = defineProps({
-    modelValue: Boolean,
+    modelValue: [Boolean, String],
     disabled: Boolean,
     label: String,
     description: String,
     id: String,
+    value: String,
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(["update:modelValue"]);
 
-const checkboxId = computed(() => props.id || `checkbox-${Math.random().toString(36).slice(2, 9)}`);
+const checked = computed({
+    get: () => props.modelValue,
+    set: (value) => emit("update:modelValue", value),
+});
 
-function handleChange(event) {
-    emit('update:modelValue', event.target.checked);
-}
+const checkboxId = computed(
+    () => props.id || `checkbox-${Math.random().toString(36).slice(2, 9)}`,
+);
 </script>
 
 <template>
     <div class="flex items-start gap-3">
-        <div class="relative">
-            <input
-                type="checkbox"
-                :id="checkboxId"
-                :checked="modelValue"
-                :disabled="disabled"
-                class="peer sr-only"
-                @change="handleChange"
-            />
-            <div
-                :class="cn(
-                    'h-5 w-5 shrink-0 rounded-md border transition-all duration-150 flex items-center justify-center cursor-pointer',
-                    'peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--interactive-primary)]/20',
-                    'peer-disabled:cursor-not-allowed peer-disabled:opacity-50',
-                    modelValue
-                        ? 'bg-[var(--interactive-primary)] border-[var(--interactive-primary)]'
-                        : 'border-[var(--border-default)] bg-[var(--surface-elevated)] hover:border-[var(--border-strong)]'
-                )"
-                @click="!disabled && emit('update:modelValue', !modelValue)"
-            >
-                <Check
-                    v-if="modelValue"
-                    class="h-3.5 w-3.5 text-white"
-                    :stroke-width="3"
-                />
-            </div>
-        </div>
+        <CheckboxRoot
+            v-model:checked="checked"
+            :id="checkboxId"
+            :disabled="disabled"
+            :value="value"
+            :class="
+                cn(
+                    'peer h-5 w-5 shrink-0 rounded-md border transition-all duration-150 flex items-center justify-center cursor-pointer',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--interactive-primary)/20',
+                    'disabled:cursor-not-allowed disabled:opacity-50',
+                    checked
+                        ? 'bg-(--brand-primary) border-(--brand-primary) shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]'
+                        : 'border-(--border-default) bg-(--surface-elevated) hover:border-(--border-strong)',
+                )
+            "
+        >
+            <CheckboxIndicator class="flex items-center justify-center text-white">
+                <Check class="h-3.5 w-3.5" :stroke-width="4" />
+            </CheckboxIndicator>
+        </CheckboxRoot>
 
         <div v-if="label || description || $slots.default" class="space-y-0.5">
             <label
                 :for="checkboxId"
-                :class="cn(
-                    'text-sm font-medium text-[var(--text-primary)] cursor-pointer select-none',
-                    disabled && 'cursor-not-allowed opacity-50'
-                )"
+                :class="
+                    cn(
+                        'text-sm font-medium text-(--text-primary) cursor-pointer select-none',
+                        disabled && 'cursor-not-allowed opacity-50',
+                    )
+                "
             >
                 <slot>{{ label }}</slot>
             </label>
-            <p v-if="description" class="text-sm text-[var(--text-muted)]">
+            <p v-if="description" class="text-sm text-(--text-muted)">
                 {{ description }}
             </p>
         </div>

@@ -356,14 +356,15 @@ class EmailAccountController extends Controller
             ->whereIn('model_id', $emailAccount->emails()->select('id'))
             ->count();
 
-        $totalBytes = max($emailsSize, $attachmentsSize);
+        // Emails bytes is just the DB sum. Attachments is the media sum.
+        // Total is the sum of both.
+        $totalBytes = $emailsSize + $attachmentsSize;
 
         return response()->json([
             'data' => [
                 'total_bytes' => (int) $totalBytes,
-                // emails_bytes is total minus attachments
-                'emails_bytes' => (int)max(0, $totalBytes - $attachmentsSize),
-                'attachments_bytes' => (int)$attachmentsSize,
+                'emails_bytes' => (int) $emailsSize,
+                'attachments_bytes' => (int) $attachmentsSize,
                 'emails_count' => $emailsCount,
                 'attachments_count' => $attachmentsCount,
                 'limit_bytes' => $emailAccount->storage_limit,

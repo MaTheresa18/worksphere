@@ -1,6 +1,6 @@
 <template>
     <div
-        class="flex flex-col h-full bg-[var(--surface-primary)]"
+        class="flex flex-col h-full bg-(--surface-primary)"
     >
         <!-- Toolbar Row 1: Actions & Search -->
         <div
@@ -10,7 +10,7 @@
             <div class="flex items-center gap-1.5 shrink-0">
                 <button
                     @click="$emit('toggle-sidebar')"
-                    class="md:hidden p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    class="md:hidden p-1.5 text-(--text-secondary) hover:text-(--text-primary)"
                 >
                     <MenuIcon class="w-5 h-5" />
                 </button>
@@ -135,40 +135,40 @@
         <Transition name="slide">
             <div
                 v-if="showFilters"
-                class="px-3 py-2 border-b border-[var(--border-default)] bg-[var(--surface-secondary)] space-y-2"
+                class="px-3 py-2 border-b border-(--border-default) bg-(--surface-secondary) space-y-2"
             >
                 <div class="flex items-center gap-2">
                     <label
-                        class="text-xs text-[var(--text-muted)] w-10 shrink-0"
+                        class="text-xs text-(--text-muted) w-10 shrink-0"
                         >From</label
                     >
                     <input
                         type="date"
                         v-model="filterDateFrom"
-                        class="flex-1 px-2 py-1 text-xs border border-[var(--border-default)] rounded bg-[var(--surface-elevated)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--interactive-primary)]"
+                        class="flex-1 px-2 py-1 text-xs border border-(--border-default) rounded bg-(--surface-elevated) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-(--interactive-primary)"
                     />
                 </div>
                 <div class="flex items-center gap-2">
                     <label
-                        class="text-xs text-[var(--text-muted)] w-10 shrink-0"
+                        class="text-xs text-(--text-muted) w-10 shrink-0"
                         >To</label
                     >
                     <input
                         type="date"
                         v-model="filterDateTo"
-                        class="flex-1 px-2 py-1 text-xs border border-[var(--border-default)] rounded bg-[var(--surface-elevated)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--interactive-primary)]"
+                        class="flex-1 px-2 py-1 text-xs border border-(--border-default) rounded bg-(--surface-elevated) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-(--interactive-primary)"
                     />
                 </div>
                 <div class="flex justify-end gap-2 pt-1">
                     <button
                         @click="clearFilters"
-                        class="px-2 py-1 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                        class="px-2 py-1 text-xs text-(--text-muted) hover:text-(--text-primary) transition-colors"
                     >
                         Clear
                     </button>
                     <button
                         @click="showFilters = false"
-                        class="px-2 py-1 text-xs bg-[var(--interactive-primary)] text-white rounded hover:bg-[var(--interactive-primary-hover)] transition-colors"
+                        class="px-2 py-1 text-xs bg-(--interactive-primary) text-white rounded hover:bg-(--interactive-primary-hover) transition-colors"
                     >
                         Apply
                     </button>
@@ -229,7 +229,7 @@
             <button
                 v-if="newEmailCount > 0"
                 @click="store.loadNewEmails()"
-                class="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-[var(--interactive-primary)] text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg hover:bg-[var(--interactive-primary-hover)] transition flex items-center gap-1 cursor-pointer"
+                class="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-(--interactive-primary) text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg hover:bg-(--interactive-primary-hover) transition flex items-center gap-1 cursor-pointer"
             >
                 <ArrowUpDownIcon class="w-3 h-3" />
                 {{ newEmailCount }} new email(s)
@@ -238,14 +238,14 @@
             <div v-if="loading" class="p-4 space-y-4">
                 <div v-for="i in 6" :key="i" class="flex gap-3 animate-pulse">
                     <div
-                        class="w-5 h-5 bg-[var(--surface-tertiary)] rounded shrink-0"
+                        class="w-5 h-5 bg-(--surface-tertiary) rounded shrink-0"
                     ></div>
                     <div class="flex-1 space-y-2">
                         <div
-                            class="h-4 bg-[var(--surface-tertiary)] rounded w-3/4"
+                            class="h-4 bg-(--surface-tertiary) rounded w-3/4"
                         ></div>
                         <div
-                            class="h-3 bg-[var(--surface-tertiary)] rounded w-1/2"
+                            class="h-3 bg-(--surface-tertiary) rounded w-1/2"
                         ></div>
                     </div>
                 </div>
@@ -262,13 +262,13 @@
             >
                 <div class="relative mb-4">
                     <div
-                        class="absolute inset-0 bg-[var(--interactive-primary)]/10 rounded-full animate-ping"
+                        class="absolute inset-0 bg-(--interactive-primary)/10 rounded-full animate-ping"
                     ></div>
                     <div
-                        class="relative bg-[var(--interactive-primary)]/20 p-4 rounded-full"
+                        class="relative bg-(--interactive-primary)/20 p-4 rounded-full"
                     >
                         <LoaderIcon
-                            class="w-10 h-10 text-[var(--interactive-primary)] animate-spin"
+                            class="w-10 h-10 text-(--interactive-primary) animate-spin"
                         />
                     </div>
                 </div>
@@ -285,7 +285,7 @@
                 v-else-if="sortedEmails.length === 0"
                 class="flex flex-col items-center justify-center h-full p-8 text-center"
             >
-                <MailIcon class="w-12 h-12 text-[var(--text-muted)] mb-4" />
+                <MailIcon class="w-12 h-12 text-(--text-muted) mb-4" />
                 <h3 class="text-lg font-bold text-(--text-primary) mb-1">
                     No emails found
                 </h3>
@@ -348,7 +348,7 @@
                     <div class="min-w-0 flex-1">
                         <div class="flex justify-between items-baseline mb-1">
                             <p
-                                class="text-sm text-[var(--text-primary)] truncate pr-2 flex items-center gap-1.5"
+                                class="text-sm text-(--text-primary) truncate pr-2 flex items-center gap-1.5"
                                 :class="{ 'font-bold': !email.is_read }"
                             >
                                 <span
@@ -366,7 +366,7 @@
                             >
                                 <span
                                     v-if="email.thread_count > 1"
-                                    class="mr-1 inline-flex items-center justify-center bg-[var(--surface-tertiary)] text-[var(--text-secondary)] rounded-full px-1.5 min-w-[1.25rem] h-5 text-[10px] font-bold"
+                                    class="mr-1 inline-flex items-center justify-center bg-(--surface-tertiary) text-(--text-secondary) rounded-full px-1.5 min-w-5 h-5 text-[10px] font-bold"
                                 >
                                     {{ email.thread_count }}
                                 </span>
@@ -398,7 +398,7 @@
                             <span
                                 v-for="label in email.labels"
                                 :key="label"
-                                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-info-bg)] text-[var(--color-info-fg)]"
+                                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-(--color-info-bg) text-(--color-info-fg)"
                             >
                                 {{ label }}
                             </span>
@@ -414,7 +414,7 @@
                 >
                     <div
                         v-if="isLoadingMore"
-                        class="w-5 h-5 border-2 border-[var(--text-muted)] border-t-[var(--interactive-primary)] rounded-full animate-spin"
+                        class="w-5 h-5 border-2 border-(--text-muted) border-t-(--interactive-primary) rounded-full animate-spin"
                     ></div>
                     <span v-else class="h-1 w-full"></span>
                 </li>
@@ -434,9 +434,10 @@
                 <span v-if="unreadCount > 0">{{ unreadCount }} unread</span>
                 <button
                     @click="$emit('compose')"
-                    class="md:hidden flex items-center gap-1 px-2 py-1 bg-(--interactive-primary) text-white rounded-md font-medium hover:bg-(--interactive-primary-hover) transition-colors"
+                    :disabled="!selectedAccount"
+                    class="md:hidden flex items-center gap-1 px-2.5 py-1.5 bg-(--interactive-primary) text-white rounded-md font-semibold hover:bg-(--interactive-primary-hover) transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
                 >
-                    <PlusIcon class="w-3 h-3" />
+                    <PlusIcon class="w-3.5 h-3.5" />
                     Compose
                 </button>
             </div>
@@ -484,6 +485,7 @@ const emit = defineEmits(["toggle-sidebar", "select", "compose"]);
 const store = useEmailStore();
 const {
     filteredEmails,
+    selectedAccount,
     selectedEmailId,
     selectedEmailIds,
     loading,
