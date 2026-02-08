@@ -43,7 +43,7 @@ function handleOverflowClick() {
   flex-direction: column-reverse;
   align-items: center;
   gap: 8px;
-  padding-bottom: 8px;
+  padding-bottom: 1px;
   position: relative;
 }
 

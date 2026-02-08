@@ -6,25 +6,28 @@
         <div class="flex-1 overflow-hidden min-h-0 relative flex flex-col">
             <!-- Loading State -->
             <div v-if="loadingThread" class="p-8 flex justify-center">
-                <LoaderIcon
-                    class="w-6 h-6 animate-spin text-(--text-muted)"
-                />
+                <LoaderIcon class="w-6 h-6 animate-spin text-(--text-muted)" />
             </div>
-            
+
             <!-- Read Receipt Prompt -->
-            <div v-if="showReadReceiptPrompt" class="mx-4 mt-4 p-3 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center justify-between shadow-sm shrink-0">
-                <div class="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+            <div
+                v-if="showReadReceiptPrompt"
+                class="mx-4 mt-4 p-3 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center justify-between shadow-sm shrink-0"
+            >
+                <div
+                    class="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300"
+                >
                     <InfoIcon class="w-4 h-4" />
                     <span>The sender has requested a read receipt.</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button 
+                    <button
                         @click="ignoreReadReceipt"
                         class="px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/50 rounded-md transition-colors"
                     >
                         Ignore
                     </button>
-                    <button 
+                    <button
                         @click="sendReadReceipt"
                         class="px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
                     >
@@ -55,8 +58,34 @@
                             {{ msg.from_name }}
                         </p>
                         <p
-                            class="text-sm text-(--text-secondary) flex-1 truncate"
+                            class="text-sm text-(--text-secondary) flex-1 min-w-0 flex items-center gap-2"
                         >
+                            <span class="font-medium text-(--text-primary)">
+                                To:
+                                {{
+                                    (msg.to || [])
+                                        .map(
+                                            (r) =>
+                                                r.name || r.email.split("@")[0],
+                                        )
+                                        .join(", ")
+                                }}
+                            </span>
+                            <span
+                                v-if="msg.cc && msg.cc.length"
+                                class="text-(--text-muted)"
+                            >
+                                Cc:
+                                {{
+                                    msg.cc
+                                        .map(
+                                            (r) =>
+                                                r.name || r.email.split("@")[0],
+                                        )
+                                        .join(", ")
+                                }}
+                            </span>
+                            <span class="text-(--text-muted)">-</span>
                             {{ msg.preview }}
                         </p>
                         <span
@@ -235,7 +264,10 @@
                     <template v-else>
                         <button
                             @click="
-                                openTab('reply', replyTargetEmail || props.email)
+                                openTab(
+                                    'reply',
+                                    replyTargetEmail || props.email,
+                                )
                             "
                             class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold tracking-tight text-white bg-(--interactive-primary) hover:bg-(--interactive-primary-hover) transition-all shadow-sm"
                         >
@@ -257,7 +289,10 @@
                         </button>
                         <button
                             @click="
-                                openTab('forward', replyTargetEmail || props.email)
+                                openTab(
+                                    'forward',
+                                    replyTargetEmail || props.email,
+                                )
                             "
                             class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold text-(--text-primary) hover:bg-(--surface-tertiary) transition-all shadow-sm border border-transparent hover:border-(--border-default)"
                             title="Forward"
@@ -429,6 +464,18 @@ const props = defineProps<{
     email: Email | null;
 }>();
 
+onMounted(() => {
+    console.log("[PreviewPane] Mounted. Email prop:", props.email?.id);
+});
+
+onUnmounted(() => {
+    console.log("[PreviewPane] Unmounted!");
+});
+
+watch(() => props.email, (newVal, oldVal) => {
+    console.log(`[PreviewPane] Email prop changed from ${oldVal?.id} to ${newVal?.id}`);
+});
+
 const emit = defineEmits<{
     compose: [];
     "tab-closed": [tabId: string];
@@ -489,12 +536,14 @@ function checkForReadReceipt(email: Email) {
     // Check if headers has Disposition-Notification-To
     // and if we haven't already sent one (need to track this, maybe local storage for now or a flag on email)
     // For now, simple check: if header exists and we are opening it.
-    
+
     // We need to access headers. In the model it is cast to array.
     // The key might be 'Disposition-Notification-To' or lowercase.
     const headers = email.headers || {};
-    const dnt = headers['Disposition-Notification-To'] || headers['disposition-notification-to'];
-    
+    const dnt =
+        headers["Disposition-Notification-To"] ||
+        headers["disposition-notification-to"];
+
     if (dnt && !localStorage.getItem(`read_receipt_sent_${email.id}`)) {
         readReceiptEmail.value = email;
         showReadReceiptPrompt.value = true;
@@ -503,11 +552,16 @@ function checkForReadReceipt(email: Email) {
 
 async function sendReadReceipt() {
     if (!readReceiptEmail.value) return;
-    
+
     try {
-        await axios.post(`/api/emails/${readReceiptEmail.value.id}/read-receipt`);
+        await axios.post(
+            `/api/emails/${readReceiptEmail.value.id}/read-receipt`,
+        );
         alert("Read receipt sent.");
-        localStorage.setItem(`read_receipt_sent_${readReceiptEmail.value.id}`, 'true');
+        localStorage.setItem(
+            `read_receipt_sent_${readReceiptEmail.value.id}`,
+            "true",
+        );
     } catch (e) {
         console.error("Failed to send read receipt", e);
         alert("Failed to send read receipt.");
@@ -519,7 +573,10 @@ async function sendReadReceipt() {
 
 function ignoreReadReceipt() {
     if (readReceiptEmail.value) {
-         localStorage.setItem(`read_receipt_sent_${readReceiptEmail.value.id}`, 'ignored');
+        localStorage.setItem(
+            `read_receipt_sent_${readReceiptEmail.value.id}`,
+            "ignored",
+        );
     }
     showReadReceiptPrompt.value = false;
     readReceiptEmail.value = null;

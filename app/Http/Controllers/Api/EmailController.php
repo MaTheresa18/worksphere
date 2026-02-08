@@ -307,6 +307,10 @@ class EmailController extends Controller
             $this->emailService->toggleStar($email);
         }
 
+        if ($request->has('is_important')) {
+            $this->emailService->toggleImportant($email);
+        }
+
         if ($request->has('folder')) {
             $this->emailService->moveToFolder($email, $request->input('folder'));
         }

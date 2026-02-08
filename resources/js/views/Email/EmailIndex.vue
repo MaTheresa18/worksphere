@@ -90,7 +90,9 @@ const selectedEmail = computed(() => {
 watch(
     [selectedEmailId, loading],
     async ([newId, isLoading]) => {
+        console.log("[EmailIndex] Watcher: selectedEmailId=", newId, "loading=", isLoading, "foundEmail=", !!selectedEmail.value);
         if (newId && !isLoading && !selectedEmail.value) {
+            console.log("[EmailIndex] Fetching missing email:", newId);
             await store.fetchEmailById(newId);
         }
     },

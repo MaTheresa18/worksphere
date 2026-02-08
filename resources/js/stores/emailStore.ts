@@ -112,6 +112,13 @@ export const useEmailStore = defineStore("email", () => {
         localStorage.getItem(getStorageKey()) || null,
     );
 
+    // watch(selectedEmailId, (newVal, oldVal) => {
+    //     console.log(`[Store] selectedEmailId changed from ${oldVal} to ${newVal}`);
+    //     if (newVal === null) {
+    //         console.trace("[Store] selectedEmailId cleared!");
+    //     }
+    // });
+
     watch(selectedAccountId, (newVal) => {
         if (newVal) {
             localStorage.setItem(getStorageKey(), newVal);
@@ -577,6 +584,14 @@ export const useEmailStore = defineStore("email", () => {
         await emailService.toggleStar(id);
     }
 
+    async function toggleImportant(id: string) {
+        // Optimistic update
+        const email = emails.value.find((e) => e.id === id);
+        if (email) email.is_important = !email.is_important;
+
+        await emailService.toggleImportant(id);
+    }
+
     async function markAsRead(id: string, isRead: boolean) {
         const email = emails.value.find((e) => e.id === id);
         if (email) email.is_read = isRead;
@@ -596,6 +611,32 @@ export const useEmailStore = defineStore("email", () => {
 
         // Note: Ideally backend supports bulk op, looping for now
         await Promise.all(ids.map((id) => emailService.markAsRead(id, isRead)));
+    }
+
+    function toggleEmailSelection(id: string) {
+        console.log("toggleEmailSelection called for", id);
+        console.log("Current selectedEmailId (preview):", selectedEmailId.value);
+        const newSet = new Set(selectedEmailIds.value);
+        if (newSet.has(id)) {
+            newSet.delete(id);
+        } else {
+            newSet.add(id);
+        }
+        selectedEmailIds.value = newSet;
+        console.log("New selectedEmailIds set size:", selectedEmailIds.value.size);
+        // Safeguard: Ensure we don't accidentally clear the currently viewed email
+        // Logic: checking boxes should not affect the preview pane
+    }
+
+    function toggleSelectAll(allIds: string[]) {
+        console.log("toggleSelectAll called. Count:", allIds.length);
+        console.log("Current selectedEmailId inside toggleSelectAll:", selectedEmailId.value);
+        if (selectedEmailIds.value.size === allIds.length && allIds.length > 0) {
+            selectedEmailIds.value = new Set();
+        } else {
+            selectedEmailIds.value = new Set(allIds);
+        }
+        console.log("New selectedEmailIds size after toggleAll:", selectedEmailIds.value.size);
     }
 
     function getEmailById(id: string) {
@@ -790,6 +831,8 @@ export const useEmailStore = defineStore("email", () => {
         fetchThread,
         fetchEmailBody,
         fetchEmailById,
+        toggleEmailSelection,
+        toggleSelectAll,
         fetchInitialData,
         loadMore,
         selectFolder,
@@ -797,7 +840,10 @@ export const useEmailStore = defineStore("email", () => {
         deleteFolder,
         addLabel,
         deleteLabel,
+        addLabel,
+        deleteLabel,
         sendEmail,
+        toggleImportant,
         setSelectedAccount,
         moveEmail,
         moveEmails,

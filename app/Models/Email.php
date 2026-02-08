@@ -214,6 +214,16 @@ class Email extends Model implements HasMedia
     }
 
     /**
+     * Toggle important status.
+     */
+    public function toggleImportant(): self
+    {
+        $this->update(['is_important' => ! $this->is_important]);
+
+        return $this;
+    }
+
+    /**
      * Move to folder.
      */
     public function moveToFolder(string $folder): self

@@ -97,8 +97,8 @@ function handleToggle() {
 <style scoped>
 .minichat-launcher-container {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  bottom: 13px;
+  right: 13px;
   z-index: 9999;
   display: flex;
   flex-direction: column;
@@ -107,8 +107,8 @@ function handleToggle() {
 }
 
 .minichat-launcher-btn {
-  width: 56px;
-  height: 56px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--interactive-primary), var(--interactive-primary-hover));
   color: white;

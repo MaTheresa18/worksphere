@@ -581,6 +581,7 @@ class EmailSyncService implements EmailSyncServiceContract
                             'headers' => $emailData['headers'] ?? [],
                             'is_read' => $emailData['is_read'] ?? false,
                             'is_starred' => $emailData['is_starred'] ?? false,
+                            'is_important' => $this->determineImportance($emailData['headers'] ?? []),
                             'has_attachments' => $emailData['has_attachments'] ?? false,
                             'size_bytes' => $sizeBytes,
                             'sent_at' => $emailData['sent_at'] ?? null,
@@ -806,6 +807,35 @@ class EmailSyncService implements EmailSyncServiceContract
 
             throw $e;
         }
+    }
+
+    /**
+     * Determine importance from headers.
+     */
+    protected function determineImportance(array $headers): bool
+    {
+        // helper to get header value case-insensitively
+        $get = fn($key) => $headers[$key] ?? $headers[strtolower($key)] ?? null;
+
+        // Check 'Importance' (High)
+        $importance = $get('Importance');
+        if ($importance && stripos($importance, 'high') !== false) {
+            return true;
+        }
+
+        // Check 'X-Priority' (1 or 2 often means High)
+        $priority = $get('X-Priority');
+        if ($priority && preg_match('/^[12]/', trim($priority))) {
+            return true;
+        }
+
+        // Check 'X-MSMail-Priority' (High)
+        $msPriority = $get('X-MSMail-Priority');
+        if ($msPriority && stripos($msPriority, 'high') !== false) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

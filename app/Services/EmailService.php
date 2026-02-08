@@ -223,6 +223,14 @@ class EmailService implements EmailServiceContract
     }
 
     /**
+     * Toggle important status.
+     */
+    public function toggleImportant(Email $email): Email
+    {
+        return $email->toggleImportant();
+    }
+
+    /**
      * Soft delete an email.
      */
     public function delete(Email $email): void

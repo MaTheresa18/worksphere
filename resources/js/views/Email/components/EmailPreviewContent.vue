@@ -29,7 +29,7 @@
 
                     <h1
                         v-if="isHeaderExpanded"
-                        class="text-2xl font-semibold text-(--text-primary) leading-tight truncate"
+                        class="text-lg font-bold text-(--text-primary) leading-tight truncate"
                         :title="email.subject"
                     >
                         {{ email.subject }}
@@ -97,8 +97,12 @@
                 class="mt-4 p-5 rounded-2xl bg-(--surface-secondary) border border-(--border-default) shadow-sm animate-in fade-in slide-in-from-top-2 duration-200"
             >
                 <div class="flex justify-between items-start mb-4">
-                    <h3 class="text-xs font-bold text-(--text-primary) uppercase tracking-wider">Original Message Details</h3>
-                    <button 
+                    <h3
+                        class="text-xs font-bold text-(--text-primary) uppercase tracking-wider"
+                    >
+                        Original Message Details
+                    </h3>
+                    <button
                         @click="openShowOriginal"
                         class="text-[10px] font-bold text-(--interactive-primary) hover:underline flex items-center gap-1"
                     >
@@ -107,66 +111,141 @@
                     </button>
                 </div>
 
-                <div class="grid grid-cols-[110px_1fr] gap-y-3 text-[13px] leading-relaxed">
-                    <div class="text-(--text-muted) font-medium">Message ID</div>
-                    <div class="text-(--text-primary) break-all font-mono text-[11px] select-all">{{ email.message_id }}</div>
-                    
-                    <div class="text-(--text-muted) font-medium">Created at</div>
+                <div
+                    class="grid grid-cols-[110px_1fr] gap-y-3 text-[13px] leading-relaxed"
+                >
+                    <div class="text-(--text-muted) font-medium">
+                        Message ID
+                    </div>
+                    <div
+                        class="text-(--text-primary) break-all font-mono text-[11px] select-all"
+                    >
+                        {{ email.message_id }}
+                    </div>
+
+                    <div class="text-(--text-muted) font-medium">
+                        Created at
+                    </div>
                     <div v-if="email.date" class="text-(--text-primary)">
-                        {{ format(new Date(email.date), 'EEE, MMM d, yyyy') }} at {{ format(new Date(email.date), 'h:mm a') }}
-                        <span class="text-(--text-muted) ml-1">({{ formatDistanceToNow(new Date(email.date)) }} ago)</span>
+                        {{ format(new Date(email.date), "EEE, MMM d, yyyy") }}
+                        at {{ format(new Date(email.date), "h:mm a") }}
+                        <span class="text-(--text-muted) ml-1"
+                            >({{
+                                formatDistanceToNow(new Date(email.date))
+                            }}
+                            ago)</span
+                        >
                     </div>
 
                     <div class="text-(--text-muted) font-medium">From</div>
                     <div class="text-(--text-primary)">
                         <span class="font-semibold">{{ email.from_name }}</span>
-                        <span class="text-(--text-muted) ml-1">&lt;{{ email.from_email }}&gt;</span>
+                        <span class="text-(--text-muted) ml-1"
+                            >&lt;{{ email.from_email }}&gt;</span
+                        >
                     </div>
 
                     <div class="text-(--text-muted) font-medium">To</div>
                     <div class="text-(--text-primary)">
-                        <div v-for="recipient in email.to" :key="recipient.email" class="flex items-center gap-1">
-                            <span v-if="recipient.name" class="font-medium">{{ recipient.name }}</span>
-                            <span class="text-(--text-muted)">&lt;{{ recipient.email }}&gt;</span>
+                        <div
+                            v-for="recipient in email.to"
+                            :key="recipient.email || recipient"
+                            class="flex items-center gap-1"
+                        >
+                            <span v-if="recipient.name" class="font-medium">{{
+                                recipient.name
+                            }}</span>
+                            <span class="text-(--text-muted)"
+                                >&lt;{{ recipient.email || recipient }}&gt;</span
+                            >
+                        </div>
+                    </div>
+
+                    <div
+                        v-if="email.cc && email.cc.length > 0"
+                        class="contents"
+                    >
+                        <div class="text-(--text-muted) font-medium">Cc</div>
+                        <div class="text-(--text-primary)">
+                            <div
+                                v-for="recipient in email.cc"
+                                :key="recipient.email"
+                                class="flex items-center gap-1"
+                            >
+                                <span
+                                    v-if="recipient.name"
+                                    class="font-medium"
+                                    >{{ recipient.name }}</span
+                                >
+                                <span class="text-(--text-muted)"
+                                    >&lt;{{ recipient.email }}&gt;</span
+                                >
+                            </div>
                         </div>
                     </div>
 
                     <div class="text-(--text-muted) font-medium">Subject</div>
-                    <div class="text-(--text-primary) font-semibold">{{ email.subject }}</div>
+                    <div class="text-(--text-primary) font-semibold">
+                        {{ email.subject }}
+                    </div>
 
                     <!-- Security Headers -->
-                    <template v-if="authInfo.spf || authInfo.dkim || authInfo.dmarc">
-                        <div class="col-span-2 my-1 border-t border-(--border-default)/50"></div>
+                    <template
+                        v-if="authInfo.spf || authInfo.dkim || authInfo.dmarc"
+                    >
+                        <div
+                            class="col-span-2 my-1 border-t border-(--border-default)/50"
+                        ></div>
 
                         <div class="text-(--text-muted) font-medium">SPF</div>
                         <div class="flex items-center gap-2">
-                            <span 
+                            <span
                                 class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight"
-                                :class="authInfo.spf === 'pass' ? 'bg-green-500/10 text-green-600' : 'bg-(--surface-tertiary) text-(--text-muted)'"
+                                :class="
+                                    authInfo.spf === 'pass'
+                                        ? 'bg-green-500/10 text-green-600'
+                                        : 'bg-(--surface-tertiary) text-(--text-muted)'
+                                "
                             >
-                                {{ authInfo.spf || 'NEUTRAL' }}
+                                {{ authInfo.spf || "NEUTRAL" }}
                             </span>
-                            <span v-if="authInfo.spfDetails" class="text-xs text-(--text-secondary)">{{ authInfo.spfDetails }}</span>
+                            <span
+                                v-if="authInfo.spfDetails"
+                                class="text-xs text-(--text-secondary)"
+                                >{{ authInfo.spfDetails }}</span
+                            >
                         </div>
 
                         <div class="text-(--text-muted) font-medium">DKIM</div>
                         <div class="flex items-center gap-2">
-                            <span 
+                            <span
                                 class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight"
-                                :class="authInfo.dkim === 'pass' ? 'bg-green-500/10 text-green-600' : 'bg-(--surface-tertiary) text-(--text-muted)'"
+                                :class="
+                                    authInfo.dkim === 'pass'
+                                        ? 'bg-green-500/10 text-green-600'
+                                        : 'bg-(--surface-tertiary) text-(--text-muted)'
+                                "
                             >
-                                {{ authInfo.dkim || 'NEUTRAL' }}
+                                {{ authInfo.dkim || "NEUTRAL" }}
                             </span>
-                            <span v-if="authInfo.dkimDetails" class="text-xs text-(--text-secondary)">{{ authInfo.dkimDetails }}</span>
+                            <span
+                                v-if="authInfo.dkimDetails"
+                                class="text-xs text-(--text-secondary)"
+                                >{{ authInfo.dkimDetails }}</span
+                            >
                         </div>
 
                         <div class="text-(--text-muted) font-medium">DMARC</div>
                         <div class="flex items-center gap-2">
-                            <span 
+                            <span
                                 class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight"
-                                :class="authInfo.dmarc === 'pass' ? 'bg-green-500/10 text-green-600' : 'bg-(--surface-tertiary) text-(--text-muted)'"
+                                :class="
+                                    authInfo.dmarc === 'pass'
+                                        ? 'bg-green-500/10 text-green-600'
+                                        : 'bg-(--surface-tertiary) text-(--text-muted)'
+                                "
                             >
-                                {{ authInfo.dmarc || 'NEUTRAL' }}
+                                {{ authInfo.dmarc || "NEUTRAL" }}
                             </span>
                         </div>
                     </template>
@@ -299,7 +378,10 @@
         >
             <!-- Security / Trust Banner -->
             <div
-                v-if="(!isTrustedSource && !isUntrustedDismissed) || hasBlockedImages"
+                v-if="
+                    (!isTrustedSource && !isUntrustedDismissed) ||
+                    hasBlockedImages
+                "
                 class="mb-6 space-y-4 p-3"
             >
                 <div
@@ -317,7 +399,7 @@
                             Use caution with links and attachments.
                         </p>
                     </div>
-                    <button 
+                    <button
                         @click="dismissUntrusted"
                         class="text-amber-500/60 hover:text-amber-500 hover:bg-amber-500/10 p-1.5 rounded-lg transition-colors"
                         title="Dismiss for this email"
@@ -348,9 +430,16 @@
             </div>
 
             <!-- Loading State -->
-            <div v-if="loadingBody" class="flex flex-col items-center justify-center py-20 animate-in fade-in duration-300">
-                <div class="w-8 h-8 border-3 border-(--surface-tertiary) border-t-(--interactive-primary) rounded-full animate-spin"></div>
-                <p class="mt-3 text-sm text-(--text-muted)">Loading content...</p>
+            <div
+                v-if="loadingBody"
+                class="flex flex-col items-center justify-center py-20 animate-in fade-in duration-300"
+            >
+                <div
+                    class="w-8 h-8 border-3 border-(--surface-tertiary) border-t-(--interactive-primary) rounded-full animate-spin"
+                ></div>
+                <p class="mt-3 text-sm text-(--text-muted)">
+                    Loading content...
+                </p>
             </div>
 
             <!-- Email Content (Shadow DOM for Style Isolation) -->
@@ -412,23 +501,37 @@
     </Modal>
 
     <!-- Show Original Modal -->
-    <Modal
-        v-model:open="showOriginalModal"
-        title="Original Message"
-        size="xl"
-    >
-        <div class="bg-(--surface-secondary) p-4 rounded-xl border border-(--border-default) overflow-hidden h-[70vh] flex flex-col">
+    <Modal v-model:open="showOriginalModal" title="Original Message" size="xl">
+        <div
+            class="bg-(--surface-secondary) p-4 rounded-xl border border-(--border-default) overflow-hidden h-[70vh] flex flex-col"
+        >
             <div class="flex items-center justify-between mb-4 shrink-0">
-                <span class="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Raw Message Source (RFC822)</span>
-                <Button variant="ghost" size="sm" @click="copyToClipboard(rawSource)" :disabled="loadingSource || !rawSource">
+                <span
+                    class="text-xs font-semibold text-(--text-muted) uppercase tracking-wider"
+                    >Raw Message Source (RFC822)</span
+                >
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    @click="copyToClipboard(rawSource)"
+                    :disabled="loadingSource || !rawSource"
+                >
                     Copy to Clipboard
                 </Button>
             </div>
-            
-            <div v-if="loadingSource" class="flex-1 flex items-center justify-center">
-                 <div class="w-8 h-8 border-3 border-(--surface-tertiary) border-t-(--interactive-primary) rounded-full animate-spin"></div>
+
+            <div
+                v-if="loadingSource"
+                class="flex-1 flex items-center justify-center"
+            >
+                <div
+                    class="w-8 h-8 border-3 border-(--surface-tertiary) border-t-(--interactive-primary) rounded-full animate-spin"
+                ></div>
             </div>
-            <pre v-else class="flex-1 overflow-auto text-[11px] font-mono text-(--text-secondary) leading-relaxed select-all whitespace-pre-wrap break-all"><code>{{ rawSource }}</code></pre>
+            <pre
+                v-else
+                class="flex-1 overflow-auto text-[11px] font-mono text-(--text-secondary) leading-relaxed select-all whitespace-pre-wrap break-all"
+            ><code>{{ rawSource }}</code></pre>
         </div>
     </Modal>
 </template>
@@ -513,16 +616,21 @@ const shadowRoot = ref<ShadowRoot | null>(null);
 const authInfo = computed(() => {
     const headers = props.email.headers || {};
     // authentication-results header is the standard way to check SPF/DKIM/DMARC
-    const authResults = headers['authentication-results'] || headers['Authentication-Results'] || '';
-    
+    const authResults =
+        headers["authentication-results"] ||
+        headers["Authentication-Results"] ||
+        "";
+
     // Extract SPF
     const spfMatch = authResults.match(/spf=([a-z]+)/i) || [];
-    const spfDetailsMatch = authResults.match(/spf=[a-z]+\s+\(([^)]+)\)/i) || [];
-    
+    const spfDetailsMatch =
+        authResults.match(/spf=[a-z]+\s+\(([^)]+)\)/i) || [];
+
     // Extract DKIM
     const dkimMatch = authResults.match(/dkim=([a-z]+)/i) || [];
-    const dkimDetailsMatch = authResults.match(/dkim=[a-z]+\s+header\.d=([^\s;]+)/i) || [];
-    
+    const dkimDetailsMatch =
+        authResults.match(/dkim=[a-z]+\s+header\.d=([^\s;]+)/i) || [];
+
     // Extract DMARC
     const dmarcMatch = authResults.match(/dmarc=([a-z]+)/i) || [];
 
@@ -531,7 +639,7 @@ const authInfo = computed(() => {
         spfDetails: spfDetailsMatch[1],
         dkim: dkimMatch[1]?.toLowerCase(),
         dkimDetails: dkimDetailsMatch[1],
-        dmarc: dmarcMatch[1]?.toLowerCase()
+        dmarc: dmarcMatch[1]?.toLowerCase(),
     };
 });
 
@@ -540,19 +648,26 @@ const loadingSource = ref(false);
 
 async function openShowOriginal() {
     showOriginalModal.value = true;
-    
+
     // If we already have it (maybe cache locally too? nah, allow refetch for now or rely on browser/redis)
-    if (rawSource.value && rawSource.value !== "Failed to load original message source.") return;
+    if (
+        rawSource.value &&
+        rawSource.value !== "Failed to load original message source."
+    )
+        return;
 
     loadingSource.value = true;
-    rawSource.value = ""; 
+    rawSource.value = "";
 
     try {
         const response = await fetch(`/api/emails/${props.email.id}/source`, {
-             headers: {
-                 "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "",
-                 Accept: "application/json",
-             },
+            headers: {
+                "X-CSRF-TOKEN":
+                    document
+                        .querySelector('meta[name="csrf-token"]')
+                        ?.getAttribute("content") || "",
+                Accept: "application/json",
+            },
         });
         if (!response.ok) throw new Error("Failed to fetch source");
         const data = await response.json();
@@ -626,12 +741,12 @@ async function checkAndFetchBody() {
     if (!props.email.body_html && !props.email.body_plain) {
         loadingBody.value = true;
         try {
-             const data = await store.fetchEmailBody(props.email.id);
-             if (data && (data.body_html || data.body_plain)) {
-                 // Update local object to trigger reactivity in this component
-                 props.email.body_html = data.body_html;
-                 props.email.body_plain = data.body_plain;
-             }
+            const data = await store.fetchEmailBody(props.email.id);
+            if (data && (data.body_html || data.body_plain)) {
+                // Update local object to trigger reactivity in this component
+                props.email.body_html = data.body_html;
+                props.email.body_plain = data.body_plain;
+            }
         } catch (e) {
             console.error("Failed to fetch email body", e);
         } finally {
@@ -643,7 +758,8 @@ async function checkAndFetchBody() {
 }
 
 // --- Syncing Placeholder ---
-const SYNCING_PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100"%3E%3Crect fill="%23f1f5f9" width="200" height="100"/%3E%3Ctext x="50%25" y="45%25" dominant-baseline="middle" text-anchor="middle" fill="%2394a3b8" font-family="sans-serif" font-size="12" font-weight="500"%3ESyncing image...%3C/text%3E%3Ctext x="50%25" y="65%25" dominant-baseline="middle" text-anchor="middle" fill="%23cbd5e1" font-family="sans-serif" font-size="10"%3EIt will appear shortly.%3C/text%3E%3C/svg%3E';
+const SYNCING_PLACEHOLDER =
+    'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100"%3E%3Crect fill="%23f1f5f9" width="200" height="100"/%3E%3Ctext x="50%25" y="45%25" dominant-baseline="middle" text-anchor="middle" fill="%2394a3b8" font-family="sans-serif" font-size="12" font-weight="500"%3ESyncing image...%3C/text%3E%3Ctext x="50%25" y="65%25" dominant-baseline="middle" text-anchor="middle" fill="%23cbd5e1" font-family="sans-serif" font-size="10"%3EIt will appear shortly.%3C/text%3E%3C/svg%3E';
 
 // Reset image state when email changes
 watch(
@@ -654,7 +770,7 @@ watch(
         selectedAttachments.value.clear();
         checkAndFetchBody();
     },
-    { immediate: true }
+    { immediate: true },
 );
 
 const visibleAttachments = computed(() => {
@@ -689,16 +805,28 @@ const sanitizedBody = computed(() => {
             if (att.content_id && att.url) {
                 const cleanCid = att.content_id.replace(/[<>]/g, "");
                 // Escape for Regex
-                const escapedCid = cleanCid.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-                const escapedFullCid = att.content_id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-                
+                const escapedCid = cleanCid.replace(
+                    /[.*+?^${}()|[\]\\]/g,
+                    "\\$&",
+                );
+                const escapedFullCid = att.content_id.replace(
+                    /[.*+?^${}()|[\]\\]/g,
+                    "\\$&",
+                );
+
                 // Matches src="cid:...", src='cid:...', src=\"cid:...\", or src=cid:...
                 // Handles optional brackets and various quote types
-                const pattern = new RegExp(`src\\s*=\\s*[\\\\"'\\s]*cid\\s*:\\s*(?:&lt;|<)?(${escapedCid}|${escapedFullCid}|${encodeURIComponent(cleanCid)})(?:&gt;|>)?([\\\\"'\\s]*)`, "gi");
+                const pattern = new RegExp(
+                    `src\\s*=\\s*[\\\\"'\\s]*cid\\s*:\\s*(?:&lt;|<)?(${escapedCid}|${escapedFullCid}|${encodeURIComponent(cleanCid)})(?:&gt;|>)?([\\\\"'\\s]*)`,
+                    "gi",
+                );
                 html = html.replace(pattern, `src="${att.url}"$2`);
-                
+
                 // Also handle background-image: url('cid:...')
-                const bgPattern = new RegExp(`url\\s*\\(\\s*[\\\\"'\\s]*cid\\s*:\\s*(?:&lt;|<)?(${escapedCid}|${escapedFullCid}|${encodeURIComponent(cleanCid)})(?:&gt;|>)?([\\\\"'\\s]*)\\)`, "gi");
+                const bgPattern = new RegExp(
+                    `url\\s*\\(\\s*[\\\\"'\\s]*cid\\s*:\\s*(?:&lt;|<)?(${escapedCid}|${escapedFullCid}|${encodeURIComponent(cleanCid)})(?:&gt;|>)?([\\\\"'\\s]*)\\)`,
+                    "gi",
+                );
                 html = html.replace(bgPattern, `url("${att.url}")`);
             }
         });
@@ -706,9 +834,12 @@ const sanitizedBody = computed(() => {
 
     // Step 1.5: Protect against remaining 'cid:' schemes to avoid ERR_UNKNOWN_URL_SCHEME
     // This catches any CIDs that didn't match an attachment
-    html = html.replace(/src\s*=\s*[\\"' ]*cid:[^\\"' >]+[\\"' ]*/gi, (match) => {
-        return `src="${SYNCING_PLACEHOLDER}" data-unresolved-cid="true" `;
-    });
+    html = html.replace(
+        /src\s*=\s*[\\"' ]*cid:[^\\"' >]+[\\"' ]*/gi,
+        (match) => {
+            return `src="${SYNCING_PLACEHOLDER}" data-unresolved-cid="true" `;
+        },
+    );
 
     // Step 2: Sanitize with DOMPurify
     const clean = sanitizeHtml(
@@ -763,11 +894,16 @@ const sanitizedBody = computed(() => {
                     // Handling Internal CID Images not yet ready
                     if (src.includes("/api/media/")) {
                         const mediaId = src.split("/").pop();
-                        const attachment = props.email.attachments?.find((a: any) => String(a.id) === String(mediaId));
-                        
+                        const attachment = props.email.attachments?.find(
+                            (a: any) => String(a.id) === String(mediaId),
+                        );
+
                         if (attachment && attachment.is_ready === false) {
                             currentNode.setAttribute("data-original-src", src);
-                            currentNode.setAttribute("src", SYNCING_PLACEHOLDER);
+                            currentNode.setAttribute(
+                                "src",
+                                SYNCING_PLACEHOLDER,
+                            );
                             currentNode.setAttribute("data-is-syncing", "true");
                         }
                     }
@@ -831,13 +967,13 @@ const isUntrustedDismissed = ref(false);
 function checkDismissedState() {
     if (!props.email?.id) return;
     const key = `untrusted_dismissed_${props.email.id}`;
-    isUntrustedDismissed.value = localStorage.getItem(key) === 'true';
+    isUntrustedDismissed.value = localStorage.getItem(key) === "true";
 }
 
 function dismissUntrusted() {
     if (!props.email?.id) return;
     const key = `untrusted_dismissed_${props.email.id}`;
-    localStorage.setItem(key, 'true');
+    localStorage.setItem(key, "true");
     isUntrustedDismissed.value = true;
 }
 
@@ -922,20 +1058,26 @@ watch(
                 shadowRoot.value?.addEventListener("click", handleImageClick);
 
                 // Add error listener for Images (Retry Loop)
-                shadowRoot.value?.querySelectorAll("img").forEach(async (img) => {
-                    const src = img.getAttribute("src");
-                    if (src && (src.includes("/api/media/") || img.hasAttribute("data-is-syncing"))) {
-                        // Apply caching if not a data URI
-                        if (src.startsWith('http') || src.startsWith('/')) {
-                            const cachedUrl = await getCachedImage(src);
-                            if (cachedUrl !== src) {
-                                img.src = cachedUrl;
+                shadowRoot.value
+                    ?.querySelectorAll("img")
+                    .forEach(async (img) => {
+                        const src = img.getAttribute("src");
+                        if (
+                            src &&
+                            (src.includes("/api/media/") ||
+                                img.hasAttribute("data-is-syncing"))
+                        ) {
+                            // Apply caching if not a data URI
+                            if (src.startsWith("http") || src.startsWith("/")) {
+                                const cachedUrl = await getCachedImage(src);
+                                if (cachedUrl !== src) {
+                                    img.src = cachedUrl;
+                                }
                             }
+
+                            setupImageSyncRetry(img);
                         }
-                        
-                        setupImageSyncRetry(img);
-                    }
-                });
+                    });
             });
         }
     },
@@ -950,7 +1092,10 @@ function setupImageSyncRetry(img: HTMLImageElement) {
 
     const attemptReload = () => {
         if (retries >= maxRetries) {
-            console.warn(`[EmailPreview] Image retry failed after ${maxRetries} attempts:`, originalSrc);
+            console.warn(
+                `[EmailPreview] Image retry failed after ${maxRetries} attempts:`,
+                originalSrc,
+            );
             return;
         }
 
@@ -966,12 +1111,19 @@ function setupImageSyncRetry(img: HTMLImageElement) {
             retries++;
             setTimeout(attemptReload, interval);
         };
-        
+
         // Append unique param to bypass cache
-        testImg.src = originalSrc + (originalSrc.includes('?') ? '&' : '?') + 'retry=' + retries;
+        testImg.src =
+            originalSrc +
+            (originalSrc.includes("?") ? "&" : "?") +
+            "retry=" +
+            retries;
     };
 
-    if (img.src === SYNCING_PLACEHOLDER || img.getAttribute("data-is-syncing") === "true") {
+    if (
+        img.src === SYNCING_PLACEHOLDER ||
+        img.getAttribute("data-is-syncing") === "true"
+    ) {
         setTimeout(attemptReload, interval);
     } else {
         img.onerror = () => {

@@ -86,6 +86,17 @@ export class EmailService extends BaseService {
   }
 
   /**
+   * Toggle important status
+   */
+  async toggleImportant(id: string): Promise<void> {
+    try {
+        await this.api.patch(`/api/emails/${id}`, { is_important: true });
+    } catch (error) {
+        this.handleError(error);
+    }
+  }
+
+  /**
    * Move email to folder
    */
   async move(id: string, folder: string): Promise<void> {

@@ -49,6 +49,7 @@ class SendEmailRequest extends FormRequest
             'is_draft' => ['boolean'],
             'draft_id' => ['nullable', 'exists:emails,id'],
             'request_read_receipt' => ['nullable', 'boolean'],
+            'is_important' => ['nullable', 'boolean'],
         ];
     }
 

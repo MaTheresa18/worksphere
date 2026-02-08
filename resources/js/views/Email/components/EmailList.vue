@@ -2,20 +2,99 @@
     <div
         class="flex flex-col h-full bg-(--surface-primary)"
     >
-        <!-- Single Toolbar Row -->
-        <div
-            class="flex items-center gap-3 p-2 border-b border-(--border-default) bg-(--surface-primary)"
-        >
-            <!-- Left: Checkbox & Sidebar Toggle -->
-            <div class="flex items-center gap-2 shrink-0">
+        <!-- Context Menu (Replaced by Reka UI) -->
+
+        <!-- Multi-Row Toolbar Layout -->
+        <div class="flex flex-col border-b border-(--border-default) bg-(--surface-primary)">
+            
+            <!-- Row 1: Global Search & Sidebar Toggle -->
+            <div class="flex items-center gap-2 p-2 px-3 border-b border-(--border-subtle)">
                 <button
                     @click="$emit('toggle-sidebar')"
-                    class="md:hidden p-1.5 text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) rounded-lg transition-colors"
+                    class="md:hidden p-1.5 -ml-1.5 text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) rounded-lg transition-colors shrink-0"
                 >
                     <MenuIcon class="w-5 h-5" />
                 </button>
 
-                <div class="flex items-center justify-center p-1.5 hover:bg-(--surface-tertiary) rounded-lg transition-colors">
+                <div class="flex-1 relative group">
+                    <SearchIcon
+                        class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted) group-focus-within:text-(--interactive-primary) transition-colors"
+                    />
+                    <input
+                        type="text"
+                        v-model="searchQuery"
+                        placeholder="Search..."
+                        class="w-full pl-9 pr-3 py-1.5 text-sm border border-(--border-default) rounded-xl bg-(--surface-secondary) focus:outline-none focus:ring-2 focus:ring-(--interactive-primary)/30 focus:border-(--interactive-primary) text-(--text-primary) placeholder-(--text-muted) transition-all"
+                    />
+                </div>
+            </div>
+
+            <!-- Row 2: Sort & Filter (Dedicated Section) -->
+            <div class="flex items-center justify-between px-3 py-2 border-b border-(--border-subtle) bg-(--surface-primary)/50">
+                <span class="text-xs font-medium text-(--text-muted)">Sort & Filter</span>
+                <div class="flex items-center gap-2">
+                     <!-- Sort Controls -->
+                    <div
+                        class="flex items-center rounded-lg border border-(--border-default) bg-(--surface-primary) shadow-sm overflow-hidden h-7"
+                    >
+                        <button
+                            @click="store.toggleSort(sortField)"
+                            class="flex items-center justify-center w-7 h-full text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) border-r border-(--border-default) transition-all active:scale-95"
+                            :title="
+                                sortOrder === 'asc'
+                                    ? 'Switch to Descending'
+                                    : 'Switch to Ascending'
+                            "
+                        >
+                            <component
+                                :is="
+                                    sortOrder === 'asc'
+                                        ? ArrowUpIcon
+                                        : ArrowDownIcon
+                                "
+                                class="w-3.5 h-3.5 text-(--interactive-primary)"
+                            />
+                        </button>
+
+                        <Dropdown :items="sortItems" align="end">
+                            <template #trigger>
+                                <button
+                                    class="flex items-center gap-1.5 px-2.5 h-full text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-all"
+                                    title="Change sort field"
+                                >
+                                    <span class="inline">{{ sortFieldLabel }}</span>
+                                    <ChevronDownIcon class="w-3.5 h-3.5 text-(--text-muted)" />
+                                </button>
+                            </template>
+                        </Dropdown>
+                    </div>
+
+                    <!-- Filter Button -->
+                    <button
+                        @click="showFilters = !showFilters"
+                        class="flex items-center justify-center h-7 w-7 text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) rounded-lg border border-(--border-default) bg-(--surface-primary) transition-all shadow-sm active:scale-95 relative"
+                        :class="{
+                            'border-(--interactive-primary) text-(--interactive-primary) bg-(--interactive-primary)/5':
+                                hasActiveFilters,
+                        }"
+                        title="Toggle filters"
+                    >
+                        <FilterIcon class="w-3.5 h-3.5" />
+                        <span
+                            v-if="hasActiveFilters"
+                            class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-(--interactive-primary) border-2 border-(--surface-primary)"
+                        ></span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Row 3: List Header & Bulk Actions -->
+            <div class="flex items-center gap-2 px-3 py-2 h-10 bg-(--surface-secondary)/30">
+                 <!-- Select All Checkbox -->
+                <div
+                    class="flex items-center justify-center p-1 hover:bg-(--surface-tertiary) rounded transition-colors shrink-0"
+                    @click.stop
+                >
                     <input
                         type="checkbox"
                         :checked="
@@ -30,103 +109,50 @@
                         class="h-4 w-4 text-(--interactive-primary) focus:ring-(--interactive-primary) border-(--border-default) rounded cursor-pointer"
                     />
                 </div>
-            </div>
 
-            <!-- Vertical Separator -->
-            <div class="h-6 w-px bg-(--border-default) mx-1"></div>
-
-            <!-- Actions (Conditional) or Search -->
-            <div class="flex-1 flex items-center gap-2 min-w-0">
-                <div v-if="selectedEmailIds.size > 0" class="flex items-center gap-1 animate-in fade-in slide-in-from-left-2 duration-200">
-                    <button
-                        @click="deleteSelected"
-                        class="p-2 text-(--text-secondary) hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
-                        title="Delete"
+                <!-- Bulk Actions Overlay or Spacer -->
+                <div v-if="selectedEmailIds.size > 0" class="flex items-center gap-3 flex-1 animate-in fade-in slide-in-from-left-2 duration-200 min-w-0">
+                    <div class="h-4 w-px bg-(--border-default) shrink-0"></div>
+                    
+                    <span
+                        class="text-xs font-bold text-(--interactive-primary) whitespace-nowrap"
                     >
-                        <TrashIcon class="w-4.5 h-4.5" />
-                    </button>
-                    <button
-                        @click="markSelectedRead(true)"
-                        class="p-2 text-(--text-secondary) hover:text-(--interactive-primary) hover:bg-(--interactive-primary)/10 rounded-lg transition-all"
-                        title="Mark Read"
-                    >
-                        <MailOpenIcon class="w-4.5 h-4.5" />
-                    </button>
-                    <button
-                        @click="markSelectedRead(false)"
-                        class="p-2 text-(--text-secondary) hover:text-(--interactive-primary) hover:bg-(--interactive-primary)/10 rounded-lg transition-all"
-                        title="Mark Unread"
-                    >
-                        <MailIcon class="w-4.5 h-4.5" />
-                    </button>
-
-                    <MoveToFolderDropdown
-                        :emailIds="Array.from(selectedEmailIds)"
-                        align="start"
-                    />
-
-                    <span class="text-xs font-semibold text-(--interactive-primary) ml-2">
                         {{ selectedEmailIds.size }} selected
                     </span>
-                </div>
 
-                <!-- Search Input -->
-                <div v-else class="flex-1 relative group">
-                    <SearchIcon
-                        class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted) group-focus-within:text-(--interactive-primary) transition-colors"
-                    />
-                    <input
-                        type="text"
-                        v-model="searchQuery"
-                        placeholder="Search emails..."
-                        class="w-full pl-9 pr-3 py-1.5 text-sm border border-(--border-default) rounded-xl bg-(--surface-secondary) focus:outline-none focus:ring-2 focus:ring-(--interactive-primary)/30 focus:border-(--interactive-primary) text-(--text-primary) placeholder-(--text-muted) transition-all"
-                    />
-                </div>
-            </div>
+                    <div class="flex items-center gap-1 ml-auto">
+                        <button
+                            @click="deleteSelected"
+                            class="p-1.5 text-(--text-secondary) hover:text-red-500 hover:bg-red-500/10 rounded-md transition-all"
+                            title="Delete"
+                        >
+                            <TrashIcon class="w-4 h-4" />
+                        </button>
+                        <button
+                            @click="markSelectedRead(true)"
+                            class="p-1.5 text-(--text-secondary) hover:text-(--interactive-primary) hover:bg-(--interactive-primary)/10 rounded-md transition-all"
+                            title="Mark Read"
+                        >
+                            <MailOpenIcon class="w-4 h-4" />
+                        </button>
+                        <button
+                            @click="markSelectedRead(false)"
+                            class="p-1.5 text-(--text-secondary) hover:text-(--interactive-primary) hover:bg-(--interactive-primary)/10 rounded-md transition-all"
+                            title="Mark Unread"
+                        >
+                            <MailIcon class="w-4 h-4" />
+                        </button>
 
-            <!-- Right: Sort & Filter -->
-            <div class="flex items-center gap-1.5 shrink-0 ml-auto">
-                <!-- Sort Controls (Split) -->
-                <div class="flex items-center rounded-lg border border-(--border-default) bg-(--surface-primary) shadow-sm overflow-hidden h-8">
-                    <!-- Direction Toggle -->
-                    <button
-                        @click="store.toggleSort(sortField)"
-                        class="flex items-center justify-center w-8 h-full text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) border-r border-(--border-default) transition-all active:scale-95"
-                        :title="sortOrder === 'asc' ? 'Switch to Descending' : 'Switch to Ascending'"
-                    >
-                        <component
-                            :is="sortOrder === 'asc' ? ArrowUpIcon : ArrowDownIcon"
-                            class="w-3.5 h-3.5 text-(--interactive-primary)"
+                        <MoveToFolderDropdown
+                            :emailIds="Array.from(selectedEmailIds)"
+                            align="end"
                         />
-                    </button>
-
-                    <!-- Field Selector -->
-                    <Dropdown :items="sortItems" align="end">
-                        <template #trigger>
-                            <button
-                                class="flex items-center gap-1.5 px-2.5 h-full text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-all"
-                                title="Change sort field"
-                            >
-                                <span class="hidden sm:inline">{{ sortFieldLabel }}</span>
-                                <ChevronDownIcon class="w-3.5 h-3.5 text-(--text-muted)" />
-                            </button>
-                        </template>
-                    </Dropdown>
+                    </div>
                 </div>
-
-                <!-- Filter Button -->
-                <button
-                    @click="showFilters = !showFilters"
-                    class="flex items-center justify-center p-2 text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) rounded-lg border border-(--border-default) bg-(--surface-primary) transition-all shadow-sm active:scale-95"
-                    :class="{ 'border-(--interactive-primary) text-(--interactive-primary) bg-(--interactive-primary)/5': hasActiveFilters }"
-                    title="Toggle filters"
-                >
-                    <FilterIcon class="w-4 h-4" />
-                    <span
-                        v-if="hasActiveFilters"
-                        class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-(--interactive-primary) border-2 border-(--surface-primary)"
-                    ></span>
-                </button>
+                
+                <div v-else class="text-xs text-(--text-muted) ml-2">
+                    Select messages to see actions
+                </div>
             </div>
         </div>
 
@@ -137,8 +163,7 @@
                 class="px-3 py-2 border-b border-(--border-default) bg-(--surface-secondary) space-y-2"
             >
                 <div class="flex items-center gap-2">
-                    <label
-                        class="text-xs text-(--text-muted) w-10 shrink-0"
+                    <label class="text-xs text-(--text-muted) w-10 shrink-0"
                         >From</label
                     >
                     <input
@@ -148,8 +173,7 @@
                     />
                 </div>
                 <div class="flex items-center gap-2">
-                    <label
-                        class="text-xs text-(--text-muted) w-10 shrink-0"
+                    <label class="text-xs text-(--text-muted) w-10 shrink-0"
                         >To</label
                     >
                     <input
@@ -198,7 +222,9 @@
             <LoaderIcon class="w-4 h-4 animate-spin shrink-0" />
             <div class="flex-1 min-w-0">
                 <p class="font-semibold">Syncing Mailbox</p>
-                <p class="truncate opacity-80">Fetching your emails from the provider...</p>
+                <p class="truncate opacity-80">
+                    Fetching your emails from the provider...
+                </p>
             </div>
         </div>
 
@@ -219,10 +245,7 @@
         </div>
 
         <!-- Email List -->
-        <div
-            v-else
-            class="flex-1 relative min-h-0 flex flex-col"
-        >
+        <div v-else class="flex-1 relative min-h-0 flex flex-col">
             <!-- New Email Toast (Floating above list) -->
             <Transition
                 enter-active-class="animate-in fade-in slide-in-from-top-4 duration-300"
@@ -248,7 +271,9 @@
                     class="absolute bottom-10 right-8 z-30 bg-(--surface-primary)/80 backdrop-blur-sm text-(--interactive-primary) p-2 rounded-full shadow-lg border border-(--border-default) hover:bg-(--surface-secondary) transition-all active:scale-90 group"
                     title="Jump to latest"
                 >
-                    <ArrowUpIcon class="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
+                    <ArrowUpIcon
+                        class="w-4 h-4 group-hover:-translate-y-0.5 transition-transform"
+                    />
                 </button>
             </Transition>
 
@@ -257,212 +282,362 @@
                 class="flex-1 overflow-y-auto min-h-0 scroll-smooth"
                 @scroll="handleScroll"
             >
-            <!-- Loading Skeleton -->
-            <div v-if="loading" class="p-4 space-y-4">
-                <div v-for="i in 6" :key="i" class="flex gap-3 animate-pulse">
+                <!-- Loading Skeleton -->
+                <div v-if="loading" class="p-4 space-y-4">
                     <div
-                        class="w-5 h-5 bg-(--surface-tertiary) rounded shrink-0"
-                    ></div>
-                    <div class="flex-1 space-y-2">
-                        <div
-                            class="h-4 bg-(--surface-tertiary) rounded w-3/4"
-                        ></div>
-                        <div
-                            class="h-3 bg-(--surface-tertiary) rounded w-1/2"
-                        ></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Empty State for Syncing -->
-            <div
-                v-else-if="
-                    sortedEmails.length === 0 &&
-                    (accountStatus?.status === 'syncing' ||
-                        accountStatus?.status === 'seeding')
-                "
-                class="flex flex-col items-center justify-center h-full p-8 text-center"
-            >
-                <div class="relative mb-4">
-                    <div
-                        class="absolute inset-0 bg-(--interactive-primary)/10 rounded-full animate-ping"
-                    ></div>
-                    <div
-                        class="relative bg-(--interactive-primary)/20 p-4 rounded-full"
+                        v-for="i in 6"
+                        :key="i"
+                        class="flex gap-3 animate-pulse"
                     >
-                        <LoaderIcon
-                            class="w-10 h-10 text-(--interactive-primary) animate-spin"
-                        />
+                        <div
+                            class="w-5 h-5 bg-(--surface-tertiary) rounded shrink-0"
+                        ></div>
+                        <div class="flex-1 space-y-2">
+                            <div
+                                class="h-4 bg-(--surface-tertiary) rounded w-3/4"
+                            ></div>
+                            <div
+                                class="h-3 bg-(--surface-tertiary) rounded w-1/2"
+                            ></div>
+                        </div>
                     </div>
                 </div>
-                <h3 class="text-lg font-bold text-(--text-primary) mb-2">
-                    Syncing Mailbox
-                </h3>
-                <p class="text-sm text-(--text-secondary) max-w-[200px]">
-                    We're fetching your emails for the first time. This may take
-                    a few moments...
-                </p>
-            </div>
 
-            <div
-                v-else-if="sortedEmails.length === 0"
-                class="flex flex-col items-center justify-center h-full p-8 text-center"
-            >
-                <MailIcon class="w-12 h-12 text-(--text-muted) mb-4" />
-                <h3 class="text-lg font-bold text-(--text-primary) mb-1">
-                    No emails found
-                </h3>
-                <p class="text-sm text-(--text-secondary)">
-                    This folder is empty.
-                </p>
-            </div>
-
-            <ul v-else class="divide-y divide-(--border-subtle)">
-                <li
-                    v-for="email in sortedEmails"
-                    :key="email.id"
-                    @click="handleSelect(email)"
-                    class="email-item relative flex items-start gap-3 px-3 py-2.5 cursor-pointer group transition-all duration-75 border-l-2 border-transparent"
-                    :class="[
-                        selectedEmailId === email.id
-                            ? 'bg-(--interactive-primary)/10 border-l-(--interactive-primary)'
-                            : 'hover:bg-(--surface-secondary) border-l-transparent',
-                        !email.is_read
-                            ? 'bg-(--surface-primary)'
-                            : 'bg-(--surface-primary) opacity-90',
-                        selectedEmailIds.has(email.id) ? 'bg-(--interactive-primary)/15' : ''
-                    ]"
+                <!-- Empty State for Syncing -->
+                <div
+                    v-else-if="
+                        sortedEmails.length === 0 &&
+                        (accountStatus?.status === 'syncing' ||
+                            accountStatus?.status === 'seeding')
+                    "
+                    class="flex flex-col items-center justify-center h-full p-8 text-center"
                 >
-                    <!-- Drag handle (Gmail style dot grid) -->
-                    <div class="absolute left-0.5 top-5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div class="grid grid-cols-2 gap-0.5 p-0.5 text-(--text-muted)">
-                            <div v-for="i in 6" :key="i" class="w-0.5 h-0.5 bg-current rounded-full"></div>
-                        </div>
-                    </div>
-
-                    <!-- Column 1: Star & Checkbox -->
-                    <div class="flex flex-col items-center gap-1.5 shrink-0 ml-1 mt-0.5">
+                    <div class="relative mb-4">
                         <div
-                            @click.stop
-                            class="h-5 flex items-center justify-center"
+                            class="absolute inset-0 bg-(--interactive-primary)/10 rounded-full animate-ping"
+                        ></div>
+                        <div
+                            class="relative bg-(--interactive-primary)/20 p-4 rounded-full"
                         >
-                            <input
-                                type="checkbox"
-                                :checked="selectedEmailIds.has(email.id)"
-                                @change="toggleSelection(email.id)"
-                                class="h-3.5 w-3.5 text-(--interactive-primary) focus:ring-(--interactive-primary) border-(--border-default) rounded transition-all cursor-pointer shadow-sm"
+                            <LoaderIcon
+                                class="w-10 h-10 text-(--interactive-primary) animate-spin"
                             />
                         </div>
-                        <div
-                            @click.stop="store.toggleStar(email.id)"
-                            class="p-1 rounded-md hover:bg-(--surface-tertiary) transition-colors cursor-pointer"
-                        >
-                            <StarIcon
+                    </div>
+                    <h3 class="text-lg font-bold text-(--text-primary) mb-2">
+                        Syncing Mailbox
+                    </h3>
+                    <p class="text-sm text-(--text-secondary) max-w-[200px]">
+                        We're fetching your emails for the first time. This may
+                        take a few moments...
+                    </p>
+                </div>
+
+                <div
+                    v-else-if="sortedEmails.length === 0"
+                    class="flex flex-col items-center justify-center h-full p-8 text-center"
+                >
+                    <MailIcon class="w-12 h-12 text-(--text-muted) mb-4" />
+                    <h3 class="text-lg font-bold text-(--text-primary) mb-1">
+                        No emails found
+                    </h3>
+                    <p class="text-sm text-(--text-secondary)">
+                        This folder is empty.
+                    </p>
+                </div>
+
+                <ul v-else class="divide-y divide-(--border-subtle)">
+                    <li
+                        v-for="email in sortedEmails"
+                        :key="email.id"
+                        class="block p-0 m-0"
+                    >
+                        <ContextMenuRoot>
+                            <ContextMenuTrigger
+                                class="email-item relative flex items-start gap-3 px-3 py-2.5 cursor-pointer group transition-all duration-75 border-l-4 outline-none select-none"
                                 :class="[
-                                    email.is_starred
-                                        ? 'text-yellow-400 fill-current'
-                                        : 'text-(--text-muted) hover:text-yellow-400',
-                                    'w-3.5 h-3.5',
+                                    selectedEmailId === email.id
+                                        ? 'bg-(--interactive-primary)/10 border-l-(--interactive-primary)'
+                                        : selectedEmailIds.has(email.id)
+                                            ? 'bg-(--interactive-primary)/15 border-l-transparent'
+                                            : !email.is_read
+                                                ? 'bg-blue-50 dark:bg-blue-900/10 border-l-blue-500'
+                                                : 'bg-(--surface-primary) border-l-transparent hover:bg-(--surface-secondary) opacity-90',
                                 ]"
-                            />
-                        </div>
-                    </div>
+                                @click="handleSelect(email)"
+                            >
 
-                    <!-- Main Content (3 Lines) -->
-                    <div class="min-w-0 flex-1 flex flex-col gap-0.5">
-                        <!-- Line 1: Sender & Date -->
-                        <div class="flex justify-between items-center h-5">
-                            <div class="flex items-center gap-2 min-w-0">
-                                <span
-                                    class="text-[13px] text-(--text-primary) truncate"
-                                    :class="!email.is_read ? 'font-bold' : 'font-medium'"
+
+
+                                <!-- Drag handle (Gmail style dot grid) -->
+                                <div
+                                    class="absolute left-0.5 top-5 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
                                 >
-                                    {{ email.from_name || email.from_email || "Unknown" }}
-                                </span>
-                                <span
-                                    v-if="email.thread_count > 1"
-                                    class="text-[10px] text-(--text-muted) font-bold bg-(--surface-tertiary) px-1 rounded border border-(--border-default)"
+                                    <div
+                                        class="grid grid-cols-2 gap-0.5 p-0.5 text-(--text-muted)"
+                                    >
+                                        <div
+                                            v-for="i in 6"
+                                            :key="i"
+                                            class="w-0.5 h-0.5 bg-current rounded-full"
+                                        ></div>
+                                    </div>
+                                </div>
+
+                                <!-- Column 1: Checkbox, Star, Important (Aligned) -->
+                                <div
+                                    class="flex flex-col items-center gap-1 shrink-0 ml-1 pt-0.5"
                                 >
-                                    {{ email.thread_count }}
-                                </span>
-                            </div>
-                            
-                            <div class="flex items-center gap-2 shrink-0">
-                                <!-- Attachment Icon (next to date) -->
-                                <PaperclipIcon
-                                    v-if="email.has_attachments"
-                                    class="w-3.5 h-3.5 text-(--text-muted)"
-                                />
-                                <span 
-                                    class="text-[11px] font-medium tabular-nums group-hover:hidden"
-                                    :class="!email.is_read ? 'text-(--interactive-primary)' : 'text-(--text-muted)'"
-                                >
-                                    {{ formatDate(email.date) }}
-                                </span>
-                                <!-- Hover Actions -->
-                                <div class="hidden group-hover:flex items-center gap-1">
-                                     <button @click.stop="store.deleteEmails([email.id])" class="p-1 hover:bg-(--surface-tertiary) rounded-md transition-colors" title="Delete">
-                                         <TrashIcon class="w-4 h-4 text-(--text-secondary)" />
-                                     </button>
-                                     <button @click.stop="store.markEmailsAsRead([email.id], email.is_read)" class="p-1 hover:bg-(--surface-tertiary) rounded-md transition-colors" :title="email.is_read ? 'Mark Unread' : 'Mark Read'">
-                                         <component :is="email.is_read ? MailIcon : MailOpenIcon" class="w-4 h-4 text-(--text-secondary)" />
-                                     </button>
+                                    <div
+                                        @click.stop
+                                        class="flex items-center justify-center h-5 w-5"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            :checked="selectedEmailIds.has(email.id)"
+                                            @change="toggleSelection(email.id)"
+                                            class="h-4 w-4 text-(--interactive-primary) focus:ring-(--interactive-primary) border-(--border-default) rounded transition-all cursor-pointer"
+                                        />
+                                    </div>
+                                    
+                                    <!-- Actions (Only show on hover or if active) -->
+                                    <div class="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        :class="{ 'opacity-100': email.is_starred || email.is_important }"
+                                    >
+                                        <div
+                                            @click.stop="store.toggleStar(email.id)"
+                                            class="p-0.5 rounded-md hover:bg-(--surface-tertiary) transition-colors cursor-pointer text-(--text-muted) hover:text-yellow-400"
+                                            :class="{ 'text-yellow-400 fill-current': email.is_starred }"
+                                        >
+                                            <StarIcon
+                                                class="w-4 h-4"
+                                                :class="{ 'fill-current': email.is_starred }"
+                                            />
+                                        </div>
+                                        <div
+                                            @click.stop="store.toggleImportant(email.id)"
+                                            class="p-0.5 rounded-md hover:bg-(--surface-tertiary) transition-colors cursor-pointer text-(--text-muted) hover:text-red-500"
+                                            :class="{ 'text-red-500 fill-current': email.is_important }"
+                                        >
+                                            <FlagIcon
+                                                class="w-4 h-4"
+                                                :class="{ 'fill-current': email.is_important }"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                        <!-- Main Content (3 Lines) -->
+                        <div class="min-w-0 flex-1 flex flex-col gap-0.5">
+                            <!-- Line 1: Sender & Date -->
+                            <div class="flex justify-between items-center h-5">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span
+                                        class="text-[13px] text-(--text-primary) truncate"
+                                        :class="
+                                            !email.is_read
+                                                ? 'font-bold text-(--text-primary)'
+                                                : 'font-medium text-(--text-secondary)'
+                                        "
+                                    >
+                                        {{
+                                            email.from_name ||
+                                            email.from_email ||
+                                            "Unknown"
+                                        }}
+                                    </span>
+                                    <span
+                                        v-if="email.thread_count && email.thread_count > 1"
+                                        class="text-[10px] text-(--text-muted) font-bold bg-(--surface-tertiary) px-1 rounded border border-(--border-default)"
+                                    >
+                                        {{ email.thread_count }}
+                                    </span>
+                                </div>
+
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <!-- Attachment Icon (next to date) -->
+                                    <PaperclipIcon
+                                        v-if="email.has_attachments"
+                                        class="w-3.5 h-3.5 text-(--text-muted)"
+                                    />
+                                    <span
+                                        class="text-[11px] font-medium tabular-nums group-hover:hidden"
+                                        :class="
+                                            !email.is_read
+                                                ? 'text-(--interactive-primary)'
+                                                : 'text-(--text-muted)'
+                                        "
+                                    >
+                                        {{ formatDate(email.date) }}
+                                    </span>
+                                    <!-- Hover Actions -->
+                                    <div
+                                        class="hidden group-hover:flex items-center gap-1"
+                                    >
+                                        <button
+                                            @click.stop="
+                                                store.deleteEmails([email.id])
+                                            "
+                                            class="p-1 hover:bg-(--surface-tertiary) rounded-md transition-colors"
+                                            title="Delete"
+                                        >
+                                            <TrashIcon
+                                                class="w-4 h-4 text-(--text-secondary)"
+                                            />
+                                        </button>
+                                        <button
+                                            @click.stop="
+                                                store.markEmailsAsRead(
+                                                    [email.id],
+                                                    email.is_read,
+                                                )
+                                            "
+                                            class="p-1 hover:bg-(--surface-tertiary) rounded-md transition-colors"
+                                            :title="
+                                                email.is_read
+                                                    ? 'Mark Unread'
+                                                    : 'Mark Read'
+                                            "
+                                        >
+                                            <component
+                                                :is="
+                                                    email.is_read
+                                                        ? MailIcon
+                                                        : MailOpenIcon
+                                                "
+                                                class="w-4 h-4 text-(--text-secondary)"
+                                            />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
+
+                            <!-- Line 2: Subject -->
+                            <h4
+                                class="text-[13px] text-(--text-primary) truncate tracking-tight leading-tight"
+                                :class="
+                                    !email.is_read
+                                        ? 'font-bold'
+                                        : 'font-semibold'
+                                "
+                            >
+                                {{ email.subject || "(No Subject)" }}
+                            </h4>
+
+                            <!-- Line 3: Snippet -->
+                            <p
+                                class="text-[12px] text-(--text-secondary) truncate font-normal leading-normal"
+                            >
+                                {{ decodeHtmlEntities(email.preview) }}
+                            </p>
                         </div>
+                        </ContextMenuTrigger>
 
-                        <!-- Line 2: Subject -->
-                        <h4
-                            class="text-[13px] text-(--text-primary) truncate tracking-tight leading-tight"
-                            :class="!email.is_read ? 'font-bold' : 'font-semibold'"
+                        <ContextMenuPortal>
+                        <ContextMenuContent
+                            class="min-w-[160px] bg-(--surface-primary) border border-(--border-default) rounded-lg shadow-xl py-1 z-50 animate-in fade-in zoom-in-95 duration-100"
+                            :align-offset="5"
                         >
-                            {{ email.subject || '(No Subject)' }}
-                        </h4>
+                            <ContextMenuItem
+                                @select="handleMarkRead(email, !email.is_read)"
+                                class="w-full text-left px-4 py-2 text-sm text-(--text-primary) hover:bg-(--surface-tertiary) flex items-center gap-2 cursor-pointer outline-none select-none"
+                            >
+                                <component
+                                    :is="
+                                        email.is_read
+                                            ? MailIcon
+                                            : MailOpenIcon
+                                    "
+                                    class="w-4 h-4 text-(--text-secondary)"
+                                />
+                                {{
+                                    email.is_read
+                                        ? "Mark as Unread"
+                                        : "Mark as Read"
+                                }}
+                            </ContextMenuItem>
+                            <ContextMenuSeparator
+                                class="h-px bg-(--border-default) my-1"
+                            />
+                            <ContextMenuItem
+                                @select="handleDelete(email)"
+                                class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer outline-none select-none"
+                            >
+                                <TrashIcon class="w-4 h-4" />
+                                Delete
+                            </ContextMenuItem>
+                            <ContextMenuSeparator
+                                class="h-px bg-(--border-default) my-1"
+                            />
+                            <ContextMenuItem
+                                disabled
+                                class="w-full text-left px-4 py-2 text-sm text-(--text-muted) flex items-center gap-2 cursor-not-allowed outline-none select-none"
+                            >
+                                <FolderIcon class="w-4 h-4" />
+                                Move to... (Soon)
+                            </ContextMenuItem>
+                            <ContextMenuItem
+                                disabled
+                                class="w-full text-left px-4 py-2 text-sm text-(--text-muted) flex items-center gap-2 cursor-not-allowed outline-none select-none"
+                            >
+                                <TagIcon class="w-4 h-4" />
+                                Add Label (Soon)
+                            </ContextMenuItem>
+                            <div class="h-px bg-(--border-default) my-1"></div>
+                             <ContextMenuItem
+                                @select="$emit('compose', { replyTo: email })"
+                                class="w-full text-left px-4 py-2 text-sm text-(--text-primary) hover:bg-(--surface-tertiary) flex items-center gap-2 cursor-pointer outline-none select-none"
+                            >
+                                <ReplyIcon class="w-4 h-4" />
+                                Reply
+                            </ContextMenuItem>
+                            <ContextMenuItem
+                                @select="$emit('compose', { forward: email })"
+                                class="w-full text-left px-4 py-2 text-sm text-(--text-primary) hover:bg-(--surface-tertiary) flex items-center gap-2 cursor-pointer outline-none select-none"
+                            >
+                                <ForwardIcon class="w-4 h-4" />
+                                Forward
+                            </ContextMenuItem>
+                        </ContextMenuContent>
+                    </ContextMenuPortal>
+                </ContextMenuRoot>
+            </li>
 
-                        <!-- Line 3: Snippet -->
-                        <p
-                            class="text-[12px] text-(--text-secondary) truncate font-normal leading-normal"
-                        >
-                            {{ email.preview }}
-                        </p>
-                    </div>
-                </li>
-
-                <!-- Sentinel for Infinite Scroll -->
-                <li
-                    ref="sentinel"
-                    class="p-4 flex justify-center"
-                    v-if="!loading && sortedEmails.length > 0"
-                >
-                    <div
-                        v-if="isLoadingMore"
-                        class="w-5 h-5 border-2 border-(--text-muted) border-t-(--interactive-primary) rounded-full animate-spin"
-                    ></div>
-                    <span v-else class="h-1 w-full"></span>
-                </li>
-            </ul>
-        </div>
-
-        <!-- Sticky Bottom Stats Bar -->
-        <div
-            class="px-3 py-2 border-t border-(--border-default) bg-(--surface-secondary) text-xs text-(--text-muted) flex items-center justify-between shrink-0"
-        >
-            <span
-                >{{ filteredEmails.length }} of
-                {{ totalEmails || filteredEmails.length }}
-                emails</span
-            >
-            <div class="flex items-center gap-3">
-                <span v-if="unreadCount > 0">{{ unreadCount }} unread</span>
-                <button
-                    @click="$emit('compose')"
-                    :disabled="!selectedAccount"
-                    class="md:hidden flex items-center gap-1 px-2.5 py-1.5 bg-(--interactive-primary) text-white rounded-md font-semibold hover:bg-(--interactive-primary-hover) transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
-                >
-                    <PlusIcon class="w-3.5 h-3.5" />
-                    Compose
-                </button>
+                    <!-- Sentinel for Infinite Scroll -->
+                    <li
+                        ref="sentinel"
+                        class="p-4 flex justify-center"
+                        v-if="!loading && sortedEmails.length > 0"
+                    >
+                        <div
+                            v-if="isLoadingMore"
+                            class="w-5 h-5 border-2 border-(--text-muted) border-t-(--interactive-primary) rounded-full animate-spin"
+                        ></div>
+                        <span v-else class="h-1 w-full"></span>
+                    </li>
+                </ul>
             </div>
+
+            <!-- ... existing sticky bottom stats bar ... -->
+            <div
+                class="px-3 py-2 border-t border-(--border-default) bg-(--surface-secondary) text-xs text-(--text-muted) flex items-center justify-between shrink-0"
+            >
+                <span
+                    >{{ filteredEmails.length }} of
+                    {{ totalEmails || filteredEmails.length }}
+                    emails</span
+                >
+                <div class="flex items-center gap-3">
+                    <span v-if="unreadCount > 0">{{ unreadCount }} unread</span>
+                    <button
+                        @click="$emit('compose')"
+                        :disabled="!selectedAccount"
+                        class="md:hidden flex items-center gap-1 px-2.5 py-1.5 bg-(--interactive-primary) text-white rounded-md font-semibold hover:bg-(--interactive-primary-hover) transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
+                    >
+                        <PlusIcon class="w-3.5 h-3.5" />
+                        Compose
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -485,7 +660,11 @@ import {
     ArrowDownIcon,
     ArrowUpDownIcon,
     ChevronDownIcon,
-    ChevronRightIcon,
+    FlagIcon,
+    FolderIcon,
+    TagIcon,
+    ReplyIcon,
+    ForwardIcon,
 } from "lucide-vue-next";
 import { useEmailStore } from "@/stores/emailStore";
 import { storeToRefs } from "pinia";
@@ -500,9 +679,17 @@ import {
 } from "vue";
 import { animate, stagger } from "animejs";
 import Dropdown from "@/components/ui/Dropdown.vue";
-import Avatar from "@/components/ui/Avatar.vue";
 import MoveToFolderDropdown from "./MoveToFolderDropdown.vue";
 import { debounce } from "lodash";
+
+import {
+    ContextMenuRoot,
+    ContextMenuTrigger,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuPortal,
+} from "reka-ui";
 
 type SortField = "date" | "sender" | "subject";
 type SortOrder = "asc" | "desc";
@@ -533,6 +720,19 @@ const {
 const listRef = ref<HTMLElement | null>(null);
 let animation: any = null;
 
+// Context Menu Logic via Reka UI
+function handleMarkRead(email: any, isRead: boolean) {
+    store.markEmailsAsRead([email.id], isRead);
+    // Optimistic update
+    email.is_read = isRead;
+}
+
+function handleDelete(email: any) {
+    if (confirm("Delete this email?")) {
+        store.deleteEmails([email.id]);
+    }
+}
+
 const showFilters = ref(false);
 
 // Filter Watcher
@@ -552,7 +752,7 @@ const handleScroll = (e: Event) => {
 };
 
 const scrollToTop = () => {
-    listRef.value?.scrollTo({ top: 0, behavior: 'smooth' });
+    listRef.value?.scrollTo({ top: 0, behavior: "smooth" });
 };
 
 onMounted(() => {
@@ -572,21 +772,35 @@ const unreadCount = computed(
 const sortItems = computed(() => [
     {
         label: "Date",
-        icon: sortField.value === "date" ? (sortOrder.value === "desc" ? ArrowUpIcon : ArrowDownIcon) : undefined,
-        action: () => store.toggleSort("date")
+        icon:
+            sortField.value === "date"
+                ? sortOrder.value === "desc"
+                    ? ArrowUpIcon
+                    : ArrowDownIcon
+                : undefined,
+        action: () => store.toggleSort("date"),
     },
     {
         label: "Sender",
-        icon: sortField.value === "sender" ? (sortOrder.value === "asc" ? ArrowUpIcon : ArrowDownIcon) : undefined,
-        action: () => store.toggleSort("sender")
+        icon:
+            sortField.value === "sender"
+                ? sortOrder.value === "asc"
+                    ? ArrowUpIcon
+                    : ArrowDownIcon
+                : undefined,
+        action: () => store.toggleSort("sender"),
     },
     {
         label: "Subject",
-        icon: sortField.value === "subject" ? (sortOrder.value === "asc" ? ArrowUpIcon : ArrowDownIcon) : undefined,
-        action: () => store.toggleSort("subject")
+        icon:
+            sortField.value === "subject"
+                ? sortOrder.value === "asc"
+                    ? ArrowUpIcon
+                    : ArrowDownIcon
+                : undefined,
+        action: () => store.toggleSort("subject"),
     },
 ]);
-
 
 function clearFilters() {
     store.filterDateFrom = "";
@@ -600,23 +814,15 @@ function formatDate(dateString: string) {
     return isToday(date) ? format(date, "h:mm a") : format(date, "MMM d");
 }
 
-function toggleSelectAll() {
-    if (
-        selectedEmailIds.value.size === filteredEmails.value.length &&
-        filteredEmails.value.length > 0
-    ) {
-        selectedEmailIds.value.clear();
-    } else {
-        filteredEmails.value.forEach((e) => selectedEmailIds.value.add(e.id));
-    }
+function toggleSelection(id: string) {
+    console.log("EmailList: toggleSelection checkbox clicked for", id);
+    store.toggleEmailSelection(id);
 }
 
-function toggleSelection(id: string) {
-    if (selectedEmailIds.value.has(id)) {
-        selectedEmailIds.value.delete(id);
-    } else {
-        selectedEmailIds.value.add(id);
-    }
+function toggleSelectAll() {
+    // Pass currently filtered email IDs to the store
+    const allIds = filteredEmails.value.map(e => e.id);
+    store.toggleSelectAll(allIds);
 }
 
 function deleteSelected() {
@@ -646,7 +852,7 @@ function animateList(isAppend = false) {
     if (allItems.length === 0) return;
 
     let targets: NodeListOf<Element> | Element[];
-    
+
     if (isAppend) {
         // Only target the last 20 items (default per_page)
         const batchSize = 20;
@@ -669,8 +875,11 @@ function animateList(isAppend = false) {
 // Watchers
 watch(sortedEmails, (newVal, oldVal) => {
     // Detect if this was an append or a reset
-    const isAppend = oldVal && newVal.length > oldVal.length && newVal[0]?.id === oldVal[0]?.id;
-    
+    const isAppend =
+        oldVal &&
+        newVal.length > oldVal.length &&
+        newVal[0]?.id === oldVal[0]?.id;
+
     nextTick(() => animateList(isAppend));
 });
 
@@ -682,6 +891,13 @@ watch(loading, (newVal) => {
 
 const sentinel = ref<HTMLElement | null>(null);
 let observer: IntersectionObserver | null = null;
+
+function decodeHtmlEntities(text: string | null | undefined): string {
+    if (!text) return "";
+    const txt = document.createElement("textarea");
+    txt.innerHTML = text;
+    return txt.value;
+}
 
 function setupObserver() {
     if (observer) observer.disconnect();
@@ -716,6 +932,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
     if (animation) animation.pause();
 });
+
 </script>
 
 <style scoped>

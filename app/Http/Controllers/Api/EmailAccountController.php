@@ -95,9 +95,25 @@ class EmailAccountController extends Controller
             'system_usage' => 'nullable|string|in:support,notification,noreply',
         ]);
 
+        $user = $request->user();
+
         // If team_id is provided, verify user belongs to team
         if (isset($validated['team_id'])) {
-            $user = $request->user();
+
+            // Check if account already exists for this team
+            $exists = EmailAccount::where('team_id', $validated['team_id'])
+                ->where('email', $validated['email'])
+                ->exists();
+                
+            if ($exists) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors' => [
+                        'email' => ['This email account has already been connected to this team.']
+                    ]
+                ], 422);
+            }
+
             $belongsToTeam = method_exists($user, 'teams')
                 && $user->teams()->where('teams.id', $validated['team_id'])->exists();
 
@@ -105,6 +121,21 @@ class EmailAccountController extends Controller
                 return response()->json([
                     'message' => 'You do not belong to this team.',
                 ], 403);
+            }
+        } else {
+            // Check if personal account already exists
+            $exists = EmailAccount::where('user_id', $user->id)
+                ->whereNull('team_id')
+                ->where('email', $validated['email'])
+                ->exists();
+
+            if ($exists) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors' => [
+                        'email' => ['This email account has already been connected.']
+                    ]
+                ], 422);
             }
         }
 

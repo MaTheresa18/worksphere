@@ -49,7 +49,9 @@ export interface Email {
     
     is_read: boolean;
     is_starred: boolean;
+    is_important: boolean;
     is_draft: boolean;
+    thread_count?: number;
     
     has_attachments: boolean;
     attachments: EmailAttachment[];
