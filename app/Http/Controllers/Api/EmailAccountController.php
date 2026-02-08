@@ -335,4 +335,39 @@ class EmailAccountController extends Controller
             'created_at' => $account->created_at->toIso8601String(),
         ];
     }
+    /**
+     * Get storage usage statistics.
+     */
+    public function getStorageUsage(EmailAccount $emailAccount): JsonResponse
+    {
+        $this->authorize('view', $emailAccount);
+
+        $emailsSize = $emailAccount->emails()->sum('size_bytes') ?? 0;
+        
+        $attachmentsSize = \Illuminate\Support\Facades\DB::table('media')
+            ->where('model_type', \App\Models\Email::class)
+            ->whereIn('model_id', $emailAccount->emails()->select('id'))
+            ->sum('size');
+
+        $emailsCount = $emailAccount->emails()->count();
+        
+        $attachmentsCount = \Illuminate\Support\Facades\DB::table('media')
+            ->where('model_type', \App\Models\Email::class)
+            ->whereIn('model_id', $emailAccount->emails()->select('id'))
+            ->count();
+
+        $totalBytes = max($emailsSize, $attachmentsSize);
+
+        return response()->json([
+            'data' => [
+                'total_bytes' => (int) $totalBytes,
+                // emails_bytes is total minus attachments
+                'emails_bytes' => (int)max(0, $totalBytes - $attachmentsSize),
+                'attachments_bytes' => (int)$attachmentsSize,
+                'emails_count' => $emailsCount,
+                'attachments_count' => $attachmentsCount,
+                'limit_bytes' => $emailAccount->storage_limit,
+            ]
+        ]);
+    }
 }

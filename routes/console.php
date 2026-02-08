@@ -153,3 +153,10 @@ Schedule::command('google:watch-all')
     ->name('google-watch-all')
     ->withoutOverlapping()
     ->onOneServer();
+
+// Prune old emails and content (Daily)
+Schedule::job(new \App\Jobs\PruneEmailsJob)
+    ->daily()
+    ->name('prune-emails')
+    ->withoutOverlapping()
+    ->onOneServer();

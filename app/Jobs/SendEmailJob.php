@@ -87,12 +87,37 @@ class SendEmailJob implements ShouldQueue
                 'to' => collect($email->to)->pluck('email')->toArray(),
             ]);
         } catch (\Throwable $e) {
+            $errorMessage = $e->getMessage();
+            
+            // Handle Google/SMTP Rate Limits
+            if (str_contains($errorMessage, 'Daily user sending limit exceeded') || 
+                str_contains($errorMessage, '550-5.4.5')) {
+                
+                Log::error('[SendEmailJob] Rate limit exceeded', [
+                    'email_id' => $email->id,
+                    'account_id' => $account->id,
+                    'error' => $errorMessage
+                ]);
+
+                // Update account status to warn user
+                $account->update([
+                    'sync_status' => \App\Enums\EmailSyncStatus::Failed,
+                    'last_error' => 'Daily sending limit exceeded. Please try again later (usually 24h).',
+                    'is_active' => false // Optional: pause account to prevent further failures? Let's keep it active but flagged.
+                    // Actually, let's just set the error.
+                ]);
+                
+                // Fail permanently to stop retries
+                $this->fail($e);
+                return;
+            }
+
             Log::error('[SendEmailJob] Failed to send email', [
                 'email_id' => $email->id,
-                'error' => $e->getMessage(),
+                'error' => $errorMessage,
             ]);
 
-            throw $e; // Re-throw for retry
+            throw $e; // Re-throw for retry for other errors
         }
     }
 

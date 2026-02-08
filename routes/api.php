@@ -418,6 +418,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce', 'demo'])->grou
         Route::post('/{emailAccount}/test', [\App\Http\Controllers\Api\EmailAccountController::class, 'testConnection']);
         Route::post('/{emailAccount}/sync', [\App\Http\Controllers\Api\EmailAccountController::class, 'sync']);
         Route::get('/{emailAccount}/remote-folders', [\App\Http\Controllers\Api\EmailAccountController::class, 'remoteFolders']);
+        Route::get('/{emailAccount}/storage-usage', [\App\Http\Controllers\Api\EmailAccountController::class, 'getStorageUsage']);
         // OAuth
         Route::get('/oauth/{provider}/redirect', [\App\Http\Controllers\Api\EmailOAuthController::class, 'redirect']);
         Route::post('/{emailAccount}/oauth/refresh', [\App\Http\Controllers\Api\EmailOAuthController::class, 'refresh']);

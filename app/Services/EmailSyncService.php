@@ -554,6 +554,18 @@ class EmailSyncService implements EmailSyncServiceContract
                         }
                     }
 
+                    // Calculate approximate size
+                    $sizeBytes = 0;
+                    $sizeBytes += strlen($emailData['body_html'] ?? '');
+                    $sizeBytes += strlen($emailData['body_plain'] ?? '');
+                    $sizeBytes += strlen(json_encode($emailData['headers'] ?? []));
+                    
+                    if (!empty($emailData['attachments'])) {
+                        foreach ($emailData['attachments'] as $att) {
+                            $sizeBytes += ($att['size'] ?? 0);
+                        }
+                    }
+
                     $email = Email::updateOrCreate(
                         $matchAttributes,
                         [
@@ -576,6 +588,7 @@ class EmailSyncService implements EmailSyncServiceContract
                             'is_read' => $emailData['is_read'] ?? false,
                             'is_starred' => $emailData['is_starred'] ?? false,
                             'has_attachments' => $emailData['has_attachments'] ?? false,
+                            'size_bytes' => $sizeBytes,
                             'sent_at' => $emailData['sent_at'] ?? null,
                             'received_at' => $emailData['date'] ?? now(),
                             'sanitized_at' => $bodyHtml ? now() : null,

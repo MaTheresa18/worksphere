@@ -36,6 +36,7 @@ class EmailOAuthController extends Controller
             'email_oauth_state' => $state,
             'email_oauth_user_id' => $request->user()->id,
             'email_oauth_team_id' => $request->input('team_id'),
+            'email_oauth_is_popup' => $request->boolean('popup'),
         ]);
 
         $url = $this->emailAccountService->getOAuthUrl($provider, $state);
@@ -49,9 +50,10 @@ class EmailOAuthController extends Controller
     /**
      * Handle OAuth callback from provider.
      */
-    public function callback(Request $request, string $provider): RedirectResponse
+    public function callback(Request $request, string $provider)
     {
         $frontendUrl = config('app.frontend_url', config('app.url'));
+        $isPopup = session('email_oauth_is_popup', false);
 
         try {
             // Verify state
@@ -59,7 +61,9 @@ class EmailOAuthController extends Controller
             $requestState = $request->input('state');
 
             if (! $sessionState || $sessionState !== $requestState) {
-                return redirect($frontendUrl.'/email/settings?error=invalid_state');
+                return $isPopup 
+                    ? $this->returnPopupError('Invalid state')
+                    : redirect($frontendUrl.'/email/settings?error=invalid_state');
             }
 
             // Check for errors from provider
@@ -70,13 +74,17 @@ class EmailOAuthController extends Controller
                     'error' => $error,
                 ]);
 
-                return redirect($frontendUrl.'/email/settings?error='.urlencode($error));
+                return $isPopup
+                    ? $this->returnPopupError($error)
+                    : redirect($frontendUrl.'/email/settings?error='.urlencode($error));
             }
 
             // Exchange code for tokens
             $code = $request->input('code');
             if (! $code) {
-                return redirect($frontendUrl.'/email/settings?error=no_code');
+                return $isPopup
+                    ? $this->returnPopupError('No code returned from provider')
+                    : redirect($frontendUrl.'/email/settings?error=no_code');
             }
 
             $tokens = $this->emailAccountService->exchangeCodeForTokens($provider, $code);
@@ -84,7 +92,9 @@ class EmailOAuthController extends Controller
             // Get user email from provider
             $email = $this->emailAccountService->getUserEmail($provider, $tokens['access_token']);
             if (! $email) {
-                return redirect($frontendUrl.'/email/settings?error=could_not_get_email');
+                return $isPopup
+                    ? $this->returnPopupError('Could not retrieve email address from provider')
+                    : redirect($frontendUrl.'/email/settings?error=could_not_get_email');
             }
 
             // Get user and team from session
@@ -92,7 +102,7 @@ class EmailOAuthController extends Controller
             $teamId = session('email_oauth_team_id');
 
             // Clear session data
-            session()->forget(['email_oauth_state', 'email_oauth_user_id', 'email_oauth_team_id']);
+            session()->forget(['email_oauth_state', 'email_oauth_user_id', 'email_oauth_team_id', 'email_oauth_is_popup']);
 
             // Check if account already exists
             $existingAccount = EmailAccount::where('email', $email)
@@ -115,7 +125,9 @@ class EmailOAuthController extends Controller
                     'last_error' => null,
                 ]);
 
-                return redirect($frontendUrl.'/email/settings?email_connected=updated');
+                return $isPopup
+                    ? $this->returnPopupSuccess($existingAccount->public_id, 'updated')
+                    : redirect($frontendUrl.'/email/settings?email_connected=updated');
             }
 
             // Create new account
@@ -143,7 +155,9 @@ class EmailOAuthController extends Controller
             // Start initial seed (Phase 1)
             app(\App\Services\EmailSyncService::class)->startSeed($account);
 
-            return redirect($frontendUrl.'/email/settings?email_connected=success');
+            return $isPopup
+                ? $this->returnPopupSuccess($account->public_id, 'created')
+                : redirect($frontendUrl.'/email/settings?email_connected=success');
 
         } catch (\Throwable $e) {
             Log::error('OAuth callback error', [
@@ -151,8 +165,40 @@ class EmailOAuthController extends Controller
                 'error' => $e->getMessage(),
             ]);
 
-            return redirect($frontendUrl.'/email/settings?error='.urlencode('Connection failed. Please try again.'));
+            return $isPopup
+                ? $this->returnPopupError('Connection failed: ' . $e->getMessage())
+                : redirect($frontendUrl.'/email/settings?error='.urlencode('Connection failed. Please try again.'));
         }
+    }
+
+    /**
+     * Return success script for popup
+     */
+    /**
+     * Return success script for popup
+     */
+    protected function returnPopupSuccess(string $accountId, string $status)
+    {
+        return view('email.oauth.callback', [
+            'status' => 'success',
+            'title' => 'Connection Successful',
+            'accountId' => $accountId,
+            'operationStatus' => $status,
+            'nonce' => request()->attributes->get('csp_nonce'), // Try to get nonce from request attributes common in CSP packages
+        ]);
+    }
+
+    /**
+     * Return error script for popup
+     */
+    protected function returnPopupError(string $message)
+    {
+        return view('email.oauth.callback', [
+            'status' => 'error',
+            'title' => 'Connection Failed',
+            'message' => $message,
+            'nonce' => request()->attributes->get('csp_nonce'),
+        ]);
     }
 
     /**

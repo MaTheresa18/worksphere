@@ -22,6 +22,7 @@ import { useEmailSignatures } from "./composables/useEmailSignatures";
 import { useEmailTemplates } from "./composables/useEmailTemplates";
 import { useEditor, EditorContent } from "@tiptap/vue-3";
 import EmailAccountsSection from "@/components/settings/EmailAccountsSection.vue";
+import EmailStorageStats from "@/components/settings/EmailStorageStats.vue";
 import { emailAccountService } from "@/services/email-account.service";
 import { RichTextEditor } from "@/components/ui";
 import { useDebounceFn } from "@vueuse/core";
@@ -867,21 +868,10 @@ function getUsageDetails(account: any) {
                                         </div>
                                     </div>
                                     <div class="text-right">
-                                        <div class="text-sm font-bold text-[var(--text-primary)]">
-                                            {{ formatBytes(account.storage_used) }}
-                                        </div>
-                                        <div class="text-xs text-[var(--text-secondary)]">
-                                            of {{ formatBytes(account.storage_limit) }}
-                                        </div>
+                                        <!-- Storage stats handled by component -->
                                     </div>
                                 </div>
-                                 <div class="w-full bg-[var(--surface-tertiary)] rounded-full h-2 overflow-hidden">
-                                    <div
-                                        class="h-full rounded-full transition-all duration-500"
-                                        :class="getUsageDetails(account).bg"
-                                        :style="{ width: `${getUsageDetails(account).percent}%` }"
-                                    ></div>
-                                </div>
+                                <EmailStorageStats :account-id="account.id" />
                             </div>
                         </div>
                     </div>
@@ -890,6 +880,7 @@ function getUsageDetails(account: any) {
         </div>
     </div>
 </template>
+
 
 <style scoped>
 /* Force RichTextEditor to integrate seamlessly */

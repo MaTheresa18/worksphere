@@ -20,13 +20,14 @@ export function sanitizeHtml(dirty: string, options?: DOMPurify.Config, hooks?: 
       'p', 'br', 'strong', 'em', 'u', 's', 'del', 'ins',
       'a', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre',
       'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-      'table', 'thead', 'tbody', 'tr', 'th', 'td',
-      'img', 'span', 'div',
+      'table', 'thead', 'tbody', 'tr', 'th', 'td', 'caption', 'colgroup', 'col',
+      'img', 'span', 'div', 'hr',
     ],
     ALLOWED_ATTR: [
       'href', 'title', 'target', 'rel',
-      'class', 'id',
-      'src', 'alt', 'width', 'height', 'style', 'align', 'border', 'cellpadding', 'cellspacing' // Added legacy table attributes
+      'class', 'id', 'name',
+      'src', 'alt', 'width', 'height', 'style', 'align', 'valign', 
+      'border', 'cellpadding', 'cellspacing', 'colspan', 'rowspan', 'bgcolor'
     ],
     ALLOW_DATA_ATTR: true,
     ADD_URI_SAFE_ATTR: ['src', 'href'],

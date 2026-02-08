@@ -40,6 +40,7 @@ class Email extends Model implements HasMedia
         'is_starred',
         'is_draft',
         'has_attachments',
+        'size_bytes',
         'imap_uid',
         'provider_id',
         'attachment_placeholders',

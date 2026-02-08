@@ -220,7 +220,7 @@
             :class="[
                 embedded
                     ? 'p-0 overflow-visible'
-                    : 'p-6 overflow-y-auto scrollbar-thin',
+                    : 'p-6 overflow-auto scrollbar-thin',
             ]"
         >
             <!-- Security / Trust Banner -->
@@ -702,10 +702,9 @@ watch(
                 color: inherit;
             }
             #email-body * {
-                max-width: 100%;
                 box-sizing: border-box !important;
             }
-            img { max-width: 100%; height: auto; }
+            img, video, iframe, svg { max-width: 100%; height: auto; }
             a { color: #2563eb !important; text-decoration: underline !important; }
             blockquote { margin: 1em 0; border-left: 4px solid #e5e7eb; padding-left: 1em; color: #6b7280 !important; }
             pre { background: #f3f4f6; padding: 1em; overflow-x: auto; border-radius: 0.5em; color: #1f2937 !important; }

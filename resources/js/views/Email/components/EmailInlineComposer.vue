@@ -851,16 +851,7 @@ async function handleSend() {
         alert("An error occurred while sending the email.");
     }
 }
-        if (success) {
-            emit("send");
-        } else {
-            alert("Failed to send email.");
-        }
-    } catch (e) {
-        console.error(e);
-        alert("An error occurred.");
-    }
-}
+
 
 function handleAiAssist() {
     // TODO: Future AI-powered email assistance feature

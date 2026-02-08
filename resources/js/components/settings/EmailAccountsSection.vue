@@ -14,6 +14,7 @@ import {
 } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import axios from "axios";
+import EmailAccountWizard from "./EmailAccountWizard.vue";
 
 const props = defineProps({
     teamId: {
@@ -291,6 +292,11 @@ onMounted(async () => {
         isLoading.value = false;
     }
 });
+
+const onWizardSaved = () => {
+    fetchAccounts();
+    showModal.value = false;
+};
 </script>
 
 <template>
@@ -520,7 +526,16 @@ onMounted(async () => {
         </div>
 
         <!-- Add/Edit Modal -->
+        <EmailAccountWizard
+            v-if="!isSystem"
+            :open="showModal"
+            @update:open="showModal = $event"
+            :account="editingAccount"
+            @saved="onWizardSaved"
+        />
+
         <Modal
+            v-else
             :open="showModal"
             @update:open="showModal = $event"
             :title="

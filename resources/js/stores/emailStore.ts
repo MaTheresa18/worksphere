@@ -503,9 +503,8 @@ export const useEmailStore = defineStore("email", () => {
             console.error(e);
             return false;
         }
-            return false;
-        }
     }
+
 
     async function sendEmail(formData: FormData) {
         try {
@@ -788,8 +787,6 @@ export const useEmailStore = defineStore("email", () => {
         deleteFolder,
         addLabel,
         deleteLabel,
-        addLabel,
-        deleteLabel,
         sendEmail,
         setSelectedAccount,
         moveEmail,
@@ -800,7 +797,6 @@ export const useEmailStore = defineStore("email", () => {
         markAsRead,
         markEmailsAsRead,
         getEmailById,
-        sendEmail,
         applyFilters,
         loadNewEmails,
         fetchAccountFolders,
