@@ -31,7 +31,7 @@ interface EmailServiceContract
      *
      * @param  array<string, mixed>  $data  Keys: to, cc, bcc, subject, body, signature_id, attachments
      */
-    public function send(User $user, EmailAccount $account, array $data): Email;
+    public function send(User $user, EmailAccount $account, array $data, ?Email $draft = null): Email;
 
     /**
      * Send bulk emails (dispatches batch jobs).
@@ -103,4 +103,9 @@ interface EmailServiceContract
      * Fetch the body content for an email if it was skipped during sync.
      */
     public function fetchBody(Email $email): Email;
+
+    /**
+     * Send a read receipt (MDN).
+     */
+    public function sendReadReceipt(User $user, Email $email): void;
 }

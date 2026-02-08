@@ -195,12 +195,12 @@ class AuthController extends Controller
             $reason = 'Account disabled';
 
             if ($user->status === 'suspended' && $user->suspended_until?->isFuture()) {
-                $reason = 'Account suspended until '.$user->suspended_until->format('M d, Y H:i');
+                $reason = 'Your account is temporarily suspended until ' . $user->suspended_until->format('M d, Y H:i') . '. Please contact support.';
             } elseif ($user->status_reason) {
                 $reason = $user->status_reason;
             } else {
-                $statusConfig = config('roles.statuses.'.$user->status, []);
-                $reason = $statusConfig['label'] ?? 'Account disabled';
+                $statusConfig = config('roles.statuses.' . $user->status, []);
+                $reason = $statusConfig['error_message'] ?? ($statusConfig['label'] ?? 'Account disabled');
             }
 
             throw ValidationException::withMessages([

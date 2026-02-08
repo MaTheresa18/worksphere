@@ -1,5 +1,5 @@
 <template>
-    <div class="flex flex-col h-full w-64" v-bind="$attrs">
+    <div class="flex flex-col h-full w-[230px]" v-bind="$attrs">
         <!-- Accounts Selector (Dropdown) & Sync -->
         <div
             class="px-3 py-3 border-b border-(--border-default) flex items-center gap-2"

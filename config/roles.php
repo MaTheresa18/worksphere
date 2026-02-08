@@ -20,21 +20,25 @@ return [
         ],
         'pending' => [
             'label' => 'Pending Verification',
+            'error_message' => 'Your account is pending verification. Please check your email for a verification link.',
             'color' => 'warning',
             'can_login' => false,
         ],
         'suspended' => [
             'label' => 'Suspended',
+            'error_message' => 'Your account has been suspended. Please contact support for more information.',
             'color' => 'error',
             'can_login' => false,
         ],
         'blocked' => [
             'label' => 'Blocked',
+            'error_message' => 'Your account has been blocked due to a policy violation. Please contact support.',
             'color' => 'error',
             'can_login' => false,
         ],
         'disabled' => [
             'label' => 'Disabled',
+            'error_message' => 'Your account is currently disabled. Please contact your administrator.',
             'color' => 'secondary',
             'can_login' => false,
         ],

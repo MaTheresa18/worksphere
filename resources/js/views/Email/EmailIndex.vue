@@ -27,7 +27,7 @@
         <!-- 2. Middle Column (List) -->
         <!-- Flex item that sends events to parent -->
         <div
-            class="flex flex-col w-full md:w-[314px] lg:w-[376px] border-r border-(--border-default) h-full min-h-0 shrink-0 bg-(--surface-primary)"
+            class="flex flex-col w-full md:w-[289px] lg:w-[346px] border-r border-(--border-default) h-full min-h-0 shrink-0 bg-(--surface-primary)"
             :class="{
                 'hidden md:flex': selectedEmailId || isComposing,
                 flex: !selectedEmailId && !isComposing,

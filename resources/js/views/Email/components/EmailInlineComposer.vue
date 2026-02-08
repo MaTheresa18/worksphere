@@ -1,10 +1,12 @@
 <template>
     <div
         class="flex flex-col h-full max-h-[calc(100vh-110px)] bg-(--surface-primary) overflow-hidden"
+        @drop.prevent="handleDrop"
+        @dragover.prevent
     >
         <!-- Compact Header -->
         <div
-            class="p-4 border-b border-(--border-default) bg-gradient-to-r from-(--surface-secondary) to-transparent"
+            class="p-4 border-b border-(--border-default) bg-linear-to-r from-(--surface-secondary) to-transparent"
         >
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-2">
@@ -26,19 +28,34 @@
                         >{{ characterCount }} chars</span
                     >
                     <div class="h-4 w-px bg-(--border-default)"></div>
+                    
+                    <!-- Saving Indicator -->
+                    <span v-if="savingDraft" class="text-xs text-(--text-muted) animate-pulse">Saving...</span>
+                    <span v-else-if="lastSavedAt" class="text-xs text-(--text-muted)">Saved {{ formatTime(lastSavedAt) }}</span>
+
+                    <button
+                        @click="saveDraft()"
+                        class="p-2 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors"
+                        title="Save Draft"
+                    >
+                        <SaveIcon class="w-4 h-4" />
+                    </button>
+                    
                     <button
                         @click="emit('close')"
-                        class="p-2 rounded-lg text-(--text-muted) hover:text-(--color-error) hover:bg-(--color-error)/10 transition-colors"
+                        class="p-2 rounded-lg text-(--text-muted) hover:text-error hover:bg-error/10 transition-colors"
                         title="Discard"
                     >
                         <TrashIcon class="w-4 h-4" />
                     </button>
                     <button
                         @click="handleSend"
-                        class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-(--interactive-primary) hover:bg-(--interactive-primary-hover) shadow-lg shadow-(--interactive-primary)/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        :disabled="isSending"
+                        class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-(--interactive-primary) hover:bg-(--interactive-primary-hover) shadow-lg shadow-(--interactive-primary)/25 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                     >
-                        Send
-                        <SendIcon class="w-3.5 h-3.5" />
+                        <span v-if="isSending">Sending...</span>
+                        <span v-else>Send</span>
+                        <SendIcon v-if="!isSending" class="w-3.5 h-3.5" />
                     </button>
                 </div>
             </div>
@@ -48,7 +65,7 @@
                 <!-- From Field -->
                 <div class="flex items-center gap-2">
                     <span
-                        class="text-xs text-(--text-muted) w-12 flex-shrink-0"
+                        class="text-xs text-(--text-muted) w-12 shrink-0"
                         >From</span
                     >
                     <div class="flex-1 relative">
@@ -86,7 +103,7 @@
                 <!-- To Field -->
                 <div class="flex items-start gap-2">
                     <span
-                        class="text-xs text-(--text-muted) w-12 pt-2.5 flex-shrink-0"
+                        class="text-xs text-(--text-muted) w-12 pt-2.5 shrink-0"
                         >To</span
                     >
                     <div class="flex-1">
@@ -125,7 +142,7 @@
                 <Transition name="slide-fade">
                     <div v-if="showCc" class="flex items-start gap-2">
                         <span
-                            class="text-xs text-(--text-muted) w-12 pt-2.5 flex-shrink-0"
+                            class="text-xs text-(--text-muted) w-12 pt-2.5 shrink-0"
                             >Cc</span
                         >
                         <EmailTagInput
@@ -140,7 +157,7 @@
                 <Transition name="slide-fade">
                     <div v-if="showBcc" class="flex items-start gap-2">
                         <span
-                            class="text-xs text-(--text-muted) w-12 pt-2.5 flex-shrink-0"
+                            class="text-xs text-(--text-muted) w-12 pt-2.5 shrink-0"
                             >Bcc</span
                         >
                         <EmailTagInput
@@ -154,7 +171,7 @@
                 <!-- Subject Field (always shown) -->
                 <div class="flex items-center gap-2">
                     <span
-                        class="text-xs text-(--text-muted) w-12 flex-shrink-0"
+                        class="text-xs text-(--text-muted) w-12 shrink-0"
                         >Subject</span
                     >
                     <input
@@ -257,7 +274,60 @@
                     class="w-px h-5 bg-(--border-default) mx-1 shrink-0"
                 ></div>
 
+                <div
+                    class="w-px h-5 bg-(--border-default) mx-1 shrink-0"
+                ></div>
+
                 <!-- Formatting -->
+                 <Dropdown align="start" class="shrink-0" :close-on-select="true">
+                    <template #trigger>
+                        <button
+                            class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors flex items-center gap-1"
+                            title="Font Family"
+                        >
+                            <TypeIcon class="w-4 h-4" />
+                            <ChevronDownIcon class="w-3 h-3 opacity-50" />
+                        </button>
+                    </template>
+                    <div class="p-1 min-w-[150px]">
+                        <button
+                            v-for="font in fontFamilies"
+                            :key="font.value"
+                            @click="setFontFamily(font.value)"
+                             class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-(--surface-tertiary) transition-colors"
+                             :style="{ fontFamily: font.value }"
+                             :class="editor?.isActive('textStyle', { fontFamily: font.value }) ? 'text-(--interactive-primary) bg-(--interactive-primary)/5' : 'text-(--text-primary)'"
+                        >
+                            {{ font.label }}
+                        </button>
+                    </div>
+                 </Dropdown>
+
+                 <Dropdown align="start" class="shrink-0" :close-on-select="true">
+                    <template #trigger>
+                         <button
+                            class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors flex items-center gap-1"
+                            title="Font Size"
+                        >
+                            <BaselineIcon class="w-4 h-4" />
+                            <ChevronDownIcon class="w-3 h-3 opacity-50" />
+                        </button>
+                    </template>
+                    <div class="p-1 min-w-[100px]">
+                         <button
+                            v-for="size in fontSizes"
+                            :key="size.value"
+                            @click="setFontSize(size.value)"
+                             class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-(--surface-tertiary) transition-colors"
+                             :class="editor?.isActive('textStyle', { fontSize: size.value }) ? 'text-(--interactive-primary) bg-(--interactive-primary)/5' : 'text-(--text-primary)'"
+                        >
+                            <span :style="{ fontSize: size.value }">{{ size.label }}</span>
+                        </button>
+                    </div>
+                 </Dropdown>
+                 
+                 <div class="w-px h-5 bg-(--border-default) mx-1 shrink-0"></div>
+
                 <button
                     @click="editor?.chain().focus().toggleBold().run()"
                     :class="[
@@ -266,6 +336,7 @@
                             : 'text-(--text-secondary)',
                     ]"
                     class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                    title="Bold"
                 >
                     <BoldIcon class="w-4 h-4" />
                 </button>
@@ -277,9 +348,85 @@
                             : 'text-(--text-secondary)',
                     ]"
                     class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                    title="Italic"
                 >
                     <ItalicIcon class="w-4 h-4" />
                 </button>
+                <button
+                    @click="editor?.chain().focus().toggleUnderline().run()"
+                     :class="[
+                        editor?.isActive('underline')
+                            ? 'bg-(--surface-tertiary) text-(--text-primary)'
+                            : 'text-(--text-secondary)',
+                    ]"
+                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                    title="Underline"
+                >
+                    <UnderlineIcon class="w-4 h-4" />
+                </button>
+                
+                 <Dropdown align="start" class="shrink-0" :close-on-select="true">
+                    <template #trigger>
+                         <button
+                            class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors"
+                            title="Text Color"
+                        >
+                            <PaletteIcon class="w-4 h-4" :style="{ color: editor?.getAttributes('textStyle').color }" />
+                        </button>
+                    </template>
+                    <div class="p-2 grid grid-cols-5 gap-1 w-[160px]">
+                         <button
+                            v-for="color in colors"
+                            :key="color"
+                            @click="setColor(color)"
+                             class="w-6 h-6 rounded-full border border-(--border-subtle) hover:scale-110 transition-transform"
+                             :style="{ backgroundColor: color }"
+                             :title="color"
+                        />
+                    </div>
+                 </Dropdown>
+
+                <div class="w-px h-5 bg-(--border-default) mx-1 shrink-0"></div>
+                
+                 <button
+                    @click="editor?.chain().focus().setTextAlign('left').run()"
+                    :class="[
+                        editor?.isActive({ textAlign: 'left' })
+                            ? 'bg-(--surface-tertiary) text-(--text-primary)'
+                            : 'text-(--text-secondary)',
+                    ]"
+                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                    title="Align Left"
+                >
+                    <AlignLeftIcon class="w-4 h-4" />
+                </button>
+                 <button
+                    @click="editor?.chain().focus().setTextAlign('center').run()"
+                    :class="[
+                        editor?.isActive({ textAlign: 'center' })
+                            ? 'bg-(--surface-tertiary) text-(--text-primary)'
+                            : 'text-(--text-secondary)',
+                    ]"
+                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                    title="Align Center"
+                >
+                    <AlignCenterIcon class="w-4 h-4" />
+                </button>
+                 <button
+                    @click="editor?.chain().focus().setTextAlign('right').run()"
+                    :class="[
+                        editor?.isActive({ textAlign: 'right' })
+                            ? 'bg-(--surface-tertiary) text-(--text-primary)'
+                            : 'text-(--text-secondary)',
+                    ]"
+                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                    title="Align Right"
+                >
+                    <AlignRightIcon class="w-4 h-4" />
+                </button>
+
+                <div class="w-px h-5 bg-(--border-default) mx-1 shrink-0"></div>
+
                 <button
                     @click="editor?.chain().focus().toggleBulletList().run()"
                     :class="[
@@ -288,8 +435,30 @@
                             : 'text-(--text-secondary)',
                     ]"
                     class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                    title="Bullet List"
                 >
                     <ListIcon class="w-4 h-4" />
+                </button>
+                
+                 <button
+                    @click="addImage"
+                    class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                    title="Insert Image"
+                >
+                    <ImageIcon class="w-4 h-4" />
+                </button>
+                
+                 <button
+                    @click="setLink"
+                    :class="[
+                        editor?.isActive('link')
+                            ? 'bg-(--surface-tertiary) text-(--text-primary)'
+                            : 'text-(--text-secondary)',
+                    ]"
+                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                    title="Insert Link"
+                >
+                    <LinkIcon class="w-4 h-4" />
                 </button>
 
                 <div
@@ -335,7 +504,22 @@
                         >Auto-Complete</span
                     >
                 </button>
+
             </div>
+            
+            <!-- Send Options (Bottom Row) -->
+             <div class="flex items-center gap-4 mt-2 px-1">
+                <label class="flex items-center gap-2 cursor-pointer group">
+                    <div class="relative flex items-center">
+                        <input 
+                            type="checkbox" 
+                            v-model="requestReadReceipt"
+                            class="peer h-4 w-4 rounded border-(--border-default) text-(--interactive-primary) focus:ring-(--interactive-primary)/20 transition-all cursor-pointer"
+                        />
+                    </div>
+                    <span class="text-xs text-(--text-secondary) group-hover:text-(--text-primary) transition-colors select-none">Request Read Receipt</span>
+                </label>
+             </div>
         </div>
     </div>
 </template>
@@ -362,6 +546,16 @@ import {
     ReplyAllIcon,
     ChevronDownIcon,
     CheckIcon,
+    TypeIcon,
+    PaletteIcon,
+    BaselineIcon,
+    AlignLeftIcon,
+    AlignCenterIcon,
+    AlignRightIcon,
+    UnderlineIcon,
+    ImageIcon,
+    LinkIcon, // Added
+    SaveIcon,
 } from "lucide-vue-next";
 import { format } from "date-fns";
 import { watch } from "vue";
@@ -373,6 +567,17 @@ import { useEmailSignatures } from "../composables/useEmailSignatures";
 import { useEmailTemplates } from "../composables/useEmailTemplates";
 import { emailAccountService } from "@/services/email-account.service";
 import axios from "axios";
+
+// Tiptap Extensions
+import TextAlign from "@tiptap/extension-text-align";
+import TextStyle from "@tiptap/extension-text-style";
+import Color from "@tiptap/extension-color";
+import FontFamily from "@tiptap/extension-font-family";
+import Underline from "@tiptap/extension-underline";
+import Image from "@tiptap/extension-image";
+import Link from "@tiptap/extension-link";
+import { FontSize } from "@/components/ui/editor/extensions/FontSize";
+import { useDebounceFn } from "@vueuse/core";
 
 const props = defineProps<{
     mode: string;
@@ -393,6 +598,12 @@ const store = useEmailStore();
 // Account Management
 const accounts = ref<any[]>([]);
 const selectedAccountId = ref<string | number | null>(null);
+const requestReadReceipt = ref(false);
+const draftId = ref<string | null>(null);
+const savingDraft = ref(false);
+const lastSavedAt = ref<Date | null>(null);
+const autoSaveInterval = ref<any>(null);
+const lastSavedHash = ref<string>("");
 
 const selectedAccount = computed(() =>
     accounts.value.find((a) => a.id === selectedAccountId.value),
@@ -415,8 +626,13 @@ onMounted(async () => {
     fetchTemplates();
 
     try {
-        const response = await emailAccountService.list();
-        accounts.value = response || [];
+        // Use store accounts if already loaded, otherwise fetch via store
+        if (store.accounts && store.accounts.length > 0) {
+            accounts.value = store.accounts;
+        } else {
+            await store.fetchInitialData();
+            accounts.value = store.accounts;
+        }
 
         // Determine initial account
         if (accounts.value.length > 0) {
@@ -487,6 +703,7 @@ const actualMode = computed(() => {
         return "forward-as-attachment";
     if (props.mode.startsWith("forward")) return "forward";
     if (props.mode.startsWith("compose")) return "compose";
+    if (props.mode.startsWith("edit")) return "edit";
     return "compose";
 });
 
@@ -500,6 +717,8 @@ const modeLabel = computed(() => {
             return "Forward as Attachment";
         case "forward":
             return "Forward";
+        case "edit":
+            return "Edit Draft";
         default:
             return "New Email";
     }
@@ -515,6 +734,8 @@ const modeIcon = computed(() => {
             return markRaw(PaperclipIcon);
         case "forward":
             return markRaw(ForwardIcon);
+        case "edit":
+            return markRaw(PencilIcon);
         default:
             return markRaw(PencilIcon);
     }
@@ -530,6 +751,8 @@ const modeStyles = computed(() => {
             return { bg: "bg-orange-500/10", text: "text-orange-500" };
         case "forward":
             return { bg: "bg-purple-500/10", text: "text-purple-500" };
+        case "edit":
+            return { bg: "bg-amber-500/10", text: "text-amber-500" };
         default:
             return { bg: "bg-green-500/10", text: "text-green-500" };
     }
@@ -596,11 +819,43 @@ const editor = useEditor({
         Placeholder.configure({
             placeholder: "Write your message...",
         }),
+        TextAlign.configure({
+            types: ["heading", "paragraph"],
+        }),
+        TextStyle,
+        Color,
+        FontFamily,
+        Underline,
+        Image.configure({
+            inline: true,
+            allowBase64: true,
+        }),
+        FontSize,
+        Link.configure({
+            openOnClick: false,
+            HTMLAttributes: {
+                class: 'text-blue-500 underline cursor-pointer',
+            },
+        }),
     ],
+    onUpdate: () => {
+        // Trigger auto-save on content change
+        autoSave();
+    },
+
     editorProps: {
         attributes: {
             class: "prose dark:prose-invert max-w-none focus:outline-none min-h-[100px] text-(--text-primary)",
         },
+        handleDrop: (view, event, slice, moved) => {
+            if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+                // Return false to let our custom drag handler in the parent div or explicit handling take over,
+                // or handle it right here.
+                // We'll let the custom directive on the container handle it for simplicity in Vue
+                return false;
+            }
+            return false;
+        }
     },
 });
 
@@ -682,6 +937,57 @@ watch(
             toEmails.value = [];
             ccEmails.value = [];
             // Forward body content is handled by setQuotedContent
+        } else if (mode === "edit") {
+            // Populate from draft
+            toEmails.value = to.map((t: any) => t.email);
+            ccEmails.value = cc.map((c: any) => c.email);
+            bccEmails.value = (props.replyTo.bcc || []).map((b: any) => b.email);
+            subject.value = origSubject || "";
+            
+            if (ccEmails.value.length > 0) showCc.value = true;
+            if (bccEmails.value.length > 0) showBcc.value = true;
+
+            // Set Draft ID to update existing
+            draftId.value = props.replyTo.id;
+
+            // Set Account
+            if (props.replyTo.email_account_id) {
+                selectedAccountId.value = props.replyTo.email_account_id;
+            }
+
+            // Set Body
+            let body = props.replyTo.body_html || props.replyTo.body_plain || "";
+            
+            // Resolve CID images if any
+            if (body.includes('cid:') && props.replyTo.attachments) {
+                props.replyTo.attachments.forEach((att: any) => {
+                    if (att.content_id && att.url) {
+                        const cleanCid = att.content_id.replace(/[<>]/g, '');
+                        const escapedCid = cleanCid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const escapedFullCid = att.content_id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        
+                        // Match src="cid:..." or src='cid:...' or src=cid:...
+                        // Also handle urlencoded versions
+                        const pattern = new RegExp(`src=["'\\\\]*cid:(${escapedCid}|${escapedFullCid}|${encodeURIComponent(cleanCid)})["'\\\\]*`, 'gi');
+                        body = body.replace(pattern, `src="${att.url}"`);
+                    }
+                });
+            }
+
+            if (body && editor.value) {
+                 editor.value.commands.setContent(body);
+            } else {
+                setTimeout(() => {
+                    editor.value?.commands.setContent(body);
+                }, 100);
+            }
+            
+            // TODO: Attachments
+            // We need to fetch existing attachments or show them?
+            // Existing attachments are on the server. We should probably show them as chips?
+            // But `attachments` ref is `File[]` for NEW uploads.
+            // We might need a separate `existingAttachments` ref or convert them?
+            // For now, assuming basic text edit.
         }
 
         // Set initial quoted content
@@ -695,7 +1001,8 @@ function setQuotedContent(mode: string) {
     if (
         !props.replyTo ||
         mode === "compose" ||
-        mode === "forward-as-attachment"
+        mode === "forward-as-attachment" ||
+        mode === "edit"
     )
         return;
 
@@ -794,69 +1101,256 @@ function formatDate(dateStr: string) {
     return format(new Date(dateStr), "MMM d, yyyy, h:mm a");
 }
 
+const isSending = ref(false);
+
 async function handleSend() {
     if (!selectedAccount.value) {
         alert("Please select a sending account.");
         return;
     }
 
-    // Construct FormData
-    const formData = new FormData();
-
-    // Account ID
-    formData.append("account_id", String(selectedAccount.value.id));
-
-    // Recipients - must be objects with email (and optional name)
-    toEmails.value.forEach((email, index) => {
-        formData.append(`to[${index}][email]`, email);
-        formData.append(`to[${index}][name]`, ""); // Name not captured separately in current UI
-    });
-    ccEmails.value.forEach((email, index) => {
-        formData.append(`cc[${index}][email]`, email);
-        formData.append(`cc[${index}][name]`, "");
-    });
-    bccEmails.value.forEach((email, index) => {
-        formData.append(`bcc[${index}][email]`, email);
-        formData.append(`bcc[${index}][name]`, "");
-    });
-
-    // Subject
-    formData.append("subject", subject.value);
-
-    // Body content (use 'body' key as expected by backend)
-    let bodyContent = editor.value?.getHTML() || "";
-
-    // Append signature if selected
-    if (selectedSignature.value?.content) {
-        bodyContent += `<br><br>${selectedSignature.value.content}`;
+    // Basic validation
+    if (!toEmails.value.length && !ccEmails.value.length && !bccEmails.value.length) {
+        alert("Please add at least one recipient.");
+        return;
     }
-    formData.append("body", bodyContent);
+    
+    if (isSending.value) return;
+    isSending.value = true;
 
-    // Attachments
-    attachments.value.forEach((file, index) => {
-        formData.append(`attachments[${index}]`, file);
-    });
+    // Prepare data
+    const emailData = {
+        account_id: selectedAccount.value.id,
+        to: toEmails.value,
+        cc: ccEmails.value,
+        bcc: bccEmails.value,
+        subject: subject.value,
+        body_html: editor.value?.getHTML() || "",
+        body_plain: editor.value?.getText() || "",
+        attachments: attachments.value,
+        request_read_receipt: requestReadReceipt.value,
+    };
 
     try {
-        const success = await store.sendEmail(formData);
-
-        if (success) {
-            emit("send");
-            emit("close");
-        } else {
-            alert("Failed to send email. Please try again.");
+        console.log("[EmailComposer] Starting handleSend...");
+        // Use FormData for file uploads
+        const formData = new FormData();
+        formData.append("account_id", String(emailData.account_id));
+        emailData.to.forEach((email, i) => formData.append(`to[${i}][email]`, email));
+        emailData.cc.forEach((email, i) => formData.append(`cc[${i}][email]`, email));
+        emailData.bcc.forEach((email, i) => formData.append(`bcc[${i}][email]`, email));
+        formData.append("subject", emailData.subject);
+        
+        let bodyContent = emailData.body_html;
+        // Append signature if selected
+        if (selectedSignature.value?.content) {
+            bodyContent += `<br><br>${selectedSignature.value.content}`;
         }
-    } catch (e) {
-        console.error("Failed to send email:", e);
-        alert("An error occurred while sending the email.");
+        formData.append("body", bodyContent);
+
+        if (emailData.request_read_receipt) {
+             formData.append("request_read_receipt", "1");
+        }
+        
+        if (draftId.value) {
+            formData.append("draft_id", draftId.value);
+        }
+
+        emailData.attachments.forEach((file, i) => {
+            formData.append(`attachments[${i}]`, file);
+        });
+
+        const response = await axios.post("/api/emails", formData, {
+            headers: { 
+                "Content-Type": "multipart/form-data",
+            },
+        });
+        console.log("[EmailComposer] Send success:", response.data);
+
+        emit('send');
+        emit('close');
+    } catch (error) {
+        console.error("Error sending email:", error);
+        alert("Failed to send email. Please try again.");
+    } finally {
+        console.log("[EmailComposer] handleSend finished, resetting isSending.");
+        isSending.value = false;
     }
 }
 
+// Formatting Handlers
+const showColorPicker = ref(false);
+const showFontFamily = ref(false);
+const showFontSize = ref(false);
+
+const fontFamilies = [
+    { label: 'Sans Serif', value: 'Inter, sans-serif' },
+    { label: 'Serif', value: 'serif' },
+    { label: 'Monospace', value: 'monospace' },
+    { label: 'Comic Sans', value: '"Comic Sans MS", "Comic Sans", cursive' },
+];
+
+const fontSizes = [
+    { label: 'Small', value: '12px' },
+    { label: 'Normal', value: '14px' },
+    { label: 'Large', value: '18px' },
+    { label: 'Huge', value: '24px' },
+];
+
+const colors = [
+    '#000000', '#434343', '#666666', '#999999', '#b7b7b7', '#cccccc', '#d9d9d9', '#efefef', '#f3f3f3', '#ffffff',
+    '#980000', '#ff0000', '#ff9900', '#ffff00', '#00ff00', '#00ffff', '#4a86e8', '#0000ff', '#9900ff', '#ff00ff',
+];
+
+function setFontFamily(font: string) {
+    editor.value?.chain().focus().setFontFamily(font).run();
+    showFontFamily.value = false;
+}
+
+function setFontSize(size: string) {
+    editor.value?.chain().focus().setFontSize(size).run();
+    showFontSize.value = false;
+}
+
+function setColor(color: string) {
+    editor.value?.chain().focus().setColor(color).run();
+    showColorPicker.value = false;
+}
+
+function addImage() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e: Event) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const result = e.target?.result as string;
+                editor.value?.chain().focus().setImage({ src: result }).run();
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+    input.click();
+}
 
 function handleAiAssist() {
-    // TODO: Future AI-powered email assistance feature
-    console.log("AI Assist clicked - Coming Soon!");
-    alert("AI Assist is coming soon! 🚀✨");
+    alert("AI Assist features are coming soon!");
+}
+
+// --- Link Support ---
+function setLink() {
+    const previousUrl = editor.value?.getAttributes('link').href;
+    const url = window.prompt('URL', previousUrl);
+
+    // cancelled
+    if (url === null) {
+        return;
+    }
+
+    // empty
+    if (url === '') {
+        editor.value?.chain().focus().extendMarkRange('link').unsetLink().run();
+        return;
+    }
+
+    // update
+    editor.value?.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+}
+
+// --- Draft Logic ---
+function formatTime(date: Date) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+const saveDraft = async (silent = false) => {
+    if (!selectedAccount.value || savingDraft.value) return;
+
+    // Don't save empty drafts
+    if (!toEmails.value.length && !subject.value && (!editor.value || editor.value.isEmpty)) return;
+
+    savingDraft.value = true;
+
+    try {
+        const formData = new FormData();
+        formData.append("account_id", String(selectedAccount.value.id));
+        
+        toEmails.value.forEach((email, i) => formData.append(`to[${i}][email]`, email));
+        ccEmails.value.forEach((email, i) => formData.append(`cc[${i}][email]`, email));
+        bccEmails.value.forEach((email, i) => formData.append(`bcc[${i}][email]`, email));
+        
+        formData.append("subject", subject.value);
+        formData.append("body", editor.value?.getHTML() || "");
+        formData.append("is_draft", "1");
+
+        if (requestReadReceipt.value) {
+             formData.append("request_read_receipt", "1");
+        }
+        
+        attachments.value.forEach((file, i) => {
+            formData.append(`attachments[${i}]`, file);
+        });
+
+        let response;
+        if (draftId.value) {
+            // Update existing draft (use POST with _method=PUT for file uploads)
+            formData.append("_method", "PUT");
+            response = await axios.post(`/api/emails/${draftId.value}`, formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+        } else {
+            // Create new draft
+            response = await axios.post("/api/emails", formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            draftId.value = response.data.id;
+        }
+
+        lastSavedAt.value = new Date();
+    } catch (error) {
+        console.error("Failed to save draft:", error);
+    } finally {
+        savingDraft.value = false;
+    }
+};
+
+// Auto-save debounced
+const autoSave = useDebounceFn(() => {
+    saveDraft(true);
+}, 3000);
+
+// Watch for changes to trigger auto-save
+watch([toEmails, ccEmails, bccEmails, subject], () => {
+    autoSave();
+}, { deep: true });
+
+// Watch editor content separately (since it's not a simple ref)
+// actually we can just hook into editor onUpdate
+watch(() => editor.value?.getHTML(), () => {
+    autoSave();
+});
+
+// Drag and drop for inline images
+function handleDrop(event: DragEvent) {
+    const hasFiles = event.dataTransfer?.files?.length;
+    if (hasFiles) {
+        event.preventDefault();
+        const files = Array.from(event.dataTransfer!.files);
+        // Separate images for inline and others for attachment
+        files.forEach(file => {
+             if (file.type.startsWith('image/')) {
+                 const reader = new FileReader();
+                 reader.onload = (e) => {
+                     const result = e.target?.result as string;
+                     editor.value?.chain().focus().setImage({ src: result }).run();
+                 };
+                 reader.readAsDataURL(file);
+             } else {
+                 attachments.value.push(file);
+             }
+        });
+    }
 }
 
 onBeforeUnmount(() => {
@@ -881,5 +1375,16 @@ onBeforeUnmount(() => {
     color: var(--text-muted);
     pointer-events: none;
     height: 0;
+}
+</style>
+
+<style>
+/* Custom Scrollbar for Action Bar */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
 </style>

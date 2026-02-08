@@ -459,6 +459,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce', 'demo'])->grou
         Route::get('/{email}/body', [\App\Http\Controllers\Api\EmailController::class, 'body']);
         Route::get('/{email}/export', [\App\Http\Controllers\Api\EmailController::class, 'exportEml']);
         Route::get('/{email}/source', [\App\Http\Controllers\Api\EmailController::class, 'source']);
+        Route::post('/{email}/read-receipt', [\App\Http\Controllers\Api\EmailController::class, 'sendReadReceipt']);
         Route::match(['put', 'patch'], '/{email}', [\App\Http\Controllers\Api\EmailController::class, 'update']);
         Route::delete('/{email}', [\App\Http\Controllers\Api\EmailController::class, 'destroy']);
     });

@@ -216,13 +216,39 @@ class EmailController extends Controller
             }
         }
 
-        $email = $this->emailService->send(
-            $request->user(),
-            $account,
-            $request->validated()
-        );
+        try {
+            if ($request->boolean('is_draft')) {
+                $email = $this->emailService->saveDraft(
+                    $request->user(),
+                    $account,
+                    $request->validated()
+                );
+            } else {
+                $draft = null;
+                if ($request->filled('draft_id')) {
+                    $draft = Email::find($request->draft_id);
+                    if ($draft) {
+                        $this->authorize('update', $draft);
+                    }
+                }
 
-        return response()->json($email, 201);
+                $email = $this->emailService->send(
+                    $request->user(),
+                    $account,
+                    $request->validated(),
+                    $draft
+                );
+            }
+
+            return response()->json($email, 201);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to ' . ($request->boolean('is_draft') ? 'save draft' : 'send email') . ': ' . $e->getMessage(), [
+                'user_id' => $request->user()->id,
+                'account_id' => $account->id,
+                'exception' => $e
+            ]);
+            return response()->json(['error' => 'Failed to process email request: ' . $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -230,7 +256,46 @@ class EmailController extends Controller
      */
     public function update(Request $request, Email $email): JsonResponse
     {
+        // Increase time limit for image processing if any
+        set_time_limit(120);
+
         $this->authorize('update', $email);
+
+        // Draft update logic
+        if ($email->is_draft && $request->hasAny(['to', 'cc', 'bcc', 'subject', 'body', 'body_html'])) {
+            $this->authorize('update', $email); // Re-authorize for content update
+            
+            $data = $request->validate([
+                'to' => ['nullable', 'array'],
+                'to.*.email' => ['nullable', 'email'],
+                'cc' => ['nullable', 'array'],
+                'cc.*.email' => ['nullable', 'email'],
+                'bcc' => ['nullable', 'array'],
+                'bcc.*.email' => ['nullable', 'email'],
+                'subject' => ['nullable', 'string', 'max:998'],
+                'body' => ['nullable', 'string'],
+                'body_html' => ['nullable', 'string'],
+                'attachments' => ['nullable', 'array'],
+                'attachments.*' => ['file', 'max:25600'], // 25MB max
+                'request_read_receipt' => ['nullable', 'boolean'],
+            ]);
+
+            // Normalize body if sent as 'body' (common in our frontend)
+            if (isset($data['body']) && !isset($data['body_html'])) {
+                $data['body_html'] = $data['body'];
+            }
+
+            try {
+                $email = $this->emailService->updateDraft($email, $data);
+                return response()->json($email);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Failed to update draft: ' . $e->getMessage(), [
+                    'email_id' => $email->id,
+                    'exception' => $e
+                ]);
+                return response()->json(['error' => 'Failed to update draft: ' . $e->getMessage()], 500);
+            }
+        }
 
         if ($request->has('is_read')) {
             $request->boolean('is_read')
@@ -247,6 +312,18 @@ class EmailController extends Controller
         }
 
         return response()->json($email->fresh());
+    }
+
+    /**
+     * Send a read receipt for an email.
+     */
+    public function sendReadReceipt(Email $email): JsonResponse
+    {
+        $this->authorize('view', $email);
+        
+        $this->emailService->sendReadReceipt(auth()->user(), $email);
+        
+        return response()->json(['message' => 'Read receipt sent']);
     }
 
     /**

@@ -67,8 +67,12 @@ export const useEmailStore = defineStore("email", () => {
     const emails = ref<Email[]>([]);
     const folders = ref<EmailFolder[]>([...defaultFolders]);
     const labels = ref<EmailLabel[]>([]);
-    const remoteFolders = ref<any[]>([]);
+    const remoteFolders = ref<any[]>([]); // This will be replaced by accountFolders for specific account
+    const accountFolders = ref<Record<string, any[]>>({}); // Stores remote folders per account
     const accounts = ref<any[]>([]);
+    const accountsLoading = ref(false);
+    const foldersLoading = ref<Record<string, boolean>>({});
+    const initialLoadDone = ref(false);
     const loading = ref(false);
 
     // Pagination
@@ -146,7 +150,10 @@ export const useEmailStore = defineStore("email", () => {
     const subscribedRemoteFolders = computed(() => {
         if (!selectedAccount.value) return [];
         const disabled = selectedAccount.value.disabled_folders || [];
-        return remoteFolders.value.filter((f) => !disabled.includes(f.id));
+        const currentAccountRemoteFolders = selectedAccountId.value
+            ? accountFolders.value[selectedAccountId.value] || []
+            : [];
+        return currentAccountRemoteFolders.filter((f) => !disabled.includes(f.id));
     });
 
     const selectedFolder = computed(
@@ -283,14 +290,17 @@ export const useEmailStore = defineStore("email", () => {
     }
 
     async function fetchAccountFolders(accountId: string) {
+        if (foldersLoading.value[accountId]) return;
+
+        foldersLoading.value = { ...foldersLoading.value, [accountId]: true };
         try {
             const response = await axios.get(
                 `/api/email-accounts/${accountId}/remote-folders`,
             );
-            remoteFolders.value = response.data.data;
+            accountFolders.value = { ...accountFolders.value, [accountId]: response.data.data };
         } catch (error: any) {
             console.error("Failed to fetch account folders:", error);
-            remoteFolders.value = [];
+            accountFolders.value = { ...accountFolders.value, [accountId]: [] }; // Clear folders for this account on error
 
             // If 404/403, the account might be deleted or inaccessible
             if (

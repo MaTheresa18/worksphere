@@ -83,7 +83,7 @@ class EmailService implements EmailServiceContract
     /**
      * Send an email (dispatches job).
      */
-    public function send(User $user, EmailAccount $account, array $data): Email
+    public function send(User $user, EmailAccount $account, array $data, ?Email $draft = null): Email
     {
         // Check rate limit
         $this->checkRateLimit($user);
@@ -93,8 +93,20 @@ class EmailService implements EmailServiceContract
             + count($data['cc'] ?? [])
             + count($data['bcc'] ?? []);
 
-        // Create email record first to handle media persistence
-        $email = $this->createEmailRecord($user, $account, $data, isSent: true);
+        if ($draft) {
+             $email = $this->updateDraft($draft, $data);
+             $email->update([
+                 'folder' => EmailFolderType::Sent->value,
+                 'is_draft' => false,
+                 'sent_at' => now(),
+                 'email_account_id' => $account->id,
+                 'from_email' => $account->email,
+                 'from_name' => $account->name ?? $user->name,
+             ]);
+        } else {
+             // Create email record first to handle media persistence
+             $email = $this->createEmailRecord($user, $account, $data, isSent: true);
+        }
 
         if ($recipientCount > config('email.batch_threshold', 10)) {
             // Use bulk send for large recipient lists
@@ -144,6 +156,11 @@ class EmailService implements EmailServiceContract
      */
     public function updateDraft(Email $email, array $data): Email
     {
+        $headers = $email->headers ?? [];
+        if (isset($data['request_read_receipt'])) {
+            $headers['request_read_receipt'] = $data['request_read_receipt'];
+        }
+
         $email->update([
             'to' => $data['to'] ?? $email->to,
             'cc' => $data['cc'] ?? $email->cc,
@@ -151,7 +168,22 @@ class EmailService implements EmailServiceContract
             'subject' => $data['subject'] ?? $email->subject,
             'body_html' => $data['body'] ?? $email->body_html,
             'preview' => $this->generatePreview($data['body'] ?? $email->body_html),
+            'headers' => $headers,
         ]);
+
+        // Handle attachments
+        if (! empty($data['attachments'])) {
+            foreach ($data['attachments'] as $file) {
+                if ($file instanceof \Illuminate\Http\UploadedFile) {
+                    $email->addMedia($file)->toMediaCollection('attachments');
+                }
+            }
+        }
+
+        // Process inline images (Base64 to CID)
+        if (isset($data['body']) || isset($data['body_html'])) {
+             $this->processInlineImages($email);
+        }
 
         return $email->fresh();
     }
@@ -285,6 +317,9 @@ class EmailService implements EmailServiceContract
             'is_read' => true,
             'is_draft' => $isDraft,
             'has_attachments' => ! empty($data['attachments']),
+            'headers' => [ // Initialize headers with read receipt preference
+                'request_read_receipt' => $data['request_read_receipt'] ?? false,
+            ],
             'sent_at' => $isDraft ? null : now(),
         ]);
 
@@ -297,7 +332,105 @@ class EmailService implements EmailServiceContract
             }
         }
 
+        // Process inline images (Base64 to CID)
+        if (! empty($emailModel->body_html)) {
+            $this->processInlineImages($emailModel);
+        }
+
         return $emailModel;
+    }
+
+    /**
+     * Process inline images in the email body.
+     * Extracts base64 images, converts to attachments, and replaces with CID.
+     */
+    protected function processInlineImages(Email $email): void
+    {
+        $body = $email->body_html;
+        if (empty($body) || !str_contains($body, 'data:image/')) {
+            return;
+        }
+
+        // Use DOMDocument to parse HTML
+        $dom = new \DOMDocument();
+        // Suppress errors for invalid HTML structure (common in email bodies)
+        libxml_use_internal_errors(true);
+        // UTF-8 hack
+        $dom->loadHTML('<?xml encoding="UTF-8">' . $body, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+
+        $images = $dom->getElementsByTagName('img');
+        $hasChanges = false;
+
+        foreach ($images as $img) {
+            $src = $img->getAttribute('src');
+
+            // Check if it's a base64 image
+            if (str_starts_with($src, 'data:image/')) {
+                // Parse base64 data
+                // Format: data:image/png;base64,.....
+                if (preg_match('/^data:image\/(\w+);base64,/', $src, $type)) {
+                    $extension = strtolower($type[1]);
+                    // Fix jpg extension
+                    if ($extension === 'jpeg') {
+                        $extension = 'jpg';
+                    }
+
+                    $data = substr($src, strpos($src, ',') + 1);
+                    $data = base64_decode($data);
+
+                    if ($data === false) {
+                        continue;
+                    }
+
+                    // Create a temporary file
+                    $tmpFilePath = tempnam(sys_get_temp_dir(), 'email_inline_');
+                    file_put_contents($tmpFilePath, $data);
+
+                    // Generate a unique CID
+                    $cid = Str::random(20) . '@worksphere.local';
+                    $filename = 'image-' . Str::random(10) . '.' . $extension;
+
+                    // Attach to the email model using MediaLibrary
+                    try {
+                        $media = $email->addMedia($tmpFilePath)
+                            ->usingName(pathinfo($filename, PATHINFO_FILENAME))
+                            ->usingFileName($filename)
+                            ->withCustomProperties([
+                                'content_id' => $cid,
+                                'disposition' => 'inline',
+                            ])
+                            ->toMediaCollection('attachments');
+
+                        // Update src to CID
+                        $img->setAttribute('src', 'cid:' . $cid);
+                        // Add data-cid attribute for reference/debugging
+                        $img->setAttribute('data-cid', $cid);
+                        $hasChanges = true;
+
+                    } catch (\Exception $e) {
+                        \Illuminate\Support\Facades\Log::error('Failed to process inline image: ' . $e->getMessage(), [
+                            'email_id' => $email->id,
+                            'cid' => $cid,
+                            'exception' => $e
+                        ]);
+                    }
+                    
+                    // Cleanup temp file (MediaLibrary moves it usually, but if copy is made, temp remains. addMedia from path usually copies)
+                    // We should check if we need to delete. `addMedia` copies by default.
+                    // unlink($tmpFilePath); // Safe to delete after add
+                }
+            }
+        }
+
+        if ($hasChanges) {
+             // Save the modified body
+            $html = $dom->saveHTML();
+            // Remove the UTF-8 hack and common additions by loadHTML
+            $html = str_replace('<?xml encoding="UTF-8">', '', $html);
+            $email->body_html = $html;
+            $email->save();
+        }
     }
 
     /**
@@ -338,5 +471,23 @@ class EmailService implements EmailServiceContract
     public function fetchBody(Email $email): Email
     {
         return app(\App\Services\EmailSyncService::class)->fetchBody($email);
+    }
+
+    /**
+     * Send a read receipt (MDN).
+     */
+    public function sendReadReceipt(User $user, Email $email): void
+    {
+        // Must have a DNT header
+        $dnt = $email->headers['Disposition-Notification-To'] 
+            ?? $email->headers['disposition-notification-to'] 
+            ?? null;
+
+        if (!$dnt) {
+            return;
+        }
+
+        // Dispatch job to send MDN
+        \App\Jobs\SendReadReceiptJob::dispatch($email->id, $dnt);
     }
 }

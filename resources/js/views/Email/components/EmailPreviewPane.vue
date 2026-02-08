@@ -10,10 +10,32 @@
                     class="w-6 h-6 animate-spin text-(--text-muted)"
                 />
             </div>
+            
+            <!-- Read Receipt Prompt -->
+            <div v-if="showReadReceiptPrompt" class="mx-4 mt-4 p-3 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center justify-between shadow-sm shrink-0">
+                <div class="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+                    <InfoIcon class="w-4 h-4" />
+                    <span>The sender has requested a read receipt.</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button 
+                        @click="ignoreReadReceipt"
+                        class="px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/50 rounded-md transition-colors"
+                    >
+                        Ignore
+                    </button>
+                    <button 
+                        @click="sendReadReceipt"
+                        class="px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
+                    >
+                        Send Receipt
+                    </button>
+                </div>
+            </div>
 
             <!-- Thread View -->
             <div
-                v-else-if="threadMessages.length > 0 && activeTab === 'read'"
+                v-if="threadMessages.length > 0 && activeTab === 'read'"
                 class="flex-1 overflow-y-auto min-h-0 flex flex-col"
             >
                 <div
@@ -54,6 +76,7 @@
                         @forward-as-attachment="
                             openTab('forward-as-attachment', msg)
                         "
+                        @edit="openTab('edit', msg)"
                     />
                 </div>
             </div>
@@ -196,43 +219,53 @@
             v-if="props.email && activeTab === 'read'"
             class="px-4 py-2.5 border-t border-(--border-default) bg-(--surface-primary) flex items-center gap-3 overflow-x-auto"
         >
-            <div class="flex items-center gap-1.5 flex-shrink-0">
-                <!-- Main Replies -->
+            <div class="flex items-center gap-1.5 shrink-0">
+                <!-- Main Replies or Edit Draft -->
                 <div
                     class="flex items-center gap-1 p-0.5 bg-(--surface-secondary) rounded-lg border border-(--border-default)"
                 >
                     <button
-                        @click="
-                            openTab('reply', replyTargetEmail || props.email)
-                        "
+                        v-if="props.email.is_draft"
+                        @click="openTab('edit', props.email)"
                         class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold tracking-tight text-white bg-(--interactive-primary) hover:bg-(--interactive-primary-hover) transition-all shadow-sm"
                     >
-                        <ReplyIcon class="w-3.5 h-3.5" />
-                        REPLY
+                        <PencilIcon class="w-3.5 h-3.5" />
+                        EDIT DRAFT
                     </button>
-                    <button
-                        @click="
-                            openTab(
-                                'reply-all',
-                                replyTargetEmail || props.email,
-                            )
-                        "
-                        class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold text-(--text-primary) hover:bg-(--surface-tertiary) transition-all shadow-sm border border-transparent hover:border-(--border-default)"
-                        title="Reply All"
-                    >
-                        <ReplyAllIcon class="w-3.5 h-3.5" />
-                        Reply All
-                    </button>
-                    <button
-                        @click="
-                            openTab('forward', replyTargetEmail || props.email)
-                        "
-                        class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold text-(--text-primary) hover:bg-(--surface-tertiary) transition-all shadow-sm border border-transparent hover:border-(--border-default)"
-                        title="Forward"
-                    >
-                        <ForwardIcon class="w-3.5 h-3.5" />
-                        Forward
-                    </button>
+                    <template v-else>
+                        <button
+                            @click="
+                                openTab('reply', replyTargetEmail || props.email)
+                            "
+                            class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold tracking-tight text-white bg-(--interactive-primary) hover:bg-(--interactive-primary-hover) transition-all shadow-sm"
+                        >
+                            <ReplyIcon class="w-3.5 h-3.5" />
+                            REPLY
+                        </button>
+                        <button
+                            @click="
+                                openTab(
+                                    'reply-all',
+                                    replyTargetEmail || props.email,
+                                )
+                            "
+                            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold text-(--text-primary) hover:bg-(--surface-tertiary) transition-all shadow-sm border border-transparent hover:border-(--border-default)"
+                            title="Reply All"
+                        >
+                            <ReplyAllIcon class="w-3.5 h-3.5" />
+                            Reply All
+                        </button>
+                        <button
+                            @click="
+                                openTab('forward', replyTargetEmail || props.email)
+                            "
+                            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold text-(--text-primary) hover:bg-(--surface-tertiary) transition-all shadow-sm border border-transparent hover:border-(--border-default)"
+                            title="Forward"
+                        >
+                            <ForwardIcon class="w-3.5 h-3.5" />
+                            Forward
+                        </button>
+                    </template>
                 </div>
 
                 <!-- Secondary Actions -->
@@ -262,7 +295,7 @@
             </div>
 
             <!-- Toggles (Moved from Right) -->
-            <div class="flex items-center gap-1 flex-shrink-0">
+            <div class="flex items-center gap-1 shrink-0">
                 <!-- Star Action -->
                 <button
                     @click="store.toggleStar(props.email.id)"
@@ -298,7 +331,7 @@
 
                 <button
                     @click="deleteEmail"
-                    class="p-2 text-(--text-secondary) hover:bg-(--color-error)/10 hover:text-(--color-error) rounded-md transition-colors"
+                    class="p-2 text-(--text-secondary) hover:bg-error/10 hover:text-error rounded-md transition-colors"
                     title="Delete"
                 >
                     <TrashIcon class="w-3.5 h-3.5" />
@@ -375,6 +408,7 @@ import {
     ChevronRightIcon,
     StarIcon,
     MailIcon as MailUnreadIcon,
+    InfoIcon,
 } from "lucide-vue-next";
 import axios from "axios";
 import EmailPreviewContent from "./EmailPreviewContent.vue";
@@ -441,9 +475,57 @@ function formatSize(bytes: any) {
     return parseFloat((b / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
+// ... (existing code) ...
+
 const threadMessages = ref<any[]>([]);
 const loadingThread = ref(false);
 const replyTargetEmail = ref<Email | null>(null); // Specific email being replied to in thread
+
+// Read Receipt Logic
+const showReadReceiptPrompt = ref(false);
+const readReceiptEmail = ref<Email | null>(null);
+
+function checkForReadReceipt(email: Email) {
+    // Check if headers has Disposition-Notification-To
+    // and if we haven't already sent one (need to track this, maybe local storage for now or a flag on email)
+    // For now, simple check: if header exists and we are opening it.
+    
+    // We need to access headers. In the model it is cast to array.
+    // The key might be 'Disposition-Notification-To' or lowercase.
+    const headers = email.headers || {};
+    const dnt = headers['Disposition-Notification-To'] || headers['disposition-notification-to'];
+    
+    if (dnt && !localStorage.getItem(`read_receipt_sent_${email.id}`)) {
+        readReceiptEmail.value = email;
+        showReadReceiptPrompt.value = true;
+    }
+}
+
+async function sendReadReceipt() {
+    if (!readReceiptEmail.value) return;
+    
+    try {
+        await axios.post(`/api/emails/${readReceiptEmail.value.id}/read-receipt`);
+        alert("Read receipt sent.");
+        localStorage.setItem(`read_receipt_sent_${readReceiptEmail.value.id}`, 'true');
+    } catch (e) {
+        console.error("Failed to send read receipt", e);
+        alert("Failed to send read receipt.");
+    } finally {
+        showReadReceiptPrompt.value = false;
+        readReceiptEmail.value = null;
+    }
+}
+
+function ignoreReadReceipt() {
+    if (readReceiptEmail.value) {
+         localStorage.setItem(`read_receipt_sent_${readReceiptEmail.value.id}`, 'ignored');
+    }
+    showReadReceiptPrompt.value = false;
+    readReceiptEmail.value = null;
+}
+
+// ... (existing code) ...
 
 // Attachment State
 const isAttachmentsExpanded = ref(
@@ -647,6 +729,8 @@ watch(
                 threadMessages.value = [{ ...newEmail, isExpanded: true }];
             } finally {
                 loadingThread.value = false;
+                // Check for read receipt on the main email
+                checkForReadReceipt(newEmail);
             }
         } else {
             threadMessages.value = [];
@@ -696,7 +780,8 @@ function openTab(
         | "reply-all"
         | "forward"
         | "compose"
-        | "forward-as-attachment",
+        | "forward-as-attachment"
+        | "edit",
     targetEmail: Email | null = null,
 ) {
     const emailToUse = targetEmail || props.email;
@@ -709,6 +794,7 @@ function openTab(
         forward: `Fwd: ${emailToUse?.subject || "Forward"}`,
         "forward-as-attachment": `Fwd(Att): ${emailToUse?.subject || "Forward"}`,
         compose: "New Email",
+        edit: `Edit: ${emailToUse?.subject || "Draft"}`,
     };
     const icons = {
         reply: markRaw(ReplyIcon),
@@ -716,6 +802,7 @@ function openTab(
         forward: markRaw(ForwardIcon),
         "forward-as-attachment": markRaw(PaperclipIcon),
         compose: markRaw(PencilIcon),
+        edit: markRaw(PencilIcon),
     };
 
     tabs.value.push({
@@ -751,7 +838,6 @@ function closeActiveTab() {
 }
 
 function handleSend() {
-    // TODO: Implement send logic
     closeActiveTab();
 }
 

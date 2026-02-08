@@ -250,23 +250,32 @@
 
                 <div class="flex gap-2">
                     <button
-                        @click="emit('reply')"
+                        v-if="email.is_draft"
+                        @click="emit('edit')"
                         class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-(--interactive-primary) text-white hover:bg-(--interactive-primary)/90 transition-colors"
                     >
-                        <ReplyIcon class="w-3.5 h-3.5" /> Reply
+                        <PencilIcon class="w-3.5 h-3.5" /> Edit Draft
                     </button>
-                    <button
-                        @click="emit('reply-all')"
-                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-(--border-default) text-(--text-primary) hover:bg-(--surface-secondary) transition-colors"
-                    >
-                        <ReplyAllIcon class="w-3.5 h-3.5" /> Reply All
-                    </button>
-                    <button
-                        @click="emit('forward')"
-                        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-(--border-default) text-(--text-primary) hover:bg-(--surface-secondary) transition-colors"
-                    >
-                        <ForwardIcon class="w-3.5 h-3.5" /> Forward
-                    </button>
+                    <template v-else>
+                        <button
+                            @click="emit('reply')"
+                            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-(--interactive-primary) text-white hover:bg-(--interactive-primary)/90 transition-colors"
+                        >
+                            <ReplyIcon class="w-3.5 h-3.5" /> Reply
+                        </button>
+                        <button
+                            @click="emit('reply-all')"
+                            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-(--border-default) text-(--text-primary) hover:bg-(--surface-secondary) transition-colors"
+                        >
+                            <ReplyAllIcon class="w-3.5 h-3.5" /> Reply All
+                        </button>
+                        <button
+                            @click="emit('forward')"
+                            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-(--border-default) text-(--text-primary) hover:bg-(--surface-secondary) transition-colors"
+                        >
+                            <ForwardIcon class="w-3.5 h-3.5" /> Forward
+                        </button>
+                    </template>
                     <div class="h-4 w-px bg-(--border-default) mx-1"></div>
                     <button
                         @click="exportAsEml"
@@ -433,6 +442,7 @@ import {
     onBeforeUnmount,
     onMounted,
 } from "vue";
+import axios from "axios";
 import {
     PrinterIcon,
     Maximize2Icon,
@@ -440,6 +450,7 @@ import {
     AlertTriangleIcon,
     ReplyIcon,
     ForwardIcon,
+    PencilIcon,
     TrashIcon,
     MoreHorizontalIcon,
     ReplyAllIcon,
@@ -475,6 +486,7 @@ const emit = defineEmits<{
     "reply-all": [];
     forward: [];
     "forward-as-attachment": [];
+    edit: [];
 }>();
 
 // --- Security & Privacy ---
@@ -627,6 +639,9 @@ async function checkAndFetchBody() {
     }
 }
 
+// --- Syncing Placeholder ---
+const SYNCING_PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100"%3E%3Crect fill="%23f1f5f9" width="200" height="100"/%3E%3Ctext x="50%25" y="45%25" dominant-baseline="middle" text-anchor="middle" fill="%2394a3b8" font-family="sans-serif" font-size="12" font-weight="500"%3ESyncing image...%3C/text%3E%3Ctext x="50%25" y="65%25" dominant-baseline="middle" text-anchor="middle" fill="%23cbd5e1" font-family="sans-serif" font-size="10"%3EIt will appear shortly.%3C/text%3E%3C/svg%3E';
+
 // Reset image state when email changes
 watch(
     () => props.email?.id,
@@ -666,30 +681,17 @@ const sanitizedBody = computed(() => {
 
     // Step 1: Replace cid: references with actual attachment URLs (Fallback for existing emails)
     let html = props.email.body_html;
-    if (props.email.attachments?.length) {
+    if (props.email.attachments?.length && html.includes("cid:")) {
         props.email.attachments.forEach((att) => {
             if (att.content_id && att.url) {
-                const escapedCid = att.content_id.replace(
-                    /[.*+?^${}()|[\]\\]/g,
-                    "\\$&",
-                );
-                const cleanCid = escapedCid.replace(/^<|>$/g, "");
-
+                const cleanCid = att.content_id.replace(/[<>]/g, "");
+                const escapedCid = cleanCid.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                const escapedFullCid = att.content_id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                
                 // Matches src="cid:...", src='cid:...', src=\"cid:...\", or src=cid:...
-                const patterns = [
-                    new RegExp(
-                        `src=[\\\\"]*cid:(?:&lt;|<)?${cleanCid}(?:&gt;|>)?([\\\\"]*)`,
-                        "gi",
-                    ),
-                    new RegExp(
-                        `src=[']cid:(?:&lt;|<)?${cleanCid}(?:&gt;|>)?[']`,
-                        "gi",
-                    ),
-                ];
-
-                patterns.forEach((pattern) => {
-                    html = html.replace(pattern, `src="${att.url}"$1`);
-                });
+                // Handles optional brackets and various quote types
+                const pattern = new RegExp(`src\\s*=\\s*[\\\\"'\\s]*cid\\s*:\\s*(?:&lt;|<)?(${escapedCid}|${escapedFullCid}|${encodeURIComponent(cleanCid)})(?:&gt;|>)?([\\\\"'\\s]*)`, "gi");
+                html = html.replace(pattern, `src="${att.url}"$2`);
             }
         });
     }
@@ -741,6 +743,18 @@ const sanitizedBody = computed(() => {
                             currentNode.style.maxWidth = "200px";
                             currentNode.style.border = "1px dashed #d1d5db";
                             currentNode.style.borderRadius = "4px";
+                        }
+                    }
+
+                    // Handling Internal CID Images not yet ready
+                    if (src.includes("/api/media/")) {
+                        const mediaId = src.split("/").pop();
+                        const attachment = props.email.attachments?.find((a: any) => String(a.id) === String(mediaId));
+                        
+                        if (attachment && attachment.is_ready === false) {
+                            currentNode.setAttribute("data-original-src", src);
+                            currentNode.setAttribute("src", SYNCING_PLACEHOLDER);
+                            currentNode.setAttribute("data-is-syncing", "true");
                         }
                     }
                 }
@@ -867,9 +881,12 @@ watch(
             ::-webkit-scrollbar-thumb { background-color: #d1d5db; border-radius: 4px; }
         `;
 
+        // Content is already CID-resolved in sanitizedBody computed property
+        const htmlWithCids = html;
+
         // Inject content
         if (shadowRoot.value) {
-            shadowRoot.value.innerHTML = `<style>${style}</style><div id="email-body">${html}</div>`;
+            shadowRoot.value.innerHTML = `<style>${style}</style><div id="email-body">${htmlWithCids}</div>`;
 
             // Adjust height to fit content
             nextTick(() => {
@@ -889,11 +906,62 @@ watch(
 
                 // Add click listener for Image Preview (MediaViewer)
                 shadowRoot.value?.addEventListener("click", handleImageClick);
+
+                // Add error listener for Images (Retry Loop)
+                shadowRoot.value?.querySelectorAll("img").forEach((img) => {
+                    const src = img.getAttribute("src");
+                    if (src && (src.includes("/api/media/") || img.hasAttribute("data-is-syncing"))) {
+                        setupImageSyncRetry(img);
+                    }
+                });
             });
         }
     },
     { immediate: true },
 );
+
+function setupImageSyncRetry(img: HTMLImageElement) {
+    let retries = 0;
+    const maxRetries = 10;
+    const interval = 5000; // 5 seconds
+    const originalSrc = img.getAttribute("data-original-src") || img.src;
+
+    const attemptReload = () => {
+        if (retries >= maxRetries) {
+            console.warn(`[EmailPreview] Image retry failed after ${maxRetries} attempts:`, originalSrc);
+            return;
+        }
+
+        const testImg = new Image();
+        testImg.onload = () => {
+            img.src = originalSrc;
+            img.removeAttribute("data-is-syncing");
+            img.removeAttribute("data-original-src");
+            img.style.maxWidth = ""; // Reset placeholder constraints if any
+            img.style.border = "";
+        };
+        testImg.onerror = () => {
+            retries++;
+            setTimeout(attemptReload, interval);
+        };
+        
+        // Append unique param to bypass cache
+        testImg.src = originalSrc + (originalSrc.includes('?') ? '&' : '?') + 'retry=' + retries;
+    };
+
+    if (img.src === SYNCING_PLACEHOLDER || img.getAttribute("data-is-syncing") === "true") {
+        setTimeout(attemptReload, interval);
+    } else {
+        img.onerror = () => {
+            if (img.src !== SYNCING_PLACEHOLDER) {
+                img.setAttribute("data-original-src", img.src);
+                img.src = SYNCING_PLACEHOLDER;
+                img.setAttribute("data-is-syncing", "true");
+                setTimeout(attemptReload, interval);
+            }
+        };
+    }
+}
 
 function handleImageClick(event: MouseEvent) {
     const target = event.target as HTMLElement;

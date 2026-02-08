@@ -13,6 +13,8 @@ class SendEmailRequest extends FormRequest
 
     public function rules(): array
     {
+        $isDraft = $this->boolean('is_draft');
+
         return [
             'account_id' => [
                 'required',
@@ -30,8 +32,8 @@ class SendEmailRequest extends FormRequest
                     }
                 },
             ],
-            'to' => ['required', 'array', 'min:1'],
-            'to.*.email' => ['required', 'email'],
+            'to' => [$isDraft ? 'nullable' : 'required', 'array', $isDraft ? '' : 'min:1'],
+            'to.*.email' => ['required_with:to', 'email'],
             'to.*.name' => ['nullable', 'string', 'max:255'],
             'cc' => ['nullable', 'array'],
             'cc.*.email' => ['required_with:cc', 'email'],
@@ -39,12 +41,14 @@ class SendEmailRequest extends FormRequest
             'bcc' => ['nullable', 'array'],
             'bcc.*.email' => ['required_with:bcc', 'email'],
             'bcc.*.name' => ['nullable', 'string', 'max:255'],
-            'subject' => ['required', 'string', 'max:998'], // RFC 2822 limit
-            'body' => ['required', 'string'],
+            'subject' => [$isDraft ? 'nullable' : 'required', 'string', 'max:998'],
+            'body' => [$isDraft ? 'nullable' : 'required', 'string'],
             'signature_id' => ['nullable', 'exists:email_signatures,id'],
             'attachments' => ['nullable', 'array'],
             'attachments.*' => ['file', 'max:25600'], // 25MB
             'is_draft' => ['boolean'],
+            'draft_id' => ['nullable', 'exists:emails,id'],
+            'request_read_receipt' => ['nullable', 'boolean'],
         ];
     }
 

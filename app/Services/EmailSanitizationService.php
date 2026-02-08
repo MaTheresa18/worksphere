@@ -268,56 +268,71 @@ class EmailSanitizationService
      */
     public function resolveInlineImages(\App\Models\Email $email): string
     {
-        $html = $email->body_html;
-        if (empty($html)) {
-            return (string) $html;
-        }
-
-        // Refresh media relation if not loaded
-        if (!$email->relationLoaded('media')) {
-            $email->load('media');
-        }
-        
-        $attachments = $email->getMedia('attachments');
-        if ($attachments->isEmpty()) {
-            return (string) $html;
-        }
-
-        foreach ($attachments as $media) {
-            $contentId = $media->getCustomProperty('content_id');
-            if (!$contentId) {
-                continue;
+        try {
+            $html = $email->body_html;
+            if (empty($html)) {
+                return (string) $html;
             }
 
-            // Possible variants of the CID in the HTML
-            $cleanCid = trim($contentId, '<>');
-            $url = route('api.media.show', ['media' => $media->id]);
+            // Refresh media relation if not loaded
+            if (!$email->relationLoaded('media')) {
+                $email->load('media');
+            }
             
-            $variants = [
-                $cleanCid,
-                '<' . $cleanCid . '>',
-                '&lt;' . $cleanCid . '&gt;',
-            ];
-
-            foreach ($variants as $variant) {
-                $v = preg_quote($variant, '/');
-                $ev = preg_quote(urlencode($variant), '/');
-                
-                // Matches src="cid:...", src='cid:...', src=\"cid:...\", src=\'cid:...\', or src=cid:...
-                $pattern = '/src\s*=\s*[\\\\\'"]*cid:('.$v.'|'.$ev.')[\\\\\'"]*/i';
-                $html = preg_replace($pattern, 'src="'.$url.'"', $html);
+            $attachments = $email->getMedia('attachments');
+            if ($attachments->isEmpty()) {
+                return (string) $html;
             }
-        }
 
-        // Final check: if there are still cid: references, try a more aggressive replacement
-        // but only for things that look like they are in a src attribute
-        if (str_contains($html, 'cid:')) {
-            $html = preg_replace('/(src\s*=\s*[\\\\\'"]*)cid:([^\\\\\'"\s>]+)/i', '$1' . route('api.media.show', ['media' => 'placeholder']) . '/$2', $html);
-            // Note: the above placeholder is just a fallback to show SOMETHING or allow debugging
-            // In practice, we want exact matches higher up.
-        }
+            foreach ($attachments as $media) {
+                $contentId = $media->getCustomProperty('content_id');
+                if (!$contentId) {
+                    continue;
+                }
 
-        return $html;
+                // Possible variants of the CID in the HTML
+                $cleanCid = trim($contentId, '<>');
+                try {
+                    $url = route('api.media.show', ['media' => $media->id]);
+                } catch (\Exception $e) {
+                    Log::warning('[EmailSanitizationService] Failed to generate route for media', [
+                        'media_id' => $media->id,
+                        'error' => $e->getMessage()
+                    ]);
+                    continue;
+                }
+                
+                $variants = [
+                    $cleanCid,
+                    '<' . $cleanCid . '>',
+                    '&lt;' . $cleanCid . '&gt;',
+                ];
+
+                foreach ($variants as $variant) {
+                    $v = preg_quote($variant, '/');
+                    $ev = preg_quote(urlencode($variant), '/');
+                    
+                    // Matches src="cid:...", src='cid:...', src=\"cid:...\", src=\'cid:...\', or src=cid:...
+                    $pattern = '/src\s*=\s*[\\\\\'"]*cid:('.$v.'|'.$ev.')[\\\\\'"]*/i';
+                    $html = preg_replace($pattern, 'src="'.$url.'"', $html);
+                }
+            }
+
+            // Final check: if there are still cid: references, try a more aggressive replacement
+            // but only for things that look like they are in a src attribute
+            if (str_contains($html, 'cid:')) {
+                $baseUrl = route('api.media.show', ['media' => 'placeholder']);
+                $html = preg_replace('/(src\s*=\s*[\\\\\'"]*)cid:([^\\\\\'"\s>]+)/i', '$1' . $baseUrl . '/$2', $html);
+            }
+
+            return $html;
+        } catch (\Throwable $e) {
+            Log::error('[EmailSanitizationService] resolveInlineImages failed', [
+                'email_id' => $email->id,
+                'error' => $e->getMessage()
+            ]);
+            return $email->body_html ?? '';
+        }
     }
 
     /**

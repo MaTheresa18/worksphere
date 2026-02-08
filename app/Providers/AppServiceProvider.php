@@ -160,5 +160,10 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('login', function (Request $request) {
             return Limit::perMinute(10)->by($request->ip());
         });
+
+        // Rate limiter for email sending per account (used by SendEmailJob)
+        RateLimiter::for('email-send-account', function ($job) {
+            return Limit::perMinute(10)->by($job->accountId);
+        });
     }
 }

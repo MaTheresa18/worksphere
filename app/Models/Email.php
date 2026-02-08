@@ -280,6 +280,7 @@ class Email extends Model implements HasMedia
                 'url' => route('api.media.show', ['media' => $media->id]),
                 'content_id' => $media->getCustomProperty('content_id'),
                 'is_inline' => $media->getCustomProperty('is_inline', false),
+                'is_ready' => file_exists($media->getPath()),
                 'is_downloaded' => true,
             ];
         });

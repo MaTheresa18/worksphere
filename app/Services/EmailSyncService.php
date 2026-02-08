@@ -604,6 +604,7 @@ class EmailSyncService implements EmailSyncServiceContract
                     // Store attachments if they are provided in sync data
                     if (!empty($emailData['attachments'])) {
                         $placeholders = [];
+                        $oldPlaceholders = $email->attachment_placeholders ?? [];
                         $existingMedia = $email->getMedia('attachments');
                         
                         foreach ($emailData['attachments'] as $attachment) {
@@ -622,7 +623,29 @@ class EmailSyncService implements EmailSyncServiceContract
                                 // Preserve all metadata (id, attachment_id, etc.) except the content
                                 $placeholder = $attachment;
                                 unset($placeholder['content']);
-                                $placeholders[] = $placeholder;
+                                
+                                // [Stability Fix] Try to preserve the old index if this attachment was already known
+                                $preservedIndex = null;
+                                foreach ($oldPlaceholders as $idx => $old) {
+                                    $matchByCid = !empty($attachment['content_id']) && !empty($old['content_id']) && $attachment['content_id'] === $old['content_id'];
+                                    $matchByName = ($attachment['name'] ?? '') === ($old['name'] ?? '') && abs(($attachment['size'] ?? 0) - ($old['size'] ?? 0)) < 1024;
+                                    
+                                    if ($matchByCid || $matchByName) {
+                                        $preservedIndex = $idx;
+                                        break;
+                                    }
+                                }
+
+                                if ($preservedIndex !== null) {
+                                    $placeholders[$preservedIndex] = $placeholder;
+                                } else {
+                                    // Find next available integer index
+                                    $nextIdx = 0;
+                                    while (isset($placeholders[$nextIdx])) {
+                                        $nextIdx++;
+                                    }
+                                    $placeholders[$nextIdx] = $placeholder;
+                                }
                                 continue;
                             }
 
