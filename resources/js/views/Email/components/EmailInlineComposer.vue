@@ -249,277 +249,308 @@
 
         <!-- Action Bar -->
         <div
-            class="p-3 border-t border-(--border-default) bg-(--surface-secondary)"
+            class="p-2 border-t border-(--border-default) bg-(--surface-secondary)"
         >
             <div
-                class="flex items-center overflow-x-auto scrollbar-hide -mx-3 px-3 gap-1"
+                class="flex items-center flex-wrap gap-2.5 px-1 pb-1"
             >
-                <!-- Attach -->
-                <input
-                    ref="fileInput"
-                    type="file"
-                    multiple
-                    class="hidden"
-                    @change="handleFileSelect"
-                />
-                <button
-                    @click="fileInput?.click()"
-                    class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors shrink-0"
-                    title="Attach file"
-                >
-                    <PaperclipIcon class="w-4 h-4" />
-                </button>
-
-                <div
-                    class="w-px h-5 bg-(--border-default) mx-1 shrink-0"
-                ></div>
-
-                <div
-                    class="w-px h-5 bg-(--border-default) mx-1 shrink-0"
-                ></div>
-
-                <!-- Formatting -->
-                 <Dropdown align="start" class="shrink-0" :close-on-select="true">
-                    <template #trigger>
-                        <button
-                            class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors flex items-center gap-1"
-                            title="Font Family"
-                        >
-                            <TypeIcon class="w-4 h-4" />
-                            <ChevronDownIcon class="w-3 h-3 opacity-50" />
-                        </button>
-                    </template>
-                    <div class="p-1 min-w-[150px]">
-                        <button
-                            v-for="font in fontFamilies"
-                            :key="font.value"
-                            @click="setFontFamily(font.value)"
-                             class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-(--surface-tertiary) transition-colors"
-                             :style="{ fontFamily: font.value }"
-                             :class="editor?.isActive('textStyle', { fontFamily: font.value }) ? 'text-(--interactive-primary) bg-(--interactive-primary)/5' : 'text-(--text-primary)'"
-                        >
-                            {{ font.label }}
-                        </button>
-                    </div>
-                 </Dropdown>
-
-                 <Dropdown align="start" class="shrink-0" :close-on-select="true">
-                    <template #trigger>
-                         <button
-                            class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors flex items-center gap-1"
-                            title="Font Size"
-                        >
-                            <BaselineIcon class="w-4 h-4" />
-                            <ChevronDownIcon class="w-3 h-3 opacity-50" />
-                        </button>
-                    </template>
-                    <div class="p-1 min-w-[100px]">
-                         <button
-                            v-for="size in fontSizes"
-                            :key="size.value"
-                            @click="setFontSize(size.value)"
-                             class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-(--surface-tertiary) transition-colors"
-                             :class="editor?.isActive('textStyle', { fontSize: size.value }) ? 'text-(--interactive-primary) bg-(--interactive-primary)/5' : 'text-(--text-primary)'"
-                        >
-                            <span :style="{ fontSize: size.value }">{{ size.label }}</span>
-                        </button>
-                    </div>
-                 </Dropdown>
-                 
-                 <div class="w-px h-5 bg-(--border-default) mx-1 shrink-0"></div>
-
-                <button
-                    @click="editor?.chain().focus().toggleBold().run()"
-                    :class="[
-                        editor?.isActive('bold')
-                            ? 'bg-(--surface-tertiary) text-(--text-primary)'
-                            : 'text-(--text-secondary)',
-                    ]"
-                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
-                    title="Bold"
-                >
-                    <BoldIcon class="w-4 h-4" />
-                </button>
-                <button
-                    @click="editor?.chain().focus().toggleItalic().run()"
-                    :class="[
-                        editor?.isActive('italic')
-                            ? 'bg-(--surface-tertiary) text-(--text-primary)'
-                            : 'text-(--text-secondary)',
-                    ]"
-                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
-                    title="Italic"
-                >
-                    <ItalicIcon class="w-4 h-4" />
-                </button>
-                <button
-                    @click="editor?.chain().focus().toggleUnderline().run()"
-                     :class="[
-                        editor?.isActive('underline')
-                            ? 'bg-(--surface-tertiary) text-(--text-primary)'
-                            : 'text-(--text-secondary)',
-                    ]"
-                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
-                    title="Underline"
-                >
-                    <UnderlineIcon class="w-4 h-4" />
-                </button>
-                
-                 <Dropdown align="start" class="shrink-0" :close-on-select="true">
-                    <template #trigger>
-                         <button
-                            class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors"
-                            title="Text Color"
-                        >
-                            <PaletteIcon class="w-4 h-4" :style="{ color: editor?.getAttributes('textStyle').color }" />
-                        </button>
-                    </template>
-                    <div class="p-2 grid grid-cols-5 gap-1 w-[160px]">
-                         <button
-                            v-for="color in colors"
-                            :key="color"
-                            @click="setColor(color)"
-                             class="w-6 h-6 rounded-full border border-(--border-subtle) hover:scale-110 transition-transform"
-                             :style="{ backgroundColor: color }"
-                             :title="color"
-                        />
-                    </div>
-                 </Dropdown>
-
-                <div class="w-px h-5 bg-(--border-default) mx-1 shrink-0"></div>
-                
-                 <button
-                    @click="editor?.chain().focus().setTextAlign('left').run()"
-                    :class="[
-                        editor?.isActive({ textAlign: 'left' })
-                            ? 'bg-(--surface-tertiary) text-(--text-primary)'
-                            : 'text-(--text-secondary)',
-                    ]"
-                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
-                    title="Align Left"
-                >
-                    <AlignLeftIcon class="w-4 h-4" />
-                </button>
-                 <button
-                    @click="editor?.chain().focus().setTextAlign('center').run()"
-                    :class="[
-                        editor?.isActive({ textAlign: 'center' })
-                            ? 'bg-(--surface-tertiary) text-(--text-primary)'
-                            : 'text-(--text-secondary)',
-                    ]"
-                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
-                    title="Align Center"
-                >
-                    <AlignCenterIcon class="w-4 h-4" />
-                </button>
-                 <button
-                    @click="editor?.chain().focus().setTextAlign('right').run()"
-                    :class="[
-                        editor?.isActive({ textAlign: 'right' })
-                            ? 'bg-(--surface-tertiary) text-(--text-primary)'
-                            : 'text-(--text-secondary)',
-                    ]"
-                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
-                    title="Align Right"
-                >
-                    <AlignRightIcon class="w-4 h-4" />
-                </button>
-
-                <div class="w-px h-5 bg-(--border-default) mx-1 shrink-0"></div>
-
-                <button
-                    @click="editor?.chain().focus().toggleBulletList().run()"
-                    :class="[
-                        editor?.isActive('bulletList')
-                            ? 'bg-(--surface-tertiary) text-(--text-primary)'
-                            : 'text-(--text-secondary)',
-                    ]"
-                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
-                    title="Bullet List"
-                >
-                    <ListIcon class="w-4 h-4" />
-                </button>
-                
-                 <button
-                    @click="addImage"
-                    class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors shrink-0"
-                    title="Insert Image"
-                >
-                    <ImageIcon class="w-4 h-4" />
-                </button>
-                
-                 <button
-                    @click="setLink"
-                    :class="[
-                        editor?.isActive('link')
-                            ? 'bg-(--surface-tertiary) text-(--text-primary)'
-                            : 'text-(--text-secondary)',
-                    ]"
-                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
-                    title="Insert Link"
-                >
-                    <LinkIcon class="w-4 h-4" />
-                </button>
-
-                <div
-                    class="w-px h-5 bg-(--border-default) mx-1 shrink-0"
-                ></div>
-
-                <!-- Template Selector -->
-                <Dropdown :items="templateItems" align="start">
-                    <template #trigger>
-                        <button
-                            class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors shrink-0"
-                            title="Insert template"
-                        >
-                            <FileTextIcon class="w-4 h-4" />
-                        </button>
-                    </template>
-                </Dropdown>
-
-                <!-- Signature Selector -->
-                <Dropdown :items="signatureItems" align="start">
-                    <template #trigger>
-                        <button
-                            class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors shrink-0"
-                            title="Select signature"
-                        >
-                            <PenToolIcon class="w-4 h-4" />
-                        </button>
-                    </template>
-                </Dropdown>
-
-                <div
-                    class="w-px h-5 bg-(--border-default) mx-1 shrink-0"
-                ></div>
-
-                <!-- AI Assist (Future Feature) -->
-                <button
-                    @click="handleAiAssist"
-                    class="p-1.5 rounded-lg text-(--accent-primary) hover:bg-(--surface-active) transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap"
-                    title="AI Assist (Coming Soon)"
-                >
-                    <SparklesIcon class="w-4 h-4" />
-                    <span class="text-xs font-medium hidden sm:inline"
-                        >Auto-Complete</span
+                <!-- Group 1: Core Actions -->
+                <div class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm">
+                    <input
+                        ref="fileInput"
+                        type="file"
+                        multiple
+                        class="hidden"
+                        @change="handleFileSelect"
+                    />
+                    <button
+                        @click="fileInput?.click()"
+                        class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                        title="Attach file"
                     >
-                </button>
+                        <PaperclipIcon class="w-4 h-4" />
+                    </button>
 
-            </div>
-            
-            <!-- Send Options (Bottom Row) -->
-             <div class="flex items-center gap-4 mt-2 px-1">
-                <label class="flex items-center gap-2 cursor-pointer group">
-                    <div class="relative flex items-center">
+                    <!-- Template Selector -->
+                    <Dropdown :items="templateItems" align="start">
+                        <template #trigger>
+                            <button
+                                class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                                title="Insert template"
+                            >
+                                <FileTextIcon class="w-4 h-4" />
+                            </button>
+                        </template>
+                    </Dropdown>
+
+                    <!-- Signature Selector -->
+                    <Dropdown :items="signatureItems" align="start">
+                        <template #trigger>
+                            <button
+                                class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                                title="Select signature"
+                            >
+                                <PenToolIcon class="w-4 h-4" />
+                            </button>
+                        </template>
+                    </Dropdown>
+                </div>
+
+                <!-- Group 2: Typography -->
+                <div class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm">
+                    <Dropdown align="start" class="shrink-0" :close-on-select="true">
+                        <template #trigger>
+                            <button
+                                class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors flex items-center gap-1"
+                                title="Font Family"
+                            >
+                                <TypeIcon class="w-4 h-4" />
+                                <ChevronDownIcon class="w-3 h-3 opacity-50" />
+                            </button>
+                        </template>
+                        <div class="p-1 min-w-[150px]">
+                            <button
+                                v-for="font in fontFamilies"
+                                :key="font.value"
+                                @click="setFontFamily(font.value)"
+                                class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-(--surface-tertiary) transition-colors"
+                                :style="{ fontFamily: font.value }"
+                                :class="editor?.isActive('textStyle', { fontFamily: font.value }) ? 'text-(--interactive-primary) bg-(--interactive-primary)/5' : 'text-(--text-primary)'"
+                            >
+                                {{ font.label }}
+                            </button>
+                        </div>
+                    </Dropdown>
+
+                    <Dropdown align="start" class="shrink-0" :close-on-select="true">
+                        <template #trigger>
+                            <button
+                                class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors flex items-center gap-1"
+                                title="Font Size"
+                            >
+                                <BaselineIcon class="w-4 h-4" />
+                                <ChevronDownIcon class="w-3 h-3 opacity-50" />
+                            </button>
+                        </template>
+                        <div class="p-1 min-w-[100px]">
+                            <button
+                                v-for="size in fontSizes"
+                                :key="size.value"
+                                @click="setFontSize(size.value)"
+                                class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-(--surface-tertiary) transition-colors"
+                                :class="editor?.isActive('textStyle', { fontSize: size.value }) ? 'text-(--interactive-primary) bg-(--interactive-primary)/5' : 'text-(--text-primary)'"
+                            >
+                                <span :style="{ fontSize: size.value }">{{ size.label }}</span>
+                            </button>
+                        </div>
+                    </Dropdown>
+                </div>
+
+                <!-- Group 3: Formatting -->
+                <div class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm">
+                    <button
+                        @click="editor?.chain().focus().toggleBold().run()"
+                        :class="[
+                            editor?.isActive('bold')
+                                ? 'bg-(--surface-tertiary) text-(--text-primary)'
+                                : 'text-(--text-secondary)',
+                        ]"
+                        class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                        title="Bold"
+                    >
+                        <BoldIcon class="w-4 h-4" />
+                    </button>
+                    <button
+                        @click="editor?.chain().focus().toggleItalic().run()"
+                        :class="[
+                            editor?.isActive('italic')
+                                ? 'bg-(--surface-tertiary) text-(--text-primary)'
+                                : 'text-(--text-secondary)',
+                        ]"
+                        class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                        title="Italic"
+                    >
+                        <ItalicIcon class="w-4 h-4" />
+                    </button>
+                    <button
+                        @click="editor?.chain().focus().toggleUnderline().run()"
+                        :class="[
+                            editor?.isActive('underline')
+                                ? 'bg-(--surface-tertiary) text-(--text-primary)'
+                                : 'text-(--text-secondary)',
+                        ]"
+                        class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                        title="Underline"
+                    >
+                        <UnderlineIcon class="w-4 h-4" />
+                    </button>
+                    <Dropdown align="start" class="shrink-0" :close-on-select="true">
+                        <template #trigger>
+                            <button
+                                class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors"
+                                title="Text Color"
+                            >
+                                <PaletteIcon class="w-4 h-4" :style="{ color: editor?.getAttributes('textStyle').color }" />
+                            </button>
+                        </template>
+                        <div class="p-2 grid grid-cols-5 gap-1 w-[160px]">
+                            <button
+                                v-for="color in colors"
+                                :key="color"
+                                @click="setColor(color)"
+                                class="w-6 h-6 rounded-full border border-(--border-subtle) hover:scale-110 transition-transform"
+                                :style="{ backgroundColor: color }"
+                                :title="color"
+                            />
+                        </div>
+                    </Dropdown>
+                </div>
+
+                <!-- Group 4: Layout -->
+                <div class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm">
+                    <button
+                        @click="editor?.chain().focus().setTextAlign('left').run()"
+                        :class="[
+                            editor?.isActive({ textAlign: 'left' })
+                                ? 'bg-(--surface-tertiary) text-(--text-primary)'
+                                : 'text-(--text-secondary)',
+                        ]"
+                        class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                        title="Align Left"
+                    >
+                        <AlignLeftIcon class="w-4 h-4" />
+                    </button>
+                    <button
+                        @click="editor?.chain().focus().setTextAlign('center').run()"
+                        :class="[
+                            editor?.isActive({ textAlign: 'center' })
+                                ? 'bg-(--surface-tertiary) text-(--text-primary)'
+                                : 'text-(--text-secondary)',
+                        ]"
+                        class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                        title="Align Center"
+                    >
+                        <AlignCenterIcon class="w-4 h-4" />
+                    </button>
+                    <button
+                        @click="editor?.chain().focus().setTextAlign('right').run()"
+                        :class="[
+                            editor?.isActive({ textAlign: 'right' })
+                                ? 'bg-(--surface-tertiary) text-(--text-primary)'
+                                : 'text-(--text-secondary)',
+                        ]"
+                        class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                        title="Align Right"
+                    >
+                        <AlignRightIcon class="w-4 h-4" />
+                    </button>
+                    <button
+                        @click="editor?.chain().focus().toggleBulletList().run()"
+                        :class="[
+                            editor?.isActive('bulletList')
+                                ? 'bg-(--surface-tertiary) text-(--text-primary)'
+                                : 'text-(--text-secondary)',
+                        ]"
+                        class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                        title="Bullet List"
+                    >
+                        <ListIcon class="w-4 h-4" />
+                    </button>
+                </div>
+
+                <!-- Group 5: Inserts -->
+                <div class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm">
+                    <button
+                        @click="addImage"
+                        class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                        title="Insert Image"
+                    >
+                        <ImageIcon class="w-4 h-4" />
+                    </button>
+                    <button
+                        @click="setLink"
+                        :class="[
+                            editor?.isActive('link')
+                                ? 'bg-(--surface-tertiary) text-(--text-primary)'
+                                : 'text-(--text-secondary)',
+                        ]"
+                        class="p-2 rounded-lg hover:bg-(--surface-tertiary) transition-colors shrink-0"
+                        title="Insert Link"
+                    >
+                        <LinkIcon class="w-4 h-4" />
+                    </button>
+                </div>
+
+                <!-- Group 6: Intelligence & Premium -->
+                <div class="flex items-center bg-(--accent-primary)/10 rounded-xl p-0.5 shadow-sm border border-(--accent-primary)/20">
+                    <button
+                        @click="handleAiAssist"
+                        class="p-1.5 rounded-lg text-(--accent-primary) hover:bg-(--surface-active) transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+                        title="AI Assist (Coming Soon)"
+                    >
+                        <SparklesIcon class="w-4 h-4" />
+                        <span class="text-xs font-bold hidden sm:inline"
+                            >Auto-Complete</span
+                        >
+                    </button>
+                    
+                    <div class="w-px h-4 bg-(--accent-primary)/20 mx-1"></div>
+
+                    <button 
+                        @click="isImportant = !isImportant"
+                        :class="[
+                            isImportant 
+                                ? 'bg-red-100 text-red-600 shadow-sm' 
+                                : 'text-(--text-secondary) hover:text-red-500 hover:bg-red-50',
+                        ]"
+                        class="p-2 rounded-lg transition-all shrink-0"
+                        :title="isImportant ? 'High Priority Enabled' : 'Mark as High Priority'"
+                    >
+                        <AlertTriangleIcon class="w-4 h-4" />
+                    </button>
+
+                    <Dropdown align="start" :close-on-select="false">
+                        <template #trigger>
+                            <button 
+                                :class="[
+                                    scheduledAt 
+                                        ? 'bg-blue-100 text-blue-600 shadow-sm' 
+                                        : 'text-(--text-secondary) hover:text-blue-500 hover:bg-blue-50',
+                                ]"
+                                class="p-2 rounded-lg transition-all shrink-0 flex items-center gap-1.5"
+                                title="Schedule Send"
+                            >
+                                <AlarmClockIcon class="w-4 h-4" />
+                                <span v-if="scheduledAt" class="text-[10px] font-bold">Planned</span>
+                            </button>
+                        </template>
+                        <div class="p-3 min-w-[240px] space-y-3">
+                            <div class="text-sm font-semibold text-(--text-primary)">Schedule Send</div>
+                            <input 
+                                type="datetime-local" 
+                                v-model="scheduledAt"
+                                class="w-full bg-(--surface-elevated) border border-(--border-default) rounded-lg px-3 py-2 text-sm text-(--text-primary) focus:ring-2 focus:ring-(--interactive-primary)/30 transition-all outline-none"
+                            />
+                            <div class="flex justify-between items-center">
+                                <button @click="scheduledAt = null" class="text-xs text-red-500 hover:text-red-600 font-bold transition-colors">Clear</button>
+                                <span class="text-[10px] text-(--text-muted)">Timezone: Local</span>
+                            </div>
+                        </div>
+                    </Dropdown>
+                </div>
+
+                <!-- Group 7: Settings -->
+                <div class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm ml-auto">
+                    <label class="flex items-center gap-2 px-3 py-1.5 cursor-pointer group hover:bg-(--surface-tertiary) rounded-lg transition-all">
                         <input 
                             type="checkbox" 
                             v-model="requestReadReceipt"
-                            class="peer h-4 w-4 rounded border-(--border-default) text-(--interactive-primary) focus:ring-(--interactive-primary)/20 transition-all cursor-pointer"
+                            class="h-3.5 w-3.5 rounded border-(--border-default) text-(--interactive-primary) focus:ring-(--interactive-primary)/20 transition-all cursor-pointer"
                         />
-                    </div>
-                    <span class="text-xs text-(--text-secondary) group-hover:text-(--text-primary) transition-colors select-none">Request Read Receipt</span>
-                </label>
-             </div>
+                        <span class="text-[11px] font-medium text-(--text-secondary) group-hover:text-(--text-primary) transition-colors select-none">Receipt</span>
+                    </label>
+                </div>
+            </div>
         </div>
     </div>
 </template>
@@ -554,8 +585,10 @@ import {
     AlignRightIcon,
     UnderlineIcon,
     ImageIcon,
-    LinkIcon, // Added
+    LinkIcon,
     SaveIcon,
+    AlertTriangleIcon,
+    AlarmClockIcon,
 } from "lucide-vue-next";
 import { format } from "date-fns";
 import { watch } from "vue";
@@ -599,6 +632,8 @@ const store = useEmailStore();
 const accounts = ref<any[]>([]);
 const selectedAccountId = ref<string | number | null>(null);
 const requestReadReceipt = ref(false);
+const isImportant = ref(false);
+const scheduledAt = ref<string | null>(null);
 const draftId = ref<string | null>(null);
 const savingDraft = ref(false);
 const lastSavedAt = ref<Date | null>(null);
@@ -1150,6 +1185,14 @@ async function handleSend() {
 
         if (emailData.request_read_receipt) {
              formData.append("request_read_receipt", "1");
+        }
+
+        if (isImportant.value) {
+            formData.append("is_important", "1");
+        }
+
+        if (scheduledAt.value) {
+            formData.append("scheduled_at", scheduledAt.value);
         }
         
         if (draftId.value) {

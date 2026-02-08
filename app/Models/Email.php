@@ -45,8 +45,10 @@ class Email extends Model implements HasMedia
         'provider_id',
         'attachment_placeholders',
         'sent_at',
+        'scheduled_at',
         'received_at',
         'sanitized_at',
+        'is_important',
     ];
 
     protected $appends = [
@@ -63,12 +65,14 @@ class Email extends Model implements HasMedia
             'headers' => 'array',
             'is_read' => 'boolean',
             'is_starred' => 'boolean',
+            'is_important' => 'boolean',
             'is_draft' => 'boolean',
             'has_attachments' => 'boolean',
             'imap_uid' => 'integer',
             'provider_id' => 'string',
             'attachment_placeholders' => 'array',
             'sent_at' => 'datetime',
+            'scheduled_at' => 'datetime',
             'received_at' => 'datetime',
             'sanitized_at' => 'datetime',
         ];

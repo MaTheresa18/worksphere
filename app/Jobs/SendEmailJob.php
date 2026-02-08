@@ -153,6 +153,13 @@ class SendEmailJob implements ShouldQueue
                 $message->getHeaders()->addTextHeader('Disposition-Notification-To', $account->email);
             }
 
+            // High Priority
+            if ($email->is_important) {
+                $message->getHeaders()->addTextHeader('Importance', 'High');
+                $message->getHeaders()->addTextHeader('X-Priority', '1 (Highest)');
+                $message->getHeaders()->addTextHeader('X-MSMail-Priority', 'High');
+            }
+
             // Subject and Body
             $message->subject($email->subject);
             

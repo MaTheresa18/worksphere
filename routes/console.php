@@ -160,3 +160,10 @@ Schedule::job(new \App\Jobs\PruneEmailsJob)
     ->name('prune-emails')
     ->withoutOverlapping()
     ->onOneServer();
+
+// Send scheduled emails (Every Minute)
+Schedule::job(new \App\Jobs\SendScheduledEmailsJob)
+    ->everyMinute()
+    ->name('send-scheduled-emails')
+    ->withoutOverlapping()
+    ->onOneServer();

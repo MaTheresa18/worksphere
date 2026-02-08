@@ -221,18 +221,42 @@
         <!-- Email List -->
         <div
             v-else
-            ref="listRef"
-            class="flex-1 overflow-y-auto min-h-0 relative"
+            class="flex-1 relative min-h-0 flex flex-col"
         >
-            <!-- New Email Toast -->
-            <button
-                v-if="newEmailCount > 0"
-                @click="store.loadNewEmails()"
-                class="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-(--interactive-primary) text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg hover:bg-(--interactive-primary-hover) transition flex items-center gap-1 cursor-pointer"
+            <!-- New Email Toast (Floating above list) -->
+            <Transition
+                enter-active-class="animate-in fade-in slide-in-from-top-4 duration-300"
+                leave-active-class="animate-out fade-out slide-out-to-top-4 duration-200"
             >
-                <ArrowUpDownIcon class="w-3 h-3" />
-                {{ newEmailCount }} new email(s)
-            </button>
+                <button
+                    v-if="newEmailCount > 0"
+                    @click="store.loadNewEmails()"
+                    class="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-(--interactive-primary) text-white px-4 py-2 rounded-full text-xs font-bold shadow-xl hover:bg-(--interactive-primary-hover) transition-all active:scale-95 flex items-center gap-2 cursor-pointer border border-white/20"
+                >
+                    <ArrowUpDownIcon class="w-3.5 h-3.5" />
+                    {{ newEmailCount }} new email(s)
+                </button>
+            </Transition>
+
+            <Transition
+                enter-active-class="animate-in fade-in zoom-in slide-in-from-bottom-4 duration-300"
+                leave-active-class="animate-out fade-out zoom-out slide-out-to-bottom-4 duration-200"
+            >
+                <button
+                    v-if="showJumpToTop"
+                    @click="scrollToTop"
+                    class="absolute bottom-10 right-8 z-30 bg-(--surface-primary)/80 backdrop-blur-sm text-(--interactive-primary) p-2 rounded-full shadow-lg border border-(--border-default) hover:bg-(--surface-secondary) transition-all active:scale-90 group"
+                    title="Jump to latest"
+                >
+                    <ArrowUpIcon class="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
+                </button>
+            </Transition>
+
+            <div
+                ref="listRef"
+                class="flex-1 overflow-y-auto min-h-0 scroll-smooth"
+                @scroll="handleScroll"
+            >
             <!-- Loading Skeleton -->
             <div v-if="loading" class="p-4 space-y-4">
                 <div v-for="i in 6" :key="i" class="flex gap-3 animate-pulse">
@@ -439,6 +463,7 @@
                     Compose
                 </button>
             </div>
+            </div>
         </div>
     </div>
 </template>
@@ -517,6 +542,22 @@ const debouncedFilter = debounce(() => {
 
 watch([searchQuery, filterDateFrom, filterDateTo], () => {
     debouncedFilter();
+});
+
+const showJumpToTop = ref(false);
+
+const handleScroll = (e: Event) => {
+    const target = e.target as HTMLElement;
+    showJumpToTop.value = target.scrollTop > 400;
+};
+
+const scrollToTop = () => {
+    listRef.value?.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+onMounted(() => {
+    store.fetchEmails();
+    animateList();
 });
 
 const sortFieldLabel = computed(() => {
@@ -669,8 +710,7 @@ watch(sentinel, (el) => {
 });
 
 onMounted(() => {
-    store.fetchEmails();
-    animateList();
+    //
 });
 
 onBeforeUnmount(() => {

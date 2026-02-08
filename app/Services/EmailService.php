@@ -169,6 +169,8 @@ class EmailService implements EmailServiceContract
             'body_html' => $data['body'] ?? $email->body_html,
             'preview' => $this->generatePreview($data['body'] ?? $email->body_html),
             'headers' => $headers,
+            'scheduled_at' => $data['scheduled_at'] ?? $email->scheduled_at,
+            'is_important' => $data['is_important'] ?? $email->is_important,
         ]);
 
         // Handle attachments
@@ -321,6 +323,8 @@ class EmailService implements EmailServiceContract
                 'request_read_receipt' => $data['request_read_receipt'] ?? false,
             ],
             'sent_at' => $isDraft ? null : now(),
+            'scheduled_at' => $data['scheduled_at'] ?? null,
+            'is_important' => $data['is_important'] ?? false,
         ]);
 
         // Handle attachments

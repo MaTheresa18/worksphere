@@ -684,10 +684,11 @@ const sanitizedBody = computed(() => {
 
     // Step 1: Replace cid: references with actual attachment URLs (Fallback for existing emails)
     let html = props.email.body_html;
-    if (props.email.attachments?.length && html.includes("cid:")) {
+    if (props.email.attachments?.length) {
         props.email.attachments.forEach((att) => {
             if (att.content_id && att.url) {
                 const cleanCid = att.content_id.replace(/[<>]/g, "");
+                // Escape for Regex
                 const escapedCid = cleanCid.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
                 const escapedFullCid = att.content_id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
                 
@@ -695,9 +696,19 @@ const sanitizedBody = computed(() => {
                 // Handles optional brackets and various quote types
                 const pattern = new RegExp(`src\\s*=\\s*[\\\\"'\\s]*cid\\s*:\\s*(?:&lt;|<)?(${escapedCid}|${escapedFullCid}|${encodeURIComponent(cleanCid)})(?:&gt;|>)?([\\\\"'\\s]*)`, "gi");
                 html = html.replace(pattern, `src="${att.url}"$2`);
+                
+                // Also handle background-image: url('cid:...')
+                const bgPattern = new RegExp(`url\\s*\\(\\s*[\\\\"'\\s]*cid\\s*:\\s*(?:&lt;|<)?(${escapedCid}|${escapedFullCid}|${encodeURIComponent(cleanCid)})(?:&gt;|>)?([\\\\"'\\s]*)\\)`, "gi");
+                html = html.replace(bgPattern, `url("${att.url}")`);
             }
         });
     }
+
+    // Step 1.5: Protect against remaining 'cid:' schemes to avoid ERR_UNKNOWN_URL_SCHEME
+    // This catches any CIDs that didn't match an attachment
+    html = html.replace(/src\s*=\s*[\\"' ]*cid:[^\\"' >]+[\\"' ]*/gi, (match) => {
+        return `src="${SYNCING_PLACEHOLDER}" data-unresolved-cid="true" `;
+    });
 
     // Step 2: Sanitize with DOMPurify
     const clean = sanitizeHtml(
