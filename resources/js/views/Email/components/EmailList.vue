@@ -298,19 +298,26 @@
                     v-for="email in sortedEmails"
                     :key="email.id"
                     @click="handleSelect(email)"
-                    class="email-item relative flex items-start gap-3 px-4 py-3.5 cursor-pointer group transition-all duration-200 border-l-4 border-transparent"
+                    class="email-item relative flex items-center gap-2 px-3 py-1.5 cursor-pointer group transition-all duration-75 border-l-2 border-transparent"
                     :class="[
                         selectedEmailId === email.id
                             ? 'bg-(--interactive-primary)/10 border-l-(--interactive-primary)'
                             : 'hover:bg-(--surface-secondary) border-l-transparent',
                         !email.is_read
-                            ? 'bg-(--interactive-primary)/5 border-l-4 border-(--interactive-primary)'
-                            : 'bg-(--surface-primary) border-l-4 border-transparent',
+                            ? 'bg-(--surface-primary) font-semibold'
+                            : 'bg-(--surface-primary) opacity-90',
                         selectedEmailIds.has(email.id) ? 'bg-(--interactive-primary)/15' : ''
                     ]"
                 >
-                    <!-- Selection and Star -->
-                    <div class="flex flex-col items-center gap-2 mt-0.5 shrink-0">
+                    <!-- Drag handle (Gmail style dot grid) - Only show on hover -->
+                    <div class="absolute left-0.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div class="grid grid-cols-2 gap-0.5 p-0.5 text-(--text-muted)">
+                            <div v-for="i in 6" :key="i" class="w-0.5 h-0.5 bg-current rounded-full"></div>
+                        </div>
+                    </div>
+
+                    <!-- Selection, Star, Attachment Icons -->
+                    <div class="flex items-center gap-1.5 shrink-0 ml-1">
                         <div
                             @click.stop
                             class="h-5 flex items-center justify-center"
@@ -319,12 +326,12 @@
                                 type="checkbox"
                                 :checked="selectedEmailIds.has(email.id)"
                                 @change="toggleSelection(email.id)"
-                                class="h-4 w-4 text-(--interactive-primary) focus:ring-(--interactive-primary) border-(--border-default) rounded transition-all cursor-pointer shadow-sm opacity-100"
+                                class="h-3.5 w-3.5 text-(--interactive-primary) focus:ring-(--interactive-primary) border-(--border-default) rounded transition-all cursor-pointer shadow-sm"
                             />
                         </div>
                         <div
                             @click.stop="store.toggleStar(email.id)"
-                            class="p-1 rounded-md hover:bg-(--surface-tertiary) transition-colors cursor-pointer opacity-100"
+                            class="p-1 rounded-md hover:bg-(--surface-tertiary) transition-colors cursor-pointer"
                         >
                             <StarIcon
                                 :class="[
@@ -337,75 +344,63 @@
                         </div>
                     </div>
 
-                    <!-- Main Content -->
-                    <div class="min-w-0 flex-1 flex flex-col gap-0.5">
-                        <div class="flex justify-between items-center">
-                            <div class="flex items-center gap-2 min-w-0">
-                                <span
-                                    v-if="!email.is_read"
-                                    class="w-2 h-2 rounded-full bg-(--interactive-primary) shrink-0 shadow-[0_0_10px_var(--interactive-primary)] animate-pulse"
-                                ></span>
-                                <span
-                                    class="text-sm text-(--text-primary) truncate"
-                                    :class="!email.is_read ? 'font-bold' : 'font-medium'"
-                                >
-                                    {{
-                                        email.from_name ||
-                                        email.from_email ||
-                                        "Unknown"
-                                    }}
-                                </span>
-                                <span
-                                    v-if="email.thread_count > 1"
-                                    class="inline-flex items-center justify-center bg-(--surface-tertiary) text-(--text-muted) rounded-md px-1.5 h-4.5 text-[10px] font-bold border border-(--border-default)"
-                                >
-                                    {{ email.thread_count }}
-                                </span>
-                            </div>
-                            <div class="flex items-center gap-3 shrink-0">
-                                <span 
-                                    class="text-[11px] font-bold tabular-nums uppercase tracking-tighter"
-                                    :class="!email.is_read ? 'text-(--interactive-primary)' : 'text-(--text-muted)'"
-                                >
-                                    {{ formatDate(email.date) }}
-                                </span>
-                            </div>
-                        </div>
+                    <!-- Sender Name -->
+                    <div class="w-32 sm:w-40 lg:w-48 shrink-0 flex items-center gap-2">
+                         <span
+                            class="text-[13px] text-(--text-primary) truncate"
+                            :class="!email.is_read ? 'font-bold' : 'font-medium'"
+                        >
+                            {{ email.from_name || email.from_email || "Unknown" }}
+                        </span>
+                        <span
+                            v-if="email.thread_count > 1"
+                            class="text-[10px] text-(--text-muted) font-bold"
+                        >
+                            {{ email.thread_count }}
+                        </span>
+                    </div>
 
-                        <!-- Subject -->
+                    <!-- Subject and Snippet (Gmail style: Subject - Preview text) -->
+                    <div class="flex-1 min-w-0 flex items-baseline gap-1.5 overflow-hidden">
                         <h4
-                            class="text-[13px] text-(--text-primary) truncate tracking-tight"
-                            :class="!email.is_read ? 'font-bold' : 'font-semibold'"
+                            class="text-[13px] text-(--text-primary) shrink-0 tracking-tight"
+                            :class="!email.is_read ? 'font-bold' : 'font-medium'"
                         >
-                            {{ email.subject }}
+                            {{ email.subject || '(No Subject)' }}
                         </h4>
-
-                        <!-- Snippet & Labels -->
-                        <div class="flex items-start gap-2 pr-4">
-                            <PaperclipIcon
-                                v-if="email.has_attachments"
-                                class="w-3.5 h-3.5 text-(--text-muted) shrink-0 mt-0.5"
-                            />
-                            <p
-                                class="text-[12px] text-(--text-secondary) line-clamp-2 leading-relaxed"
-                            >
-                                {{ email.preview }}
-                            </p>
-                        </div>
-
-                        <!-- Actionable Labels -->
-                        <div
-                            v-if="email.labels?.length"
-                            class="mt-1.5 flex flex-wrap gap-1.5"
+                        <span class="text-(--text-muted) text-[13px] shrink-0">-</span>
+                        <p
+                            class="text-[13px] text-(--text-muted) truncate font-normal"
                         >
-                            <span
-                                v-for="label in email.labels"
-                                :key="label"
-                                class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase bg-(--interactive-primary)/5 text-(--interactive-primary) border border-(--interactive-primary)/10 shadow-sm"
-                            >
-                                {{ label }}
-                            </span>
+                            {{ email.preview }}
+                        </p>
+                    </div>
+
+                    <!-- Labels & Icons (Right side) -->
+                    <div class="flex items-center gap-2 ml-auto shrink-0 pl-2">
+                        <!-- Attachment Icon -->
+                        <PaperclipIcon
+                            v-if="email.has_attachments"
+                            class="w-3 h-3 text-(--text-muted) shrink-0"
+                        />
+
+                        <!-- Actions (Hover Only) -->
+                        <div class="hidden group-hover:flex items-center gap-1">
+                             <button @click.stop="store.deleteEmails([email.id])" class="p-1.5 hover:bg-(--surface-tertiary) rounded-md transition-colors" title="Delete">
+                                 <TrashIcon class="w-4 h-4 text-(--text-secondary)" />
+                             </button>
+                             <button @click.stop="store.markEmailsAsRead([email.id], email.is_read)" class="p-1.5 hover:bg-(--surface-tertiary) rounded-md transition-colors" :title="email.is_read ? 'Mark Unread' : 'Mark Read'">
+                                 <component :is="email.is_read ? MailIcon : MailOpenIcon" class="w-4 h-4 text-(--text-secondary)" />
+                             </button>
                         </div>
+
+                        <!-- Date -->
+                        <span 
+                            class="text-[12px] font-medium tabular-nums group-hover:hidden"
+                            :class="!email.is_read ? 'text-(--interactive-primary)' : 'text-(--text-muted)'"
+                        >
+                            {{ formatDate(email.date) }}
+                        </span>
                     </div>
                 </li>
 

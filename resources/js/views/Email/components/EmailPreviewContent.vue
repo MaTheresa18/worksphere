@@ -442,6 +442,7 @@ import {
     onBeforeUnmount,
     onMounted,
 } from "vue";
+import { useImageCache } from "@/composables/useImageCache";
 import axios from "axios";
 import {
     PrinterIcon,
@@ -478,6 +479,8 @@ const props = defineProps<{
     isPopup?: boolean;
     embedded?: boolean;
 }>();
+
+const { getCachedImage } = useImageCache();
 
 const store = useEmailStore();
 
@@ -908,9 +911,17 @@ watch(
                 shadowRoot.value?.addEventListener("click", handleImageClick);
 
                 // Add error listener for Images (Retry Loop)
-                shadowRoot.value?.querySelectorAll("img").forEach((img) => {
+                shadowRoot.value?.querySelectorAll("img").forEach(async (img) => {
                     const src = img.getAttribute("src");
                     if (src && (src.includes("/api/media/") || img.hasAttribute("data-is-syncing"))) {
+                        // Apply caching if not a data URI
+                        if (src.startsWith('http') || src.startsWith('/')) {
+                            const cachedUrl = await getCachedImage(src);
+                            if (cachedUrl !== src) {
+                                img.src = cachedUrl;
+                            }
+                        }
+                        
                         setupImageSyncRetry(img);
                     }
                 });
