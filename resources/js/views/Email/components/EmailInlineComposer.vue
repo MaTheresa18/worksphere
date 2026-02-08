@@ -654,27 +654,39 @@ watch(
         // Recipients
         if (mode === "reply") {
             toEmails.value = from_email ? [from_email] : [];
+            // Remove our own email from TO if present (optional, but good UX)
+            // For now, simple implementation
             ccEmails.value = [];
         } else if (mode === "reply-all") {
-            // TO: Sender + Original TOs
+            // TO: Sender
             const allTos = new Set<string>();
             if (from_email) allTos.add(from_email);
+            
+            // CC: Original TOs + Original CCs
+            // Exclude our own email accounts if possible, but for now just add everyone
+            const allCcs = new Set<string>();
+            
             to.forEach((t) => {
                 if (t?.email) allTos.add(t.email);
             });
-            toEmails.value = Array.from(allTos);
+            
+            cc.forEach((c) => {
+                if (c?.email) allCcs.add(c.email);
+            });
 
-            // CC: Original CCs
-            ccEmails.value = cc.filter((c) => c?.email).map((c) => c.email);
+            toEmails.value = Array.from(allTos);
+            ccEmails.value = Array.from(allCcs);
 
             if (ccEmails.value.length > 0) showCc.value = true;
         } else if (mode === "forward") {
             toEmails.value = [];
             ccEmails.value = [];
+            // Forward body content is handled by setQuotedContent
         }
 
         // Set initial quoted content
-        setQuotedContent(mode);
+        // Must wait for next tick or ensure editor is ready
+        setTimeout(() => setQuotedContent(mode), 100);
     },
     { immediate: true },
 );
@@ -696,21 +708,50 @@ function setQuotedContent(mode: string) {
     const sender =
         props.replyTo.from_name || props.replyTo.from_email || "Unknown";
 
-    const quotedHtml = `
-        <br><br>
-        <div class="gmail_quote">
-            <div dir="ltr" class="gmail_attr">
-                On ${date}, ${sender} wrote:<br>
+    let quotedHtml = "";
+    
+    if (mode === "reply" || mode === "reply-all") {
+        quotedHtml = `
+            <br><br>
+            <div class="gmail_quote">
+                <div dir="ltr" class="gmail_attr">
+                    On ${date}, ${sender} wrote:<br>
+                </div>
+                <blockquote class="gmail_quote" style="margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">
+                    ${body}
+                </blockquote>
             </div>
-            <blockquote class="gmail_quote" style="margin:0px 0px 0px 0.8ex;border-left:1px solid rgb(204,204,204);padding-left:1ex">
+        `;
+    } else if (mode === "forward") {
+        const toList = props.replyTo.to?.map(t => t.name ? `${t.name} &lt;${t.email}&gt;` : t.email).join(', ') || '';
+        const ccList = props.replyTo.cc?.map(c => c.name ? `${c.name} &lt;${c.email}&gt;` : c.email).join(', ') || '';
+        
+        quotedHtml = `
+            <br><br>
+            <div class="gmail_quote">
+                <div dir="ltr" class="gmail_attr">
+                    ---------- Forwarded message ---------<br>
+                    From: <strong>${props.replyTo.from_name || sender}</strong> &lt;${props.replyTo.from_email}&gt;<br>
+                    Date: ${date}<br>
+                    Subject: ${props.replyTo.subject}<br>
+                    To: ${toList}<br>
+                    ${ccList ? `Cc: ${ccList}<br>` : ''}
+                </div>
+                <br>
                 ${body}
-            </blockquote>
-        </div>
-    `;
+            </div>
+        `;
+    }
 
-    editor.value?.commands.setContent(quotedHtml);
-    // Focus at start
-    editor.value?.commands.focus("start");
+    if (quotedHtml && editor.value) {
+        // Keep existing content if user has typed? 
+        // For now, just set it as we are initializing
+        // Check if editor is empty to avoid overwriting if hot module reload or similar triggers
+        if (editor.value.getText().length === 0) {
+            editor.value.commands.setContent(quotedHtml);
+            editor.value.commands.focus("start");
+        }
+    }
 }
 
 const characterCount = computed(() => {
@@ -798,6 +839,18 @@ async function handleSend() {
 
     try {
         const success = await store.sendEmail(formData);
+
+        if (success) {
+            emit("send");
+            emit("close");
+        } else {
+            alert("Failed to send email. Please try again.");
+        }
+    } catch (e) {
+        console.error("Failed to send email:", e);
+        alert("An error occurred while sending the email.");
+    }
+}
         if (success) {
             emit("send");
         } else {
