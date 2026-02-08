@@ -118,6 +118,43 @@ class EmailAccountService
     }
 
     /**
+     * Ensure the host is safe to connect to (SSRF protection).
+     */
+    protected function ensureHostIsSafe(?string $host): void
+    {
+        if ($host === null || $host === '') {
+            return;
+        }
+
+        // 1. Check if it's an IP address
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            if (! filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                throw new \Exception('Access to private IP addresses is not allowed.');
+            }
+
+            return;
+        }
+
+        // 2. Resolve hostname (IPv4)
+        $ips = gethostbynamel($host);
+        if ($ips === false) {
+            // Check for IPv6 records too if IPv4 failed
+            $ipv6 = dns_get_record($host, DNS_AAAA);
+            if (! $ipv6) {
+                return; // Resolution failed, let connection attempt fail naturally
+            }
+            $ips = array_column($ipv6, 'ipv6');
+        }
+
+        // 3. Check all resolved IPs
+        foreach ($ips as $ip) {
+            if (! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                throw new \Exception('Host resolves to a private IP address. Access denied.');
+            }
+        }
+    }
+
+    /**
      * Test SMTP connection for an email account.
      */
     public function testSmtpConnection(EmailAccount $account): array
@@ -127,6 +164,8 @@ class EmailAccountService
             if ($account->isOAuth() && $account->needsTokenRefresh()) {
                 $this->refreshToken($account);
             }
+
+            $this->ensureHostIsSafe($account->smtp_host);
 
             $host = $account->smtp_host;
             $port = $account->smtp_port;
@@ -182,6 +221,8 @@ class EmailAccountService
             if ($account->isOAuth() && $account->needsTokenRefresh()) {
                 $this->refreshToken($account);
             }
+
+            $this->ensureHostIsSafe($account->imap_host);
 
             $adapter = \App\Services\EmailAdapters\AdapterFactory::make($account);
             $client = $adapter->createClient($account);
