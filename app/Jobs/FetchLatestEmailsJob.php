@@ -262,8 +262,17 @@ class FetchLatestEmailsJob implements ShouldBeUnique, ShouldQueue
                 return 0;
             }
 
-            // Fetch UIDs greater than cursor
-            $range = ($forwardCursor + 1).':*';
+            // Fetch UIDs greater than cursor with a limit to prevent memory spikes
+            // We fetch a batch (e.g. 500) to ensure we don't load 50k headers at once if the gap is huge.
+            $batchSize = config('email.fetch_batch_size', 500);
+            $rangeEnd = $forwardCursor + $batchSize;
+            
+            // If we know the max UID, we can clamp it
+            if ($uidNext > 0) {
+                $rangeEnd = min($rangeEnd, $uidNext);
+            }
+
+            $range = ($forwardCursor + 1).':'.$rangeEnd;
             $overview = $folder->overview($range);
 
             $newUids = [];
@@ -367,5 +376,13 @@ class FetchLatestEmailsJob implements ShouldBeUnique, ShouldQueue
     public function tags(): array
     {
         return ['email', 'forward-crawler', 'account:'.$this->accountId];
+    }
+
+    /**
+     * Get the middleware the job should pass through.
+     */
+    public function middleware(): array
+    {
+        return [new \App\Jobs\Middleware\LogMemoryUsage];
     }
 }

@@ -210,4 +210,11 @@ class SendBulkEmailJob implements ShouldBeUnique, ShouldQueue
             'batch:'.($this->batchIndex + 1).'/'.$this->totalBatches,
         ];
     }
+    /**
+     * Get the middleware the job should pass through.
+     */
+    public function middleware(): array
+    {
+        return [new \App\Jobs\Middleware\LogMemoryUsage];
+    }
 }
