@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, watch } from "vue";
 import { useDate } from "@/composables/useDate";
-const { formatDate, formatRelative } = useDate();
+const { formatDate, formatRelativeTime } = useDate();
 import { useRouter } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import api from "@/lib/api";
@@ -520,8 +520,22 @@ onMounted(() => {
                                             class="px-6 py-4 text-[var(--text-tertiary)]"
                                         >
                                             <div class="flex flex-col text-xs">
-                                                <span>Joined: {{ formatDate(user.created_at) }}</span>
-                                                <span v-if="user.last_active_at">Last seen: {{ formatRelative(user.last_active_at) }}</span>
+                                                <span
+                                                    >Joined:
+                                                    {{
+                                                        formatDate(
+                                                            user.created_at,
+                                                        )
+                                                    }}</span
+                                                >
+                                                <span v-if="user.last_active_at"
+                                                    >Last seen:
+                                                    {{
+                                                        formatRelativeTime(
+                                                            user.last_active_at,
+                                                        )
+                                                    }}</span
+                                                >
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 text-right">
@@ -661,9 +675,7 @@ onMounted(() => {
                                 class="w-full pt-4 border-t border-[var(--border-default)] flex justify-between text-xs text-[var(--text-tertiary)]"
                             >
                                 <span>Joined</span>
-                                <span>{{
-                                    formatDate(user.created_at)
-                                }}</span>
+                                <span>{{ formatDate(user.created_at) }}</span>
                             </div>
                         </div>
                     </div>

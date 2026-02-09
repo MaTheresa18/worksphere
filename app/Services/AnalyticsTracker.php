@@ -74,6 +74,8 @@ class AnalyticsTracker
         $anonymize = config('analytics.anonymize_ips', false);
         $storedIp = $anonymize ? hash('sha256', $ip.date('Ymd')) : $ip;
 
+        $location = geoip($ip);
+
         return array_merge([
             'session_id' => Session::getId(),
             'user_id' => $user?->id,
@@ -86,6 +88,11 @@ class AnalyticsTracker
             'device_type' => $this->getDeviceType($agent),
             'browser' => $agent->browser(),
             'platform' => $agent->platform(),
+            'country' => $location->country,
+            'city' => $location->city,
+            'iso_code' => $location->iso_code,
+            'lat' => $location->lat,
+            'lon' => $location->lon,
             'created_at' => now(),
         ], $overrides);
     }

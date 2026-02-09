@@ -12,6 +12,8 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     const chart = ref<AnalyticsState['chart']>([]);
     const topPages = ref<AnalyticsState['topPages']>([]);
     const sources = ref<AnalyticsState['sources']>([]);
+    const demographics = ref<AnalyticsState['demographics']>(null);
+    const geoStats = ref<AnalyticsState['geoStats']>([]);
 
     async function fetchAll(newPeriod?: AnalyticsPeriod) {
         if (newPeriod) {
@@ -25,6 +27,8 @@ export const useAnalyticsStore = defineStore('analytics', () => {
             chart.value = data.chart;
             topPages.value = data.topPages;
             sources.value = data.sources;
+            demographics.value = data.demographics;
+            geoStats.value = data.geoStats;
         } catch (error) {
             console.error('Failed to fetch analytics:', error);
         } finally {
@@ -39,6 +43,8 @@ export const useAnalyticsStore = defineStore('analytics', () => {
         chart,
         topPages,
         sources,
+        demographics,
+        geoStats,
         fetchAll
     };
 });

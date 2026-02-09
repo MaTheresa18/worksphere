@@ -142,7 +142,7 @@
                         {{ formatDateTime(email.date, "EEE, MMM d, yyyy") }}
                         at {{ formatDateTime(email.date, "h:mm a") }}
                         <span class="text-(--text-muted) ml-1"
-                            >({{ formatRelative(email.date) }})</span
+                            >({{ formatRelativeTime(email.date) }})</span
                         >
                     </div>
 
@@ -405,7 +405,7 @@
                             {{ formatDate(email.date) }}
                         </p>
                         <p class="text-xs text-(--text-muted)">
-                            {{ formatRelative(email.date) }}
+                            {{ formatRelativeTime(email.date) }}
                         </p>
                     </div>
                 </div>
@@ -727,7 +727,7 @@ import {
 } from "lucide-vue-next";
 import { useDate } from "@/composables/useDate";
 
-const { formatDate, formatDateTime, formatRelative } = useDate();
+const { formatDate, formatDateTime, formatRelativeTime } = useDate();
 import type { Email } from "@/types/models/email";
 import { animate, stagger } from "animejs";
 import { sanitizeHtml } from "@/utils/sanitize";

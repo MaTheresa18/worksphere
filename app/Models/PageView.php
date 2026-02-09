@@ -21,7 +21,13 @@ class PageView extends Model
         'user_agent',
         'device_type',
         'browser',
+        'browser',
         'platform',
+        'country',
+        'city',
+        'iso_code',
+        'lat',
+        'lon',
         'created_at',
     ];
 

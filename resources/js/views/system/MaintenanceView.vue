@@ -42,7 +42,7 @@ import axios from "axios";
 import { isEchoAvailable } from "../../echo";
 import { useDate } from "@/composables/useDate";
 
-const { formatRelative: formatRelativeComposible } = useDate();
+const { formatRelativeTime } = useDate();
 
 import { Line } from "vue-chartjs";
 import {
@@ -746,7 +746,7 @@ const runTask = async (taskName) => {
 // Format last run time
 const formatLastRun = (isoString) => {
     if (!isoString) return "Never";
-    return formatRelativeComposible(isoString);
+    return formatRelativeTime(isoString);
 };
 
 // System Metrics Charts

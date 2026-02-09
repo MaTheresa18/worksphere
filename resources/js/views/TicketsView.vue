@@ -6,7 +6,7 @@ import { useAuthStore } from "@/stores/auth";
 import axios from "axios";
 import { useDate } from "@/composables/useDate";
 
-const { formatRelative: formatRelativeComposible } = useDate();
+const { formatRelativeTime } = useDate();
 
 const router = useRouter();
 const route = useRoute();
@@ -357,10 +357,6 @@ async function refreshData() {
 }
 
 // Helper to format relative time
-function formatRelativeTime(dateString) {
-    if (!dateString) return "";
-    return formatRelativeComposible(dateString);
-}
 
 // Watch for filter changes
 watch([statusFilter, priorityFilter], () => {

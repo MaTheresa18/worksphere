@@ -69,7 +69,7 @@ import MediaViewer from "@/components/tools/MediaViewer.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useDate } from "@/composables/useDate";
 
-const { formatDate, formatRelative: formatRelativeTime } = useDate();
+const { formatDate, formatRelativeTime } = useDate();
 
 // Types
 interface UserLite {

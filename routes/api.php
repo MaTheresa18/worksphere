@@ -625,6 +625,8 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce', 'demo'])->grou
             Route::get('/chart', [\App\Http\Controllers\Api\AnalyticsController::class, 'chart']);
             Route::get('/pages', [\App\Http\Controllers\Api\AnalyticsController::class, 'topPages']);
             Route::get('/sources', [\App\Http\Controllers\Api\AnalyticsController::class, 'sources']);
+            Route::get('/demographics', [\App\Http\Controllers\Api\AnalyticsController::class, 'demographics']);
+            Route::get('/geo-stats', [\App\Http\Controllers\Api\AnalyticsController::class, 'geoStats']);
         });
     });
 

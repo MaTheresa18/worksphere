@@ -5,6 +5,8 @@ import { TrendingUp, TrendingDown, Users, Eye, Clock, ArrowUpRight } from 'lucid
 import { useAnalyticsStore } from '@/stores/analytics';
 import { Bar } from 'vue-chartjs';
 import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale } from 'chart.js';
+import DemographicsCharts from './Analytics/components/DemographicsCharts.vue';
+import AnalyticsMap from './Analytics/components/AnalyticsMap.vue';
 
 // Register ChartJS components
 ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale);
@@ -145,6 +147,12 @@ onMounted(() => {
                 </div>
             </Card>
         </div>
+
+        <!-- Geo Map -->
+        <AnalyticsMap />
+
+        <!-- Demographics -->
+        <DemographicsCharts />
 
         <!-- Top Pages -->
         <Card padding="none">

@@ -66,4 +66,22 @@ class AnalyticsController extends Controller
             'data' => $this->analyticsService->getTrafficSources($period),
         ]);
     }
+
+    public function demographics(Request $request)
+    {
+        $period = $request->input('period', '7d');
+
+        return response()->json([
+            'data' => $this->analyticsService->getDemographics($period),
+        ]);
+    }
+
+    public function geoStats(Request $request)
+    {
+        $period = $request->input('period', '7d');
+
+        return response()->json([
+            'data' => $this->analyticsService->getGeoStats($period),
+        ]);
+    }
 }
