@@ -268,6 +268,9 @@ class SendEmailJob implements ShouldQueue
     public function middleware(): array
     {
         // Limit to 10 emails per minute per account to avoid provider blocks
-        return [(new \Illuminate\Queue\Middleware\RateLimited('email-send-account'))];
+        return [
+            (new \Illuminate\Queue\Middleware\RateLimited('email-send-account')),
+            new \App\Jobs\Middleware\LogMemoryUsage,
+        ];
     }
 }

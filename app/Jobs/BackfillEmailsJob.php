@@ -218,4 +218,12 @@ class BackfillEmailsJob implements ShouldQueue
     {
         return ['email', 'backfill-crawler', 'account:'.$this->accountId];
     }
+
+    /**
+     * Get the middleware the job should pass through.
+     */
+    public function middleware(): array
+    {
+        return [new \App\Jobs\Middleware\LogMemoryUsage];
+    }
 }

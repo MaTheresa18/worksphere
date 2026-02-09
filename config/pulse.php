@@ -188,9 +188,11 @@ return [
                 // '#^http://127\.0\.0\.1:13714#', // Inertia SSR...
             ],
             'groups' => [
-                // '#^https://api\.github\.com/repos/.*$#' => 'api.github.com/repos/*',
-                // '#^https?://([^/]*).*$#' => '\1',
-                // '#/\d+#' => '/*',
+                '#^https://.*\.googleapis\.com.*$#' => 'Google API',
+                '#^https://.*\.outlook\.com.*$#' => 'Outlook API',
+                '#^https://api\.github\.com/repos/.*$#' => 'api.github.com/repos/*',
+                '#^https?://([^/]*).*$#' => '\1',
+                '#/\d+#' => '/*',
             ],
         ],
 
