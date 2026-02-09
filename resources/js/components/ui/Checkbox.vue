@@ -15,20 +15,25 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue"]);
 
-const checked = computed({
-    get: () => props.modelValue,
-    set: (value) => emit("update:modelValue", value),
+const proxyChecked = computed({
+    get() {
+        return props.modelValue;
+    },
+    set(val) {
+        emit("update:modelValue", val);
+    },
 });
 
 const checkboxId = computed(
     () => props.id || `checkbox-${Math.random().toString(36).slice(2, 9)}`,
 );
+
 </script>
 
 <template>
     <div class="flex items-start gap-3">
         <CheckboxRoot
-            v-model:checked="checked"
+            v-model="proxyChecked"
             :id="checkboxId"
             :disabled="disabled"
             :value="value"
@@ -37,7 +42,7 @@ const checkboxId = computed(
                     'peer h-5 w-5 shrink-0 rounded-md border transition-all duration-150 flex items-center justify-center cursor-pointer',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--interactive-primary)/20',
                     'disabled:cursor-not-allowed disabled:opacity-50',
-                    checked
+                    proxyChecked
                         ? 'bg-(--brand-primary) border-(--brand-primary) shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]'
                         : 'border-(--border-default) bg-(--surface-elevated) hover:border-(--border-strong)',
                 )

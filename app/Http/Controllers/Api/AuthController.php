@@ -668,79 +668,114 @@ class AuthController extends Controller
             'agreed' => 'required|accepted',
         ]);
 
-        $data = \Illuminate\Support\Facades\Cache::pull("social_completion_{$request->token}");
+        $cacheKey = "social_completion_{$request->token}";
+        $data = \Illuminate\Support\Facades\Cache::get($cacheKey);
 
         if (! $data) {
+            // Check if it might have been consumed recently or invalid
             return response()->json(['message' => 'Invalid or expired registration session.'], 400);
         }
 
-        // Create new user
-        $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'username' => $data['nickname'] ?? explode('@', $data['email'])[0].rand(100, 999),
-            // 'email_verified_at' => now(), // Handled explicitly below
-            'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(32)),
-            'status' => 'active',
-            'is_password_set' => false,
-            'preferences' => [
-                'appearance' => ['mode' => 'system', 'color' => 'default'],
-                'notifications' => ['email' => true, 'push' => true],
-                'timezone' => $request->timezone ?? config('app.timezone'),
-            ],
-            'provider' => $data['provider'], // Legacy compat
-            'provider_id' => $data['provider_id'], // Legacy compat
-        ]);
+        try {
+            $user = \Illuminate\Support\Facades\DB::transaction(function () use ($data, $request, $cacheKey) {
+                // Double check if user created in the meantime
+                if (User::where('email', $data['email'])->exists()) {
+                     // If user exists, we should probably consume the cache and fail, or just fail.
+                     // But if they clicked twice, maybe we can find the user and log them in? 
+                     // For security, strict failure is safer, but let's clear cache if they exist to prevent endless loops?
+                     // Actually, if they exist, they should login normally.
+                     throw new \Exception('User already exists. Please login.');
+                }
 
-        // Explicitly mark as verified since it's not in fillable
-        $user->markEmailAsVerified();
-
-        // Create social account
-        \App\Models\SocialAccount::create([
-            'user_id' => $user->id,
-            'provider' => $data['provider'],
-            'provider_id' => $data['provider_id'],
-            'provider_email' => $data['email'],
-            'provider_avatar' => $data['avatar'],
-            'provider_name' => $data['name'],
-        ]);
-
-        // Sync avatar
-        if ($data['avatar']) {
-            app(\App\Contracts\AvatarContract::class)->syncFromSocial($data['avatar'], $user);
-        }
-
-        // Assign Role
-        $defaultRole = config('roles.default_role', 'user');
-        $user->assignRole($defaultRole);
-
-        // Record Legal Agreements
-        foreach (['tos', 'privacy'] as $type) {
-            if ($config = config("legal.{$type}")) {
-                \App\Models\LegalAgreementLog::create([
-                    'user_id' => $user->id,
-                    'document_type' => $type,
-                    'version' => $config['version'],
-                    'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent(),
-                    'accepted_at' => now(),
+                // Create new user
+                $user = User::create([
+                    'name' => $data['name'],
+                    'email' => $data['email'],
+                    'username' => $data['nickname'] ?? explode('@', $data['email'])[0].rand(100, 999),
+                    'password' => \Illuminate\Support\Facades\Hash::make(\Illuminate\Support\Str::random(32)),
+                    'status' => 'active',
+                    'is_password_set' => false,
+                    'preferences' => [
+                        'appearance' => ['mode' => 'system', 'color' => 'default'],
+                        'notifications' => ['email' => true, 'push' => true],
+                        'timezone' => $request->timezone ?? config('app.timezone'),
+                    ],
+                    'provider' => $data['provider'], // Legacy compat
+                    'provider_id' => $data['provider_id'], // Legacy compat
                 ]);
+
+                // Explicitly mark as verified
+                $user->markEmailAsVerified();
+
+                // Create social account
+                \App\Models\SocialAccount::create([
+                    'user_id' => $user->id,
+                    'provider' => $data['provider'],
+                    'provider_id' => $data['provider_id'],
+                    'provider_email' => $data['email'],
+                    'provider_avatar' => $data['avatar'],
+                    'provider_name' => $data['name'],
+                ]);
+                
+                // Record Legal Agreements
+                foreach (['tos', 'privacy'] as $type) {
+                    if ($config = config("legal.{$type}")) {
+                        \App\Models\LegalAgreementLog::create([
+                            'user_id' => $user->id,
+                            'document_type' => $type,
+                            'version' => $config['version'],
+                            'ip_address' => $request->ip(),
+                            'user_agent' => $request->userAgent(),
+                            'accepted_at' => now(),
+                        ]);
+                    }
+                }
+                
+                // Assign Role
+                $defaultRole = config('roles.default_role', 'user');
+                $user->assignRole($defaultRole);
+
+                return $user;
+            });
+
+            // Operations outside transaction that shouldn't block registration
+            
+            // Sync avatar
+            if ($data['avatar']) {
+                try {
+                    app(\App\Contracts\AvatarContract::class)->syncFromSocial($data['avatar'], $user);
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::warning('Failed to sync avatar during social registration: ' . $e->getMessage());
+                    // Continue without avatar
+                }
             }
+
+            // Send Welcome Email
+            try {
+                $token = Password::createToken($user);
+                $resetUrl = url(config('app.url').'/reset-password?token='.$token.'&email='.urlencode($user->email));
+                $user->notify(new \App\Notifications\WelcomeEmailNotification(true, $resetUrl, 'Set Password & Access Dashboard'));
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Failed to send welcome email: ' . $e->getMessage());
+            }
+            
+            // Now verify everything is good, forget cache
+            \Illuminate\Support\Facades\Cache::forget($cacheKey);
+
+            // Login
+            Auth::login($user);
+            $user->recordLogin($request->ip());
+
+            return response()->json([
+                'message' => 'Registration complete.',
+                'data' => ['user' => new UserResource($user)],
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Registration failed: ' . $e->getMessage(),
+            ], 500);
         }
-
-        // Send Welcome Email
-        $token = Password::createToken($user);
-        $resetUrl = url(config('app.url').'/reset-password?token='.$token.'&email='.urlencode($user->email));
-        $user->notify(new \App\Notifications\WelcomeEmailNotification(true, $resetUrl, 'Set Password & Access Dashboard'));
-
-        // Login
-        Auth::login($user);
-        $user->recordLogin($request->ip());
-
-        return response()->json([
-            'message' => 'Registration complete.',
-            'data' => ['user' => new UserResource($user)],
-        ]);
     }
 
     /**

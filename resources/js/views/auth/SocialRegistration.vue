@@ -74,7 +74,6 @@
                         variant="primary"
                         class="w-full justify-center shadow-lg shadow-blue-500/20"
                         size="lg"
-                        :disabled="!agreed || isLoading"
                         :loading="isLoading"
                         @click="completeRegistration"
                     >
@@ -112,7 +111,10 @@ const agreed = ref(false);
 const isLoading = ref(false);
 
 const completeRegistration = async () => {
-    if (!agreed.value) return;
+    if (!agreed.value) {
+        toast.error('Please agree to the Terms of Service and Privacy Policy to continue.');
+        return;
+    }
     if (!token.value) {
         toast.error("Invalid registration session.");
         return;
