@@ -16,10 +16,9 @@
                             :class="['w-4 h-4', modeStyles.text]"
                         />
                     </div>
-                    <span
-                        class="text-sm font-semibold text-(--text-primary)"
-                        >{{ modeLabel }}</span
-                    >
+                    <span class="text-sm font-semibold text-(--text-primary)">{{
+                        modeLabel
+                    }}</span>
                 </div>
 
                 <!-- Action Buttons (Moved to Header) -->
@@ -28,10 +27,18 @@
                         >{{ characterCount }} chars</span
                     >
                     <div class="h-4 w-px bg-(--border-default)"></div>
-                    
+
                     <!-- Saving Indicator -->
-                    <span v-if="savingDraft" class="text-xs text-(--text-muted) animate-pulse">Saving...</span>
-                    <span v-else-if="lastSavedAt" class="text-xs text-(--text-muted)">Saved {{ formatTime(lastSavedAt) }}</span>
+                    <span
+                        v-if="savingDraft"
+                        class="text-xs text-(--text-muted) animate-pulse"
+                        >Saving...</span
+                    >
+                    <span
+                        v-else-if="lastSavedAt"
+                        class="text-xs text-(--text-muted)"
+                        >Saved {{ formatTime(lastSavedAt) }}</span
+                    >
 
                     <button
                         @click="saveDraft()"
@@ -40,7 +47,7 @@
                     >
                         <SaveIcon class="w-4 h-4" />
                     </button>
-                    
+
                     <button
                         @click="emit('close')"
                         class="p-2 rounded-lg text-(--text-muted) hover:text-error hover:bg-error/10 transition-colors"
@@ -64,8 +71,7 @@
             <div class="space-y-2">
                 <!-- From Field -->
                 <div class="flex items-center gap-2">
-                    <span
-                        class="text-xs text-(--text-muted) w-12 shrink-0"
+                    <span class="text-xs text-(--text-muted) w-12 shrink-0"
                         >From</span
                     >
                     <div class="flex-1 relative">
@@ -86,9 +92,7 @@
                                             selectedAccount.email
                                         }}&gt;
                                     </span>
-                                    <span
-                                        v-else
-                                        class="text-(--text-muted)"
+                                    <span v-else class="text-(--text-muted)"
                                         >Select account...</span
                                     >
                                     <ChevronDownIcon
@@ -170,8 +174,7 @@
 
                 <!-- Subject Field (always shown) -->
                 <div class="flex items-center gap-2">
-                    <span
-                        class="text-xs text-(--text-muted) w-12 shrink-0"
+                    <span class="text-xs text-(--text-muted) w-12 shrink-0"
                         >Subject</span
                     >
                     <input
@@ -218,9 +221,7 @@
                 v-if="selectedSignature?.content"
                 class="mt-4 pt-4 border-t border-dashed border-(--border-default)"
             >
-                <div class="text-xs text-(--text-muted) mb-2">
-                    Signature
-                </div>
+                <div class="text-xs text-(--text-muted) mb-2">Signature</div>
                 <div
                     class="text-sm text-(--text-secondary)"
                     v-html="selectedSignature.content"
@@ -251,11 +252,11 @@
         <div
             class="p-2 border-t border-(--border-default) bg-(--surface-secondary)"
         >
-            <div
-                class="flex items-center flex-wrap gap-2.5 px-1 pb-1"
-            >
+            <div class="flex items-center flex-wrap gap-2.5 px-1 pb-1">
                 <!-- Group 1: Core Actions -->
-                <div class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm">
+                <div
+                    class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm"
+                >
                     <input
                         ref="fileInput"
                         type="file"
@@ -297,8 +298,14 @@
                 </div>
 
                 <!-- Group 2: Typography -->
-                <div class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm">
-                    <Dropdown align="start" class="shrink-0" :close-on-select="true">
+                <div
+                    class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm"
+                >
+                    <Dropdown
+                        align="start"
+                        class="shrink-0"
+                        :close-on-select="true"
+                    >
                         <template #trigger>
                             <button
                                 class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors flex items-center gap-1"
@@ -315,14 +322,24 @@
                                 @click="setFontFamily(font.value)"
                                 class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-(--surface-tertiary) transition-colors"
                                 :style="{ fontFamily: font.value }"
-                                :class="editor?.isActive('textStyle', { fontFamily: font.value }) ? 'text-(--interactive-primary) bg-(--interactive-primary)/5' : 'text-(--text-primary)'"
+                                :class="
+                                    editor?.isActive('textStyle', {
+                                        fontFamily: font.value,
+                                    })
+                                        ? 'text-(--interactive-primary) bg-(--interactive-primary)/5'
+                                        : 'text-(--text-primary)'
+                                "
                             >
                                 {{ font.label }}
                             </button>
                         </div>
                     </Dropdown>
 
-                    <Dropdown align="start" class="shrink-0" :close-on-select="true">
+                    <Dropdown
+                        align="start"
+                        class="shrink-0"
+                        :close-on-select="true"
+                    >
                         <template #trigger>
                             <button
                                 class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors flex items-center gap-1"
@@ -338,16 +355,26 @@
                                 :key="size.value"
                                 @click="setFontSize(size.value)"
                                 class="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-(--surface-tertiary) transition-colors"
-                                :class="editor?.isActive('textStyle', { fontSize: size.value }) ? 'text-(--interactive-primary) bg-(--interactive-primary)/5' : 'text-(--text-primary)'"
+                                :class="
+                                    editor?.isActive('textStyle', {
+                                        fontSize: size.value,
+                                    })
+                                        ? 'text-(--interactive-primary) bg-(--interactive-primary)/5'
+                                        : 'text-(--text-primary)'
+                                "
                             >
-                                <span :style="{ fontSize: size.value }">{{ size.label }}</span>
+                                <span :style="{ fontSize: size.value }">{{
+                                    size.label
+                                }}</span>
                             </button>
                         </div>
                     </Dropdown>
                 </div>
 
                 <!-- Group 3: Formatting -->
-                <div class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm">
+                <div
+                    class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm"
+                >
                     <button
                         @click="editor?.chain().focus().toggleBold().run()"
                         :class="[
@@ -384,13 +411,24 @@
                     >
                         <UnderlineIcon class="w-4 h-4" />
                     </button>
-                    <Dropdown align="start" class="shrink-0" :close-on-select="true">
+                    <Dropdown
+                        align="start"
+                        class="shrink-0"
+                        :close-on-select="true"
+                    >
                         <template #trigger>
                             <button
                                 class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors"
                                 title="Text Color"
                             >
-                                <PaletteIcon class="w-4 h-4" :style="{ color: editor?.getAttributes('textStyle').color }" />
+                                <PaletteIcon
+                                    class="w-4 h-4"
+                                    :style="{
+                                        color: editor?.getAttributes(
+                                            'textStyle',
+                                        ).color,
+                                    }"
+                                />
                             </button>
                         </template>
                         <div class="p-2 grid grid-cols-5 gap-1 w-[160px]">
@@ -407,9 +445,13 @@
                 </div>
 
                 <!-- Group 4: Layout -->
-                <div class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm">
+                <div
+                    class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm"
+                >
                     <button
-                        @click="editor?.chain().focus().setTextAlign('left').run()"
+                        @click="
+                            editor?.chain().focus().setTextAlign('left').run()
+                        "
                         :class="[
                             editor?.isActive({ textAlign: 'left' })
                                 ? 'bg-(--surface-tertiary) text-(--text-primary)'
@@ -421,7 +463,9 @@
                         <AlignLeftIcon class="w-4 h-4" />
                     </button>
                     <button
-                        @click="editor?.chain().focus().setTextAlign('center').run()"
+                        @click="
+                            editor?.chain().focus().setTextAlign('center').run()
+                        "
                         :class="[
                             editor?.isActive({ textAlign: 'center' })
                                 ? 'bg-(--surface-tertiary) text-(--text-primary)'
@@ -433,7 +477,9 @@
                         <AlignCenterIcon class="w-4 h-4" />
                     </button>
                     <button
-                        @click="editor?.chain().focus().setTextAlign('right').run()"
+                        @click="
+                            editor?.chain().focus().setTextAlign('right').run()
+                        "
                         :class="[
                             editor?.isActive({ textAlign: 'right' })
                                 ? 'bg-(--surface-tertiary) text-(--text-primary)'
@@ -445,7 +491,9 @@
                         <AlignRightIcon class="w-4 h-4" />
                     </button>
                     <button
-                        @click="editor?.chain().focus().toggleBulletList().run()"
+                        @click="
+                            editor?.chain().focus().toggleBulletList().run()
+                        "
                         :class="[
                             editor?.isActive('bulletList')
                                 ? 'bg-(--surface-tertiary) text-(--text-primary)'
@@ -459,7 +507,9 @@
                 </div>
 
                 <!-- Group 5: Inserts -->
-                <div class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm">
+                <div
+                    class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm"
+                >
                     <button
                         @click="addImage"
                         class="p-2 rounded-lg text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-colors shrink-0"
@@ -482,7 +532,9 @@
                 </div>
 
                 <!-- Group 6: Intelligence & Premium -->
-                <div class="flex items-center bg-(--accent-primary)/10 rounded-xl p-0.5 shadow-sm border border-(--accent-primary)/20">
+                <div
+                    class="flex items-center bg-(--accent-primary)/10 rounded-xl p-0.5 shadow-sm border border-(--accent-primary)/20"
+                >
                     <button
                         @click="handleAiAssist"
                         class="p-1.5 rounded-lg text-(--accent-primary) hover:bg-(--surface-active) transition-colors flex items-center gap-1.5 shrink-0 whitespace-nowrap"
@@ -493,61 +545,87 @@
                             >Auto-Complete</span
                         >
                     </button>
-                    
+
                     <div class="w-px h-4 bg-(--accent-primary)/20 mx-1"></div>
 
-                    <button 
+                    <button
                         @click="isImportant = !isImportant"
                         :class="[
-                            isImportant 
-                                ? 'bg-red-100 text-red-600 shadow-sm' 
+                            isImportant
+                                ? 'bg-red-100 text-red-600 shadow-sm'
                                 : 'text-(--text-secondary) hover:text-red-500 hover:bg-red-50',
                         ]"
                         class="p-2 rounded-lg transition-all shrink-0"
-                        :title="isImportant ? 'High Priority Enabled' : 'Mark as High Priority'"
+                        :title="
+                            isImportant
+                                ? 'High Priority Enabled'
+                                : 'Mark as High Priority'
+                        "
                     >
                         <AlertTriangleIcon class="w-4 h-4" />
                     </button>
 
                     <Dropdown align="start" :close-on-select="false">
                         <template #trigger>
-                            <button 
+                            <button
                                 :class="[
-                                    scheduledAt 
-                                        ? 'bg-blue-100 text-blue-600 shadow-sm' 
+                                    scheduledAt
+                                        ? 'bg-blue-100 text-blue-600 shadow-sm'
                                         : 'text-(--text-secondary) hover:text-blue-500 hover:bg-blue-50',
                                 ]"
                                 class="p-2 rounded-lg transition-all shrink-0 flex items-center gap-1.5"
                                 title="Schedule Send"
                             >
                                 <AlarmClockIcon class="w-4 h-4" />
-                                <span v-if="scheduledAt" class="text-[10px] font-bold">Planned</span>
+                                <span
+                                    v-if="scheduledAt"
+                                    class="text-[10px] font-bold"
+                                    >Planned</span
+                                >
                             </button>
                         </template>
                         <div class="p-3 min-w-[240px] space-y-3">
-                            <div class="text-sm font-semibold text-(--text-primary)">Schedule Send</div>
-                            <input 
-                                type="datetime-local" 
+                            <div
+                                class="text-sm font-semibold text-(--text-primary)"
+                            >
+                                Schedule Send
+                            </div>
+                            <input
+                                type="datetime-local"
                                 v-model="scheduledAt"
                                 class="w-full bg-(--surface-elevated) border border-(--border-default) rounded-lg px-3 py-2 text-sm text-(--text-primary) focus:ring-2 focus:ring-(--interactive-primary)/30 transition-all outline-none"
                             />
                             <div class="flex justify-between items-center">
-                                <button @click="scheduledAt = null" class="text-xs text-red-500 hover:text-red-600 font-bold transition-colors">Clear</button>
-                                <span class="text-[10px] text-(--text-muted)">Timezone: Local</span>
+                                <button
+                                    @click="scheduledAt = null"
+                                    class="text-xs text-red-500 hover:text-red-600 font-bold transition-colors"
+                                >
+                                    Clear
+                                </button>
+                                <span class="text-[10px] text-(--text-muted)"
+                                    >Timezone: Local</span
+                                >
                             </div>
                         </div>
                     </Dropdown>
                 </div>
 
                 <!-- Group 7: Settings -->
-                <div class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm ml-auto">
-                    <label class="flex items-center gap-2 px-3 py-1.5 cursor-pointer group hover:bg-(--surface-tertiary) rounded-lg transition-all">
-                        <input 
-                            type="checkbox" 
+                <div
+                    class="flex items-center bg-(--surface-tertiary)/40 rounded-xl p-0.5 shadow-sm ml-auto"
+                >
+                    <label
+                        class="flex items-center gap-2 px-3 py-1.5 cursor-pointer group hover:bg-(--surface-tertiary) rounded-lg transition-all"
+                    >
+                        <input
+                            type="checkbox"
                             v-model="requestReadReceipt"
                             class="h-3.5 w-3.5 rounded border-(--border-default) text-(--interactive-primary) focus:ring-(--interactive-primary)/20 transition-all cursor-pointer"
                         />
-                        <span class="text-[11px] font-medium text-(--text-secondary) group-hover:text-(--text-primary) transition-colors select-none">Receipt</span>
+                        <span
+                            class="text-[11px] font-medium text-(--text-secondary) group-hover:text-(--text-primary) transition-colors select-none"
+                            >Receipt</span
+                        >
                     </label>
                 </div>
             </div>
@@ -869,7 +947,7 @@ const editor = useEditor({
         Link.configure({
             openOnClick: false,
             HTMLAttributes: {
-                class: 'text-blue-500 underline cursor-pointer',
+                class: "text-blue-500 underline cursor-pointer",
             },
         }),
     ],
@@ -883,14 +961,19 @@ const editor = useEditor({
             class: "prose dark:prose-invert max-w-none focus:outline-none min-h-[100px] text-(--text-primary)",
         },
         handleDrop: (view, event, slice, moved) => {
-            if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+            if (
+                !moved &&
+                event.dataTransfer &&
+                event.dataTransfer.files &&
+                event.dataTransfer.files.length > 0
+            ) {
                 // Return false to let our custom drag handler in the parent div or explicit handling take over,
                 // or handle it right here.
                 // We'll let the custom directive on the container handle it for simplicity in Vue
                 return false;
             }
             return false;
-        }
+        },
     },
 });
 
@@ -951,15 +1034,15 @@ watch(
             // TO: Sender
             const allTos = new Set<string>();
             if (from_email) allTos.add(from_email);
-            
+
             // CC: Original TOs + Original CCs
             // Exclude our own email accounts if possible, but for now just add everyone
             const allCcs = new Set<string>();
-            
+
             to.forEach((t) => {
                 if (t?.email) allTos.add(t.email);
             });
-            
+
             cc.forEach((c) => {
                 if (c?.email) allCcs.add(c.email);
             });
@@ -976,9 +1059,11 @@ watch(
             // Populate from draft
             toEmails.value = to.map((t: any) => t.email);
             ccEmails.value = cc.map((c: any) => c.email);
-            bccEmails.value = (props.replyTo.bcc || []).map((b: any) => b.email);
+            bccEmails.value = (props.replyTo.bcc || []).map(
+                (b: any) => b.email,
+            );
             subject.value = origSubject || "";
-            
+
             if (ccEmails.value.length > 0) showCc.value = true;
             if (bccEmails.value.length > 0) showBcc.value = true;
 
@@ -991,32 +1076,42 @@ watch(
             }
 
             // Set Body
-            let body = props.replyTo.body_html || props.replyTo.body_plain || "";
-            
+            let body =
+                props.replyTo.body_html || props.replyTo.body_plain || "";
+
             // Resolve CID images if any
-            if (body.includes('cid:') && props.replyTo.attachments) {
+            if (body.includes("cid:") && props.replyTo.attachments) {
                 props.replyTo.attachments.forEach((att: any) => {
                     if (att.content_id && att.url) {
-                        const cleanCid = att.content_id.replace(/[<>]/g, '');
-                        const escapedCid = cleanCid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                        const escapedFullCid = att.content_id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                        
+                        const cleanCid = att.content_id.replace(/[<>]/g, "");
+                        const escapedCid = cleanCid.replace(
+                            /[.*+?^${}()|[\]\\]/g,
+                            "\\$&",
+                        );
+                        const escapedFullCid = att.content_id.replace(
+                            /[.*+?^${}()|[\]\\]/g,
+                            "\\$&",
+                        );
+
                         // Match src="cid:..." or src='cid:...' or src=cid:...
                         // Also handle urlencoded versions
-                        const pattern = new RegExp(`src=["'\\\\]*cid:(${escapedCid}|${escapedFullCid}|${encodeURIComponent(cleanCid)})["'\\\\]*`, 'gi');
+                        const pattern = new RegExp(
+                            `src=["'\\\\]*cid:(${escapedCid}|${escapedFullCid}|${encodeURIComponent(cleanCid)})["'\\\\]*`,
+                            "gi",
+                        );
                         body = body.replace(pattern, `src="${att.url}"`);
                     }
                 });
             }
 
             if (body && editor.value) {
-                 editor.value.commands.setContent(body);
+                editor.value.commands.setContent(body);
             } else {
                 setTimeout(() => {
                     editor.value?.commands.setContent(body);
                 }, 100);
             }
-            
+
             // TODO: Attachments
             // We need to fetch existing attachments or show them?
             // Existing attachments are on the server. We should probably show them as chips?
@@ -1051,7 +1146,7 @@ function setQuotedContent(mode: string) {
         props.replyTo.from_name || props.replyTo.from_email || "Unknown";
 
     let quotedHtml = "";
-    
+
     if (mode === "reply" || mode === "reply-all") {
         quotedHtml = `
             <br><br>
@@ -1065,9 +1160,19 @@ function setQuotedContent(mode: string) {
             </div>
         `;
     } else if (mode === "forward") {
-        const toList = props.replyTo.to?.map(t => t.name ? `${t.name} &lt;${t.email}&gt;` : t.email).join(', ') || '';
-        const ccList = props.replyTo.cc?.map(c => c.name ? `${c.name} &lt;${c.email}&gt;` : c.email).join(', ') || '';
-        
+        const toList =
+            props.replyTo.to
+                ?.map((t) =>
+                    t.name ? `${t.name} &lt;${t.email}&gt;` : t.email,
+                )
+                .join(", ") || "";
+        const ccList =
+            props.replyTo.cc
+                ?.map((c) =>
+                    c.name ? `${c.name} &lt;${c.email}&gt;` : c.email,
+                )
+                .join(", ") || "";
+
         quotedHtml = `
             <br><br>
             <div class="gmail_quote">
@@ -1077,7 +1182,7 @@ function setQuotedContent(mode: string) {
                     Date: ${date}<br>
                     Subject: ${props.replyTo.subject}<br>
                     To: ${toList}<br>
-                    ${ccList ? `Cc: ${ccList}<br>` : ''}
+                    ${ccList ? `Cc: ${ccList}<br>` : ""}
                 </div>
                 <br>
                 ${body}
@@ -1086,7 +1191,7 @@ function setQuotedContent(mode: string) {
     }
 
     if (quotedHtml && editor.value) {
-        // Keep existing content if user has typed? 
+        // Keep existing content if user has typed?
         // For now, just set it as we are initializing
         // Check if editor is empty to avoid overwriting if hot module reload or similar triggers
         if (editor.value.getText().length === 0) {
@@ -1145,11 +1250,15 @@ async function handleSend() {
     }
 
     // Basic validation
-    if (!toEmails.value.length && !ccEmails.value.length && !bccEmails.value.length) {
+    if (
+        !toEmails.value.length &&
+        !ccEmails.value.length &&
+        !bccEmails.value.length
+    ) {
         alert("Please add at least one recipient.");
         return;
     }
-    
+
     if (isSending.value) return;
     isSending.value = true;
 
@@ -1171,11 +1280,17 @@ async function handleSend() {
         // Use FormData for file uploads
         const formData = new FormData();
         formData.append("account_id", String(emailData.account_id));
-        emailData.to.forEach((email, i) => formData.append(`to[${i}][email]`, email));
-        emailData.cc.forEach((email, i) => formData.append(`cc[${i}][email]`, email));
-        emailData.bcc.forEach((email, i) => formData.append(`bcc[${i}][email]`, email));
+        emailData.to.forEach((email, i) =>
+            formData.append(`to[${i}][email]`, email),
+        );
+        emailData.cc.forEach((email, i) =>
+            formData.append(`cc[${i}][email]`, email),
+        );
+        emailData.bcc.forEach((email, i) =>
+            formData.append(`bcc[${i}][email]`, email),
+        );
         formData.append("subject", emailData.subject);
-        
+
         let bodyContent = emailData.body_html;
         // Append signature if selected
         if (selectedSignature.value?.content) {
@@ -1184,17 +1299,15 @@ async function handleSend() {
         formData.append("body", bodyContent);
 
         if (emailData.request_read_receipt) {
-             formData.append("request_read_receipt", "1");
+            formData.append("request_read_receipt", "1");
         }
 
-        if (isImportant.value) {
-            formData.append("is_important", "1");
-        }
+        formData.append("is_important", isImportant.value ? "1" : "0");
 
         if (scheduledAt.value) {
             formData.append("scheduled_at", scheduledAt.value);
         }
-        
+
         if (draftId.value) {
             formData.append("draft_id", draftId.value);
         }
@@ -1204,19 +1317,21 @@ async function handleSend() {
         });
 
         const response = await axios.post("/api/emails", formData, {
-            headers: { 
+            headers: {
                 "Content-Type": "multipart/form-data",
             },
         });
         console.log("[EmailComposer] Send success:", response.data);
 
-        emit('send');
-        emit('close');
+        emit("send");
+        emit("close");
     } catch (error) {
         console.error("Error sending email:", error);
         alert("Failed to send email. Please try again.");
     } finally {
-        console.log("[EmailComposer] handleSend finished, resetting isSending.");
+        console.log(
+            "[EmailComposer] handleSend finished, resetting isSending.",
+        );
         isSending.value = false;
     }
 }
@@ -1227,22 +1342,40 @@ const showFontFamily = ref(false);
 const showFontSize = ref(false);
 
 const fontFamilies = [
-    { label: 'Sans Serif', value: 'Inter, sans-serif' },
-    { label: 'Serif', value: 'serif' },
-    { label: 'Monospace', value: 'monospace' },
-    { label: 'Comic Sans', value: '"Comic Sans MS", "Comic Sans", cursive' },
+    { label: "Sans Serif", value: "Inter, sans-serif" },
+    { label: "Serif", value: "serif" },
+    { label: "Monospace", value: "monospace" },
+    { label: "Comic Sans", value: '"Comic Sans MS", "Comic Sans", cursive' },
 ];
 
 const fontSizes = [
-    { label: 'Small', value: '12px' },
-    { label: 'Normal', value: '14px' },
-    { label: 'Large', value: '18px' },
-    { label: 'Huge', value: '24px' },
+    { label: "Small", value: "12px" },
+    { label: "Normal", value: "14px" },
+    { label: "Large", value: "18px" },
+    { label: "Huge", value: "24px" },
 ];
 
 const colors = [
-    '#000000', '#434343', '#666666', '#999999', '#b7b7b7', '#cccccc', '#d9d9d9', '#efefef', '#f3f3f3', '#ffffff',
-    '#980000', '#ff0000', '#ff9900', '#ffff00', '#00ff00', '#00ffff', '#4a86e8', '#0000ff', '#9900ff', '#ff00ff',
+    "#000000",
+    "#434343",
+    "#666666",
+    "#999999",
+    "#b7b7b7",
+    "#cccccc",
+    "#d9d9d9",
+    "#efefef",
+    "#f3f3f3",
+    "#ffffff",
+    "#980000",
+    "#ff0000",
+    "#ff9900",
+    "#ffff00",
+    "#00ff00",
+    "#00ffff",
+    "#4a86e8",
+    "#0000ff",
+    "#9900ff",
+    "#ff00ff",
 ];
 
 function setFontFamily(font: string) {
@@ -1261,9 +1394,9 @@ function setColor(color: string) {
 }
 
 function addImage() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
     input.onchange = async (e: Event) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (file) {
@@ -1284,8 +1417,8 @@ function handleAiAssist() {
 
 // --- Link Support ---
 function setLink() {
-    const previousUrl = editor.value?.getAttributes('link').href;
-    const url = window.prompt('URL', previousUrl);
+    const previousUrl = editor.value?.getAttributes("link").href;
+    const url = window.prompt("URL", previousUrl);
 
     // cancelled
     if (url === null) {
@@ -1293,44 +1426,62 @@ function setLink() {
     }
 
     // empty
-    if (url === '') {
-        editor.value?.chain().focus().extendMarkRange('link').unsetLink().run();
+    if (url === "") {
+        editor.value?.chain().focus().extendMarkRange("link").unsetLink().run();
         return;
     }
 
     // update
-    editor.value?.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+    editor.value
+        ?.chain()
+        .focus()
+        .extendMarkRange("link")
+        .setLink({ href: url })
+        .run();
 }
 
 // --- Draft Logic ---
 function formatTime(date: Date) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 const saveDraft = async (silent = false) => {
     if (!selectedAccount.value || savingDraft.value) return;
 
     // Don't save empty drafts
-    if (!toEmails.value.length && !subject.value && (!editor.value || editor.value.isEmpty)) return;
+    if (
+        !toEmails.value.length &&
+        !subject.value &&
+        (!editor.value || editor.value.isEmpty)
+    )
+        return;
 
     savingDraft.value = true;
 
     try {
         const formData = new FormData();
         formData.append("account_id", String(selectedAccount.value.id));
-        
-        toEmails.value.forEach((email, i) => formData.append(`to[${i}][email]`, email));
-        ccEmails.value.forEach((email, i) => formData.append(`cc[${i}][email]`, email));
-        bccEmails.value.forEach((email, i) => formData.append(`bcc[${i}][email]`, email));
-        
+
+        toEmails.value.forEach((email, i) =>
+            formData.append(`to[${i}][email]`, email),
+        );
+        ccEmails.value.forEach((email, i) =>
+            formData.append(`cc[${i}][email]`, email),
+        );
+        bccEmails.value.forEach((email, i) =>
+            formData.append(`bcc[${i}][email]`, email),
+        );
+
         formData.append("subject", subject.value);
         formData.append("body", editor.value?.getHTML() || "");
         formData.append("is_draft", "1");
 
         if (requestReadReceipt.value) {
-             formData.append("request_read_receipt", "1");
+            formData.append("request_read_receipt", "1");
         }
-        
+
+        formData.append("is_important", isImportant.value ? "1" : "0");
+
         attachments.value.forEach((file, i) => {
             formData.append(`attachments[${i}]`, file);
         });
@@ -1339,9 +1490,13 @@ const saveDraft = async (silent = false) => {
         if (draftId.value) {
             // Update existing draft (use POST with _method=PUT for file uploads)
             formData.append("_method", "PUT");
-            response = await axios.post(`/api/emails/${draftId.value}`, formData, {
-                headers: { "Content-Type": "multipart/form-data" },
-            });
+            response = await axios.post(
+                `/api/emails/${draftId.value}`,
+                formData,
+                {
+                    headers: { "Content-Type": "multipart/form-data" },
+                },
+            );
         } else {
             // Create new draft
             response = await axios.post("/api/emails", formData, {
@@ -1364,15 +1519,22 @@ const autoSave = useDebounceFn(() => {
 }, 3000);
 
 // Watch for changes to trigger auto-save
-watch([toEmails, ccEmails, bccEmails, subject], () => {
-    autoSave();
-}, { deep: true });
+watch(
+    [toEmails, ccEmails, bccEmails, subject],
+    () => {
+        autoSave();
+    },
+    { deep: true },
+);
 
 // Watch editor content separately (since it's not a simple ref)
 // actually we can just hook into editor onUpdate
-watch(() => editor.value?.getHTML(), () => {
-    autoSave();
-});
+watch(
+    () => editor.value?.getHTML(),
+    () => {
+        autoSave();
+    },
+);
 
 // Drag and drop for inline images
 function handleDrop(event: DragEvent) {
@@ -1381,17 +1543,21 @@ function handleDrop(event: DragEvent) {
         event.preventDefault();
         const files = Array.from(event.dataTransfer!.files);
         // Separate images for inline and others for attachment
-        files.forEach(file => {
-             if (file.type.startsWith('image/')) {
-                 const reader = new FileReader();
-                 reader.onload = (e) => {
-                     const result = e.target?.result as string;
-                     editor.value?.chain().focus().setImage({ src: result }).run();
-                 };
-                 reader.readAsDataURL(file);
-             } else {
-                 attachments.value.push(file);
-             }
+        files.forEach((file) => {
+            if (file.type.startsWith("image/")) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const result = e.target?.result as string;
+                    editor.value
+                        ?.chain()
+                        .focus()
+                        .setImage({ src: result })
+                        .run();
+                };
+                reader.readAsDataURL(file);
+            } else {
+                attachments.value.push(file);
+            }
         });
     }
 }

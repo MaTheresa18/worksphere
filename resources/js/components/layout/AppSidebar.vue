@@ -5,10 +5,12 @@ import { useNavigationStore } from "@/stores/navigation";
 import { useAuthStore } from "@/stores/auth";
 import { appConfig } from "@/config/app";
 import { cn } from "@/lib/utils";
-import type { NavigationItem, NavigationChild } from "@/types/models/navigation";
+import type {
+    NavigationItem,
+    NavigationChild,
+} from "@/types/models/navigation";
 
 // ... (existing imports)
-
 
 import { usePresence } from "@/composables/usePresence.ts";
 import {
@@ -45,6 +47,7 @@ import {
     Mail,
     Plus,
     BookOpen,
+    Calendar,
 } from "lucide-vue-next";
 
 const route = useRoute();
@@ -71,6 +74,7 @@ const iconMap = {
     mail: Mail,
     plus: Plus,
     "book-open": BookOpen,
+    calendar: Calendar,
 };
 
 const isHovered = ref(false);
@@ -87,13 +91,12 @@ const handleMouseLeave = () => {
     isHovered.value = false;
 };
 
-
 const sidebarClasses = computed(() =>
     cn(
         "fixed left-0 top-0 bottom-0 z-50 flex flex-col",
         // Minimalist Base
-         "bg-[var(--surface-primary)] border-r border-[var(--border-muted)]",
-        "transition-all duration-300 ease-[var(--ease-bounce)]", 
+        "bg-[var(--surface-primary)] border-r border-[var(--border-muted)]",
+        "transition-all duration-300 ease-[var(--ease-bounce)]",
         navStore.isSidebarCollapsed && !isHovered.value
             ? "w-[var(--sidebar-width-collapsed)]"
             : "w-[var(--sidebar-width)]",
@@ -101,8 +104,8 @@ const sidebarClasses = computed(() =>
         "max-lg:w-[var(--sidebar-width)]",
         navStore.isMobileSidebarOpen
             ? "max-lg:translate-x-0"
-            : "max-lg:-translate-x-full"
-    )
+            : "max-lg:-translate-x-full",
+    ),
 );
 
 // Helper functions
@@ -112,7 +115,9 @@ function isActive(itemRoute: string | undefined): boolean {
 
 function isChildActive(item: NavigationItem): boolean {
     if (!item.children) return false;
-    return item.children.some((child: NavigationChild) => route.path === child.route);
+    return item.children.some(
+        (child: NavigationChild) => route.path === child.route,
+    );
 }
 
 function navigate(path: string): void {
@@ -131,7 +136,12 @@ async function handleLogout() {
 }
 
 // Helper to determine if we should show expanded content
-const showExpanded = computed(() => !navStore.isSidebarCollapsed || isHovered.value || navStore.isMobileSidebarOpen);
+const showExpanded = computed(
+    () =>
+        !navStore.isSidebarCollapsed ||
+        isHovered.value ||
+        navStore.isMobileSidebarOpen,
+);
 
 function handleItemClick(item: NavigationItem): void {
     if (navStore.hasChildren(item) && !showExpanded.value) {
@@ -149,15 +159,13 @@ onMounted(() => {
 </script>
 
 <template>
-    <aside 
+    <aside
         :class="sidebarClasses"
         @mouseenter="handleMouseEnter"
         @mouseleave="handleMouseLeave"
     >
         <!-- Header -->
-        <div
-            class="flex h-16 items-center justify-between px-4 pb-2 pt-4"
-        >
+        <div class="flex h-16 items-center justify-between px-4 pb-2 pt-4">
             <!-- Logo -->
             <a
                 href="/"
@@ -165,7 +173,7 @@ onMounted(() => {
                 :class="
                     cn(
                         'flex items-center gap-3 transition-all duration-300',
-                        !showExpanded && 'justify-center w-full'
+                        !showExpanded && 'justify-center w-full',
                     )
                 "
             >
@@ -192,14 +200,18 @@ onMounted(() => {
                             'flex flex-col transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap',
                             !showExpanded
                                 ? 'max-lg:opacity-100 max-lg:w-auto lg:max-w-0 lg:opacity-0'
-                                : 'max-w-[200px] opacity-100'
+                                : 'max-w-[200px] opacity-100',
                         )
                     "
                 >
-                    <span class="text-[15px] font-semibold text-[var(--text-primary)] leading-none tracking-tight">
+                    <span
+                        class="text-[15px] font-semibold text-[var(--text-primary)] leading-none tracking-tight"
+                    >
                         {{ appConfig.name }}
                     </span>
-                    <span class="text-[11px] font-medium text-[var(--text-tertiary)] mt-0.5">
+                    <span
+                        class="text-[11px] font-medium text-[var(--text-tertiary)] mt-0.5"
+                    >
                         Team Workspace
                     </span>
                 </div>
@@ -207,8 +219,9 @@ onMounted(() => {
         </div>
 
         <!-- Navigation -->
-        <nav class="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-6 scrollbar-thin hover:scrollbar-thumb-[var(--scrollbar-thumb)]">
-
+        <nav
+            class="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-6 scrollbar-thin hover:scrollbar-thumb-[var(--scrollbar-thumb)]"
+        >
             <!-- Pinned Items -->
             <div v-if="navStore.pinnedItems.length" class="space-y-0.5">
                 <template v-for="item in navStore.pinnedItems" :key="item.id">
@@ -226,13 +239,14 @@ onMounted(() => {
                                     cn(
                                         'group relative flex w-full items-center rounded-lg transition-colors duration-200 border border-transparent',
                                         // Base spacing
-                                        !showExpanded 
-                                            ? 'justify-center p-2 mx-auto' 
+                                        !showExpanded
+                                            ? 'justify-center p-2 mx-auto'
                                             : 'px-3 py-2 gap-3',
                                         // Active State (Pill)
-                                        isActive(item.route) || isChildActive(item)
+                                        isActive(item.route) ||
+                                            isChildActive(item)
                                             ? 'bg-[var(--surface-tertiary)] text-[var(--text-primary)] font-medium'
-                                            : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]'
+                                            : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]',
                                     )
                                 "
                                 @click="handleItemClick(item)"
@@ -242,9 +256,10 @@ onMounted(() => {
                                     :class="
                                         cn(
                                             'h-[1.2rem] w-[1.2rem] shrink-0 transition-colors duration-200',
-                                            isActive(item.route) || isChildActive(item)
+                                            isActive(item.route) ||
+                                                isChildActive(item)
                                                 ? 'text-[var(--text-primary)]'
-                                                : 'text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]'
+                                                : 'text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]',
                                         )
                                     "
                                     stroke-width="2"
@@ -255,7 +270,7 @@ onMounted(() => {
                                             'flex-1 text-left whitespace-nowrap overflow-hidden text-[13.5px] transition-all duration-300 ease-in-out',
                                             !showExpanded
                                                 ? 'max-w-0 opacity-0'
-                                                : 'max-w-[200px] opacity-100'
+                                                : 'max-w-[200px] opacity-100',
                                         )
                                     "
                                 >
@@ -264,7 +279,9 @@ onMounted(() => {
 
                                 <!-- Badge -->
                                 <span
-                                    v-if="navStore.getBadge(item) && showExpanded"
+                                    v-if="
+                                        navStore.getBadge(item) && showExpanded
+                                    "
                                     class="rounded-md px-1.5 py-0.5 text-[10px] font-medium transition-colors ml-2 bg-[var(--surface-tertiary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]"
                                 >
                                     {{ navStore.getBadge(item) }}
@@ -272,27 +289,40 @@ onMounted(() => {
 
                                 <!-- Badge (collapsed) -->
                                 <div
-                                    v-if="navStore.getBadge(item) && !showExpanded"
+                                    v-if="
+                                        navStore.getBadge(item) && !showExpanded
+                                    "
                                     class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[var(--color-primary-500)] ring-2 ring-[var(--surface-primary)]"
                                 ></div>
 
                                 <!-- Expand/Collapse Arrow -->
                                 <ChevronDown
-                                    v-if="navStore.hasChildren(item) && showExpanded"
+                                    v-if="
+                                        navStore.hasChildren(item) &&
+                                        showExpanded
+                                    "
                                     :class="
                                         cn(
                                             'h-3.5 w-3.5 shrink-0 text-[var(--text-muted)] transition-transform duration-200',
-                                            navStore.isExpanded(item.id) && 'rotate-180'
+                                            navStore.isExpanded(item.id) &&
+                                                'rotate-180',
                                         )
                                     "
                                 />
                             </button>
-                            
+
                             <!-- Unpin Button (shows on hover) -->
                             <button
                                 v-if="showExpanded && item.pinnable !== false"
                                 @click.stop="navStore.togglePin(item.id)"
-                                :class="cn('absolute top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover/item:opacity-100 transition-opacity text-[var(--text-muted)] hover:text-[var(--interactive-primary)] hover:bg-[var(--surface-secondary)]', navStore.hasChildren(item) ? 'right-8' : 'right-1')"
+                                :class="
+                                    cn(
+                                        'absolute top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover/item:opacity-100 transition-opacity text-[var(--text-muted)] hover:text-[var(--interactive-primary)] hover:bg-[var(--surface-secondary)]',
+                                        navStore.hasChildren(item)
+                                            ? 'right-8'
+                                            : 'right-1',
+                                    )
+                                "
                                 title="Unpin"
                             >
                                 <PinOff class="h-3 w-3" />
@@ -304,13 +334,28 @@ onMounted(() => {
                     <div
                         v-if="navStore.hasChildren(item) && showExpanded"
                         class="grid transition-all duration-200 ease-in-out"
-                        :class="navStore.isExpanded(item.id) ? 'grid-rows-[1fr] opacity-100 mb-1' : 'grid-rows-[0fr] opacity-0'"
+                        :class="
+                            navStore.isExpanded(item.id)
+                                ? 'grid-rows-[1fr] opacity-100 mb-1'
+                                : 'grid-rows-[0fr] opacity-0'
+                        "
                     >
                         <div class="overflow-hidden">
-                            <div class="ml-[1.1rem] pl-3 border-l border-[var(--border-muted)] space-y-0.5 pt-0.5">
-                                <template v-for="child in item.children" :key="child.id">
-                                    <div v-if="child.type === 'divider'" class="my-1.5 h-px bg-[var(--border-muted)]/50 mx-2"></div>
-                                    <div v-else-if="child.type === 'header'" class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] opacity-80 mt-1">
+                            <div
+                                class="ml-[1.1rem] pl-3 border-l border-[var(--border-muted)] space-y-0.5 pt-0.5"
+                            >
+                                <template
+                                    v-for="child in item.children"
+                                    :key="child.id"
+                                >
+                                    <div
+                                        v-if="child.type === 'divider'"
+                                        class="my-1.5 h-px bg-[var(--border-muted)]/50 mx-2"
+                                    ></div>
+                                    <div
+                                        v-else-if="child.type === 'header'"
+                                        class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] opacity-80 mt-1"
+                                    >
                                         {{ child.label }}
                                     </div>
                                     <button
@@ -321,17 +366,21 @@ onMounted(() => {
                                                 isActive(child.route)
                                                     ? 'text-[var(--text-primary)] bg-[var(--surface-secondary)]'
                                                     : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]/50',
-                                                'cursor-pointer'
+                                                'cursor-pointer',
                                             )
                                         "
-                                        @click="child.route && navigate(child.route)"
+                                        @click="
+                                            child.route && navigate(child.route)
+                                        "
                                     >
                                         <component
                                             v-if="child.icon"
                                             :is="getIcon(child.icon)"
                                             class="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]"
                                         />
-                                        <span class="truncate">{{ child.label }}</span>
+                                        <span class="truncate">{{
+                                            child.label
+                                        }}</span>
                                         <span
                                             v-if="child.team_badge"
                                             class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-tertiary)] text-[var(--text-muted)] border border-[var(--border-subtle)] shrink-0"
@@ -342,23 +391,29 @@ onMounted(() => {
                                 </template>
                                 <!-- Static Team Actions -->
                                 <template v-if="item.id === 'teams'">
-                                    <div class="my-1.5 h-px bg-[var(--border-muted)]/50 mx-2"></div>
+                                    <div
+                                        class="my-1.5 h-px bg-[var(--border-muted)]/50 mx-2"
+                                    ></div>
                                     <button
                                         class="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] transition-colors duration-200 border border-transparent font-medium text-[var(--text-muted)] hover:text-[var(--interactive-primary)] hover:bg-[var(--interactive-primary)]/5"
                                         @click="navigate('/teams?create=true')"
                                     >
                                         <Plus class="h-3 w-3 shrink-0" />
-                                        <span class="truncate text-[11.5px]">Create New Team</span>
+                                        <span class="truncate text-[11.5px]"
+                                            >Create New Team</span
+                                        >
                                     </button>
                                     <button
                                         class="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] transition-colors duration-200 border border-transparent font-medium text-[var(--text-muted)] hover:text-[var(--interactive-primary)] hover:bg-[var(--interactive-primary)]/5"
                                         @click="navigate('/teams')"
                                     >
                                         <Sliders class="h-3 w-3 shrink-0" />
-                                        <span class="truncate text-[11.5px]">Manage Teams</span>
+                                        <span class="truncate text-[11.5px]"
+                                            >Manage Teams</span
+                                        >
                                     </button>
                                 </template>
-</div>
+                            </div>
                         </div>
                     </div>
                 </template>
@@ -387,12 +442,13 @@ onMounted(() => {
                                         'group relative flex w-full items-center rounded-lg transition-colors duration-200 border border-transparent',
                                         // Base spacing
                                         !showExpanded
-                                            ? 'justify-center p-2 mx-auto' 
+                                            ? 'justify-center p-2 mx-auto'
                                             : 'px-3 py-2 gap-3',
                                         // Active State (Pill)
-                                        isActive(item.route) || isChildActive(item)
+                                        isActive(item.route) ||
+                                            isChildActive(item)
                                             ? 'bg-[var(--surface-tertiary)] text-[var(--text-primary)] font-medium'
-                                            : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]'
+                                            : 'text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]',
                                     )
                                 "
                                 @click="handleItemClick(item)"
@@ -402,9 +458,10 @@ onMounted(() => {
                                     :class="
                                         cn(
                                             'h-[1.2rem] w-[1.2rem] shrink-0 transition-colors duration-200',
-                                            isActive(item.route) || isChildActive(item)
+                                            isActive(item.route) ||
+                                                isChildActive(item)
                                                 ? 'text-[var(--text-primary)]'
-                                                : 'text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]'
+                                                : 'text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]',
                                         )
                                     "
                                     stroke-width="2"
@@ -415,7 +472,7 @@ onMounted(() => {
                                             'flex-1 text-left whitespace-nowrap overflow-hidden text-[13.5px] transition-all duration-300 ease-in-out',
                                             !showExpanded
                                                 ? 'max-w-0 opacity-0'
-                                                : 'max-w-[200px] opacity-100'
+                                                : 'max-w-[200px] opacity-100',
                                         )
                                     "
                                 >
@@ -424,7 +481,9 @@ onMounted(() => {
 
                                 <!-- Badge -->
                                 <span
-                                    v-if="navStore.getBadge(item) && showExpanded"
+                                    v-if="
+                                        navStore.getBadge(item) && showExpanded
+                                    "
                                     class="rounded-md px-1.5 py-0.5 text-[10px] font-medium transition-colors ml-2 bg-[var(--surface-tertiary)] text-[var(--text-secondary)] border border-[var(--border-subtle)]"
                                 >
                                     {{ navStore.getBadge(item) }}
@@ -432,27 +491,40 @@ onMounted(() => {
 
                                 <!-- Badge (collapsed) -->
                                 <div
-                                    v-if="navStore.getBadge(item) && !showExpanded"
+                                    v-if="
+                                        navStore.getBadge(item) && !showExpanded
+                                    "
                                     class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[var(--color-primary-500)] ring-2 ring-[var(--surface-primary)]"
                                 ></div>
 
                                 <!-- Expand/Collapse Arrow -->
                                 <ChevronDown
-                                    v-if="navStore.hasChildren(item) && showExpanded"
+                                    v-if="
+                                        navStore.hasChildren(item) &&
+                                        showExpanded
+                                    "
                                     :class="
                                         cn(
                                             'h-3.5 w-3.5 shrink-0 text-[var(--text-muted)] transition-transform duration-200',
-                                            navStore.isExpanded(item.id) && 'rotate-180'
+                                            navStore.isExpanded(item.id) &&
+                                                'rotate-180',
                                         )
                                     "
                                 />
                             </button>
-                            
+
                             <!-- Pin Button (shows on hover) -->
                             <button
                                 v-if="showExpanded && item.pinnable !== false"
                                 @click.stop="navStore.togglePin(item.id)"
-                                :class="cn('absolute top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover/item:opacity-100 transition-opacity text-[var(--text-muted)] hover:text-[var(--interactive-primary)] hover:bg-[var(--surface-secondary)]', navStore.hasChildren(item) ? 'right-8' : 'right-1')"
+                                :class="
+                                    cn(
+                                        'absolute top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover/item:opacity-100 transition-opacity text-[var(--text-muted)] hover:text-[var(--interactive-primary)] hover:bg-[var(--surface-secondary)]',
+                                        navStore.hasChildren(item)
+                                            ? 'right-8'
+                                            : 'right-1',
+                                    )
+                                "
                                 title="Pin"
                             >
                                 <Pin class="h-3 w-3" />
@@ -464,13 +536,28 @@ onMounted(() => {
                     <div
                         v-if="navStore.hasChildren(item) && showExpanded"
                         class="grid transition-all duration-200 ease-in-out"
-                        :class="navStore.isExpanded(item.id) ? 'grid-rows-[1fr] opacity-100 mb-1' : 'grid-rows-[0fr] opacity-0'"
+                        :class="
+                            navStore.isExpanded(item.id)
+                                ? 'grid-rows-[1fr] opacity-100 mb-1'
+                                : 'grid-rows-[0fr] opacity-0'
+                        "
                     >
-                         <div class="overflow-hidden">
-                            <div class="ml-[1.1rem] pl-3 border-l border-[var(--border-muted)] space-y-0.5 pt-0.5">
-                                <template v-for="child in item.children" :key="child.id">
-                                    <div v-if="child.type === 'divider'" class="my-1.5 h-px bg-[var(--border-muted)]/50 mx-2"></div>
-                                    <div v-else-if="child.type === 'header'" class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] opacity-80 mt-1">
+                        <div class="overflow-hidden">
+                            <div
+                                class="ml-[1.1rem] pl-3 border-l border-[var(--border-muted)] space-y-0.5 pt-0.5"
+                            >
+                                <template
+                                    v-for="child in item.children"
+                                    :key="child.id"
+                                >
+                                    <div
+                                        v-if="child.type === 'divider'"
+                                        class="my-1.5 h-px bg-[var(--border-muted)]/50 mx-2"
+                                    ></div>
+                                    <div
+                                        v-else-if="child.type === 'header'"
+                                        class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] opacity-80 mt-1"
+                                    >
                                         {{ child.label }}
                                     </div>
                                     <button
@@ -481,17 +568,21 @@ onMounted(() => {
                                                 isActive(child.route)
                                                     ? 'text-[var(--text-primary)] bg-[var(--surface-secondary)]'
                                                     : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]/50',
-                                                'cursor-pointer'
+                                                'cursor-pointer',
                                             )
                                         "
-                                        @click="child.route && navigate(child.route)"
+                                        @click="
+                                            child.route && navigate(child.route)
+                                        "
                                     >
                                         <component
                                             v-if="child.icon"
                                             :is="getIcon(child.icon)"
                                             class="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]"
                                         />
-                                        <span class="truncate">{{ child.label }}</span>
+                                        <span class="truncate">{{
+                                            child.label
+                                        }}</span>
                                         <span
                                             v-if="child.team_badge"
                                             class="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-tertiary)] text-[var(--text-muted)] border border-[var(--border-subtle)] shrink-0"
@@ -502,23 +593,29 @@ onMounted(() => {
                                 </template>
                                 <!-- Static Team Actions -->
                                 <template v-if="item.id === 'teams'">
-                                    <div class="my-1.5 h-px bg-[var(--border-muted)]/50 mx-2"></div>
+                                    <div
+                                        class="my-1.5 h-px bg-[var(--border-muted)]/50 mx-2"
+                                    ></div>
                                     <button
                                         class="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] transition-colors duration-200 border border-transparent font-medium text-[var(--text-muted)] hover:text-[var(--interactive-primary)] hover:bg-[var(--interactive-primary)]/5"
                                         @click="navigate('/teams?create=true')"
                                     >
                                         <Plus class="h-3 w-3 shrink-0" />
-                                        <span class="truncate text-[11.5px]">Create New Team</span>
+                                        <span class="truncate text-[11.5px]"
+                                            >Create New Team</span
+                                        >
                                     </button>
                                     <button
                                         class="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] transition-colors duration-200 border border-transparent font-medium text-[var(--text-muted)] hover:text-[var(--interactive-primary)] hover:bg-[var(--interactive-primary)]/5"
                                         @click="navigate('/teams')"
                                     >
                                         <Sliders class="h-3 w-3 shrink-0" />
-                                        <span class="truncate text-[11.5px]">Manage Teams</span>
+                                        <span class="truncate text-[11.5px]"
+                                            >Manage Teams</span
+                                        >
                                     </button>
                                 </template>
-</div>
+                            </div>
                         </div>
                     </div>
                 </template>
@@ -550,7 +647,7 @@ onMounted(() => {
                                 'cursor-pointer',
                                 !showExpanded
                                     ? 'justify-center gap-0'
-                                    : 'gap-3'
+                                    : 'gap-3',
                             )
                         "
                     >
@@ -563,14 +660,14 @@ onMounted(() => {
                                 class="rounded-md"
                             />
                         </div>
-                        
+
                         <div
                             :class="
                                 cn(
                                     'flex-1 text-left min-w-0 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap',
                                     !showExpanded
                                         ? 'max-w-0 opacity-0'
-                                        : 'max-w-[200px] opacity-100'
+                                        : 'max-w-[200px] opacity-100',
                                 )
                             "
                         >
@@ -591,7 +688,7 @@ onMounted(() => {
                                     'h-4 w-4 text-[var(--text-muted)] transition-all duration-300 ease-in-out shrink-0',
                                     !showExpanded
                                         ? 'w-0 opacity-0'
-                                        : 'w-4 opacity-100'
+                                        : 'w-4 opacity-100',
                                 )
                             "
                         />

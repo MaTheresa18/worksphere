@@ -9,33 +9,6 @@
                 <LoaderIcon class="w-6 h-6 animate-spin text-(--text-muted)" />
             </div>
 
-            <!-- Read Receipt Prompt -->
-            <div
-                v-if="showReadReceiptPrompt"
-                class="mx-4 mt-4 p-3 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center justify-between shadow-sm shrink-0"
-            >
-                <div
-                    class="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300"
-                >
-                    <InfoIcon class="w-4 h-4" />
-                    <span>The sender has requested a read receipt.</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button
-                        @click="ignoreReadReceipt"
-                        class="px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/50 rounded-md transition-colors"
-                    >
-                        Ignore
-                    </button>
-                    <button
-                        @click="sendReadReceipt"
-                        class="px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
-                    >
-                        Send Receipt
-                    </button>
-                </div>
-            </div>
-
             <!-- Thread View -->
             <div
                 v-if="threadMessages.length > 0 && activeTab === 'read'"
@@ -472,9 +445,14 @@ onUnmounted(() => {
     console.log("[PreviewPane] Unmounted!");
 });
 
-watch(() => props.email, (newVal, oldVal) => {
-    console.log(`[PreviewPane] Email prop changed from ${oldVal?.id} to ${newVal?.id}`);
-});
+watch(
+    () => props.email,
+    (newVal, oldVal) => {
+        console.log(
+            `[PreviewPane] Email prop changed from ${oldVal?.id} to ${newVal?.id}`,
+        );
+    },
+);
 
 const emit = defineEmits<{
     compose: [];
@@ -528,59 +506,7 @@ const threadMessages = ref<any[]>([]);
 const loadingThread = ref(false);
 const replyTargetEmail = ref<Email | null>(null); // Specific email being replied to in thread
 
-// Read Receipt Logic
-const showReadReceiptPrompt = ref(false);
-const readReceiptEmail = ref<Email | null>(null);
-
-function checkForReadReceipt(email: Email) {
-    // Check if headers has Disposition-Notification-To
-    // and if we haven't already sent one (need to track this, maybe local storage for now or a flag on email)
-    // For now, simple check: if header exists and we are opening it.
-
-    // We need to access headers. In the model it is cast to array.
-    // The key might be 'Disposition-Notification-To' or lowercase.
-    const headers = email.headers || {};
-    const dnt =
-        headers["Disposition-Notification-To"] ||
-        headers["disposition-notification-to"];
-
-    if (dnt && !localStorage.getItem(`read_receipt_sent_${email.id}`)) {
-        readReceiptEmail.value = email;
-        showReadReceiptPrompt.value = true;
-    }
-}
-
-async function sendReadReceipt() {
-    if (!readReceiptEmail.value) return;
-
-    try {
-        await axios.post(
-            `/api/emails/${readReceiptEmail.value.id}/read-receipt`,
-        );
-        alert("Read receipt sent.");
-        localStorage.setItem(
-            `read_receipt_sent_${readReceiptEmail.value.id}`,
-            "true",
-        );
-    } catch (e) {
-        console.error("Failed to send read receipt", e);
-        alert("Failed to send read receipt.");
-    } finally {
-        showReadReceiptPrompt.value = false;
-        readReceiptEmail.value = null;
-    }
-}
-
-function ignoreReadReceipt() {
-    if (readReceiptEmail.value) {
-        localStorage.setItem(
-            `read_receipt_sent_${readReceiptEmail.value.id}`,
-            "ignored",
-        );
-    }
-    showReadReceiptPrompt.value = false;
-    readReceiptEmail.value = null;
-}
+// Read Receipt Logic removed (moved to EmailPreviewContent)
 
 // ... (existing code) ...
 
@@ -786,8 +712,6 @@ watch(
                 threadMessages.value = [{ ...newEmail, isExpanded: true }];
             } finally {
                 loadingThread.value = false;
-                // Check for read receipt on the main email
-                checkForReadReceipt(newEmail);
             }
         } else {
             threadMessages.value = [];

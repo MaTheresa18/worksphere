@@ -18,7 +18,7 @@
                 <div class="flex items-center gap-3 flex-1 min-w-0">
                     <button
                         @click="isHeaderExpanded = !isHeaderExpanded"
-                        class="p-1.5 rounded-lg hover:bg-(--surface-tertiary) text-(--text-secondary) transition-colors shrink-0"
+                        class="p-1 rounded-lg hover:bg-(--surface-tertiary) text-(--text-secondary) transition-colors shrink-0"
                         :title="isHeaderExpanded ? 'Collapse' : 'Expand'"
                     >
                         <ChevronDownIcon
@@ -27,13 +27,24 @@
                         />
                     </button>
 
-                    <h1
+                    <div
                         v-if="isHeaderExpanded"
-                        class="text-lg font-bold text-(--text-primary) leading-tight truncate"
-                        :title="email.subject"
+                        class="flex items-center gap-2 overflow-hidden"
                     >
-                        {{ email.subject }}
-                    </h1>
+                        <div
+                            v-if="email.is_important"
+                            class="shrink-0 text-red-500"
+                            title="High Importance"
+                        >
+                            <AlertCircleIcon class="w-4 h-4 fill-current/10" />
+                        </div>
+                        <h1
+                            class="!text-[24px] font-bold text-(--text-primary) leading-tight truncate"
+                            :title="email.subject"
+                        >
+                            {{ email.subject }}
+                        </h1>
+                    </div>
                     <div v-else class="flex items-center gap-3 truncate">
                         <span
                             class="font-semibold text-sm text-(--text-primary) truncate"
@@ -54,7 +65,7 @@
                 <div class="flex space-x-1 shrink-0">
                     <button
                         v-if="isHeaderExpanded"
-                        class="p-2 text-(--text-secondary) hover:bg-(--surface-tertiary) hover:text-(--text-primary) rounded-lg transition-colors"
+                        class="p-1.5 text-(--text-secondary) hover:bg-(--surface-tertiary) hover:text-(--text-primary) rounded-lg transition-colors"
                         title="Show Details"
                         @click="showMetadata = !showMetadata"
                         :class="{
@@ -62,22 +73,22 @@
                                 showMetadata,
                         }"
                     >
-                        <InfoIcon class="w-5 h-5" />
+                        <InfoIcon class="w-4 h-4" />
                     </button>
                     <button
-                        class="p-2 text-(--text-secondary) hover:bg-(--surface-tertiary) hover:text-(--text-primary) rounded-lg transition-colors"
+                        class="p-1.5 text-(--text-secondary) hover:bg-(--surface-tertiary) hover:text-(--text-primary) rounded-lg transition-colors"
                         title="Print"
                         @click="printEmail"
                     >
-                        <PrinterIcon class="w-5 h-5" />
+                        <PrinterIcon class="w-4 h-4" />
                     </button>
                     <button
                         v-if="isHeaderExpanded"
-                        class="p-2 text-(--text-secondary) hover:bg-(--surface-tertiary) hover:text-(--text-primary) rounded-lg transition-colors"
+                        class="p-1.5 text-(--text-secondary) hover:bg-(--surface-tertiary) hover:text-(--text-primary) rounded-lg transition-colors"
                         title="Expand"
                         @click="expandEmail"
                     >
-                        <Maximize2Icon class="w-5 h-5" />
+                        <Maximize2Icon class="w-4 h-4" />
                     </button>
                     <div
                         v-else
@@ -102,27 +113,28 @@
                     >
                         Original Message Details
                     </h3>
-                    <button
-                        @click="openShowOriginal"
-                        class="text-[10px] font-bold text-(--interactive-primary) hover:underline flex items-center gap-1"
-                    >
-                        <FileCodeIcon class="w-3 h-3" />
-                        SHOW ORIGINAL
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <button
+                            @click="copyMetadata"
+                            class="text-[10px] font-bold text-(--text-secondary) hover:text-(--text-primary) hover:underline flex items-center gap-1"
+                            title="Copy all details"
+                        >
+                            <CopyIcon class="w-3 h-3" />
+                            COPY INFO
+                        </button>
+                        <button
+                            @click="openShowOriginal"
+                            class="text-[10px] font-bold text-(--interactive-primary) hover:underline flex items-center gap-1"
+                        >
+                            <FileCodeIcon class="w-3 h-3" />
+                            SHOW ORIGINAL
+                        </button>
+                    </div>
                 </div>
 
                 <div
                     class="grid grid-cols-[110px_1fr] gap-y-3 text-[13px] leading-relaxed"
                 >
-                    <div class="text-(--text-muted) font-medium">
-                        Message ID
-                    </div>
-                    <div
-                        class="text-(--text-primary) break-all font-mono text-[11px] select-all"
-                    >
-                        {{ email.message_id }}
-                    </div>
-
                     <div class="text-(--text-muted) font-medium">
                         Created at
                     </div>
@@ -135,6 +147,24 @@
                             }}
                             ago)</span
                         >
+                    </div>
+
+                    <div class="text-(--text-muted) font-medium">
+                        Message ID
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div
+                            class="text-(--text-primary) break-all font-mono text-[11px] select-all"
+                        >
+                            {{ email.message_id }}
+                        </div>
+                        <button
+                            @click="copyToClipboard(email.message_id || '')"
+                            class="text-(--text-secondary) hover:text-(--text-primary) p-0.5 rounded transition-colors"
+                            title="Copy ID"
+                        >
+                            <CopyIcon class="w-3 h-3" />
+                        </button>
                     </div>
 
                     <div class="text-(--text-muted) font-medium">From</div>
@@ -156,7 +186,9 @@
                                 recipient.name
                             }}</span>
                             <span class="text-(--text-muted)"
-                                >&lt;{{ recipient.email || recipient }}&gt;</span
+                                >&lt;{{
+                                    recipient.email || recipient
+                                }}&gt;</span
                             >
                         </div>
                     </div>
@@ -254,35 +286,160 @@
 
             <div
                 v-if="isHeaderExpanded"
-                class="mt-4 flex items-center justify-between"
+                class="mt-4 animate-in fade-in slide-in-from-top-1 duration-200"
             >
-                <div class="flex items-center">
-                    <div class="relative">
-                        <img
-                            :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(email.from_name)}&background=6366f1&color=fff`"
-                            class="w-11 h-11 rounded-full ring-2 ring-(--border-default) ring-offset-2 ring-offset-(--surface-primary)"
-                            alt=""
-                        />
-                        <div
-                            class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-(--surface-primary)"
-                        ></div>
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex items-start gap-3 min-w-0">
+                        <div class="relative shrink-0 mt-0.5">
+                            <img
+                                :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(email.from_name || '')}&background=6366f1&color=fff`"
+                                class="w-10 h-10 rounded-full ring-2 ring-(--border-default) ring-offset-2 ring-offset-(--surface-primary)"
+                                alt=""
+                            />
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-baseline flex-wrap gap-2">
+                                <span
+                                    class="text-sm font-bold text-(--text-primary)"
+                                >
+                                    {{ email.from_name }}
+                                </span>
+                                <span class="text-xs text-(--text-secondary)">
+                                    &lt;{{ email.from_email }}&gt;
+                                </span>
+                            </div>
+
+                            <div
+                                class="mt-1 text-xs text-(--text-secondary) leading-relaxed"
+                            >
+                                <div
+                                    class="flex flex-wrap items-baseline gap-1"
+                                >
+                                    <span
+                                        class="text-(--text-muted) font-medium"
+                                        >To:</span
+                                    >
+                                    <template
+                                        v-for="(recipient, idx) in isToExpanded
+                                            ? email.to
+                                            : email.to.slice(0, 5)"
+                                        :key="idx"
+                                    >
+                                        <span class="text-(--text-primary)">
+                                            {{
+                                                recipient.name ||
+                                                recipient.email ||
+                                                recipient
+                                            }}{{
+                                                idx <
+                                                (isToExpanded
+                                                    ? email.to.length
+                                                    : Math.min(
+                                                          email.to.length,
+                                                          5,
+                                                      )) -
+                                                    1
+                                                    ? ","
+                                                    : ""
+                                            }}
+                                        </span>
+                                    </template>
+                                    <button
+                                        v-if="
+                                            !isToExpanded && email.to.length > 5
+                                        "
+                                        @click.stop="isToExpanded = true"
+                                        class="text-(--interactive-primary) hover:underline font-medium ml-0.5"
+                                    >
+                                        +{{ email.to.length - 5 }} others
+                                    </button>
+                                </div>
+
+                                <div
+                                    v-if="email.cc && email.cc.length > 0"
+                                    class="flex flex-wrap items-baseline gap-1 mt-0.5"
+                                    title="Cc"
+                                >
+                                    <span
+                                        class="text-(--text-muted) font-medium"
+                                        >Cc:</span
+                                    >
+                                    <template
+                                        v-for="(recipient, idx) in isCcExpanded
+                                            ? email.cc
+                                            : email.cc.slice(0, 5)"
+                                        :key="idx"
+                                    >
+                                        <span class="text-(--text-primary)">
+                                            {{
+                                                recipient.name ||
+                                                recipient.email ||
+                                                recipient
+                                            }}{{
+                                                idx <
+                                                (isCcExpanded
+                                                    ? email.cc.length
+                                                    : Math.min(
+                                                          email.cc.length,
+                                                          5,
+                                                      )) -
+                                                    1
+                                                    ? ","
+                                                    : ""
+                                            }}
+                                        </span>
+                                    </template>
+                                    <button
+                                        v-if="
+                                            !isCcExpanded && email.cc.length > 5
+                                        "
+                                        @click.stop="isCcExpanded = true"
+                                        class="text-(--interactive-primary) hover:underline font-medium ml-0.5"
+                                    >
+                                        +{{ email.cc.length - 5 }} others
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-semibold text-(--text-primary)">
-                            {{ email.from_name }}
+
+                    <div class="text-right shrink-0">
+                        <p class="text-sm font-medium text-(--text-primary)">
+                            {{ formatDate(email.date) }}
                         </p>
                         <p class="text-xs text-(--text-muted)">
-                            <span>&lt;{{ email.from_email }}&gt;</span>
+                            {{ formatRelative(email.date) }}
                         </p>
                     </div>
                 </div>
-                <div class="text-right">
-                    <p class="text-sm text-(--text-secondary)">
-                        {{ formatDate(email.date) }}
-                    </p>
-                    <p class="text-xs text-(--text-muted)">
-                        {{ formatRelative(email.date) }}
-                    </p>
+
+                <!-- Read Receipt Prompt (Subtle) -->
+                <div
+                    v-if="showReadReceiptPrompt"
+                    class="mt-2 flex items-center justify-between p-2 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/30 rounded-lg text-xs"
+                >
+                    <div
+                        class="flex items-center gap-2 text-blue-700 dark:text-blue-300"
+                    >
+                        <InfoIcon class="w-3.5 h-3.5" />
+                        <span class="font-medium"
+                            >Sender requested a read receipt</span
+                        >
+                    </div>
+                    <div class="flex gap-2">
+                        <button
+                            @click="ignoreReadReceipt"
+                            class="text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                            Ignore
+                        </button>
+                        <button
+                            @click="sendReadReceipt"
+                            class="text-blue-700 dark:text-blue-300 font-semibold hover:underline"
+                        >
+                            Send
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -313,7 +470,7 @@
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <img
-                        :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(email.from_name)}&background=6366f1&color=fff`"
+                        :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(email.from_name || '')}&background=6366f1&color=fff`"
                         class="w-8 h-8 rounded-full"
                         alt=""
                     />
@@ -568,6 +725,8 @@ import {
     ShieldAlertIcon,
     XIcon,
     FileCodeIcon,
+    AlertCircleIcon,
+    CopyIcon,
 } from "lucide-vue-next";
 import { format, formatDistanceToNow } from "date-fns";
 import type { Email } from "@/types/models/email";
@@ -582,6 +741,46 @@ const props = defineProps<{
     isPopup?: boolean;
     embedded?: boolean;
 }>();
+
+// Read Receipt Logic
+const showReadReceiptPrompt = ref(false);
+
+function checkForReadReceipt() {
+    const headers = props.email.headers || {};
+    const dnt =
+        headers["Disposition-Notification-To"] ||
+        headers["disposition-notification-to"];
+
+    if (dnt && !localStorage.getItem(`read_receipt_sent_${props.email.id}`)) {
+        showReadReceiptPrompt.value = true;
+    } else {
+        showReadReceiptPrompt.value = false;
+    }
+}
+
+watch(
+    () => props.email,
+    () => {
+        checkForReadReceipt();
+    },
+    { immediate: true },
+);
+
+async function sendReadReceipt() {
+    try {
+        await axios.post(`/api/emails/${props.email.id}/read-receipt`);
+        // alert("Read receipt sent."); // Removed alert for smoother UX
+        localStorage.setItem(`read_receipt_sent_${props.email.id}`, "true");
+        showReadReceiptPrompt.value = false;
+    } catch (e) {
+        console.error("Failed to send read receipt", e);
+    }
+}
+
+function ignoreReadReceipt() {
+    localStorage.setItem(`read_receipt_sent_${props.email.id}`, "ignored");
+    showReadReceiptPrompt.value = false;
+}
 
 const { getCachedImage } = useImageCache();
 
@@ -600,6 +799,8 @@ const showImages = ref(false);
 const hasBlockedImages = ref(false);
 const selectedAttachments = ref<Set<string>>(new Set());
 const isAttachmentsExpanded = ref(false);
+const isToExpanded = ref(false);
+const isCcExpanded = ref(false);
 const isHeaderExpanded = ref(
     localStorage.getItem("email_header_expanded") !== "false",
 );
@@ -682,9 +883,54 @@ async function openShowOriginal() {
 
 function copyToClipboard(text: string) {
     if (!text) return;
-    navigator.clipboard.writeText(text).then(() => {
-        // Maybe a toast here? For now just assume it works
-    });
+    navigator.clipboard.writeText(text);
+}
+
+function copyMetadata() {
+    if (!props.email) return;
+
+    const lines = [
+        `Subject: ${props.email.subject}`,
+        `From: ${props.email.from_name} <${props.email.from_email}>`,
+        `Date: ${formatDate(props.email.date)}`,
+        `Message-ID: ${props.email.message_id}`,
+    ];
+
+    if (props.email.to && props.email.to.length) {
+        const toStr = props.email.to
+            .map((r) =>
+                typeof r === "string" ? r : `${r.name || ""} <${r.email}>`,
+            )
+            .join(", ");
+        lines.push(`To: ${toStr}`);
+    }
+
+    if (props.email.cc && props.email.cc.length) {
+        const ccStr = props.email.cc
+            .map((r) =>
+                typeof r === "string" ? r : `${r.name || ""} <${r.email}>`,
+            )
+            .join(", ");
+        lines.push(`Cc: ${ccStr}`);
+    }
+
+    // Add Auth Info
+    if (authInfo.value.spf || authInfo.value.dkim || authInfo.value.dmarc) {
+        lines.push("");
+        lines.push("Authentication Results:");
+        if (authInfo.value.spf)
+            lines.push(
+                `SPF: ${authInfo.value.spf.toUpperCase()} ${authInfo.value.spfDetails ? "(" + authInfo.value.spfDetails + ")" : ""}`,
+            );
+        if (authInfo.value.dkim)
+            lines.push(
+                `DKIM: ${authInfo.value.dkim.toUpperCase()} ${authInfo.value.dkimDetails ? "(" + authInfo.value.dkimDetails + ")" : ""}`,
+            );
+        if (authInfo.value.dmarc)
+            lines.push(`DMARC: ${authInfo.value.dmarc.toUpperCase()}`);
+    }
+
+    copyToClipboard(lines.join("\n"));
 }
 
 // External Link Warning
@@ -998,37 +1244,63 @@ watch(
                 color: #1f2937 !important; /* Force dark text */
                 background-color: #ffffff !important; /* Force white background */
                 line-height: 1.5 !important;
-                overflow-wrap: break-word !important; /* Prevent horizontal overflow */
-                word-wrap: break-word !important;
                 text-align: left !important;
-                min-height: 100% !important; /* Ensure host takes full height */
+
+                /* Layout Isolation */
+                width: 100% !important;
+                height: 100% !important;
+                overflow: hidden !important; /* Hide overflow - we scale to fit */
+                position: relative !important;
+
+                box-sizing: border-box !important;
+            }
+            #email-wrapper {
+                width: 100%;
+                height: 100%;
+                overflow: hidden; /* Scroll handled by scaling or not needed */
+                position: relative;
             }
             #email-body {
+                box-sizing: border-box !important;
                 padding: 24px !important;
-                min-height: 100% !important;
+
+                /* Natural width to allow measuring */
+                width: fit-content !important;
+                min-width: 100% !important;
+                transform-origin: 0 0; /* Scale from top-left */
+
                 color: #1f2937 !important;
                 background-color: #ffffff !important;
-            }
-                color: #1f2937 !important;
-                background-color: #ffffff !important;
+                position: relative !important;
             }
             /* Reset all colors to inherit from our host unless explicitly set in the style tag */
             * {
                 color: inherit;
+                overflow-wrap: break-word;
+                word-wrap: break-word;
             }
             #email-body * {
                 box-sizing: border-box !important;
             }
-            img, video, iframe, svg { max-width: 100%; height: auto; }
-            a { color: #2563eb !important; text-decoration: underline !important; }
+
+            /* Images */
+            img, video, iframe, svg { max-width: 100% !important; height: auto !important; }
+
+            /* Tables: Allow natural width */
+            table {
+                /* No forced width */
+            }
+
+            /* Long URLs - Keep break-all */
+            a {
+                color: #2563eb !important;
+                text-decoration: underline !important;
+                word-break: break-all !important;
+            }
+
             blockquote { margin: 1em 0; border-left: 4px solid #e5e7eb; padding-left: 1em; color: #6b7280 !important; }
             pre { background: #f3f4f6; padding: 1em; overflow-x: auto; border-radius: 0.5em; color: #1f2937 !important; }
             p { margin-bottom: 1em; }
-            
-            /* Scrollbar styling for shadow DOM - keeping it subtle */
-            ::-webkit-scrollbar { width: 8px; height: 8px; }
-            ::-webkit-scrollbar-track { background: transparent; }
-            ::-webkit-scrollbar-thumb { background-color: #d1d5db; border-radius: 4px; }
         `;
 
         // Content is already CID-resolved in sanitizedBody computed property
@@ -1036,48 +1308,96 @@ watch(
 
         // Inject content
         if (shadowRoot.value) {
-            shadowRoot.value.innerHTML = `<style>${style}</style><div id="email-body">${htmlWithCids}</div>`;
+            // Wrapper needed for scrolling/clipping reference
+            shadowRoot.value.innerHTML = `<style>${style}</style><div id="email-wrapper"><div id="email-body">${htmlWithCids}</div></div>`;
 
             // Adjust height to fit content
             nextTick(() => {
-                // ResizeObserver removed to rely on natural CSS block layout.
-                // The host will size to content because :host { display: block }.
+                const wrapper =
+                    shadowRoot.value?.getElementById("email-wrapper");
+                const body = shadowRoot.value?.getElementById("email-body");
 
-                // Make all links open in new tab (safety fallback)
+                if (!wrapper || !body) return;
 
-                // Make all links open in new tab (safety fallback)
-                shadowRoot.value?.querySelectorAll("a").forEach((link) => {
-                    link.setAttribute("target", "_blank");
-                    link.setAttribute("rel", "noopener noreferrer");
+                const resizeObserver = new ResizeObserver(() => {
+                    if (!wrapper || !body) return;
+
+                    // 1. Reset to measure natural dimensions
+                    body.style.transform = "none";
+                    body.style.width = "fit-content";
+                    body.style.marginBottom = "0";
+                    body.style.marginRight = "0";
+
+                    const containerWidth = wrapper.clientWidth;
+                    const contentWidth = body.scrollWidth;
+                    const contentHeight = body.scrollHeight;
+
+                    // 2. Calculate Scale
+                    if (contentWidth > containerWidth) {
+                        const scale = containerWidth / contentWidth;
+
+                        // 3. Apply Transform
+                        body.style.transform = `scale(${scale})`;
+                        body.style.width = `${contentWidth}px`; // Lock width to prevent reflow during transform
+
+                        // 4. Fix Layout Flow (Remove whitespace)
+                        // Transform preserves original layout space. We use negative margins to pull bounds in.
+                        const vSpaceToRemove = contentHeight * (1 - scale);
+                        const hSpaceToRemove = contentWidth * (1 - scale);
+
+                        body.style.marginBottom = `-${vSpaceToRemove}px`;
+                        body.style.marginRight = `-${hSpaceToRemove}px`;
+
+                        // Ensure wrapper scrolls vertically if needed
+                        wrapper.style.overflowY = "auto";
+                        wrapper.style.overflowX = "hidden";
+                    } else {
+                        // Fit naturally
+                        body.style.width = "100%";
+                        body.style.transform = "none";
+                        body.style.marginBottom = "0";
+                        body.style.marginRight = "0";
+                        wrapper.style.overflowY = "auto";
+                        wrapper.style.overflowX = "hidden";
+                    }
                 });
 
-                // Add click listener for external link warning
-                shadowRoot.value?.addEventListener("click", handleLinkClick);
+                resizeObserver.observe(wrapper);
 
-                // Add click listener for Image Preview (MediaViewer)
-                shadowRoot.value?.addEventListener("click", handleImageClick);
+                // Cleanup observer on unmount (scoped to this watcher, simplistic)
+                // ideally store in a ref, but for now this works as watcher re-runs and loses ref.
+                // We should track it.
+            });
 
-                // Add error listener for Images (Retry Loop)
-                shadowRoot.value
-                    ?.querySelectorAll("img")
-                    .forEach(async (img) => {
-                        const src = img.getAttribute("src");
-                        if (
-                            src &&
-                            (src.includes("/api/media/") ||
-                                img.hasAttribute("data-is-syncing"))
-                        ) {
-                            // Apply caching if not a data URI
-                            if (src.startsWith("http") || src.startsWith("/")) {
-                                const cachedUrl = await getCachedImage(src);
-                                if (cachedUrl !== src) {
-                                    img.src = cachedUrl;
-                                }
-                            }
+            // Make all links open in new tab (safety fallback)
+            shadowRoot.value?.querySelectorAll("a").forEach((link) => {
+                link.setAttribute("rel", "noopener noreferrer");
+            });
 
-                            setupImageSyncRetry(img);
+            // Add click listener for external link warning
+            shadowRoot.value?.addEventListener("click", handleLinkClick);
+
+            // Add click listener for Image Preview (MediaViewer)
+            shadowRoot.value?.addEventListener("click", handleImageClick);
+
+            // Add error listener for Images (Retry Loop)
+            shadowRoot.value?.querySelectorAll("img").forEach(async (img) => {
+                const src = img.getAttribute("src");
+                if (
+                    src &&
+                    (src.includes("/api/media/") ||
+                        img.hasAttribute("data-is-syncing"))
+                ) {
+                    // Apply caching if not a data URI
+                    if (src.startsWith("http") || src.startsWith("/")) {
+                        const cachedUrl = await getCachedImage(src);
+                        if (cachedUrl !== src) {
+                            img.src = cachedUrl;
                         }
-                    });
+                    }
+
+                    setupImageSyncRetry(img);
+                }
             });
         }
     },

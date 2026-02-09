@@ -217,16 +217,47 @@ class EmailSanitizationService
      */
     protected function purify(string $html, string $source): string
     {
-        // Use the 'email' config from config/purifier.php
-        // If not defined, use 'default'
-        $configName = config('purifier.settings.email') ? 'email' : 'default';
+        // Use manual instantiation to allow custom CSS properties that are otherwise stripped
+        $settings = config('purifier.settings.email') ?? config('purifier.settings.default') ?? [];
+        
+        $config = \HTMLPurifier_Config::createDefault();
+        $config->loadArray($settings);
+        
+        // Suppress warnings when accessing definitions to inject custom properties
+        $old = error_reporting(E_ALL & ~E_USER_WARNING);
+        
+        // 1. Inject Custom CSS Properties
+        if ($def = $config->getCSSDefinition()) {
+            $def->info['visibility'] = new \HTMLPurifier_AttrDef_Enum(['visible', 'hidden', 'collapse']);
+            $def->info['opacity'] = new \HTMLPurifier_AttrDef_CSS_AlphaValue();
+            $def->info['overflow'] = new \HTMLPurifier_AttrDef_Enum(['visible', 'hidden', 'scroll', 'auto']);
+            $def->info['display'] = new \HTMLPurifier_AttrDef_Enum(['block', 'inline', 'inline-block', 'none']);
+            $def->info['mso-hide'] = new \HTMLPurifier_AttrDef_Enum(['all']);
+        }
 
-        Log::debug('[EmailSanitizationService] Purifying HTML', [
-            'config' => $configName,
+        // 2. Inject Custom HTML Definitions (HTML5, etc.) from config
+        $customDef = config('purifier.custom_definition');
+        if ($customDef && ($def = $config->getHTMLDefinition(true))) {
+             if (isset($customDef['elements'])) {
+                 foreach ($customDef['elements'] as $element) {
+                     call_user_func_array([$def, 'addElement'], $element);
+                 }
+             }
+             if (isset($customDef['attributes'])) {
+                 foreach ($customDef['attributes'] as $attribute) {
+                     call_user_func_array([$def, 'addAttribute'], $attribute);
+                 }
+             }
+        }
+        
+        error_reporting($old);
+
+        Log::debug('[EmailSanitizationService] Purifying HTML with custom CSS rules', [
             'html_length' => strlen($html),
         ]);
 
-        return Purifier::clean($html, $configName);
+        $purifier = new \HTMLPurifier($config);
+        return $purifier->purify($html);
     }
 
     /**
