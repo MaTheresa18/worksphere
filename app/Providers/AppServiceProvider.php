@@ -143,22 +143,22 @@ class AppServiceProvider extends ServiceProvider
 
         // Rate limiter for guest requests (login, register, etc.)
         RateLimiter::for('guest', function (Request $request) {
-            return Limit::perMinute(25)->by($request->ip());
+            return Limit::perMinute(25)->by('guest:'.$request->ip());
         });
 
         // Strict rate limiter for sensitive operations
         RateLimiter::for('sensitive', function (Request $request) {
-            return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
+            return Limit::perMinute(10)->by('sensitive:'.($request->user()?->id ?: $request->ip()));
         });
 
         // Rate limiter for password reset
         RateLimiter::for('password-reset', function (Request $request) {
-            return Limit::perMinute(5)->by($request->ip());
+            return Limit::perMinute(5)->by('password-reset:'.$request->ip());
         });
 
         // Rate limiter for login attempts
         RateLimiter::for('login', function (Request $request) {
-            return Limit::perMinute(10)->by($request->ip());
+            return Limit::perMinute(10)->by('login:'.$request->ip());
         });
 
         // Rate limiter for email sending per account (used by SendEmailJob)

@@ -27,8 +27,8 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['throttle:guest'])->group(function () {
     // Authentication
     Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:password-reset');
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
     Route::get('/auth/config', [AuthController::class, 'config']);
     Route::get('/auth/hint/{public_id}', [AuthController::class, 'userHint']);
