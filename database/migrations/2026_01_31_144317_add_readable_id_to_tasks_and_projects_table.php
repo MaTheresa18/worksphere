@@ -26,20 +26,22 @@ return new class extends Migration
             // Generate prefix from name (uppercase, remove vowels/spaces, max 4 chars) or fallback
             $name = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $project->name));
             $prefix = substr($name, 0, 3);
-            if (strlen($prefix) < 2) $prefix = 'PROJ';
-            
+            if (strlen($prefix) < 2) {
+                $prefix = 'PROJ';
+            }
+
             // Ensure uniqueness of prefix if possible, but for now simple logic
             $project->prefix = $prefix;
-            
+
             // Iterate tasks
             $tasks = $project->tasks()->orderBy('created_at')->get();
             $count = 0;
             foreach ($tasks as $task) {
                 $count++;
-                $task->readable_id = $prefix . '-' . $count;
+                $task->readable_id = $prefix.'-'.$count;
                 $task->saveQuietly();
             }
-            
+
             $project->last_task_number = $count;
             $project->saveQuietly();
         }

@@ -21,6 +21,16 @@ export interface User {
   requires_2fa_setup?: boolean;
   team_permissions?: Record<string, string[]>;
   is_demo_mode?: boolean;
+  preferences?: {
+    timezone?: string;
+    notifications?: Record<string, boolean>;
+    appearance?: {
+      mode?: 'light' | 'dark' | 'system';
+      cover_offset?: number;
+      [key: string]: any;
+    };
+    [key: string]: any;
+  };
 }
 
 export interface Role {

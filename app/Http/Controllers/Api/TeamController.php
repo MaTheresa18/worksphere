@@ -42,7 +42,7 @@ class TeamController extends Controller
         } else {
             // Scope to user's teams (personal or non-admin)
             $teamIds = $user->teams()->pluck('teams.id');
-            
+
             $stats = [
                 'total' => $teamIds->count(),
                 'active' => Team::whereIn('id', $teamIds)->where('status', 'active')->count(),
@@ -97,11 +97,11 @@ class TeamController extends Controller
 
         // 2. Top 5 Clients by Earnings
         $topClients = \App\Models\Client::where('team_id', $team->id)
-            ->withSum(['invoices' => fn($q) => $q->paid()], 'total')
+            ->withSum(['invoices' => fn ($q) => $q->paid()], 'total')
             ->orderByDesc('invoices_sum_total')
             ->take(5)
             ->get()
-            ->map(fn($client) => [
+            ->map(fn ($client) => [
                 'id' => $client->public_id,
                 'name' => $client->name,
                 'avatar_url' => $client->avatar_url,
@@ -110,11 +110,11 @@ class TeamController extends Controller
 
         // 3. Top 5 Projects by Earnings
         $topProjects = \App\Models\Project::where('team_id', $team->id)
-            ->withSum(['invoices' => fn($q) => $q->paid()], 'total')
+            ->withSum(['invoices' => fn ($q) => $q->paid()], 'total')
             ->orderByDesc('invoices_sum_total')
             ->take(5)
             ->get()
-            ->map(fn($project) => [
+            ->map(fn ($project) => [
                 'id' => $project->public_id,
                 'name' => $project->name,
                 'status' => $project->status,
@@ -132,14 +132,14 @@ class TeamController extends Controller
             $date = $sixMonthsAgo->copy()->addMonths($i);
             $monthKey = $date->format('Y-m');
             $label = $date->format('M Y');
-            
+
             $total = $invoices->filter(function ($invoice) use ($monthKey) {
                 return $invoice->paid_at->format('Y-m') === $monthKey;
             })->sum('total');
 
             return [
                 'month' => $label,
-                'amount' => $total
+                'amount' => $total,
             ];
         });
 
@@ -159,7 +159,7 @@ class TeamController extends Controller
         $this->authorize('viewAny', Team::class);
 
         $user = $request->user();
-        
+
         $query = Team::query()->with(['owner', 'members']);
 
         $scope = $request->query('scope', 'all');
@@ -170,11 +170,11 @@ class TeamController extends Controller
         }
 
         $query->when($request->search, function ($query, $search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
-                });
-            })
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            });
+        })
             ->when($request->date_from, function ($query, $date) {
                 $query->whereDate('created_at', '>=', $date);
             })

@@ -19,9 +19,9 @@ if ($count > 0) {
         ->orderBy('imap_uid', 'desc')
         ->limit(10)
         ->get();
-        
+
     foreach ($emails as $email) {
-        echo "[{$email->id}] UID:{$email->imap_uid} Folder:{$email->folder} Subject: " . substr($email->subject, 0, 30) . "\n";
+        echo "[{$email->id}] UID:{$email->imap_uid} Folder:{$email->folder} Subject: ".substr($email->subject, 0, 30)."\n";
     }
 } else {
     echo "No emails found.\n";
@@ -31,6 +31,6 @@ echo "\nChecking Account State:\n";
 $account = EmailAccount::first();
 echo "Account: {$account->email}\n";
 echo "Sync Status: {$account->sync_status->value}\n";
-echo "Backfill Complete: " . ($account->backfill_complete ? 'YES' : 'NO') . "\n";
+echo 'Backfill Complete: '.($account->backfill_complete ? 'YES' : 'NO')."\n";
 echo "Backfill Cursor: {$account->backfill_uid_cursor}\n";
 echo "Forward Cursor: {$account->forward_uid_cursor}\n";

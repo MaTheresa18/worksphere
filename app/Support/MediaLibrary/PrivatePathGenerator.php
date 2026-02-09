@@ -12,7 +12,7 @@ class PrivatePathGenerator implements PathGenerator
      */
     public function getPath(Media $media): string
     {
-        return $this->getBasePath($media) . '/';
+        return $this->getBasePath($media).'/';
     }
 
     /*
@@ -20,7 +20,7 @@ class PrivatePathGenerator implements PathGenerator
      */
     public function getPathForConversions(Media $media): string
     {
-        return $this->getBasePath($media) . '/conversions/';
+        return $this->getBasePath($media).'/conversions/';
     }
 
     /*
@@ -28,7 +28,7 @@ class PrivatePathGenerator implements PathGenerator
      */
     public function getPathForResponsiveImages(Media $media): string
     {
-        return $this->getBasePath($media) . '/responsive-images/';
+        return $this->getBasePath($media).'/responsive-images/';
     }
 
     /*
@@ -39,7 +39,7 @@ class PrivatePathGenerator implements PathGenerator
     {
         $model = $media->model;
         $userId = $model && isset($model->user_id) ? $model->user_id : 'shared';
-        
+
         // Determine type slug (e.g. 'templates' or 'signatures')
         $type = 'consultants'; // default fallback
         if ($model instanceof \App\Models\EmailTemplate) {

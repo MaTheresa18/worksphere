@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\EmailAccount;
 use Google\Client;
 use Google\Service\Gmail;
-use Illuminate\Support\Facades\Log;
 
 class GmailApiService
 {
@@ -13,7 +12,7 @@ class GmailApiService
 
     public function __construct()
     {
-        $this->client = new Client();
+        $this->client = new Client;
         $this->client->setClientId(config('services.google.client_id'));
         $this->client->setClientSecret(config('services.google.client_secret'));
     }
@@ -59,7 +58,7 @@ class GmailApiService
         }
 
         $results = $gmail->users_messages->listUsersMessages('me', $params);
-        
+
         return [
             'messages' => $results->getMessages(),
             'nextPageToken' => $results->getNextPageToken(),
@@ -97,7 +96,7 @@ class GmailApiService
         $this->setupForAccount($account);
         $gmail = new Gmail($this->client);
 
-        $request = new Gmail\WatchRequest();
+        $request = new Gmail\WatchRequest;
         $request->setTopicName($topicName);
         $request->setLabelIds(['INBOX']); // We usually only watch Inbox for real-time
 

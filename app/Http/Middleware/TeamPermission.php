@@ -59,8 +59,6 @@ class TeamPermission
         // Store team in request for convenience
         $request->attributes->set('current_team', $team);
 
-
-
         return $next($request);
     }
 

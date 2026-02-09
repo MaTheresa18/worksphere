@@ -12,7 +12,6 @@ use App\Models\User;
 use App\Models\WhitelistedIp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Torann\GeoIP\Facades\GeoIP;
 
 class SecurityDashboardController extends Controller
 {
@@ -129,8 +128,8 @@ class SecurityDashboardController extends Controller
     public function bannedUsers(Request $request)
     {
         // Assuming 'users.view' or similar permission check happens in Policy or Middleware
-         $this->authorize('viewAny', User::class);
-        
+        $this->authorize('viewAny', User::class);
+
         $users = User::whereIn('status', ['banned', 'suspended'])
             ->latest('updated_at')
             ->paginate($request->integer('per_page', 20));
@@ -179,9 +178,9 @@ class SecurityDashboardController extends Controller
             AuditAction::AccountSuspended,
             AuditAction::AccountBanned,
         ])
-        ->select('action', DB::raw('count(*) as count'))
-        ->groupBy('action')
-        ->get();
+            ->select('action', DB::raw('count(*) as count'))
+            ->groupBy('action')
+            ->get();
 
         $distribution = $distributionData->map(function ($item) {
             return [
@@ -221,6 +220,7 @@ class SecurityDashboardController extends Controller
 
         return response()->json($activities);
     }
+
     /**
      * Get whitelisted IPs list.
      */

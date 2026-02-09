@@ -83,8 +83,10 @@ async function fetchOptions(query = '', page = 1) {
             credentials: 'include',
         });
         
+        if (!response.ok) throw new Error('Network response was not ok');
+        
         const data = await response.json();
-        const users = data.data || data;
+        const users = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
         
         // Transform to our format
         const transformed = users.map(u => ({

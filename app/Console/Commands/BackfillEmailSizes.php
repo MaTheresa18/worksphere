@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 class BackfillEmailSizes extends Command
 {
     protected $signature = 'email:backfill-sizes {--force : Force recalculation even if size is already set}';
+
     protected $description = 'Calculate and update size_bytes for existing emails';
 
     public function handle()
@@ -17,7 +18,7 @@ class BackfillEmailSizes extends Command
 
         $query = Email::query();
 
-        if (!$this->option('force')) {
+        if (! $this->option('force')) {
             $query->whereNull('size_bytes')->orWhere('size_bytes', 0);
         }
 
@@ -29,7 +30,7 @@ class BackfillEmailSizes extends Command
                 // Approximate size calculation
                 $bodySize = strlen($email->body_html ?? $email->body_plain ?? '');
                 $headersSize = strlen(json_encode($email->headers ?? []));
-                
+
                 // Get attachment sizes
                 $attachmentsSize = DB::table('media')
                     ->where('model_type', Email::class)

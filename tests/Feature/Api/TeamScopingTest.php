@@ -15,7 +15,7 @@ class TeamScopingTest extends TestCase
     {
         $admin = User::factory()->create();
         $admin->assignRole('administrator'); // Ensure roles/permissions are set up
-        
+
         Team::factory()->count(3)->create(); // Random teams
         $usersTeam = Team::factory()->create();
         $usersTeam->members()->attach($admin, ['role' => 'team_lead']);

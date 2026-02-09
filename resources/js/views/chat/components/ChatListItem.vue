@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useDate } from '@/composables/useDate';
+const { formatDate } = useDate();
 import type { Chat } from '@/types/models/chat';
 
 interface Props {
@@ -62,19 +64,7 @@ const lastMessagePreview = computed(() => {
 const lastMessageTime = computed(() => {
   const msg = props.chat.last_message;
   if (!msg) return '';
-  
-  const date = new Date(msg.created_at);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-  
-  if (diffDays === 0) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } else if (diffDays === 1) {
-    return 'Yesterday';
-  } else if (diffDays < 7) {
-    return date.toLocaleDateString([], { weekday: 'short' });
-  }
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  return formatDate(msg.created_at, 'smart');
 });
 
 const unreadCount = computed(() => props.chat.unread_count ?? 0);

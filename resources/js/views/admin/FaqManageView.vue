@@ -3,7 +3,9 @@ import { ref, onMounted, watch, computed } from "vue";
 import { useRouter } from "vue-router";
 import { faqService } from "@/services";
 import { debounce } from "lodash";
-import { format } from "date-fns";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate, format } = useDate();
 import {
     SelectFilter,
     Button,

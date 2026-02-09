@@ -30,15 +30,17 @@ class GoogleCalendarService implements GoogleCalendarContract
 
         if (! $account || ! $account->access_token) {
             \Illuminate\Support\Facades\Log::warning("DEBUG: Google Service: No Google account or access token found for user {$user->id}");
+
             return false;
         }
 
         // Check if token expired
         if ($account->token_expires_at && $account->token_expires_at->isPast()) {
             \Illuminate\Support\Facades\Log::info("DEBUG: Google Service: Token expired for user {$user->id}. Attempting refresh.");
-            
+
             if (! $account->refresh_token) {
                 \Illuminate\Support\Facades\Log::error("DEBUG: Google Service: No refresh token available for user {$user->id}. Cannot refresh.");
+
                 return false; // Cannot refresh
             }
 
@@ -47,9 +49,10 @@ class GoogleCalendarService implements GoogleCalendarContract
                 $this->client->fetchAccessTokenWithRefreshToken($account->refresh_token);
                 $newTokens = $this->client->getAccessToken();
 
-                if (!isset($newTokens['access_token'])) {
-                     \Illuminate\Support\Facades\Log::error("DEBUG: Google Service: Refresh failed, no access token in response for user {$user->id}", ['response' => $newTokens]);
-                     return false;
+                if (! isset($newTokens['access_token'])) {
+                    \Illuminate\Support\Facades\Log::error("DEBUG: Google Service: Refresh failed, no access token in response for user {$user->id}", ['response' => $newTokens]);
+
+                    return false;
                 }
 
                 // Update DB
@@ -59,10 +62,11 @@ class GoogleCalendarService implements GoogleCalendarContract
                     // refresh_token usually stays same unless rotated
                     'refresh_token' => $newTokens['refresh_token'] ?? $account->refresh_token,
                 ]);
-                
+
                 \Illuminate\Support\Facades\Log::info("DEBUG: Google Service: Token refreshed successfully for user {$user->id}");
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::error("DEBUG: Google Service: Exception during token refresh for user {$user->id}: ".$e->getMessage());
+
                 return false;
             }
         } else {
@@ -235,6 +239,7 @@ class GoogleCalendarService implements GoogleCalendarContract
 
         if (! $account || ! $account->user) {
             \Illuminate\Support\Facades\Log::warning("DEBUG: Google Service: Received webhook for unknown channel: {$channelId} (Account lookup failed)");
+
             return;
         }
 
@@ -242,7 +247,8 @@ class GoogleCalendarService implements GoogleCalendarContract
         \Illuminate\Support\Facades\Log::info("DEBUG: Google Service: Syncing for User ID: {$user->id}");
 
         if (! $this->optimizeClientForUser($user)) {
-             \Illuminate\Support\Facades\Log::error("DEBUG: Google Service: Failed to optimize client (Auth check failed) for user {$user->id}");
+            \Illuminate\Support\Facades\Log::error("DEBUG: Google Service: Failed to optimize client (Auth check failed) for user {$user->id}");
+
             return;
         }
 
@@ -257,14 +263,14 @@ class GoogleCalendarService implements GoogleCalendarContract
             // Use Sync Token if available, otherwise fallback to recent
             if ($account->google_sync_token) {
                 $params['syncToken'] = $account->google_sync_token;
-                \Illuminate\Support\Facades\Log::info("DEBUG: Google Service: Using Sync Token", ['token_snippet' => substr($account->google_sync_token, 0, 10).'...']);
+                \Illuminate\Support\Facades\Log::info('DEBUG: Google Service: Using Sync Token', ['token_snippet' => substr($account->google_sync_token, 0, 10).'...']);
             } else {
                 $params['updatedMin'] = now()->subMinutes(15)->toRfc3339String();
-                \Illuminate\Support\Facades\Log::info("DEBUG: Google Service: Using updatedMin fallback", ['time' => $params['updatedMin']]);
+                \Illuminate\Support\Facades\Log::info('DEBUG: Google Service: Using updatedMin fallback', ['time' => $params['updatedMin']]);
             }
 
             $events = $service->events->listEvents('primary', $params);
-            
+
             $items = $events->getItems();
             $count = count($items);
             \Illuminate\Support\Facades\Log::info("DEBUG: Google Service: Fetched {$count} events from Google.");
@@ -272,13 +278,13 @@ class GoogleCalendarService implements GoogleCalendarContract
             // Store new Sync Token
             if ($events->getNextSyncToken()) {
                 $account->update(['google_sync_token' => $events->getNextSyncToken()]);
-                \Illuminate\Support\Facades\Log::info("DEBUG: Google Service: Updated Sync Token.");
+                \Illuminate\Support\Facades\Log::info('DEBUG: Google Service: Updated Sync Token.');
             }
 
             foreach ($items as $googleEvent) {
                 $googleId = $googleEvent->id;
                 $summary = $googleEvent->summary ?? '(No Title)';
-                
+
                 if ($googleEvent->status === 'cancelled') {
                     \Illuminate\Support\Facades\Log::info("DEBUG: Google Service: Processing DELETE for Event {$googleId}");
                     // Handle deletion
@@ -289,7 +295,7 @@ class GoogleCalendarService implements GoogleCalendarContract
 
                     continue;
                 }
-                
+
                 \Illuminate\Support\Facades\Log::info("DEBUG: Google Service: Processing CREATE/UPDATE for Event {$googleId} ('{$summary}')");
 
                 // Handle creation/update
@@ -313,7 +319,7 @@ class GoogleCalendarService implements GoogleCalendarContract
                         'last_synced_at' => now(),
                     ])->saveQuietly();
                 } else {
-                     \Illuminate\Support\Facades\Log::info("DEBUG: Google Service: Creating New Local Event.");
+                    \Illuminate\Support\Facades\Log::info('DEBUG: Google Service: Creating New Local Event.');
                     // Create (if not exists locally)
                     Event::withoutEvents(function () use ($user, $googleEvent, $startTime, $endTime, $isAllDay) {
                         $newEvent = Event::create([
@@ -338,7 +344,7 @@ class GoogleCalendarService implements GoogleCalendarContract
             // Google PHP Library auto-pagination possible? Yes usually.
 
         } catch (\Google\Service\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("DEBUG: Google Service: Google API Exception: " . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('DEBUG: Google Service: Google API Exception: '.$e->getMessage());
             if ($e->getCode() == 410) {
                 // Sync token invalid (expired/cleared). Clear it and perform full sync next time (or now).
                 $account->update(['google_sync_token' => null]);
@@ -349,7 +355,7 @@ class GoogleCalendarService implements GoogleCalendarContract
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("DEBUG: Google Service: General Exception during sync for user {$user->id}: ".$e->getMessage());
         } finally {
-             \Illuminate\Support\Facades\Log::info("DEBUG: GoogleCalendarService::syncFromGoogle - END");
+            \Illuminate\Support\Facades\Log::info('DEBUG: GoogleCalendarService::syncFromGoogle - END');
         }
     }
 }

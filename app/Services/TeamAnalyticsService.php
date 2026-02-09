@@ -2,10 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\Team;
 use App\Models\Task;
+use App\Models\Team;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class TeamAnalyticsService
@@ -57,13 +56,13 @@ class TeamAnalyticsService
             // Ensure dates are Carbon instances (casts should handle this, but being safe)
             return \Carbon\Carbon::parse($task->completed_at)->diffInHours($task->created_at);
         });
-        
+
         $avgCycleDays = $avgCycleTime ? round($avgCycleTime / 24, 1) : 0;
 
         // 4. Tasks Due This Week
         $startOfWeek = now()->startOfWeek();
         $endOfWeek = now()->endOfWeek();
-        
+
         $dueThisWeek = $team->projects()
             ->join('tasks', 'projects.id', '=', 'tasks.project_id')
             ->whereBetween('tasks.due_date', [$startOfWeek, $endOfWeek])
@@ -87,9 +86,9 @@ class TeamAnalyticsService
     public function getMemberStats(Team $team): array
     {
         $members = $team->members;
-        
+
         $stats = [];
-        
+
         foreach ($members as $member) {
             // Get user's tasks within this team
             $query = Task::query()
@@ -98,19 +97,19 @@ class TeamAnalyticsService
 
             $totalAssigned = (clone $query)->count();
             $completed = (clone $query)->where('status', 'completed')->count();
-            
+
             // Overdue: Not completed + Due date passed
             $overdue = (clone $query)
                 ->where('status', '!=', 'completed')
                 ->where('due_date', '<', now())
                 ->count();
-                
+
             // Member Adherence
             $completedWithDue = (clone $query)
                 ->where('status', 'completed')
                 ->whereNotNull('due_date')
                 ->count();
-                
+
             $completedOnTime = (clone $query)
                 ->where('status', 'completed')
                 ->whereNotNull('due_date')
@@ -123,13 +122,13 @@ class TeamAnalyticsService
             // Formula: (Failed QA Reviews / Total QA Reviews) * 100
             // Scope: QA reviews on tasks assigned to this user
             $totalReviews = \App\Models\TaskQaReview::whereHas('task', function ($q) use ($member, $team) {
-                 $q->where('assigned_to', $member->id)
-                   ->whereIn('project_id', $team->projects()->pluck('projects.id'));
+                $q->where('assigned_to', $member->id)
+                    ->whereIn('project_id', $team->projects()->pluck('projects.id'));
             })->count();
 
             $failedReviews = \App\Models\TaskQaReview::whereHas('task', function ($q) use ($member, $team) {
-                 $q->where('assigned_to', $member->id)
-                   ->whereIn('project_id', $team->projects()->pluck('projects.id'));
+                $q->where('assigned_to', $member->id)
+                    ->whereIn('project_id', $team->projects()->pluck('projects.id'));
             })->where('status', 'failed')->count();
 
             $rejectionRate = $totalReviews > 0 ? round(($failedReviews / $totalReviews) * 100, 1) : 0;
@@ -151,7 +150,7 @@ class TeamAnalyticsService
         }
 
         // Sort by most tasks assigned for now
-        usort($stats, fn($a, $b) => $b['total_assigned'] <=> $a['total_assigned']);
+        usort($stats, fn ($a, $b) => $b['total_assigned'] <=> $a['total_assigned']);
 
         return $stats;
     }

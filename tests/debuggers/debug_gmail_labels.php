@@ -2,13 +2,12 @@
 
 use App\Models\EmailAccount;
 use App\Services\EmailAdapters\AdapterFactory;
-use Webklex\PHPIMAP\Attribute;
 
 echo "--- GMAIL LABEL DEBUG ---\n";
 
 // 1. Get Gmail Account
 $account = EmailAccount::where('email', 'like', '%gmail.com%')->first();
-if (!$account) {
+if (! $account) {
     echo "No Gmail account found.\n";
     exit;
 }
@@ -31,13 +30,10 @@ try {
     // List folders to debug
     $folders = $client->getFolders();
     foreach ($folders as $f) {
-        echo "- " . $f->path . "\n";
+        echo '- '.$f->path."\n";
     }
     exit;
 }
-
-
-
 
 // 4. Fetch Sample via UIDs (Production Pattern)
 echo "Fetching sample UIDs...\n";
@@ -51,28 +47,32 @@ echo "Fetching overview for range: $range\n";
 $overview = $folder->overview($range);
 $uids = [];
 foreach ($overview as $msg) {
-    if (isset($msg->uid)) $uids[] = $msg->uid;
+    if (isset($msg->uid)) {
+        $uids[] = $msg->uid;
+    }
 }
 rsort($uids);
 $topUids = array_slice($uids, 0, 3);
-echo "Use UIDs: " . implode(', ', $topUids) . "\n";
+echo 'Use UIDs: '.implode(', ', $topUids)."\n";
 
 foreach ($topUids as $uid) {
     echo "\nFetching UID: $uid\n";
     $msg = $folder->query()->getMessageByUid($uid);
-    
-    if (!$msg) continue;
 
-    echo "Subject: " . $msg->getSubject() . "\n";
-    
+    if (! $msg) {
+        continue;
+    }
+
+    echo 'Subject: '.$msg->getSubject()."\n";
+
     // Check Attributes for Labels
     $attributes = $msg->getAttributes();
-    echo "Attribute Keys: " . implode(', ', array_keys($attributes)) . "\n";
-    
+    echo 'Attribute Keys: '.implode(', ', array_keys($attributes))."\n";
+
     if (isset($attributes['x-gm-labels'])) {
-        echo "X-GM-LABELS: " . print_r($attributes['x-gm-labels'], true) . "\n";
+        echo 'X-GM-LABELS: '.print_r($attributes['x-gm-labels'], true)."\n";
     } elseif (isset($attributes['X-GM-LABELS'])) {
-         echo "X-GM-LABELS (Caps): " . print_r($attributes['X-GM-LABELS'], true) . "\n";
+        echo 'X-GM-LABELS (Caps): '.print_r($attributes['X-GM-LABELS'], true)."\n";
     } else {
         echo "X-GM-LABELS NOT FOUND. Dumping all attributes:\n";
         print_r($attributes);

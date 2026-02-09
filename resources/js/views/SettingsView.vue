@@ -13,6 +13,7 @@ import {
     Avatar,
     Badge,
     PasswordStrengthMeter,
+    TimezoneSelect,
 } from "@/components/ui";
 import {
     User,
@@ -63,6 +64,7 @@ const profile = ref({
     bio: "",
     location: "",
     website: "",
+    timezone: "",
     skills: [],
 });
 
@@ -449,6 +451,9 @@ const initProfile = () => {
             location: authStore.user.location || "",
             website: authStore.user.website || "",
             skills: authStore.user.skills ? [...authStore.user.skills] : [],
+            timezone:
+                authStore.user.preferences?.timezone ||
+                Intl.DateTimeFormat().resolvedOptions().timeZone,
         };
 
         // Load preferences from user
@@ -515,6 +520,7 @@ const saveProfile = async () => {
             location: profile.value.location,
             website: profile.value.website,
             skills: profile.value.skills,
+            timezone: profile.value.timezone,
         });
 
         await authStore.fetchUser();
@@ -715,7 +721,10 @@ watch(notifications, saveNotifications, { deep: true });
 // Save ticket notification preferences
 const saveTicketNotifications = debounce(async () => {
     try {
-        await api.put("/api/user/notification-preferences", ticketNotifications.value);
+        await api.put(
+            "/api/user/notification-preferences",
+            ticketNotifications.value,
+        );
         toast.success("Ticket notification preferences saved");
     } catch (error) {
         toast.error("Failed to save ticket notification preferences");
@@ -1377,6 +1386,13 @@ onMounted(() => {
                                 label="Website"
                                 placeholder="https://"
                             />
+                            <div class="space-y-1.5">
+                                <label
+                                    class="block text-sm font-medium text-[var(--text-primary)]"
+                                    >Timezone</label
+                                >
+                                <TimezoneSelect v-model="profile.timezone" />
+                            </div>
                         </div>
 
                         <div class="sm:col-span-2">

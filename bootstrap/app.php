@@ -44,6 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\CheckBlockedIp::class,
             CheckUserStatus::class,
             \App\Http\Middleware\SecurityHeaders::class,
+            \App\Http\Middleware\SetUserTimezone::class,
             \App\Http\Middleware\TrackPageView::class,
         ]);
 

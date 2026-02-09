@@ -42,6 +42,9 @@ class UpdateUserProfileInformation implements UpdatesUserProfileInformation
                 'location' => $input['location'] ?? $user->location,
                 'website' => $input['website'] ?? $user->website,
                 'skills' => $input['skills'] ?? $user->skills,
+                'preferences' => array_merge($user->preferences ?? [], [
+                    'timezone' => $input['timezone'] ?? ($user->preferences['timezone'] ?? config('app.timezone')),
+                ]),
             ])->save();
         }
     }
@@ -63,6 +66,9 @@ class UpdateUserProfileInformation implements UpdatesUserProfileInformation
             'location' => $input['location'] ?? $user->location,
             'website' => $input['website'] ?? $user->website,
             'skills' => $input['skills'] ?? $user->skills,
+            'preferences' => array_merge($user->preferences ?? [], [
+                'timezone' => $input['timezone'] ?? ($user->preferences['timezone'] ?? config('app.timezone')),
+            ]),
         ])->save();
 
         $user->sendEmailVerificationNotification();

@@ -138,7 +138,7 @@ class AuditService
                 'public_id' => $data['public_id'],
                 'action' => $action->value,
                 'category' => $category->value,
-                'auditable' => $auditable ? get_class($auditable) . ':' . $auditable->getKey() : 'none'
+                'auditable' => $auditable ? get_class($auditable).':'.$auditable->getKey() : 'none',
             ]);
 
             if (config('audit.async', true) && $this->shouldQueueLog($action)) {
@@ -146,7 +146,7 @@ class AuditService
                     try {
                         \Illuminate\Support\Facades\Log::debug('AuditService: Attempting async log create', [
                             'public_id' => $data['public_id'],
-                            'action' => $action->value
+                            'action' => $action->value,
                         ]);
                         AuditLog::create($data);
                     } catch (\Throwable $e) {
@@ -155,13 +155,13 @@ class AuditService
                                 'public_id' => $data['public_id'],
                                 'action' => $action->value,
                                 'existing' => AuditLog::where('public_id', $data['public_id'])->first()?->toArray(),
-                                'new_data' => $data
+                                'new_data' => $data,
                             ]);
                         }
                         \Illuminate\Support\Facades\Log::error('AuditService: Async logging failed', [
                             'public_id' => $data['public_id'],
                             'action' => $action->value,
-                            'error' => $e->getMessage()
+                            'error' => $e->getMessage(),
                         ]);
                         // Don't re-throw in production to avoid crashing async workers, but maybe in dev?
                     }
@@ -177,11 +177,11 @@ class AuditService
                 return $auditLog;
             } catch (\Throwable $e) {
                 if ($e instanceof \Illuminate\Database\UniqueConstraintViolationException) {
-                     \Illuminate\Support\Facades\Log::critical('AuditService: SYNC UNIQUE COLLISION DETECTED', [
+                    \Illuminate\Support\Facades\Log::critical('AuditService: SYNC UNIQUE COLLISION DETECTED', [
                         'public_id' => $data['public_id'],
                         'action' => $action->value,
                         'existing' => AuditLog::where('public_id', $data['public_id'])->first()?->toArray(),
-                        'new_data' => $data
+                        'new_data' => $data,
                     ]);
                 }
                 throw $e;

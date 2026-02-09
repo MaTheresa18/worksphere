@@ -16,7 +16,9 @@ import {
     Plus,
     Download,
 } from "lucide-vue-next";
-import { format } from "date-fns";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate } = useDate();
 import api from "@/lib/api";
 
 const props = defineProps({
@@ -93,8 +95,8 @@ async function fetchHolidays(start, end) {
         const response = await api.get("/api/holidays", {
             params: {
                 country: selectedCountry.value,
-                start: format(start, "yyyy-MM-dd"),
-                end: format(end, "yyyy-MM-dd"),
+                start: formatDate(start, "yyyy-MM-dd"),
+                end: formatDate(end, "yyyy-MM-dd"),
             },
         });
         holidays.value = response.data.map((h) => ({

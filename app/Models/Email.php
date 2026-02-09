@@ -277,7 +277,7 @@ class Email extends Model implements HasMedia
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('attachments')
-             ->useDisk('private');
+            ->useDisk('private');
     }
 
     /**
@@ -300,7 +300,7 @@ class Email extends Model implements HasMedia
         });
 
         // Merge with placeholders (on-demand attachments)
-        if (!empty($this->attachment_placeholders)) {
+        if (! empty($this->attachment_placeholders)) {
             foreach ($this->attachment_placeholders as $index => $placeholder) {
                 $attachments->push([
                     'id' => "placeholder_{$index}",

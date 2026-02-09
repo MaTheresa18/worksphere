@@ -5,13 +5,9 @@ use Webklex\PHPIMAP\ClientManager;
 
 require __DIR__.'/vendor/autoload.php';
 
-
-use Illuminate\Support\Facades\Crypt;
-
-
 $account = EmailAccount::first();
 
-if (!$account) {
+if (! $account) {
     echo "No account found.\n";
     exit;
 }
@@ -19,8 +15,7 @@ if (!$account) {
 echo "Account: {$account->email}\n";
 echo "DB Forward Cursor: {$account->forward_uid_cursor}\n";
 
-
-$cm = new ClientManager();
+$cm = new ClientManager;
 $config = [
     'host' => $account->imap_host,
     'port' => $account->imap_port,
@@ -39,17 +34,13 @@ if ($account->auth_type === 'oauth') {
 $client = $cm->make($config);
 $client->connect();
 
-
-
 $folder = $client->getFolder('INBOX');
 // Just query directly
-
 
 $messages = $folder->query()->since($account->forward_uid_cursor ?? 1)->limit(5)->get();
 
 $count = $messages->count();
-$maxUid = $messages->count() > 0 ? $messages->max(fn($m) => $m->getUid()) : 0;
-
+$maxUid = $messages->count() > 0 ? $messages->max(fn ($m) => $m->getUid()) : 0;
 
 echo "IMAP Max UID: {$maxUid}\n";
 echo "Messages since cursor: {$count}\n";

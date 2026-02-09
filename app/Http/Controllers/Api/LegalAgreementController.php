@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\LegalAgreementLog;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class LegalAgreementController extends Controller
 {
@@ -19,7 +19,7 @@ class LegalAgreementController extends Controller
 
         foreach (['tos', 'privacy'] as $type) {
             $config = config("legal.{$type}");
-            if ($config && !$user->hasAcceptedLatest($type)) {
+            if ($config && ! $user->hasAcceptedLatest($type)) {
                 $required[] = [
                     'type' => $type,
                     'version' => $config['version'],
@@ -47,7 +47,7 @@ class LegalAgreementController extends Controller
         $type = $request->document_type;
         $config = config("legal.{$type}");
 
-        if (!$config) {
+        if (! $config) {
             return response()->json(['message' => 'Invalid document type.'], 400);
         }
 

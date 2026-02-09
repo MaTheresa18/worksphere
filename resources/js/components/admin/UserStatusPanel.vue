@@ -1,5 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
+import { useDate } from '@/composables/useDate';
+const { formatDate } = useDate();
 import { Button, Card, Modal, Input, Badge, Alert, SelectFilter, Textarea } from '@/components/ui';
 import api from '@/lib/api';
 import { toast } from 'vue-sonner';
@@ -189,15 +191,7 @@ async function loadRoleHistory() {
     }
 }
 
-function formatDate(date) {
-    return new Date(date).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-}
+// Local formatDate removed in favor of useDate composable
 
 function getRoleLabel(role) {
     const option = roleOptions.value.find(r => r.value === role);

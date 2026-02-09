@@ -1,7 +1,8 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import api from "@/lib/api";
-import { formatDistanceToNow } from "date-fns";
+import { useDate } from "@/composables/useDate";
+const { formatRelativeTime } = useDate();
 
 // Alias api to axios
 const axios = api;
@@ -97,7 +98,7 @@ const formatAction = (action) => {
                         {{ formatAction(log.action) }}
                     </h4>
                     <span class="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-wider whitespace-nowrap">
-                        {{ formatDistanceToNow(new Date(log.created_at), { addSuffix: true }) }}
+                        {{ formatRelativeTime(log.created_at) }}
                     </span>
                 </div>
 

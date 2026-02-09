@@ -19,11 +19,11 @@ class DevAccessMiddleware
         if (! app()->environment('local', 'testing')) {
             abort(403, 'Development tools are disabled in this environment.');
         }
-        
+
         // 2. Optional: Check for specific header or key if configured
-        // This adds an extra layer even in local/testing if needed, 
+        // This adds an extra layer even in local/testing if needed,
         // but primarily we care about blocking production access.
-        
+
         return $next($request);
     }
 }

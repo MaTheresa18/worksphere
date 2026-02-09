@@ -67,6 +67,9 @@ import {
 import MediaManager from "@/components/tools/MediaManager.vue";
 import MediaViewer from "@/components/tools/MediaViewer.vue";
 import { useAuthStore } from "@/stores/auth";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate, formatRelative: formatRelativeTime } = useDate();
 
 // Types
 interface UserLite {
@@ -645,33 +648,7 @@ function getTypeConfig(type: string) {
 
 // getFileIcon removed
 
-function formatDate(dateString: string) {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-    });
-}
-
-function formatRelativeTime(dateString: string) {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return "Just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 7) return `${days}d ago`;
-    return formatDate(dateString);
-}
+// Local formatting functions removed in favor of useDate composable
 
 // Activity timeline helper functions
 const activityIconMap: Record<string, any> = {

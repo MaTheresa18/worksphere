@@ -1,5 +1,7 @@
 <script setup>
 import { computed } from "vue";
+import { useDate } from "@/composables/useDate";
+const { formatDate, formatRelativeTime } = useDate();
 import {
     Shield,
     ShieldOff,
@@ -35,27 +37,7 @@ const props = defineProps({
 
 const emit = defineEmits(["renew", "revoke", "view"]);
 
-function formatDate(dateString) {
-    if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-    });
-}
-
-function formatRelativeTime(dateString) {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = date - now;
-    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return "Expired";
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "Tomorrow";
-    return `In ${diffDays} days`;
-}
+// Local formatting functions removed in favor of useDate composable
 
 const sortedOverrides = computed(() => {
     return [...props.overrides].sort((a, b) => {

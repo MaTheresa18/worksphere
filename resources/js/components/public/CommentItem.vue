@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { User, ChevronDown, ChevronUp } from "lucide-vue-next";
-import { format } from "date-fns";
+import { useDate } from "@/composables/useDate";
+
+const { formatDateTime } = useDate();
 
 const props = defineProps<{
     comment: {
@@ -65,10 +67,7 @@ const toggleExpand = () => {
                     <span
                         class="text-xs text-[var(--text-tertiary)] whitespace-nowrap flex-shrink-0"
                         >{{
-                            format(
-                                new Date(comment.created_at),
-                                "MMM d, yyyy h:mm a"
-                            )
+                            formatDateTime(comment.created_at)
                         }}</span
                     >
                 </div>

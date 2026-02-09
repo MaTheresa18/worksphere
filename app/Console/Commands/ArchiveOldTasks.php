@@ -32,6 +32,7 @@ class ArchiveOldTasks extends Command
     {
         if (! Config::get('worksphere.task.auto_archive.enabled', true)) {
             $this->info('Auto-archiving is disabled in configuration.');
+
             return;
         }
 
@@ -43,7 +44,7 @@ class ArchiveOldTasks extends Command
         // Use a safer lookup that doesn't throw if role is missing
         try {
             // 'administrator' is the super admin role defined in config/roles.php
-            $archiver = User::role('administrator')->first() 
+            $archiver = User::role('administrator')->first()
                 ?? User::first();
         } catch (\Throwable $e) {
             // Fallback if role permissions fail
@@ -52,6 +53,7 @@ class ArchiveOldTasks extends Command
 
         if (! $archiver) {
             $this->error('No user found to perform archiving.');
+
             return;
         }
 
@@ -65,6 +67,7 @@ class ArchiveOldTasks extends Command
 
         if ($count === 0) {
             $this->info('No tasks found to archive.');
+
             return;
         }
 
@@ -79,7 +82,7 @@ class ArchiveOldTasks extends Command
             } else {
                 try {
                     if ($workflowService->archiveTask($task, $archiver)) {
-                         // Success
+                        // Success
                     } else {
                         $this->error("Failed to archive task {$task->id}: Invalid transition.");
                     }

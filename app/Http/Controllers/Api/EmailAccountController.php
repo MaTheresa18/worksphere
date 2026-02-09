@@ -104,13 +104,13 @@ class EmailAccountController extends Controller
             $exists = EmailAccount::where('team_id', $validated['team_id'])
                 ->where('email', $validated['email'])
                 ->exists();
-                
+
             if ($exists) {
                 return response()->json([
                     'message' => 'The given data was invalid.',
                     'errors' => [
-                        'email' => ['This email account has already been connected to this team.']
-                    ]
+                        'email' => ['This email account has already been connected to this team.'],
+                    ],
                 ], 422);
             }
 
@@ -133,8 +133,8 @@ class EmailAccountController extends Controller
                 return response()->json([
                     'message' => 'The given data was invalid.',
                     'errors' => [
-                        'email' => ['This email account has already been connected.']
-                    ]
+                        'email' => ['This email account has already been connected.'],
+                    ],
                 ], 422);
             }
         }
@@ -366,6 +366,7 @@ class EmailAccountController extends Controller
             'created_at' => $account->created_at->toIso8601String(),
         ];
     }
+
     /**
      * Get storage usage statistics.
      */
@@ -374,14 +375,14 @@ class EmailAccountController extends Controller
         $this->authorize('view', $emailAccount);
 
         $emailsSize = $emailAccount->emails()->sum('size_bytes') ?? 0;
-        
+
         $attachmentsSize = \Illuminate\Support\Facades\DB::table('media')
             ->where('model_type', \App\Models\Email::class)
             ->whereIn('model_id', $emailAccount->emails()->select('id'))
             ->sum('size');
 
         $emailsCount = $emailAccount->emails()->count();
-        
+
         $attachmentsCount = \Illuminate\Support\Facades\DB::table('media')
             ->where('model_type', \App\Models\Email::class)
             ->whereIn('model_id', $emailAccount->emails()->select('id'))
@@ -399,7 +400,7 @@ class EmailAccountController extends Controller
                 'emails_count' => $emailsCount,
                 'attachments_count' => $attachmentsCount,
                 'limit_bytes' => $emailAccount->storage_limit,
-            ]
+            ],
         ]);
     }
 }

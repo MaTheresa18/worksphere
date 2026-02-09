@@ -1,5 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
+import { useDate } from '@/composables/useDate';
+const { formatDate, formatDateTime } = useDate();
 import { useRoute, useRouter } from 'vue-router';
 import api from '@/lib/api';
 import { Button, Badge, Modal, SelectFilter } from '@/components/ui';
@@ -535,8 +537,7 @@ onMounted(async () => {
                                 <span>{{ user.email }}</span>
                             </div>
                             <div class="flex items-center gap-1.5">
-                                <Calendar class="w-4 h-4" />
-                                <span>Joined {{ new Date(user.created_at).toLocaleDateString() }}</span>
+                                <span>Joined {{ formatDate(user.created_at) }}</span>
                             </div>
                             <div class="flex items-center gap-1.5" v-if="user.location">
                                 <component :is="MapPin" class="w-4 h-4" />
@@ -696,7 +697,7 @@ onMounted(async () => {
                                         <CheckCircle2 v-if="user.email_verified_at" class="w-4 h-4 text-green-500" />
                                         <XCircle v-else class="w-4 h-4 text-[var(--text-muted)]" />
                                         <span :class="user.email_verified_at ? 'text-green-600 dark:text-green-400' : 'text-[var(--text-muted)]'">
-                                            {{ user.email_verified_at ? `Verified on ${new Date(user.email_verified_at).toLocaleDateString()}` : 'Not Verified' }}
+                                            {{ user.email_verified_at ? `Verified on ${formatDate(user.email_verified_at)}` : 'Not Verified' }}
                                         </span>
                                     </div>
                                     <Button 
@@ -713,7 +714,7 @@ onMounted(async () => {
                             </div>
                              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-none pb-0">
                                 <dt class="text-sm font-medium text-[var(--text-secondary)]">Account Created</dt>
-                                <dd class="text-sm text-[var(--text-primary)] md:col-span-2">{{ new Date(user.created_at).toLocaleString() }}</dd>
+                                <dd class="text-sm text-[var(--text-primary)] md:col-span-2">{{ formatDateTime(user.created_at) }}</dd>
                             </div>
                         </div>
                     </div>
@@ -741,7 +742,7 @@ onMounted(async () => {
                                             </Badge>
                                         </div>
                                         <p v-if="user.password_last_updated_at" class="text-xs text-[var(--text-muted)]">
-                                            Last changed: {{ new Date(user.password_last_updated_at).toLocaleDateString() }}
+                                            Last changed: {{ formatDate(user.password_last_updated_at) }}
                                         </p>
                                     </div>
                                 </div>
@@ -765,7 +766,7 @@ onMounted(async () => {
                                                 />
                                                 <div class="flex flex-col">
                                                     <span class="text-sm font-medium text-[var(--text-primary)] capitalize">{{ account.provider }}</span>
-                                                    <span class="text-xs text-[var(--text-muted)]">Connected {{ new Date(account.connected_at).toLocaleDateString() }}</span>
+                                                    <span class="text-xs text-[var(--text-muted)]">Connected {{ formatDate(account.connected_at) }}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1079,10 +1080,10 @@ onMounted(async () => {
                                 <!-- Time -->
                                 <div class="text-right shrink-0">
                                     <div class="text-sm text-[var(--text-secondary)]">
-                                        {{ log.time_ago || new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
+                                        {{ log.time_ago || formatDateTime(log.created_at, 'h:mm a') }}
                                     </div>
                                     <div class="text-xs text-[var(--text-muted)]">
-                                        {{ new Date(log.created_at).toLocaleDateString() }}
+                                        {{ formatDate(log.created_at) }}
                                     </div>
                                 </div>
 
@@ -1140,7 +1141,7 @@ onMounted(async () => {
                                     {{ selectedLog.action_label || formatActionLabel(selectedLog.action) }}
                                 </h3>
                                 <p class="text-sm text-[var(--text-secondary)]">
-                                    {{ new Date(selectedLog.created_at).toLocaleString() }}
+                                    {{ formatDateTime(selectedLog.created_at) }}
                                 </p>
                             </div>
                             <div class="flex gap-2">

@@ -37,7 +37,9 @@ import Card from "@/components/ui/Card.vue";
 import Input from "@/components/ui/Input.vue";
 import Modal from "@/components/ui/Modal.vue";
 import StatusBadge from "@/components/ui/StatusBadge.vue";
-import { format } from "date-fns";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate } = useDate();
 import { useToast } from "@/composables/useToast.ts";
 import { useAuthStore } from "@/stores/auth";
 import MediaManager from "@/components/tools/MediaManager.vue";
@@ -214,8 +216,8 @@ function handleExportEvents(range) {
     }
 
     const params = new URLSearchParams({
-        start: format(range.start, "yyyy-MM-dd"),
-        end: format(range.end, "yyyy-MM-dd"),
+        start: formatDate(range.start, "yyyy-MM-dd"),
+        end: formatDate(range.end, "yyyy-MM-dd"),
     });
 
     // Trigger download by opening URL
@@ -909,9 +911,7 @@ watch(team, (newTeam) => {
     }
 });
 
-const formatDate = (dateString) => {
-    return format(new Date(dateString), "MMM d, yyyy");
-};
+
 
 const formatSize = (bytes) => {
     if (bytes === 0) return "0 B";

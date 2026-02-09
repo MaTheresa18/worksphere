@@ -12,6 +12,8 @@ import {
     Printer,
 } from "lucide-vue-next";
 import axios from "axios";
+import { useDate } from "@/composables/useDate";
+const { formatDate } = useDate();
 
 const route = useRoute();
 const router = useRouter();
@@ -31,23 +33,14 @@ const formatCurrency = (amount: number, currency: string = "USD") => {
     }).format(amount);
 };
 
-const formatDate = (dateString: string) => {
+const formatFullDate = (dateString: string) => {
     if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("en-US", {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-    });
+    return formatDate(dateString, 'EEEE, MMMM d, yyyy');
 };
 
 const formatShortDate = (dateString: string) => {
     if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-    });
+    return formatDate(dateString);
 };
 
 const getStatusVariant = (status: string) => {

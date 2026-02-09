@@ -1,6 +1,8 @@
 <script setup>
 import { computed } from 'vue';
-import { formatDistanceToNow } from 'date-fns';
+import { useDate } from '@/composables/useDate';
+
+const { formatRelativeTime } = useDate();
 import { 
     Info, 
     CheckCircle2, 
@@ -63,11 +65,7 @@ const iconColor = computed(() => {
 });
 
 const timeAgo = computed(() => {
-    try {
-        return formatDistanceToNow(new Date(props.notification.created_at), { addSuffix: true });
-    } catch (e) {
-        return '';
-    }
+    return formatRelativeTime(props.notification.created_at);
 });
 
 const handleAction = () => {

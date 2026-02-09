@@ -4,6 +4,9 @@ import { useRouter, useRoute } from "vue-router";
 import { useToast } from "@/composables/useToast.ts";
 import { useAuthStore } from "@/stores/auth";
 import axios from "axios";
+import { useDate } from "@/composables/useDate";
+
+const { formatRelative: formatRelativeComposible } = useDate();
 
 const router = useRouter();
 const route = useRoute();
@@ -356,18 +359,7 @@ async function refreshData() {
 // Helper to format relative time
 function formatRelativeTime(dateString) {
     if (!dateString) return "";
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now - date;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return "Just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 7) return `${days}d ago`;
-    return date.toLocaleDateString();
+    return formatRelativeComposible(dateString);
 }
 
 // Watch for filter changes

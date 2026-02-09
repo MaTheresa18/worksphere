@@ -26,16 +26,16 @@ class HandleGoogleWebhookJob implements ShouldQueue
     {
         try {
             \Illuminate\Support\Facades\Log::info("DEBUG: HandleGoogleWebhookJob Started for Channel: {$this->channelId}");
-            
+
             $service->syncFromGoogle($this->channelId);
-            
+
             \Illuminate\Support\Facades\Log::info("DEBUG: HandleGoogleWebhookJob Completed for Channel: {$this->channelId}");
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error("DEBUG: HandleGoogleWebhookJob Failed for Channel: {$this->channelId}", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            
+
             // Re-throw to ensure job fails and specific queue handling (retry/failed_jobs) takes over
             throw $e;
         }

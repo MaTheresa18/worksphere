@@ -1,6 +1,8 @@
 <script setup>
 import { computed } from 'vue';
-import { format } from 'date-fns';
+import { useDate } from "@/composables/useDate";
+
+const { formatDateTime } = useDate();
 import { MapPin, Clock } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -12,10 +14,7 @@ const formattedTime = computed(() => {
     if (!props.event) return '';
     if (props.event.is_all_day) return 'All Day';
     
-    const start = props.event.start_time instanceof Date ? props.event.start_time : new Date(props.event.start_time);
-    const end = props.event.end_time instanceof Date ? props.event.end_time : new Date(props.event.end_time);
-    
-    return `${format(start, 'h:mm a')} - ${format(end, 'h:mm a')}`;
+    return `${formatDateTime(props.event.start_time, 'h:mm a')} - ${formatDateTime(props.event.end_time, 'h:mm a')}`;
 });
 
 const attendees = computed(() => {

@@ -22,12 +22,12 @@ class DashboardPermissionTest extends TestCase
         $user->givePermissionTo(['dashboard.view']); // No tickets.view
 
         $team = Team::factory()->create(['owner_id' => $user->id]);
-        
+
         $service = app(DashboardService::class);
         $chartData = $service->getChartData($user, $team);
 
         $activityDatasets = $chartData['activity']['datasets'];
-        
+
         $hasTickets = collect($activityDatasets)->contains('label', 'Tickets');
         $this->assertFalse($hasTickets, 'Activity chart should not contain Tickets dataset for regular users');
     }
@@ -41,12 +41,12 @@ class DashboardPermissionTest extends TestCase
         $user->givePermissionTo(['dashboard.view', 'tickets.view']);
 
         $team = Team::factory()->create(['owner_id' => $user->id]);
-        
+
         $service = app(DashboardService::class);
         $chartData = $service->getChartData($user, $team);
 
         $activityDatasets = $chartData['activity']['datasets'];
-        
+
         $hasTickets = collect($activityDatasets)->contains('label', 'Tickets');
         $this->assertTrue($hasTickets, 'Activity chart should contain Tickets dataset for support users');
     }

@@ -30,9 +30,9 @@ class SendScheduledEmailsJob implements ShouldQueue
         foreach ($emails as $email) {
             // Mark as no longer a draft (it's now "sending" or "sent")
             $email->update(['is_draft' => false]);
-            
+
             SendEmailJob::dispatch($email->id, $email->email_account_id);
-            
+
             \Illuminate\Support\Facades\Log::info('[SendScheduledEmailsJob] Dispatched scheduled email', [
                 'email_id' => $email->id,
                 'scheduled_at' => $email->scheduled_at,

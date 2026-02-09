@@ -1,5 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from "vue";
+import { useDate } from "@/composables/useDate";
+const { formatDateTime } = useDate();
 import { useRoute, useRouter } from "vue-router";
 import api from "@/lib/api";
 import { Button, Badge } from "@/components/ui";
@@ -240,9 +242,7 @@ onMounted(() => {
                                     </p>
                                     <p class="text-[var(--text-primary)]">
                                         {{
-                                            new Date(
-                                                log.created_at
-                                            ).toLocaleString()
+                                            formatDateTime(log.created_at)
                                         }}
                                     </p>
                                     <p class="text-xs text-[var(--text-muted)]">

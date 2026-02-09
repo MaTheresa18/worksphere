@@ -83,19 +83,19 @@ class PrepareSecureDownload implements ShouldQueue
                     $zip->addFile($filePath, $file);
                 }
             }
-            
+
             // Set password if supported by this PHP version/Zip extension
             if (method_exists($zip, 'setPassword')) {
                 $zip->setPassword($password);
             }
-            
+
             $zip->close();
         } else {
-             throw new \Exception('Failed to create secure zip archive.');
+            throw new \Exception('Failed to create secure zip archive.');
         }
 
         // Validate zip created successfully
-        if (!file_exists($zipPath)) {
+        if (! file_exists($zipPath)) {
             Log::error('Zip creation failed');
             throw new \Exception('Failed to create secure zip archive (file missing).');
         }

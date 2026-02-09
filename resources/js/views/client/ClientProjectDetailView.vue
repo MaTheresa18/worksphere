@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { Card, Button, Badge, PageLoader } from '@/components/ui';
 import { ArrowLeft, Folder, Calendar, CheckCircle2, Clock, AlertCircle, ListTodo } from 'lucide-vue-next';
 import axios from 'axios';
+import { useDate } from "@/composables/useDate";
+const { formatDate: formatDateComposible } = useDate();
 
 const route = useRoute();
 const router = useRouter();
@@ -15,13 +17,9 @@ const tasks = ref<any[]>([]);
 
 const projectId = computed(() => route.params.id as string);
 
-const formatDate = (dateString: string) => {
+const formatShortDate = (dateString: string) => {
     if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-    });
+    return formatDateComposible(dateString);
 };
 
 const getStatusVariant = (status: string) => {
@@ -203,7 +201,7 @@ onMounted(() => {
                                     <div v-if="task.due_date" class="flex items-center gap-1 mt-2 text-xs text-[var(--text-muted)]">
                                         <Clock class="w-3 h-3" />
                                         <span :class="{ 'text-[var(--color-error)]': task.is_overdue }">
-                                            Due {{ formatDate(task.due_date) }}
+                                            Due {{ formatShortDate(task.due_date) }}
                                         </span>
                                     </div>
                                 </div>
@@ -231,21 +229,21 @@ onMounted(() => {
                                 <dt class="text-xs font-semibold uppercase text-[var(--text-muted)]">Start Date</dt>
                                 <dd class="text-[var(--text-primary)] flex items-center gap-2">
                                     <Calendar class="w-4 h-4 text-[var(--text-muted)]" />
-                                    {{ formatDate(project.start_date) }}
+                                    {{ formatShortDate(project.start_date) }}
                                 </dd>
                             </div>
                             <div v-if="project.due_date">
                                 <dt class="text-xs font-semibold uppercase text-[var(--text-muted)]">Due Date</dt>
                                 <dd class="text-[var(--text-primary)] flex items-center gap-2">
                                     <Calendar class="w-4 h-4 text-[var(--text-muted)]" />
-                                    {{ formatDate(project.due_date) }}
+                                    {{ formatShortDate(project.due_date) }}
                                 </dd>
                             </div>
                             <div v-if="project.completed_at">
                                 <dt class="text-xs font-semibold uppercase text-[var(--text-muted)]">Completed</dt>
                                 <dd class="text-[var(--color-success)] flex items-center gap-2">
                                     <CheckCircle2 class="w-4 h-4" />
-                                    {{ formatDate(project.completed_at) }}
+                                    {{ formatShortDate(project.completed_at) }}
                                 </dd>
                             </div>
                         </dl>

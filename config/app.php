@@ -14,7 +14,7 @@ return [
     */
 
     'name' => env('APP_NAME', 'Laravel'),
-    
+
     'demo_mode_secret_hash' => env('DEMO_MODE_SECRET_HASH', ''),
 
     /*

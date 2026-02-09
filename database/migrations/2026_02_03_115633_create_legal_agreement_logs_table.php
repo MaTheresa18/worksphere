@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('user_agent')->nullable();
             $table->timestamp('accepted_at');
             $table->timestamps();
-            
+
             $table->index(['user_id', 'document_type']);
         });
     }

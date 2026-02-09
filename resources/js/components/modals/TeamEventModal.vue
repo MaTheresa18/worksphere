@@ -2,8 +2,8 @@
 import { ref, computed, watch } from 'vue';
 import { Modal, Input, Button, Switch, StatusBadge, Avatar, TimezoneSelect } from '@/components/ui';
 import ParticipantSelector from '@/components/ui/ParticipantSelector.vue';
-import { fromZonedTime, toZonedTime } from 'date-fns-tz';
-import { format } from 'date-fns';
+import { useDate } from '@/composables/useDate';
+const { toZonedTime, fromZonedTime, format } = useDate();
 import { Mail, Download, Calendar, Send } from 'lucide-vue-next';
 import api from '@/lib/api';
 import { useToast } from '@/composables/useToast';
@@ -95,17 +95,25 @@ const colors = [
     '#6366F1', // Indigo
 ];
 
-// Helper: Convert UTC Date (ISO) -> "YYYY-MM-DDTHH:mm" in Specific Timezone
 const toFormFormat = (isoString: string, timeZone: string) => {
     if (!isoString) return '';
     try {
         const utcDate = new Date(isoString);
-        const zoned = toZonedTime(utcDate, timeZone);
+        const zoned = hideSeconds(toZonedTime(utcDate, timeZone));
         return format(zoned, "yyyy-MM-dd'T'HH:mm");
     } catch (e) {
         console.error('Date conversion error', e);
         return isoString.slice(0, 16);
     }
+};
+
+/**
+ * Helper to zero out seconds and milliseconds for consistent comparison
+ */
+const hideSeconds = (date: Date) => {
+    const d = new Date(date);
+    d.setSeconds(0, 0);
+    return d;
 };
 
 // Helper: Convert "YYYY-MM-DDTHH:mm" (User Time) -> UTC ISO String
@@ -308,13 +316,13 @@ const handleDownloadIcs = () => {
         <div class="space-y-4">
             <!-- Title -->
             <div class="space-y-2">
-                <label class="text-sm font-medium text-[var(--text-secondary)]">Event Title</label>
+                <label class="text-sm font-medium text-(--text-secondary)">Event Title</label>
                 <Input v-model="form.title" placeholder="Team meeting, Review, etc." required />
             </div>
 
             <!-- All Day -->
              <div class="flex items-center justify-between">
-                <label class="text-sm font-medium text-[var(--text-secondary)]">All Day Event</label>
+                <label class="text-sm font-medium text-(--text-secondary)">All Day Event</label>
                 <Switch 
                     :modelValue="form.is_all_day" 
                     @update:modelValue="form.is_all_day = $event" 
@@ -324,14 +332,14 @@ const handleDownloadIcs = () => {
 
             <!-- Timezone -->
              <div class="space-y-2" v-if="!form.is_all_day">
-                <label class="text-sm font-medium text-[var(--text-secondary)]">Timezone</label>
+                <label class="text-sm font-medium text-(--text-secondary)">Timezone</label>
                 <TimezoneSelect v-model="form.timezone" />
             </div>
 
             <!-- Date/Time -->
             <div class="grid grid-cols-2 gap-4">
                 <div class="space-y-2">
-                    <label class="text-sm font-medium text-[var(--text-secondary)]">Start</label>
+                    <label class="text-sm font-medium text-(--text-secondary)">Start</label>
                     <Input 
                         v-model="form.start_time" 
                         :type="form.is_all_day ? 'date' : 'datetime-local'" 
@@ -339,7 +347,7 @@ const handleDownloadIcs = () => {
                     />
                 </div>
                 <div class="space-y-2">
-                    <label class="text-sm font-medium text-[var(--text-secondary)]">End</label>
+                    <label class="text-sm font-medium text-(--text-secondary)">End</label>
                      <Input 
                         v-model="form.end_time" 
                         :type="form.is_all_day ? 'date' : 'datetime-local'" 
@@ -349,23 +357,23 @@ const handleDownloadIcs = () => {
 
             <!-- Description -->
              <div class="space-y-2">
-                <label class="text-sm font-medium text-[var(--text-secondary)]">Description</label>
+                <label class="text-sm font-medium text-(--text-secondary)">Description</label>
                 <textarea 
                     v-model="form.description" 
                     rows="3"
-                    class="w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--interactive-primary)]"
+                    class="w-full rounded-md border border-(--border-default) bg-(--surface-elevated) px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-(--interactive-primary)"
                 ></textarea>
             </div>
 
              <!-- Location -->
             <div class="space-y-2">
-                <label class="text-sm font-medium text-[var(--text-secondary)]">Location</label>
+                <label class="text-sm font-medium text-(--text-secondary)">Location</label>
                 <Input v-model="form.location" placeholder="Conference Room A, Zoom, etc." />
             </div>
 
             <!-- Color -->
              <div class="space-y-2">
-                <label class="text-sm font-medium text-[var(--text-secondary)]">Color</label>
+                <label class="text-sm font-medium text-(--text-secondary)">Color</label>
                 <div class="flex gap-2">
                     <button 
                         v-for="c in colors" 
@@ -380,7 +388,7 @@ const handleDownloadIcs = () => {
 
              <!-- Participants -->
             <div class="space-y-2">
-                <label class="text-sm font-medium text-[var(--text-secondary)]">Participants</label>
+                <label class="text-sm font-medium text-(--text-secondary)">Participants</label>
                 <ParticipantSelector
                     v-model="form.participants"
                     :fetch-url="participantsFetchUrl"
@@ -393,17 +401,17 @@ const handleDownloadIcs = () => {
                 <input 
                     type="checkbox" 
                     v-model="sendInvite"
-                    class="w-4 h-4 rounded border-[var(--border-default)] text-[var(--interactive-primary)] focus:ring-[var(--interactive-primary)]/30"
+                    class="w-4 h-4 rounded border-(--border-default) text-(--interactive-primary) focus:ring-(--interactive-primary)/30"
                 />
-                <Send class="w-4 h-4 text-[var(--text-tertiary)]" />
-                <span class="text-sm text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">
+                <Send class="w-4 h-4 text-(--text-tertiary)" />
+                <span class="text-sm text-(--text-secondary) group-hover:text-(--text-primary) transition-colors">
                     Send email invitations on save
                 </span>
             </label>
 
              <!-- Reminder -->
             <div class="space-y-2">
-                <label class="text-sm font-medium text-[var(--text-secondary)]">Reminder</label>
+                <label class="text-sm font-medium text-(--text-secondary)">Reminder</label>
                 <div class="flex items-center gap-2">
                     <Input 
                         v-model="form.reminder_minutes_before" 
@@ -411,13 +419,13 @@ const handleDownloadIcs = () => {
                         min="0"
                         placeholder="15"
                     />
-                    <span class="text-sm text-[var(--text-muted)]">minutes before</span>
+                    <span class="text-sm text-(--text-muted)">minutes before</span>
                 </div>
             </div>
 
             <!-- Participant Status (Read Only) -->
-            <div v-if="event && event.participants_details && event.participants_details.length > 0" class="space-y-2 pt-2 border-t border-[var(--border-default)]">
-                 <label class="text-sm font-medium text-[var(--text-secondary)]">Participation Status</label>
+            <div v-if="event && event.participants_details && event.participants_details.length > 0" class="space-y-2 pt-2 border-t border-(--border-default)">
+                 <label class="text-sm font-medium text-(--text-secondary)">Participation Status</label>
                  <div class="space-y-2 max-h-40 overflow-y-auto">
                     <div v-for="p in event.participants_details" :key="p.id" class="flex items-center justify-between text-sm">
                         <div class="flex items-center gap-2">

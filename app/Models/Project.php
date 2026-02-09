@@ -96,7 +96,9 @@ class Project extends Model implements HasMedia
                 // Generate prefix: Uppercase, alphanumeric only, max 4 chars
                 $name = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $project->name));
                 $prefix = substr($name, 0, 3);
-                if (strlen($prefix) < 2) $prefix = 'PROJ';
+                if (strlen($prefix) < 2) {
+                    $prefix = 'PROJ';
+                }
                 $project->prefix = $prefix;
             }
         });

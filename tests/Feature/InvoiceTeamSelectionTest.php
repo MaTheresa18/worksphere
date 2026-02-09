@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Client;
-use App\Models\Invoice;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,7 +28,7 @@ class InvoiceTeamSelectionTest extends TestCase
         $user = User::factory()->create();
         $team = Team::factory()->create(['owner_id' => $user->id]);
         $team->members()->attach($user);
-        
+
         $client = Client::factory()->create(['team_id' => $team->id]);
 
         Sanctum::actingAs($user);
@@ -54,16 +53,16 @@ class InvoiceTeamSelectionTest extends TestCase
 
         $response->assertStatus(201);
         $this->assertDatabaseHas('invoices', [
-             'team_id' => $team->id,
-             'client_id' => $client->id,
-             'notes' => 'Test Note',
+            'team_id' => $team->id,
+            'client_id' => $client->id,
+            'notes' => 'Test Note',
         ]);
     }
 
     public function test_user_can_switch_teams_and_create_invoice()
     {
         $user = User::factory()->create();
-        
+
         // Team A
         $teamA = Team::factory()->create(['owner_id' => $user->id]);
         $teamA->members()->attach($user);

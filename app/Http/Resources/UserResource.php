@@ -72,7 +72,7 @@ class UserResource extends JsonResource
                         return $permissions->unique()->values()->map(function ($name) {
                             $parts = explode('.', $name);
                             $category = count($parts) > 1 ? $parts[0] : 'Other';
-                            
+
                             return [
                                 'id' => $name,
                                 'name' => $name,
@@ -87,13 +87,14 @@ class UserResource extends JsonResource
                     function () {
                         $permissionService = app(\App\Services\PermissionService::class);
                         $persona = $permissionService->getPersona($this->resource);
-                        
+
                         $teamPermissions = [];
                         foreach ($this->resource->teams as $team) {
                             if (isset($persona->teamPermissions[$team->id])) {
                                 $teamPermissions[$team->public_id] = $persona->teamPermissions[$team->id];
                             }
                         }
+
                         return $teamPermissions;
                     }
                 ),

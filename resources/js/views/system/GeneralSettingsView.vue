@@ -26,6 +26,9 @@ import EmailAccountsSection from "@/components/settings/EmailAccountsSection.vue
 import SupportTicketsSection from "@/components/settings/SupportTicketsSection.vue";
 import BlockedUrlManager from "@/components/settings/BlockedUrlManager.vue";
 import { useAuthStore } from "@/stores/auth";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate: formatDateComposible } = useDate();
 
 const authStore = useAuthStore();
 
@@ -1900,17 +1903,13 @@ onMounted(async () => {
                                     <span v-if="a.starts_at || a.ends_at"
                                         >{{
                                             a.starts_at
-                                                ? new Date(
-                                                      a.starts_at,
-                                                  ).toLocaleDateString()
+                                                ? formatDateComposible(a.starts_at)
                                                 : "Now"
                                         }}
                                         →
                                         {{
                                             a.ends_at
-                                                ? new Date(
-                                                      a.ends_at,
-                                                  ).toLocaleDateString()
+                                                ? formatDateComposible(a.ends_at)
                                                 : "Forever"
                                         }}</span
                                     >

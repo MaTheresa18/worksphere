@@ -40,6 +40,9 @@ import {
 import { toast } from "vue-sonner";
 import axios from "axios";
 import { isEchoAvailable } from "../../echo";
+import { useDate } from "@/composables/useDate";
+
+const { formatRelative: formatRelativeComposible } = useDate();
 
 import { Line } from "vue-chartjs";
 import {
@@ -743,14 +746,7 @@ const runTask = async (taskName) => {
 // Format last run time
 const formatLastRun = (isoString) => {
     if (!isoString) return "Never";
-    const date = new Date(isoString);
-    const now = new Date();
-    const diff = now - date;
-
-    if (diff < 60000) return "Just now";
-    if (diff < 3600000) return `${Math.floor(diff / 60000)} min ago`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)} hour(s) ago`;
-    return date.toLocaleDateString();
+    return formatRelativeComposible(isoString);
 };
 
 // System Metrics Charts

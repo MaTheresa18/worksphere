@@ -139,13 +139,10 @@
                         Created at
                     </div>
                     <div v-if="email.date" class="text-(--text-primary)">
-                        {{ format(new Date(email.date), "EEE, MMM d, yyyy") }}
-                        at {{ format(new Date(email.date), "h:mm a") }}
+                        {{ formatDateTime(email.date, "EEE, MMM d, yyyy") }}
+                        at {{ formatDateTime(email.date, "h:mm a") }}
                         <span class="text-(--text-muted) ml-1"
-                            >({{
-                                formatDistanceToNow(new Date(email.date))
-                            }}
-                            ago)</span
+                            >({{ formatRelative(email.date) }})</span
                         >
                     </div>
 
@@ -728,7 +725,9 @@ import {
     AlertCircleIcon,
     CopyIcon,
 } from "lucide-vue-next";
-import { format, formatDistanceToNow } from "date-fns";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate, formatDateTime, formatRelative } = useDate();
 import type { Email } from "@/types/models/email";
 import { animate, stagger } from "animejs";
 import { sanitizeHtml } from "@/utils/sanitize";
@@ -1523,19 +1522,7 @@ function proceedToLink() {
     }
 }
 
-function formatDate(dateStr: string) {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return format(date, "MMM d, yyyy, h:mm a");
-}
-
-function formatRelative(dateStr: string) {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return "Unknown Date";
-    return formatDistanceToNow(date, { addSuffix: true });
-}
+// Local formatting functions removed in favor of useDate composable
 
 // --- Attachments ---
 

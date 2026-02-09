@@ -4,8 +4,8 @@ namespace App\Services;
 
 use App\Models\PageView;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class AnalyticsService
 {
@@ -78,7 +78,7 @@ class AnalyticsService
                 [
                     'id' => 4,
                     'label' => 'Bounce Rate',
-                    'value' => round($currentBounceRate, 1) . '%',
+                    'value' => round($currentBounceRate, 1).'%',
                     'change' => $this->calculateChange($currentBounceRate, $prevBounceRate, true),
                     'trend' => $currentBounceRate <= $prevBounceRate ? 'up' : 'down',
                     'icon' => 'ArrowUpRight',
@@ -99,21 +99,21 @@ class AnalyticsService
             $driver = DB::getDriverName();
 
             if ($driver === 'sqlite') {
-                $dateFormat = $period === '24h' ? "strftime('%Y-%m-%d %H:00:00', created_at)" : "date(created_at)";
+                $dateFormat = $period === '24h' ? "strftime('%Y-%m-%d %H:00:00', created_at)" : 'date(created_at)';
             } else {
-                $dateFormat = $period === '24h' ? "DATE_FORMAT(created_at, '%Y-%m-%d %H:00:00')" : "DATE(created_at)";
+                $dateFormat = $period === '24h' ? "DATE_FORMAT(created_at, '%Y-%m-%d %H:00:00')" : 'DATE(created_at)';
             }
 
             $views = PageView::query()->select([
-                DB::raw($dateFormat . ' as date'),
-                DB::raw('count(*) as count')
+                DB::raw($dateFormat.' as date'),
+                DB::raw('count(*) as count'),
             ])
                 ->where('created_at', '>=', $startDate)
                 ->groupBy('date')
                 ->orderBy('date')
                 ->get();
 
-            return $views->map(fn($v) => [
+            return $views->map(fn ($v) => [
                 'date' => $v->date,
                 'count' => $v->count,
             ])->toArray();
@@ -133,14 +133,14 @@ class AnalyticsService
             return PageView::query()->select([
                 'path',
                 DB::raw('count(*) as views'),
-                DB::raw('count(distinct session_id) as unique_visits')
+                DB::raw('count(distinct session_id) as unique_visits'),
             ])
                 ->where('created_at', '>=', $startDate)
                 ->groupBy('path')
                 ->orderByDesc('views')
                 ->limit(10)
                 ->get()
-                ->map(fn($p) => [
+                ->map(fn ($p) => [
                     'path' => $p->path,
                     'views' => number_format($p->views),
                     'unique' => number_format($p->unique_visits),
@@ -166,7 +166,7 @@ class AnalyticsService
 
             return PageView::query()->select([
                 'referer',
-                DB::raw('count(*) as visits')
+                DB::raw('count(*) as visits'),
             ])
                 ->where('created_at', '>=', $startDate)
                 ->whereNotNull('referer')
@@ -185,6 +185,7 @@ class AnalyticsService
                 })
                 ->filter(function ($source) {
                     $appHost = parse_url(config('app.url'), PHP_URL_HOST);
+
                     return $source['source'] !== $appHost && $source['source'] !== 'localhost';
                 })
                 ->values()
@@ -216,13 +217,13 @@ class AnalyticsService
             $query->select('session_id')
                 ->from('page_views')
                 ->where('created_at', '>=', $startDate)
-                ->when($endDate, fn($q) => $q->where('created_at', '<', $endDate))
+                ->when($endDate, fn ($q) => $q->where('created_at', '<', $endDate))
                 ->groupBy('session_id')
                 ->havingRaw('count(*) = 1');
         }, 'bounces')->count();
 
         $totalSessions = PageView::query()->where('created_at', '>=', $startDate)
-            ->when($endDate, fn($q) => $q->where('created_at', '<', $endDate))
+            ->when($endDate, fn ($q) => $q->where('created_at', '<', $endDate))
             ->distinct()
             ->count('session_id');
 
@@ -243,6 +244,6 @@ class AnalyticsService
         $percent = ($diff / $prev) * 100;
         $sign = $percent > 0 ? '+' : '';
 
-        return $sign . round($percent, 1) . '%';
+        return $sign.round($percent, 1).'%';
     }
 }

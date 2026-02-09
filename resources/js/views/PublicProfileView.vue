@@ -9,6 +9,9 @@ import {
     Users, FileText, Globe
 } from 'lucide-vue-next';
 import api from '@/lib/api';
+import { useDate } from '@/composables/useDate';
+
+const { formatDate: formatDateComposible } = useDate();
 
 const route = useRoute();
 const isLoading = ref(true);
@@ -123,7 +126,7 @@ watch(() => route.params.slug, () => {
                         </div>
                         <div class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
                             <Calendar class="h-4 w-4" />
-                            Joined {{ user?.created_at ? new Date(user.created_at).toLocaleDateString() : '' }}
+                            Joined {{ user?.created_at ? formatDateComposible(user.created_at) : '' }}
                         </div>
                         <div class="flex items-center gap-2 text-sm text-[var(--text-secondary)]" v-if="user?.website">
                             <LinkIcon class="h-4 w-4" />

@@ -63,7 +63,7 @@
                         </p>
                         <span
                             class="text-xs text-(--text-muted) whitespace-nowrap"
-                            >{{ formatDate(msg.date) }}</span
+                            >{{ formatDate(msg.date, 'smart') }}</span
                         >
                     </div>
 
@@ -424,8 +424,9 @@ import EmailInlineComposer from "./EmailInlineComposer.vue";
 import Dropdown from "@/components/ui/Dropdown.vue";
 import type { Email } from "@/types/models/email";
 import { useEmailStore } from "@/stores/emailStore";
-import { isToday, format } from "date-fns";
+import { useDate } from "@/composables/useDate";
 
+const { formatDate } = useDate();
 interface Tab {
     id: string;
     label: string;
@@ -727,12 +728,7 @@ function toggleExpand(index: number) {
     }
 }
 
-function formatDate(dateString: string) {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "";
-    return isToday(date) ? format(date, "h:mm a") : format(date, "MMM d");
-}
+// Local formatDate removed in favor of useDate composable with 'smart' formatting
 
 // Listen for postMessage from popup windows
 onMounted(() => {

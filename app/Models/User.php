@@ -815,13 +815,13 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, WebAuth
     /**
      * Check if user has accepted the latest version of a document.
      *
-     * @param string $type 'tos' or 'privacy'
+     * @param  string  $type  'tos' or 'privacy'
      */
     public function hasAcceptedLatest(string $type): bool
     {
         $config = config("legal.{$type}");
-        
-        if (!$config) {
+
+        if (! $config) {
             return true; // No config means no requirement
         }
 

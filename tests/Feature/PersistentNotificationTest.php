@@ -20,7 +20,7 @@ class PersistentNotificationTest extends TestCase
     {
         Notification::fake();
         Event::fake([
-             'App\Events\TaskCreated', // Fake this so we focus on Notifications
+            'App\Events\TaskCreated', // Fake this so we focus on Notifications
         ]);
 
         $assignee = User::factory()->create();
@@ -66,7 +66,7 @@ class PersistentNotificationTest extends TestCase
         ]);
 
         $this->actingAs($creator);
-        
+
         // Update assignment
         $task->update(['assigned_to' => $assignee->id]);
 
@@ -78,11 +78,11 @@ class PersistentNotificationTest extends TestCase
             }
         );
     }
-    
-    public function test_notification_is_NOT_sent_when_assigned_to_self()
+
+    public function test_notification_is_no_t_sent_when_assigned_to_self()
     {
         Notification::fake();
-        
+
         $user = User::factory()->create();
         $team = Team::factory()->create();
         $project = Project::factory()->create(['team_id' => $team->id]);

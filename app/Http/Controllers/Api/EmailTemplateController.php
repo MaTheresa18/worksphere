@@ -5,11 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEmailTemplateRequest;
 use App\Models\EmailTemplate;
-use Spatie\MediaLibrary\MediaCollections\Models\Media; // Add import
 use App\Services\MediaService; // Add import
-use Illuminate\Http\JsonResponse;
+use Illuminate\Http\JsonResponse; // Add import
 use Illuminate\Http\Request;
-use Illuminate\Support\Str; // Add import
+use Illuminate\Support\Str;
+use Spatie\MediaLibrary\MediaCollections\Models\Media; // Add import
 
 class EmailTemplateController extends Controller
 {

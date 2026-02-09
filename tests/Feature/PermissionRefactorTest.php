@@ -2,14 +2,12 @@
 
 namespace Tests\Feature;
 
-use App\Enums\AuditAction;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\ImpersonationService;
 use App\Services\PermissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Session;
 use Tests\TestCase;
 
 class PermissionRefactorTest extends TestCase
@@ -17,6 +15,7 @@ class PermissionRefactorTest extends TestCase
     use RefreshDatabase;
 
     protected $permissionService;
+
     protected $impersonationService;
 
     protected function setUp(): void

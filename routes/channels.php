@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Broadcast;
 use App\Helpers\ChannelAuthLogger;
+use Illuminate\Support\Facades\Broadcast;
 
 Broadcast::channel('App.Models.User.{publicId}', ChannelAuthLogger::wrap('App.Models.User.{publicId}', function ($user, $publicId) {
     return (string) $user->public_id === (string) $publicId;
@@ -86,7 +86,7 @@ Broadcast::channel('personal-notes.{publicId}', ChannelAuthLogger::wrap('persona
 // Operators (view_assigned) - See only assigned projects (technically can see channel events, filtered by frontend)
 Broadcast::channel('teams.{teamId}.projects', ChannelAuthLogger::wrap('teams.{teamId}.projects', function ($user, $teamId) {
     $team = \App\Models\Team::find($teamId);
-    
+
     if (! $team) {
         return false;
     }

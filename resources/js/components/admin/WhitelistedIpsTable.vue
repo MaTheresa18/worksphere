@@ -1,7 +1,8 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import api from "@/lib/api";
-import { format } from "date-fns";
+import { useDate } from "@/composables/useDate";
+const { formatDate } = useDate();
 import { toast } from "vue-sonner";
 import {
     PlusIcon,
@@ -115,7 +116,7 @@ onMounted(() => {
                                 {{ ip.creator?.name || 'System' }}
                             </td>
                             <td class="px-6 py-4 text-[var(--text-secondary)]">
-                                {{ format(new Date(ip.created_at), 'MMM d, yyyy') }}
+                                {{ formatDate(ip.created_at) }}
                             </td>
                             <td class="px-6 py-4 text-right">
                                 <button

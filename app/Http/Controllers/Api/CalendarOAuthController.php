@@ -229,15 +229,16 @@ class CalendarOAuthController extends Controller
 
         if ($resourceState === 'sync') {
             Log::info("DEBUG: Google Calendar Webhook - Sync Confirmation (Channel: {$channelId})");
+
             return response('OK', 200);
         }
 
         if ($resourceState === 'exists') {
             Log::info("DEBUG: Google Calendar Webhook - Changes Detected. Dispatching Job for Channel: {$channelId}");
-            
+
             // Dispatch job to process the change
             \App\Jobs\HandleGoogleWebhookJob::dispatch($channelId);
-            
+
             Log::info("DEBUG: Google Calendar Webhook - Job Dispatched (Channel: {$channelId})");
         }
 

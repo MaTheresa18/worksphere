@@ -21,7 +21,7 @@ class CheckDemoMode
 
         // List of methods to block
         $blockedMethods = ['DELETE'];
-        
+
         // List of sensitive paths or route names to block even for POST/PUT/PATCH
         $blockedPaths = [
             'api/settings*',

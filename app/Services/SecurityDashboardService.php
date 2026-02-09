@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\AuditLog;
 use App\Models\SuspiciousActivity;
-use Illuminate\Support\Facades\DB;
 use Torann\GeoIP\Facades\GeoIP;
 
 class SecurityDashboardService
@@ -15,12 +14,12 @@ class SecurityDashboardService
     public static function recordSuspiciousActivity(AuditLog $log): void
     {
         $ip = $log->ip_address;
-        if (!$ip || $ip === '127.0.0.1') {
+        if (! $ip || $ip === '127.0.0.1') {
             return;
         }
 
         $type = $log->action->value;
-        
+
         $location = null;
         try {
             $location = GeoIP::getLocation($ip);

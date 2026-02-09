@@ -6,7 +6,9 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import listPlugin from "@fullcalendar/list";
 import interactionPlugin from "@fullcalendar/interaction";
 import multiMonthPlugin from "@fullcalendar/multimonth";
-import { format } from "date-fns";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate, formatDateTime } = useDate();
 import {
     Plus,
     Globe,
@@ -374,8 +376,8 @@ async function fetchEvents(start, end) {
     try {
         const response = await api.get("/api/calendar/events", {
             params: {
-                start: format(start, "yyyy-MM-dd HH:mm:ss"),
-                end: format(end, "yyyy-MM-dd HH:mm:ss"),
+                start: formatDate(start, "yyyy-MM-dd HH:mm:ss"),
+                end: formatDate(end, "yyyy-MM-dd HH:mm:ss"),
                 users: selectedCalendarIds.value,
             },
         });
@@ -401,8 +403,8 @@ async function fetchHolidays(start, end) {
         const response = await api.get("/api/holidays", {
             params: {
                 country: selectedCountry.value,
-                start: format(start, "yyyy-MM-dd"),
-                end: format(end, "yyyy-MM-dd"),
+                start: formatDate(start, "yyyy-MM-dd"),
+                end: formatDate(end, "yyyy-MM-dd"),
             },
         });
         holidays.value = response.data.map((h) => ({
@@ -508,8 +510,8 @@ async function handleEventDrop(dropInfo) {
     try {
         await api.put(`/api/calendar/events/${event.id}`, {
             ...event,
-            start_time: format(dropInfo.event.start, "yyyy-MM-dd HH:mm:ss"),
-            end_time: format(
+            start_time: formatDate(dropInfo.event.start, "yyyy-MM-dd HH:mm:ss"),
+            end_time: formatDate(
                 dropInfo.event.end || dropInfo.event.start,
                 "yyyy-MM-dd HH:mm:ss"
             ),
@@ -541,8 +543,8 @@ async function handleEventResize(resizeInfo) {
     try {
         await api.put(`/api/calendar/events/${event.id}`, {
             ...event,
-            start_time: format(resizeInfo.event.start, "yyyy-MM-dd HH:mm:ss"),
-            end_time: format(resizeInfo.event.end, "yyyy-MM-dd HH:mm:ss"),
+            start_time: formatDate(resizeInfo.event.start, "yyyy-MM-dd HH:mm:ss"),
+            end_time: formatDate(resizeInfo.event.end, "yyyy-MM-dd HH:mm:ss"),
         });
         toast.success("Event updated");
         const calendarApi = calendarRef.value?.getApi();

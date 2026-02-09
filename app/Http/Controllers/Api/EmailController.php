@@ -73,7 +73,7 @@ class EmailController extends Controller
         // --- Threading Logic ---
         // We group by thread_id (or id if null) to get distinct conversations.
         // We emulate a "Thread" entity by creating a query that returns the stats of the thread.
-        
+
         $threadQuery = $query->clone()
             ->selectRaw('
                 COALESCE(thread_id, CAST(id AS CHAR)) as thread_key,
@@ -110,7 +110,7 @@ class EmailController extends Controller
 
         // Now verify/hydrate the actual email models for the "latest" in each thread
         $latestIds = $threads->pluck('latest_email_id');
-        
+
         $emails = Email::whereIn('id', $latestIds)
             ->with(['labels', 'emailAccount', 'media'])
             ->get()
@@ -119,15 +119,18 @@ class EmailController extends Controller
         // Map the results back to the paginator, injecting thread_count
         $resourceCollection = $threads->getCollection()->map(function ($threadStat) use ($emails) {
             $email = $emails->get($threadStat->latest_email_id);
-            if (!$email) return null;
+            if (! $email) {
+                return null;
+            }
 
             $email->thread_count = $threadStat->thread_count;
+
             return $email;
         })->filter();
 
         $threads->setCollection($resourceCollection);
 
-        // We use a header to tell the resource to use "lite" mode 
+        // We use a header to tell the resource to use "lite" mode
         // without needing every frontend call to explicitly add ?lite=1
         $request->merge(['lite' => true]);
 
@@ -141,7 +144,7 @@ class EmailController extends Controller
     {
         // If threadId looks like an integer, it might be a single email fallback.
         // But our logic uses valid thread_ids usually.
-        
+
         $emails = Email::query()
             ->forUser(auth()->id())
             ->where('thread_id', $threadId)
@@ -152,7 +155,7 @@ class EmailController extends Controller
         // Fallback: if no emails found by thread_id, maybe it was a single email ID passed as thread key?
         // (Scenario: thread_id was null, so we used ID as key)
         if ($emails->isEmpty() && is_numeric($threadId)) {
-             $emails = Email::query()
+            $emails = Email::query()
                 ->forUser(auth()->id())
                 ->where('id', $threadId)
                 ->with(['labels', 'emailAccount', 'media'])
@@ -242,12 +245,13 @@ class EmailController extends Controller
 
             return response()->json($email, 201);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to ' . ($request->boolean('is_draft') ? 'save draft' : 'send email') . ': ' . $e->getMessage(), [
+            \Illuminate\Support\Facades\Log::error('Failed to '.($request->boolean('is_draft') ? 'save draft' : 'send email').': '.$e->getMessage(), [
                 'user_id' => $request->user()->id,
                 'account_id' => $account->id,
-                'exception' => $e
+                'exception' => $e,
             ]);
-            return response()->json(['error' => 'Failed to process email request: ' . $e->getMessage()], 500);
+
+            return response()->json(['error' => 'Failed to process email request: '.$e->getMessage()], 500);
         }
     }
 
@@ -264,7 +268,7 @@ class EmailController extends Controller
         // Draft update logic
         if ($email->is_draft && $request->hasAny(['to', 'cc', 'bcc', 'subject', 'body', 'body_html'])) {
             $this->authorize('update', $email); // Re-authorize for content update
-            
+
             $data = $request->validate([
                 'to' => ['nullable', 'array'],
                 'to.*.email' => ['nullable', 'email'],
@@ -281,19 +285,21 @@ class EmailController extends Controller
             ]);
 
             // Normalize body if sent as 'body' (common in our frontend)
-            if (isset($data['body']) && !isset($data['body_html'])) {
+            if (isset($data['body']) && ! isset($data['body_html'])) {
                 $data['body_html'] = $data['body'];
             }
 
             try {
                 $email = $this->emailService->updateDraft($email, $data);
+
                 return response()->json($email);
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error('Failed to update draft: ' . $e->getMessage(), [
+                \Illuminate\Support\Facades\Log::error('Failed to update draft: '.$e->getMessage(), [
                     'email_id' => $email->id,
-                    'exception' => $e
+                    'exception' => $e,
                 ]);
-                return response()->json(['error' => 'Failed to update draft: ' . $e->getMessage()], 500);
+
+                return response()->json(['error' => 'Failed to update draft: '.$e->getMessage()], 500);
             }
         }
 
@@ -324,9 +330,9 @@ class EmailController extends Controller
     public function sendReadReceipt(Email $email): JsonResponse
     {
         $this->authorize('view', $email);
-        
+
         $this->emailService->sendReadReceipt(auth()->user(), $email);
-        
+
         return response()->json(['message' => 'Read receipt sent']);
     }
 
@@ -393,7 +399,7 @@ class EmailController extends Controller
     /**
      * Build EML content from Email model.
      */
-    public function source(Email $email) 
+    public function source(Email $email)
     {
         $cacheKey = "email_source:{$email->id}";
 

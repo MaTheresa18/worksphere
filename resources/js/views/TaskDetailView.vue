@@ -48,6 +48,8 @@ import {
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth";
 import { toast } from "vue-sonner";
+import { useDate } from "@/composables/useDate";
+const { formatDate, formatRelativeTime: timeAgo } = useDate();
 import TaskWorkflowActions from "@/components/tasks/TaskWorkflowActions.vue";
 import MediaManager from "@/components/tools/MediaManager.vue";
 import TaskFormModal from "@/components/tasks/TaskFormModal.vue";
@@ -682,29 +684,7 @@ const executeDeleteTask = async () => {
 };
 
 // Helpers
-const formatDate = (date?: string) => {
-    if (!date) return "";
-    return new Date(date).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-    });
-};
-
-const timeAgo = (date?: string) => {
-    if (!date) return "";
-    const now = new Date();
-    const past = new Date(date);
-    const diffMs = now.getTime() - past.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffMins < 1) return "just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return formatDate(date);
-};
+// Local formatting functions removed in favor of useDate composable
 
 const getItemStatusIcon = (status: string) => {
     if (status === "done") return CheckSquare;

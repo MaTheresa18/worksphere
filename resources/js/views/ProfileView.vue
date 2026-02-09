@@ -1,5 +1,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from "vue";
+import { useDate } from "@/composables/useDate";
+const { formatDate } = useDate();
 import { useAuthStore } from "@/stores/auth";
 import { Card, Button, Badge, Avatar, Input } from "@/components/ui";
 import MiniCalendar from "@/components/ui/MiniCalendar.vue";
@@ -361,9 +363,7 @@ onMounted(() => {
                         Joined
                         {{
                             authStore.user?.created_at
-                                ? new Date(
-                                      authStore.user.created_at,
-                                  ).toLocaleDateString()
+                                ? formatDate(authStore.user.created_at)
                                 : "Loading..."
                         }}
                     </div>
@@ -571,7 +571,7 @@ onMounted(() => {
                                         {{ file.name }}
                                     </p>
                                     <p class="text-xs text-[var(--text-muted)]">
-                                        {{ file.created_at }} •
+                                        {{ formatDate(file.created_at) }} •
                                         {{ (file.size / 1024).toFixed(1) }} KB
                                     </p>
                                 </div>

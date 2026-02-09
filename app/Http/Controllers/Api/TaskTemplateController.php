@@ -20,10 +20,10 @@ class TaskTemplateController extends Controller
         $team = \App\Models\Team::where('public_id', $teamId)->firstOrFail();
 
         if (! $user->hasRole('administrator')) {
-             $permissionService = app(\App\Services\PermissionService::class);
-             if (! $permissionService->hasTeamPermission($user, $team, 'task_templates.view')) {
+            $permissionService = app(\App\Services\PermissionService::class);
+            if (! $permissionService->hasTeamPermission($user, $team, 'task_templates.view')) {
                 abort(403, 'Unauthorized access to team templates.');
-             }
+            }
         }
 
         $templates = $this->service->getAllForTeam($teamId);
@@ -39,7 +39,7 @@ class TaskTemplateController extends Controller
         if (! $user->hasRole('administrator')) {
             $permissionService = app(\App\Services\PermissionService::class);
             if (! $permissionService->hasTeamPermission($user, $team, 'task_templates.create')) {
-                 abort(403, 'Unauthorized action.');
+                abort(403, 'Unauthorized action.');
             }
         }
 
@@ -80,12 +80,12 @@ class TaskTemplateController extends Controller
     {
         $user = $request->user();
 
-         if (! $user->hasRole('administrator')) {
-             $team = \App\Models\Team::find($taskTemplate->team_id);
-             $permissionService = app(\App\Services\PermissionService::class);
-             if (!$team || ! $permissionService->hasTeamPermission($user, $team, 'task_templates.view')) {
+        if (! $user->hasRole('administrator')) {
+            $team = \App\Models\Team::find($taskTemplate->team_id);
+            $permissionService = app(\App\Services\PermissionService::class);
+            if (! $team || ! $permissionService->hasTeamPermission($user, $team, 'task_templates.view')) {
                 abort(403, 'Unauthorized.');
-             }
+            }
         }
 
         return response()->json(['data' => $taskTemplate]);
@@ -95,12 +95,12 @@ class TaskTemplateController extends Controller
     {
         $user = $request->user();
 
-         if (! $user->hasRole('administrator')) {
-             $team = \App\Models\Team::find($taskTemplate->team_id);
-             $permissionService = app(\App\Services\PermissionService::class);
-             if (!$team || ! $permissionService->hasTeamPermission($user, $team, 'task_templates.update')) {
+        if (! $user->hasRole('administrator')) {
+            $team = \App\Models\Team::find($taskTemplate->team_id);
+            $permissionService = app(\App\Services\PermissionService::class);
+            if (! $team || ! $permissionService->hasTeamPermission($user, $team, 'task_templates.update')) {
                 abort(403, 'Unauthorized.');
-             }
+            }
         }
 
         $validated = $request->validate([
@@ -121,12 +121,12 @@ class TaskTemplateController extends Controller
     {
         $user = $request->user();
 
-         if (! $user->hasRole('administrator')) {
-             $team = \App\Models\Team::find($taskTemplate->team_id);
-             $permissionService = app(\App\Services\PermissionService::class);
-             if (!$team || ! $permissionService->hasTeamPermission($user, $team, 'task_templates.delete')) {
+        if (! $user->hasRole('administrator')) {
+            $team = \App\Models\Team::find($taskTemplate->team_id);
+            $permissionService = app(\App\Services\PermissionService::class);
+            if (! $team || ! $permissionService->hasTeamPermission($user, $team, 'task_templates.delete')) {
                 abort(403, 'Unauthorized.');
-             }
+            }
         }
 
         $this->service->delete($taskTemplate->id);

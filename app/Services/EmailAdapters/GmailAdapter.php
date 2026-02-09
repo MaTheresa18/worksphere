@@ -5,8 +5,8 @@ namespace App\Services\EmailAdapters;
 use App\Enums\EmailFolderType;
 use App\Models\Email;
 use App\Models\EmailAccount;
-use App\Services\EmailSyncService;
 use App\Services\EmailSanitizationService;
+use App\Services\EmailSyncService;
 use App\Services\GmailApiService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -37,7 +37,7 @@ class GmailAdapter extends BaseEmailAdapter
      */
     public function createClient(EmailAccount $account, bool $fetchBody = true): Client
     {
-        // For Gmail, we prefer the API service. 
+        // For Gmail, we prefer the API service.
         // We only implement this if some part of the system still strictly requires an IMAP Client object.
         return parent::createClient($account, $fetchBody);
     }
@@ -85,6 +85,7 @@ class GmailAdapter extends BaseEmailAdapter
                 'folder' => $folderType,
                 'error' => $e->getMessage(),
             ]);
+
             return ['exists' => 0];
         }
     }
@@ -96,17 +97,18 @@ class GmailAdapter extends BaseEmailAdapter
     {
         try {
             $labelId = $this->getFolderName($folderType);
-            
+
             // Gmail API uses page tokens instead of numeric offsets.
             // For the initial implementation, we'll fetch the first batch.
             // Improvement: Store page tokens in sync_cursor if offset > limit.
             $result = $this->apiService->listMessages($account, $labelId, $limit);
             $messages = collect($result['messages'] ?? []);
-            
+
             $format = $fetchBody ? 'full' : 'metadata';
 
             return $messages->map(function ($msgSummary) use ($account, $fetchBody, $format) {
                 $fullMsg = $this->apiService->getMessage($account, $msgSummary->getId(), $format);
+
                 return $this->parseGmailMessage($fullMsg, true, $account, $fetchBody);
             });
         } catch (\Throwable $e) {
@@ -115,6 +117,7 @@ class GmailAdapter extends BaseEmailAdapter
                 'folder' => $folderType,
                 'error' => $e->getMessage(),
             ]);
+
             return collect();
         }
     }
@@ -127,10 +130,10 @@ class GmailAdapter extends BaseEmailAdapter
         try {
             $labelId = $this->getFolderName($folderType);
             $result = $this->apiService->listMessages($account, $labelId, $count);
-            
+
             $format = $fetchBody ? 'full' : 'metadata';
             $messages = collect();
-            
+
             foreach ($result['messages'] as $msg) {
                 $fullMsg = $this->apiService->getMessage($account, $msg->getId(), $format);
                 $messages->push($this->parseGmailMessage($fullMsg, true, $account, $fetchBody));
@@ -143,6 +146,7 @@ class GmailAdapter extends BaseEmailAdapter
                 'folder' => $folderType,
                 'error' => $e->getMessage(),
             ]);
+
             return collect();
         }
     }
@@ -156,16 +160,16 @@ class GmailAdapter extends BaseEmailAdapter
         $startHistoryId = $cursor['history_id'] ?? null;
         $format = $fetchBody ? 'full' : 'metadata';
 
-        if (!$startHistoryId) {
+        if (! $startHistoryId) {
             // No history ID yet, fallback to fetching latest from Inbox
             return $this->fetchLatestMessagesForAccount($account, 'inbox', 50, $fetchBody);
         }
 
         try {
-            $result = $this->apiService->listHistory($account, (string)$startHistoryId);
+            $result = $this->apiService->listHistory($account, (string) $startHistoryId);
             $newMessages = collect();
 
-            if (!empty($result['history'])) {
+            if (! empty($result['history'])) {
                 foreach ($result['history'] as $historyRecord) {
                     $messagesAdded = $historyRecord->getMessagesAdded();
                     if ($messagesAdded) {
@@ -184,7 +188,7 @@ class GmailAdapter extends BaseEmailAdapter
                 'account_id' => $account->id,
                 'error' => $e->getMessage(),
             ]);
-            
+
             // If history ID is expired or not found, fallback to fetching latest
             $errorMsg = strtolower($e->getMessage());
             if (str_contains($errorMsg, 'expired') || str_contains($errorMsg, 'not found') || str_contains($errorMsg, 'notfound')) {
@@ -192,9 +196,10 @@ class GmailAdapter extends BaseEmailAdapter
                     'account_id' => $account->id,
                     'history_id' => $startHistoryId,
                 ]);
+
                 return $this->fetchLatestMessagesForAccount($account, 'inbox', 50, $fetchBody);
             }
-            
+
             return collect();
         }
     }
@@ -205,14 +210,15 @@ class GmailAdapter extends BaseEmailAdapter
     public function subscribeToNotifications(EmailAccount $account): bool
     {
         $topicName = config('services.google.pubsub_topic');
-        if (!$topicName) {
+        if (! $topicName) {
             Log::warning('[GmailAdapter] Pub/Sub topic not configured');
+
             return false;
         }
 
         try {
             $result = $this->apiService->watch($account, $topicName);
-            
+
             // Store the initial historyId
             $cursor = $account->sync_cursor ?? [];
             $cursor['history_id'] = $result['historyId'];
@@ -222,8 +228,9 @@ class GmailAdapter extends BaseEmailAdapter
         } catch (\Throwable $e) {
             Log::error('[GmailAdapter] Failed to setup watch', [
                 'account_id' => $account->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }
@@ -243,20 +250,22 @@ class GmailAdapter extends BaseEmailAdapter
     {
         $payload = $message->getPayload();
         $headers = collect($payload->getHeaders() ?: []);
-        
-        $getHeader = function($name) use ($headers) {
-            $header = $headers->first(fn($h) => strtolower($h->getName()) === strtolower($name));
+
+        $getHeader = function ($name) use ($headers) {
+            $header = $headers->first(fn ($h) => strtolower($h->getName()) === strtolower($name));
             $value = $header ? $header->getValue() : null;
-            
+
             // Decode MIME encoded headers (e.g. =?UTF-8?Q?...?=)
             if ($value && str_contains($value, '=?')) {
                 try {
                     $decoded = iconv_mime_decode($value, ICONV_MIME_DECODE_CONTINUE_ON_ERROR, 'UTF-8');
+
                     return $decoded ?: $value;
                 } catch (\Throwable $e) {
                     return $value;
                 }
             }
+
             return $value;
         };
 
@@ -292,11 +301,11 @@ class GmailAdapter extends BaseEmailAdapter
             'preview' => $message->getSnippet() ?: app(EmailSanitizationService::class)->generatePreview($body['plain'] ?: $body['html']),
             'body_html' => $body['html'],
             'body_plain' => $body['plain'],
-            'headers' => $headers->mapWithKeys(fn($h) => [strtolower($h->getName()) => $h->getValue()])->toArray(),
+            'headers' => $headers->mapWithKeys(fn ($h) => [strtolower($h->getName()) => $h->getValue()])->toArray(),
             'history_id' => $message->getHistoryId(),
-            'is_read' => !in_array('UNREAD', $message->getLabelIds() ?? []),
+            'is_read' => ! in_array('UNREAD', $message->getLabelIds() ?? []),
             'is_starred' => in_array('STARRED', $message->getLabelIds() ?? []),
-            'has_attachments' => !empty($attachments) || ($fetchBody && $this->hasGmailAttachments($payload)),
+            'has_attachments' => ! empty($attachments) || ($fetchBody && $this->hasGmailAttachments($payload)),
             'attachments' => $attachments,
             'imap_uid' => null,
             'date' => $message->getInternalDate() ? date('Y-m-d H:i:s', $message->getInternalDate() / 1000) : now(),
@@ -308,12 +317,12 @@ class GmailAdapter extends BaseEmailAdapter
         $html = '';
         $plain = '';
 
-        $processPart = function($part) use (&$html, &$plain, &$processPart) {
+        $processPart = function ($part) use (&$html, &$plain, &$processPart) {
             $mimeType = $part->getMimeType();
             $body = $part->getBody();
             $data = $body->getData();
-            
-            if ($data !== null && !$part->getFilename()) {
+
+            if ($data !== null && ! $part->getFilename()) {
                 $decoded = $this->base64url_decode($data);
                 if ($mimeType === 'text/html') {
                     $html .= $decoded;
@@ -341,7 +350,7 @@ class GmailAdapter extends BaseEmailAdapter
     {
         $attachments = [];
 
-        $processPart = function($part) use (&$attachments, $bodyHtml, $skipAttachments, $messageId, $account, &$processPart) {
+        $processPart = function ($part) use (&$attachments, $bodyHtml, $skipAttachments, $messageId, $account, &$processPart) {
             $filename = $part->getFilename();
             $mimeType = $part->getMimeType();
             $body = $part->getBody();
@@ -350,14 +359,14 @@ class GmailAdapter extends BaseEmailAdapter
 
             // Extract Content-ID from headers
             $headers = collect($part->getHeaders() ?: []);
-            $cidHeader = $headers->first(fn($h) => strtolower($h->getName()) === 'content-id');
+            $cidHeader = $headers->first(fn ($h) => strtolower($h->getName()) === 'content-id');
             if ($cidHeader) {
                 $contentId = trim($cidHeader->getValue(), '<>');
             }
 
             if ($filename || $attachmentId) {
                 $isInline = false;
-                if ($contentId && $bodyHtml && str_contains($bodyHtml, 'cid:' . $contentId)) {
+                if ($contentId && $bodyHtml && str_contains($bodyHtml, 'cid:'.$contentId)) {
                     $isInline = true;
                 }
 
@@ -373,7 +382,7 @@ class GmailAdapter extends BaseEmailAdapter
                     'is_lazy' => $isInline ? false : $skipAttachments,
                 ];
 
-                if (!$attachmentData['is_lazy']) {
+                if (! $attachmentData['is_lazy']) {
                     if ($body->getData()) {
                         $attachmentData['content'] = $this->base64url_decode($body->getData());
                     } elseif ($attachmentId && $messageId && $account) {
@@ -417,42 +426,51 @@ class GmailAdapter extends BaseEmailAdapter
         if ($padding) {
             $base64 .= str_repeat('=', 4 - $padding);
         }
+
         return (string) base64_decode($base64);
     }
 
     protected function parseGmailRecipients($header): array
     {
-        if (!$header) return [];
-        
+        if (! $header) {
+            return [];
+        }
+
         $recipients = [];
         $parts = explode(',', $header);
-        
+
         foreach ($parts as $part) {
             $part = trim($part);
             if (preg_match('/^(.*?)\s*<(.*?)>$/', $part, $matches)) {
                 $recipients[] = [
                     'name' => trim($matches[1], '" '),
-                    'email' => $matches[2]
+                    'email' => $matches[2],
                 ];
             } else {
                 $recipients[] = ['name' => null, 'email' => $part];
             }
         }
-        
+
         return $recipients;
     }
 
     protected function hasGmailAttachments($payload): bool
     {
-        if ($payload->getFilename()) return true;
-        
+        if ($payload->getFilename()) {
+            return true;
+        }
+
         if ($payload->getParts()) {
             foreach ($payload->getParts() as $part) {
-                if ($part->getFilename()) return true;
-                if ($this->hasGmailAttachments($part)) return true;
+                if ($part->getFilename()) {
+                    return true;
+                }
+                if ($this->hasGmailAttachments($part)) {
+                    return true;
+                }
             }
         }
-        
+
         return false;
     }
 
@@ -484,7 +502,7 @@ class GmailAdapter extends BaseEmailAdapter
                 try {
                     $fullMsg = $this->apiService->getMessage($account, $msgSummary->getId(), $fetchBody ? 'full' : 'metadata');
                     $emailData = $this->parseGmailMessage($fullMsg, true, $account, $fetchBody);
-                    
+
                     // Store using sync service (provider agnostic)
                     // We explicitly disable broadcasting for backfill
                     app(EmailSyncService::class)->storeEmail($account, $emailData, $labelId, false);
@@ -500,7 +518,7 @@ class GmailAdapter extends BaseEmailAdapter
 
             // Reload cursor from model to include any history_id updates from storeEmail
             $cursor = $account->sync_cursor ?? [];
-            
+
             if (empty($cursor['labels'][$labelId])) {
                 $cursor['labels'][$labelId] = [
                     'total' => $result['resultSizeEstimate'] ?? 0,
@@ -508,11 +526,11 @@ class GmailAdapter extends BaseEmailAdapter
                     'priority' => 1,
                 ];
             }
-            
+
             $cursor['backfill_page_token'] = $result['nextPageToken'] ?? null;
             $cursor['labels'][$labelId]['total'] = max($cursor['labels'][$labelId]['total'], $result['resultSizeEstimate'] ?? 0);
             $cursor['labels'][$labelId]['synced'] += $fetched;
-            
+
             $account->sync_cursor = $cursor;
             $account->save();
 
@@ -522,12 +540,12 @@ class GmailAdapter extends BaseEmailAdapter
                 'fetched' => $fetched,
                 'total_synced' => $cursor['labels'][$labelId]['synced'],
                 'estimated_total' => $cursor['labels'][$labelId]['total'],
-                'has_more' => !empty($result['nextPageToken']),
+                'has_more' => ! empty($result['nextPageToken']),
             ]);
 
             return [
                 'fetched' => $fetched,
-                'has_more' => !empty($result['nextPageToken']),
+                'has_more' => ! empty($result['nextPageToken']),
                 'new_cursor' => $cursor['backfill_page_token'],
             ];
         } catch (\Throwable $e) {
@@ -535,6 +553,7 @@ class GmailAdapter extends BaseEmailAdapter
                 'account_id' => $account->id,
                 'error' => $e->getMessage(),
             ]);
+
             return ['fetched' => 0, 'has_more' => false];
         }
     }
@@ -562,6 +581,7 @@ class GmailAdapter extends BaseEmailAdapter
                 'account_id' => $account->id,
                 'error' => $e->getMessage(),
             ]);
+
             return collect();
         }
     }
@@ -573,8 +593,9 @@ class GmailAdapter extends BaseEmailAdapter
     {
         // Use Gmail API if provider_id (gmail_id) is present
         if ($email->provider_id) {
-             $fullMsg = $this->apiService->getMessage($email->emailAccount, $email->provider_id, 'full');
-             return $this->parseGmailMessage($fullMsg, true, $email->emailAccount, true);
+            $fullMsg = $this->apiService->getMessage($email->emailAccount, $email->provider_id, 'full');
+
+            return $this->parseGmailMessage($fullMsg, true, $email->emailAccount, true);
         }
 
         return parent::fetchFullMessage($email);
@@ -586,7 +607,7 @@ class GmailAdapter extends BaseEmailAdapter
     public function downloadAttachment(\App\Models\Email $email, int $placeholderIndex): \Spatie\MediaLibrary\MediaCollections\Models\Media
     {
         $placeholders = $email->attachment_placeholders ?? [];
-        if (!isset($placeholders[$placeholderIndex])) {
+        if (! isset($placeholders[$placeholderIndex])) {
             throw new \InvalidArgumentException('Attachment placeholder not found.');
         }
 
@@ -595,7 +616,7 @@ class GmailAdapter extends BaseEmailAdapter
         $attachmentId = $placeholder['attachment_id'] ?? null;
 
         // [Self-Healing] If attachment_id is missing, try to find it in the full message via API
-        if (empty($attachmentId) && !empty($email->provider_id)) {
+        if (empty($attachmentId) && ! empty($email->provider_id)) {
             try {
                 $fullMessage = $this->apiService->getMessage($account, $email->provider_id);
                 $foundAttachments = $this->extractGmailAttachments(
@@ -608,14 +629,14 @@ class GmailAdapter extends BaseEmailAdapter
 
                 foreach ($foundAttachments as $att) {
                     $matchByName = ($att['name'] === ($placeholder['name'] ?? null) && abs($att['size'] - ($placeholder['size'] ?? 0)) < 1024);
-                    $matchByCid = (!empty($att['content_id']) && $att['content_id'] === ($placeholder['content_id'] ?? null));
+                    $matchByCid = (! empty($att['content_id']) && $att['content_id'] === ($placeholder['content_id'] ?? null));
 
                     if ($matchByCid || $matchByName) {
                         // Found it! If it already has content (small attachment), use it directly
-                        if (!empty($att['content'])) {
+                        if (! empty($att['content'])) {
                             return $this->storeFetchedAttachment($email, $att, $placeholders, $placeholderIndex);
                         }
-                        
+
                         $attachmentId = $att['attachment_id'] ?? null;
                         break;
                     }
@@ -633,7 +654,7 @@ class GmailAdapter extends BaseEmailAdapter
             if ($email->imap_uid) {
                 return parent::downloadAttachment($email, $placeholderIndex);
             }
-            throw new \RuntimeException("Could not identify Gmail attachment ID for download.");
+            throw new \RuntimeException('Could not identify Gmail attachment ID for download.');
         }
 
         try {
@@ -645,7 +666,7 @@ class GmailAdapter extends BaseEmailAdapter
 
             $att = $placeholder;
             $att['content'] = $this->base64url_decode($attachmentData->getData());
-            
+
             return $this->storeFetchedAttachment($email, $att, $placeholders, $placeholderIndex);
         } catch (\Throwable $e) {
             Log::error('[GmailAdapter] API attachment download failed', [
@@ -653,7 +674,7 @@ class GmailAdapter extends BaseEmailAdapter
                 'attachment_id' => $attachmentId,
                 'error' => $e->getMessage(),
             ]);
-            
+
             // Fallback to IMAP if API fails and UID exists
             if ($email->imap_uid) {
                 return parent::downloadAttachment($email, $placeholderIndex);
@@ -673,7 +694,7 @@ class GmailAdapter extends BaseEmailAdapter
             ->usingName($att['name'] ?? 'Attachment')
             ->toMediaCollection('attachments');
 
-        if (!empty($att['content_id'])) {
+        if (! empty($att['content_id'])) {
             $media->setCustomProperty('content_id', $att['content_id']);
             $media->save();
         }
@@ -683,10 +704,10 @@ class GmailAdapter extends BaseEmailAdapter
         $email->update(['attachment_placeholders' => array_values($placeholders)]);
 
         // If it was an inline image, resolve it now
-        if (!empty($att['content_id'])) {
+        if (! empty($att['content_id'])) {
             $sanitizer = app(\App\Services\EmailSanitizationService::class);
             $email->update([
-                'body_html' => $sanitizer->resolveInlineImages($email)
+                'body_html' => $sanitizer->resolveInlineImages($email),
             ]);
         }
 
@@ -702,6 +723,7 @@ class GmailAdapter extends BaseEmailAdapter
         if ($email->provider_id) {
             // 'raw' format returns the full RFC822 message in 'raw' field (base64url encoded)
             $rawMsg = $this->apiService->getMessage($email->emailAccount, $email->provider_id, 'raw');
+
             return $this->base64url_decode($rawMsg->getRaw());
         }
 

@@ -312,7 +312,7 @@ class SettingsController extends Controller
         ]);
 
         $hash = config('app.demo_mode_secret_hash');
-        
+
         if (empty($hash)) {
             // Fallback just in case, or fail closed
             return response()->json(['message' => 'Demo mode configuration error.'], 500);

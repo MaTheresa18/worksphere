@@ -26,7 +26,7 @@ class EmailSyncIncremental extends Command
 
         foreach ($accounts as $account) {
             FetchLatestEmailsJob::dispatch($account->id);
-            $this->line("  → Queued: {$account->email} (forward: {$account->forward_uid_cursor}, backfill: " . ($account->backfill_complete ? 'complete' : $account->backfill_uid_cursor) . ")");
+            $this->line("  → Queued: {$account->email} (forward: {$account->forward_uid_cursor}, backfill: ".($account->backfill_complete ? 'complete' : $account->backfill_uid_cursor).')');
         }
 
         return self::SUCCESS;

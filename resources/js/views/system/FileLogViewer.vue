@@ -17,6 +17,9 @@ import {
     Check
 } from 'lucide-vue-next';
 import { debounce } from 'lodash';
+import { useDate } from '@/composables/useDate';
+
+const { formatDateTime } = useDate();
 
 // State
 const files = ref([]);
@@ -211,7 +214,7 @@ const copyToClipboard = async (text, label = 'Content') => {
 };
 
 const formatTime = (timestamp) => {
-    return timestamp; // Already formatted in controller? If not, new Date(timestamp)...
+    return formatDateTime(timestamp);
 };
 
 // Watchers

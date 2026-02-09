@@ -35,7 +35,7 @@ class TrackPageView
 
         // Only track HTML responses
         $contentType = $response->headers->get('Content-Type');
-        if (!$contentType || !str_contains($contentType, 'text/html')) {
+        if (! $contentType || ! str_contains($contentType, 'text/html')) {
             return $response;
         }
 

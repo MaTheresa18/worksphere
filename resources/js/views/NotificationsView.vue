@@ -1,5 +1,7 @@
 <script setup>
 import { onMounted, ref, computed } from 'vue';
+import { useDate } from '@/composables/useDate';
+const { formatDateTime, userTimezone } = useDate();
 import { Card, Button, Badge, Avatar } from '@/components/ui';
 import { Bell, Check, Trash2, Settings, Filter, UserPlus, X, Calendar, MessageSquare, Briefcase, FileText } from 'lucide-vue-next';
 import { useNotifications } from '@/composables/useNotifications.ts';
@@ -213,7 +215,7 @@ onMounted(() => {
                                         </div>
                                         
                                         <span class="text-xs text-[var(--text-muted)] whitespace-nowrap shrink-0">
-                                            {{ new Date(notification.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) }}
+                                            {{ formatDateTime(notification.created_at, 'h:mm a') }}
                                         </span>
                                     </div>
 

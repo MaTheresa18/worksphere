@@ -4,7 +4,9 @@ import { Badge, Card, Avatar } from "@/components/ui";
 import { Folder, Clock } from "lucide-vue-next";
 import { useRouter } from "vue-router";
 import axios from "axios";
-import { format } from "date-fns";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate: formatDateComposable } = useDate();
 
 const props = defineProps<{
     teamId: string;
@@ -28,7 +30,7 @@ const fetchProjects = async () => {
 
 const formatDate = (dateString?: string) => {
     if (!dateString) return "-";
-    return format(new Date(dateString), "MMM d, yyyy");
+    return formatDateComposable(dateString);
 };
 
 const getStatusColor = (status: any) => {

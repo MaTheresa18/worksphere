@@ -26,6 +26,9 @@ import {
 import axios from "axios";
 import { useAuthStore } from "@/stores/auth";
 import { toast } from "vue-sonner";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate: formatDateComposable } = useDate();
 
 const route = useRoute();
 const router = useRouter();
@@ -50,11 +53,7 @@ const formatCurrency = (amount: number, currency: string = "USD") => {
 
 const formatShortDate = (dateString: string) => {
     if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-    });
+    return formatDateComposable(dateString, "MMM d, yyyy");
 };
 
 const copyToClipboard = (text: string) => {

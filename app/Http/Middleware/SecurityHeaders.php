@@ -46,7 +46,7 @@ class SecurityHeaders
         $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
 
         // Content Security Policy (skip for Horizon and Pulse which use inline scripts/Livewire)
-        if (!$request->is('horizon*', 'pulse*')) {
+        if (! $request->is('horizon*', 'pulse*')) {
             $this->addCspHeader($response);
         }
 
@@ -84,7 +84,7 @@ class SecurityHeaders
         // Allow images from self, data URIs (base64), and S3/R2 (https)
         $imgSrc = "'self' data: https: blob: cid:";
         if (app()->isLocal()) {
-            $imgSrc .= " http:";
+            $imgSrc .= ' http:';
         }
 
         // Definitions

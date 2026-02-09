@@ -510,7 +510,7 @@
                                                         : 'text-(--text-muted)'
                                                 "
                                             >
-                                                {{ formatDate(email.date) }}
+                                                {{ formatDate(email.date, 'smart') }}
                                             </span>
                                             <!-- Hover Actions -->
                                             <div
@@ -724,7 +724,9 @@ import {
 } from "lucide-vue-next";
 import { useEmailStore } from "@/stores/emailStore";
 import { storeToRefs } from "pinia";
-import { isToday, format } from "date-fns";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate } = useDate();
 import {
     ref,
     computed,
@@ -863,12 +865,8 @@ function clearFilters() {
     store.filterDateTo = "";
 }
 
-function formatDate(dateString: string) {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return isToday(date) ? format(date, "h:mm a") : format(date, "MMM d");
-}
+// Local formatDate removed in favor of useDate composable with 'smart' formatting
+// In the template, we call formatDate(email.date, 'smart')
 
 function toggleSelection(id: string) {
     console.log("EmailList: toggleSelection checkbox clicked for", id);

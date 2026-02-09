@@ -14,7 +14,7 @@ class AnalyticsTracker
      */
     public function trackRequest(Request $request): void
     {
-        $agent = new Agent();
+        $agent = new Agent;
         $agent->setUserAgent($request->userAgent());
 
         if ($agent->isRobot()) {
@@ -42,7 +42,7 @@ class AnalyticsTracker
      */
     public function trackManual(Request $request, array $attributes): void
     {
-        $agent = new Agent();
+        $agent = new Agent;
         $agent->setUserAgent($request->userAgent());
 
         if ($agent->isRobot()) {
@@ -72,7 +72,7 @@ class AnalyticsTracker
     {
         $ip = $request->ip();
         $anonymize = config('analytics.anonymize_ips', false);
-        $storedIp = $anonymize ? hash('sha256', $ip . date('Ymd')) : $ip;
+        $storedIp = $anonymize ? hash('sha256', $ip.date('Ymd')) : $ip;
 
         return array_merge([
             'session_id' => Session::getId(),
@@ -96,6 +96,7 @@ class AnalyticsTracker
     protected function shouldIgnoreIp(string $ip): bool
     {
         $ignoredIps = config('analytics.ignore_ips', []);
+
         return in_array($ip, $ignoredIps);
     }
 
@@ -111,7 +112,7 @@ class AnalyticsTracker
             return true;
         }
 
-        if (!empty($ignoredRoles) && $user->hasAnyRole($ignoredRoles)) {
+        if (! empty($ignoredRoles) && $user->hasAnyRole($ignoredRoles)) {
             return true;
         }
 

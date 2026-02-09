@@ -26,10 +26,21 @@ class AuthController extends Controller
      */
     public function register(RegisterRequest $request): JsonResponse
     {
+        $timezone = $request->timezone;
+
+        if (! $timezone && $request->ip()) {
+            try {
+                $geo = geoip($request->ip());
+                $timezone = $geo->timezone;
+            } catch (\Exception $e) {
+                // Ignore geoip errors
+            }
+        }
+
         $userData = [
             'name' => $request->name,
             'email' => $request->email,
-            'password' => $request->password, // Password is hashed in model mutator or usually manually here? User::create likely doesn't hash automatically unless cast/mutator exists. Standard Laravel requires Hash::make.
+            'password' => $request->password,
             'status' => 'active',
             'is_password_set' => true,
             'password_last_updated_at' => now(),
@@ -42,6 +53,7 @@ class AuthController extends Controller
                     'email' => true,
                     'push' => true,
                 ],
+                'timezone' => $timezone ?? config('app.timezone'),
             ],
         ];
         // Hash password if not handled by model
@@ -195,11 +207,11 @@ class AuthController extends Controller
             $reason = 'Account disabled';
 
             if ($user->status === 'suspended' && $user->suspended_until?->isFuture()) {
-                $reason = 'Your account is temporarily suspended until ' . $user->suspended_until->format('M d, Y H:i') . '. Please contact support.';
+                $reason = 'Your account is temporarily suspended until '.$user->suspended_until->format('M d, Y H:i').'. Please contact support.';
             } elseif ($user->status_reason) {
                 $reason = $user->status_reason;
             } else {
-                $statusConfig = config('roles.statuses.' . $user->status, []);
+                $statusConfig = config('roles.statuses.'.$user->status, []);
                 $reason = $statusConfig['error_message'] ?? ($statusConfig['label'] ?? 'Account disabled');
             }
 
@@ -645,7 +657,7 @@ class AuthController extends Controller
             'token' => $tempToken,
         ];
     }
-    
+
     /**
      * Complete social registration after legal acceptance.
      */
@@ -658,7 +670,7 @@ class AuthController extends Controller
 
         $data = \Illuminate\Support\Facades\Cache::pull("social_completion_{$request->token}");
 
-        if (!$data) {
+        if (! $data) {
             return response()->json(['message' => 'Invalid or expired registration session.'], 400);
         }
 
@@ -674,6 +686,7 @@ class AuthController extends Controller
             'preferences' => [
                 'appearance' => ['mode' => 'system', 'color' => 'default'],
                 'notifications' => ['email' => true, 'push' => true],
+                'timezone' => $request->timezone ?? config('app.timezone'),
             ],
             'provider' => $data['provider'], // Legacy compat
             'provider_id' => $data['provider_id'], // Legacy compat

@@ -26,6 +26,9 @@ import {
     DollarSign,
 } from "lucide-vue-next";
 import ClientContactModal from "@/components/clients/ClientContactModal.vue";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate: formatDateComposable } = useDate();
 
 const route = useRoute();
 const router = useRouter();
@@ -125,11 +128,7 @@ const handleSaved = () => {
 
 const formatDate = (dateString) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-    });
+    return formatDateComposable(dateString, "MMM d, yyyy");
 };
 
 const formatCurrency = (amount, currency = "USD") => {

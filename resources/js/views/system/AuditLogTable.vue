@@ -1,5 +1,7 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue';
+import { useDate } from '@/composables/useDate';
+const { formatDateTime } = useDate();
 import { useRouter } from 'vue-router';
 import api from '@/lib/api';
 import { debounce } from 'lodash';
@@ -524,7 +526,7 @@ onMounted(() => {
                                     </span>
                                 </td>
                                 <td class="px-4 py-3 text-right text-xs text-[var(--text-secondary)] whitespace-nowrap">
-                                    {{ new Date(log.created_at).toLocaleString() }}
+                                    {{ formatDateTime(log.created_at) }}
                                 </td>
                                 <td class="px-4 py-3 text-right">
                                     <button

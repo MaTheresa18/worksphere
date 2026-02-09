@@ -51,14 +51,14 @@ class ChatStabilitySeeder extends Seeder
             for ($i = 0; $i < $count; $i++) {
                 $sender = $participants->random();
                 $currentTime->addMinutes(rand(1, $intervalMinutes * 2));
-                
+
                 if ($currentTime->isFuture()) {
                     $currentTime = now()->subMinutes($count - $i);
                 }
 
                 // Content Generation
                 $dice = rand(1, 100);
-                
+
                 if ($dice > 90) { // 10% Long messages
                     $content = $faker->paragraph(10)."\n\n".
                                'LONG_STRING_TEST_'.str_repeat('AaBbCcDdEeFfGgHh', 20).

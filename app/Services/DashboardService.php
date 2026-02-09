@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\InvoiceStatus;
 use App\Models\AuditLog;
 use App\Models\Invoice;
 use App\Models\Project;
@@ -9,7 +10,6 @@ use App\Models\Task;
 use App\Models\Team;
 use App\Models\Ticket;
 use App\Models\User;
-use App\Enums\InvoiceStatus;
 use Carbon\Carbon;
 
 class DashboardService
@@ -46,9 +46,9 @@ class DashboardService
     {
         $stats = [];
         $features = $this->getFeatureFlags($user, $team);
-        
+
         // Projects stat
-        if ($features['projects_enabled'] && !$project) {
+        if ($features['projects_enabled'] && ! $project) {
             $stats[] = $this->getProjectStats($user, $team);
         }
 
@@ -58,12 +58,12 @@ class DashboardService
         }
 
         // Tickets stat
-        if ($features['tickets_enabled'] && !$project) {
+        if ($features['tickets_enabled'] && ! $project) {
             $stats[] = $this->getTicketStats($user, $team);
         }
 
         // Team members stat
-        if ($team && !$project) {
+        if ($team && ! $project) {
             $stats[] = $this->getTeamMemberStats($team);
         }
 
@@ -275,17 +275,17 @@ class DashboardService
             ->limit($limit);
 
         if ($project) {
-            $query->where(function($q) use ($project) {
+            $query->where(function ($q) use ($project) {
                 // If the audit is for the project itself
-                $q->where(function($sq) use ($project) {
+                $q->where(function ($sq) use ($project) {
                     $sq->where('auditable_type', 'App\\Models\\Project')
-                       ->where('auditable_id', $project->id);
+                        ->where('auditable_id', $project->id);
                 })
                 // Or if it's for a task in this project
-                ->orWhere(function($sq) use ($project) {
-                    $sq->where('auditable_type', 'App\\Models\\Task')
-                       ->whereIn('auditable_id', fn($q) => $q->select('id')->from('tasks')->where('project_id', $project->id));
-                });
+                    ->orWhere(function ($sq) use ($project) {
+                        $sq->where('auditable_type', 'App\\Models\\Task')
+                            ->whereIn('auditable_id', fn ($q) => $q->select('id')->from('tasks')->where('project_id', $project->id));
+                    });
             });
         } elseif ($team) {
             $query->where('team_id', $team->id);
@@ -379,7 +379,7 @@ class DashboardService
 
         foreach ($dates as $date) {
             $carbon = Carbon::parse($date);
-            
+
             if ($daysCount <= 7) {
                 $labels[] = $carbon->format('D');
             } elseif ($daysCount <= 31) {
@@ -399,12 +399,12 @@ class DashboardService
 
             // Count tickets created on this day
             $ticketQuery = Ticket::whereDate('created_at', $date);
-            
+
             if ($team) {
                 $ticketQuery->where('team_id', $team->id);
             }
 
-            if ($project || !$user->can('tickets.view')) {
+            if ($project || ! $user->can('tickets.view')) {
                 // Tickets only shown for support capable users if not project-scoped
                 $ticketsData[] = 0;
             } else {
@@ -421,7 +421,7 @@ class DashboardService
             ],
         ];
 
-        if (!$project && $user->can('tickets.view')) {
+        if (! $project && $user->can('tickets.view')) {
             $datasets[] = [
                 'label' => 'Tickets',
                 'data' => $ticketsData,
@@ -501,7 +501,7 @@ class DashboardService
      */
     protected function getTicketTrendsChartData(User $user, ?Team $team, string $period): array
     {
-        if (!$user->can('tickets.view')) {
+        if (! $user->can('tickets.view')) {
             return [
                 'labels' => [],
                 'datasets' => [],
@@ -529,7 +529,7 @@ class DashboardService
             if ($useWeeks) {
                 $startDate = now()->subWeeks($i)->startOfWeek();
                 $endDate = now()->subWeeks($i)->endOfWeek();
-                $labels[] = 'W' . (now()->subWeeks($i)->weekOfYear);
+                $labels[] = 'W'.(now()->subWeeks($i)->weekOfYear);
             } else {
                 $startDate = now()->subDays($i)->startOfDay();
                 $endDate = now()->subDays($i)->endOfDay();
@@ -539,7 +539,7 @@ class DashboardService
             $openedQuery = Ticket::whereBetween('created_at', [$startDate, $endDate]);
             $closedQuery = Ticket::where('status', 'closed')
                 ->whereBetween('updated_at', [$startDate, $endDate]);
-            
+
             if ($team) {
                 $openedQuery->where('team_id', $team->id);
                 $closedQuery->where('team_id', $team->id);
@@ -573,7 +573,7 @@ class DashboardService
      */
     protected function getFinancialStats(User $user, ?Team $team = null, ?Project $project = null): ?array
     {
-        if (!$user->can('invoices.view') || !$team) {
+        if (! $user->can('invoices.view') || ! $team) {
             return null;
         }
 
@@ -591,7 +591,7 @@ class DashboardService
             ->whereIn('status', [
                 InvoiceStatus::Sent,
                 InvoiceStatus::Viewed,
-                InvoiceStatus::Overdue
+                InvoiceStatus::Overdue,
             ])
             ->sum('total');
 
@@ -607,7 +607,7 @@ class DashboardService
                 'value' => number_format($pending, 2),
                 'raw' => $pending,
                 'currency' => $team->currency ?? 'USD',
-            ]
+            ],
         ];
     }
 
@@ -618,7 +618,7 @@ class DashboardService
      */
     protected function getDetailedTaskStats(User $user, ?Team $team = null, ?Project $project = null): ?array
     {
-        if (!$user->can('tasks.view') && !$user->can('tasks.view_assigned')) {
+        if (! $user->can('tasks.view') && ! $user->can('tasks.view_assigned')) {
             return null;
         }
 
@@ -630,7 +630,7 @@ class DashboardService
             $query->whereHas('project', fn ($q) => $q->where('team_id', $team->id));
         }
 
-        if (!$user->can('tasks.view')) {
+        if (! $user->can('tasks.view')) {
             $query->where('assigned_to', $user->id);
         }
 

@@ -389,7 +389,7 @@ class EmailAccount extends Model
      */
     public function canRunBackfillCrawler(): bool
     {
-        return $this->is_active && $this->is_verified && !$this->backfill_complete;
+        return $this->is_active && $this->is_verified && ! $this->backfill_complete;
     }
 
     /**
@@ -419,6 +419,7 @@ class EmailAccount extends Model
         // Estimate: backfill progress relative to forward cursor
         if ($forward > 0 && $backfill > 0) {
             $filled = $forward - $backfill;
+
             return min(100, (int) (($filled / $forward) * 100));
         }
 

@@ -3,6 +3,8 @@ import { ref, onMounted, computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "@/composables/useToast";
 import api from "@/lib/api";
+import { useDate } from "@/composables/useDate";
+const { formatDate, formatDateTime } = useDate();
 import NoteEditor from "@/components/notes/NoteEditor.vue";
 import { Button, Card, Badge, Input } from "@/components/ui";
 import {
@@ -173,12 +175,7 @@ async function deleteNote() {
                     class="text-xs text-[var(--text-tertiary)] mr-2 hidden md:block"
                 >
                     Last saved
-                    {{
-                        new Date(note.updated_at).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                        })
-                    }}
+                    {{ formatDateTime(note.updated_at, 'h:mm a') }}
                 </span>
 
                 <div
@@ -331,13 +328,7 @@ async function deleteNote() {
                                     :size="14"
                                     class="text-[var(--text-secondary)]"
                                 />
-                                {{
-                                    new Date(
-                                        note.created_at,
-                                    ).toLocaleDateString(undefined, {
-                                        dateStyle: "medium",
-                                    })
-                                }}
+                                {{ formatDate(note.created_at) }}
                             </div>
                         </div>
 
@@ -352,15 +343,7 @@ async function deleteNote() {
                                     :size="14"
                                     class="text-[var(--text-secondary)]"
                                 />
-                                {{
-                                    new Date(note.updated_at).toLocaleString(
-                                        undefined,
-                                        {
-                                            dateStyle: "medium",
-                                            timeStyle: "short",
-                                        },
-                                    )
-                                }}
+                                {{ formatDateTime(note.updated_at) }}
                             </div>
                         </div>
 

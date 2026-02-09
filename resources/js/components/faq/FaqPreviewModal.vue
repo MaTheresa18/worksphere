@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { defineProps, defineEmits } from 'vue';
 import { X, Calendar, User } from 'lucide-vue-next';
-import { format } from 'date-fns';
+import { useDate } from '@/composables/useDate';
+
+const { formatDate } = useDate();
 
 const props = defineProps<{
     show: boolean;
@@ -61,7 +63,7 @@ const emit = defineEmits(['close']);
                             </div>
                             <div class="flex items-center gap-2">
                                 <Calendar class="h-4 w-4" />
-                                <span>Updated {{ article.updated_at ? format(new Date(article.updated_at), 'MMM d, yyyy') : 'Just now' }}</span>
+                                <span>Updated {{ article.updated_at ? formatDate(article.updated_at, 'MMM d, yyyy') : 'Just now' }}</span>
                             </div>
                         </div>
                     </div>

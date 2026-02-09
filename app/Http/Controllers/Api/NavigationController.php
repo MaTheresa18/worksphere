@@ -128,18 +128,18 @@ class NavigationController extends Controller
                     foreach ($userTeams as $team) {
                         $canViewAll = $this->permissionService->hasTeamPermission($user, $team, 'projects.view');
                         $canViewAssigned = $this->permissionService->hasTeamPermission($user, $team, 'projects.view_assigned');
-                        
-                        if (!$canViewAll && !$canViewAssigned) {
+
+                        if (! $canViewAll && ! $canViewAssigned) {
                             continue;
                         }
 
-                        if (!$hasCreatePermission && $this->permissionService->hasTeamPermission($user, $team, 'projects.create')) {
+                        if (! $hasCreatePermission && $this->permissionService->hasTeamPermission($user, $team, 'projects.create')) {
                             $hasCreatePermission = true;
                         }
 
                         $query = \App\Models\Project::where('team_id', $team->id)->active();
 
-                        if (!$canViewAll && $canViewAssigned) {
+                        if (! $canViewAll && $canViewAssigned) {
                             $query->whereHas('members', function ($q) use ($user) {
                                 $q->where('user_id', $user->id);
                             });
@@ -151,14 +151,14 @@ class NavigationController extends Controller
 
                         if ($projects->isNotEmpty()) {
                             $projectChildren[] = [
-                                'id' => 'team-projects-header-' . $team->public_id,
+                                'id' => 'team-projects-header-'.$team->public_id,
                                 'label' => $team->name,
                                 'type' => 'header',
                             ];
 
                             foreach ($projects as $project) {
                                 $projectChildren[] = [
-                                    'id' => 'project-' . $project->public_id,
+                                    'id' => 'project-'.$project->public_id,
                                     'label' => $project->name,
                                     'route' => "/projects/{$project->public_id}?team_id={$team->public_id}",
                                 ];
@@ -197,7 +197,7 @@ class NavigationController extends Controller
                     ];
 
                     foreach ($userTeams as $team) {
-                        if (!$this->permissionService->hasTeamPermission($user, $team, 'clients.view')) {
+                        if (! $this->permissionService->hasTeamPermission($user, $team, 'clients.view')) {
                             continue;
                         }
 
@@ -209,14 +209,14 @@ class NavigationController extends Controller
 
                         if ($clients->isNotEmpty()) {
                             $clientChildren[] = [
-                                'id' => 'team-clients-header-' . $team->public_id,
+                                'id' => 'team-clients-header-'.$team->public_id,
                                 'label' => $team->name,
                                 'type' => 'header',
                             ];
 
                             foreach ($clients as $client) {
                                 $clientChildren[] = [
-                                    'id' => 'client-' . $client->public_id,
+                                    'id' => 'client-'.$client->public_id,
                                     'label' => $client->name,
                                     'route' => "/clients/{$client->public_id}?team_id={$team->public_id}",
                                 ];
@@ -255,8 +255,8 @@ class NavigationController extends Controller
 
         return collect($items)
             ->filter(function ($item) use ($user, $hasTeams) {
-                // We used to hide items here if $hasTeams was false, 
-                // but now we show them so the user sees a valid sidebar 
+                // We used to hide items here if $hasTeams was false,
+                // but now we show them so the user sees a valid sidebar
                 // and gets "empty state" CTAs in the main views.
 
                 // Always show items without permission requirements
@@ -276,6 +276,7 @@ class NavigationController extends Controller
                         if ($this->permissionService->hasPermission($user, $permission)) {
                             return true;
                         }
+
                         // Continue to next permission if this one failed
                         continue;
                     }

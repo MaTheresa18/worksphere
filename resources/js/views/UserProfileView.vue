@@ -459,6 +459,8 @@ import {
     Loader2,
     Users,
 } from "lucide-vue-next";
+import { useDate } from "@/composables/useDate";
+const { formatDate, formatDateTime } = useDate();
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 import { useChatStore } from "@/stores/chat";
@@ -473,13 +475,7 @@ const chatStore = useChatStore();
 const miniChatStore = useMiniChatStore();
 const toast = useToast();
 
-const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-    });
-};
+
 
 interface UserProfile {
     public_id: string;

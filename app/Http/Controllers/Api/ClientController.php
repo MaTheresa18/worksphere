@@ -27,7 +27,7 @@ class ClientController extends Controller
 
         // Resolve Team Scoping
         $requestedTeamId = $request->header('X-Team-ID') ?? $request->input('team_id');
-        
+
         if ($requestedTeamId) {
             $team = \App\Models\Team::where('public_id', $requestedTeamId)->first();
             if ($team) {
@@ -67,12 +67,12 @@ class ClientController extends Controller
         $user = $request->user();
         $isAdmin = $user->hasRole('administrator');
         $query = Client::query()->with(['team']);
-        
+
         // Check for route parameter 'team' from teams/{team}/clients
         $routeTeam = $request->route('team');
-        
+
         // If route parameter is present (string public_id due to implicit binding typically being disabled or custom in API routes for this structure, or model if bound)
-        // Given existing code uses 'public_id', lets check if we got a string or model. 
+        // Given existing code uses 'public_id', lets check if we got a string or model.
         // Typically in this codebase, we see manual resolution often.
         // Let's rely on standard resolution logic combined with the input check.
 
@@ -85,13 +85,13 @@ class ClientController extends Controller
 
         // 1. Resolve Scope
         if ($isAdmin) {
-             // Admin Scoping
+            // Admin Scoping
             if ($requestedTeamId) {
                 // Check if it's already a model (Route Model Binding) or string
                 if ($requestedTeamId instanceof \App\Models\Team) {
                     $targetTeam = $requestedTeamId;
                 } else {
-                     $targetTeam = \App\Models\Team::where('public_id', $requestedTeamId)->first();
+                    $targetTeam = \App\Models\Team::where('public_id', $requestedTeamId)->first();
                 }
 
                 if ($targetTeam) {
@@ -118,7 +118,7 @@ class ClientController extends Controller
                 // Allow if user is member (basic) or specific permission? existing code used 'clients.view'
                 // But index might be called by dropdowns, so 'clients.view' is reasonable.
                 if (! $permissionService->hasTeamPermission($user, $targetTeam, 'clients.view')) {
-                     abort(403, 'Insufficient permissions for this team.');
+                    abort(403, 'Insufficient permissions for this team.');
                 }
 
                 $query->where('team_id', $targetTeam->id);
@@ -139,11 +139,11 @@ class ClientController extends Controller
 
         // 2. Apply Filters
         $query->when($request->search, function ($query, $search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
-                });
-            })
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        })
             ->when($request->status, function ($query, $status) {
                 $query->where('status', $status);
             })
@@ -238,12 +238,12 @@ class ClientController extends Controller
 
         // Append counts and sums
         $client->loadCount(['projects', 'invoices', 'contacts']);
-        
-        $client->loadSum(['invoices as total_paid' => function($query) {
+
+        $client->loadSum(['invoices as total_paid' => function ($query) {
             $query->paid();
         }], 'total');
 
-        $client->loadSum(['invoices as total_pending' => function($query) {
+        $client->loadSum(['invoices as total_pending' => function ($query) {
             $query->pending();
         }], 'total');
 
@@ -267,10 +267,10 @@ class ClientController extends Controller
             $team = $client->team;
 
             if (! $team) {
-                 abort(404, 'Client team not found.');
+                abort(404, 'Client team not found.');
             }
 
-             $permissionService = app(\App\Services\PermissionService::class);
+            $permissionService = app(\App\Services\PermissionService::class);
             if (! $permissionService->hasTeamPermission($user, $team, 'clients.update')) {
                 abort(403, 'Insufficient permissions to update this client.');
             }
@@ -320,7 +320,7 @@ class ClientController extends Controller
             if (! $team) {
                 abort(404, 'Client team not found.');
             }
-             $permissionService = app(\App\Services\PermissionService::class);
+            $permissionService = app(\App\Services\PermissionService::class);
             if (! $permissionService->hasTeamPermission($user, $team, 'clients.delete')) {
                 abort(403, 'Insufficient permissions to delete this client.');
             }

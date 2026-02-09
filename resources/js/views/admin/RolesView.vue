@@ -1,5 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
+import { useDate } from '@/composables/useDate';
+const { formatDate } = useDate();
 import { useRoute, useRouter } from 'vue-router';
 
 import { Shield, Users, Clock, CheckCircle, XCircle, AlertTriangle, ChevronRight, MoreVertical, Plus, Search, Filter, Copy, Smartphone } from 'lucide-vue-next';
@@ -133,16 +135,7 @@ function handleRoleSaved() {
 }
 
 // Format helpers
-function formatDate(dateString) {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-}
+// Local formatDate removed in favor of useDate composable
 
 function getRequestTypeColor(type) {
     const colors = {

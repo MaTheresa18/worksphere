@@ -1431,8 +1431,8 @@ class MaintenanceService
             $chunkSize = 4096;
             $fileSize = File::size($logFile);
             $handle = fopen($logFile, 'rb');
-            
-            if (!$handle) {
+
+            if (! $handle) {
                 return [
                     'content' => [],
                     'file_size' => $this->formatBytes($fileSize),
@@ -1447,10 +1447,10 @@ class MaintenanceService
             while ($position > 0 && count($linesFound) < $lines) {
                 $readSize = min($chunkSize, $position);
                 $position -= $readSize;
-                
+
                 fseek($handle, $position);
                 $chunk = fread($handle, $readSize);
-                
+
                 // Process chunk in reverse
                 for ($i = strlen($chunk) - 1; $i >= 0; $i--) {
                     $char = $chunk[$i];
@@ -1460,7 +1460,7 @@ class MaintenanceService
                             array_unshift($linesFound, strrev($currentLine));
                             $currentLine = '';
                         }
-                        
+
                         if (count($linesFound) >= $lines) {
                             break;
                         }
@@ -1469,10 +1469,10 @@ class MaintenanceService
                     }
                 }
             }
-            
+
             // Add any remaining line segment
             if ($currentLine !== '') {
-                 array_unshift($linesFound, strrev($currentLine));
+                array_unshift($linesFound, strrev($currentLine));
             }
 
             fclose($handle);

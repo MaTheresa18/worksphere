@@ -43,7 +43,7 @@ class EmailSanitizationService
 
             // Step 3: Preserve CID images and STYLE tags before purification (HTMLPurifier strips them)
             $placeholders = [];
-            
+
             // 3a: Preserve CID images
             $html = preg_replace_callback(
                 '/<img\s+[^>]*src\s*=\s*(["\'])cid:([^"\']+)\1[^>]*>/i',
@@ -51,6 +51,7 @@ class EmailSanitizationService
                     $index = count($placeholders);
                     $placeholder = 'IMG_CID_PLACEHOLDER_'.$index;
                     $placeholders[$placeholder] = $matches[0];
+
                     return $placeholder;
                 },
                 $html
@@ -63,6 +64,7 @@ class EmailSanitizationService
                     $index = count($placeholders);
                     $placeholder = 'STYLE_TAG_PLACEHOLDER_'.$index;
                     $placeholders[$placeholder] = $matches[0];
+
                     // Wrap in div and add a marker so we can move it to the body easily
                     return "[[[MOVE_TO_BODY:<div>{$placeholder}</div>]]]";
                 },
@@ -72,16 +74,17 @@ class EmailSanitizationService
             // Step 3c: Move all placeholders to the body (Purifier strips anything in <head>)
             if (str_contains($html, '[[[MOVE_TO_BODY:')) {
                 $foundPlaceholders = [];
-                $html = preg_replace_callback('/\[\[\[MOVE_TO_BODY:(.*?)\]\]\]/is', function($m) use (&$foundPlaceholders) {
+                $html = preg_replace_callback('/\[\[\[MOVE_TO_BODY:(.*?)\]\]\]/is', function ($m) use (&$foundPlaceholders) {
                     $foundPlaceholders[] = $m[1];
+
                     return '';
                 }, $html);
 
                 $allPlaceholders = implode("\n", $foundPlaceholders);
                 if (str_contains($html, '<body')) {
-                    $html = preg_replace('/<body([^>]*)>/i', '<body$1>' . $allPlaceholders, $html);
+                    $html = preg_replace('/<body([^>]*)>/i', '<body$1>'.$allPlaceholders, $html);
                 } else {
-                    $html = $allPlaceholders . $html;
+                    $html = $allPlaceholders.$html;
                 }
             }
 
@@ -90,11 +93,11 @@ class EmailSanitizationService
             $html = $this->purify($html, $source);
 
             // Step 5: Restore preserved elements
-            if (!empty($placeholders)) {
+            if (! empty($placeholders)) {
                 $html = str_replace(array_keys($placeholders), array_values($placeholders), $html);
             }
 
-            if (empty($html) && !empty($htmlBeforePurify)) {
+            if (empty($html) && ! empty($htmlBeforePurify)) {
                 $html = $htmlBeforePurify;
             }
 
@@ -104,7 +107,7 @@ class EmailSanitizationService
             return $html;
         } catch (\Throwable $e) {
             $errMessage = $e->getMessage();
-            
+
             // Check if this is a CSS property warning (non-critical)
             if (str_contains($errMessage, 'Style attribute') && str_contains($errMessage, 'is not supported')) {
                 Log::warning('[EmailSanitizationService] Unsupported CSS property found, using fallback', [
@@ -117,12 +120,12 @@ class EmailSanitizationService
                     'error' => $errMessage,
                 ]);
             }
-            
+
             // If we have the pre-processed version, use that
-            $html = (isset($htmlBeforePurify) && !empty($htmlBeforePurify)) ? $htmlBeforePurify : $html;
+            $html = (isset($htmlBeforePurify) && ! empty($htmlBeforePurify)) ? $htmlBeforePurify : $html;
 
             // ALWAYS restore placeholders if they exist
-            if (!empty($placeholders)) {
+            if (! empty($placeholders)) {
                 foreach ($placeholders as $placeholder => $original) {
                     // Try to restore with and without the div wrapper we added in Step 3
                     $html = str_replace("<div>{$placeholder}</div>", $original, $html);
@@ -191,9 +194,9 @@ class EmailSanitizationService
         $html = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $html);
 
         // Remove style tags ONLY if they contain obviously dangerous content
-        $html = preg_replace_callback('/<style\b[^>]*>(.*?)<\/style>/is', function($matches) {
+        $html = preg_replace_callback('/<style\b[^>]*>(.*?)<\/style>/is', function ($matches) {
             $content = $matches[1];
-            
+
             // Highly suspicious keywords that shouldn't be in CSS
             $dangerous = ['javascript:', 'expression(', 'vbscript:', 'url("data:', 'url(\'data:'];
             foreach ($dangerous as $bad) {
@@ -201,7 +204,7 @@ class EmailSanitizationService
                     return ''; // Strip dangerous style block
                 }
             }
-            
+
             return $matches[0]; // Keep safe style block
         }, $html);
 
@@ -219,17 +222,17 @@ class EmailSanitizationService
     {
         // Use manual instantiation to allow custom CSS properties that are otherwise stripped
         $settings = config('purifier.settings.email') ?? config('purifier.settings.default') ?? [];
-        
+
         $config = \HTMLPurifier_Config::createDefault();
         $config->loadArray($settings);
-        
+
         // Suppress warnings when accessing definitions to inject custom properties
         $old = error_reporting(E_ALL & ~E_USER_WARNING);
-        
+
         // 1. Inject Custom CSS Properties
         if ($def = $config->getCSSDefinition()) {
             $def->info['visibility'] = new \HTMLPurifier_AttrDef_Enum(['visible', 'hidden', 'collapse']);
-            $def->info['opacity'] = new \HTMLPurifier_AttrDef_CSS_AlphaValue();
+            $def->info['opacity'] = new \HTMLPurifier_AttrDef_CSS_AlphaValue;
             $def->info['overflow'] = new \HTMLPurifier_AttrDef_Enum(['visible', 'hidden', 'scroll', 'auto']);
             $def->info['display'] = new \HTMLPurifier_AttrDef_Enum(['block', 'inline', 'inline-block', 'none']);
             $def->info['mso-hide'] = new \HTMLPurifier_AttrDef_Enum(['all']);
@@ -238,18 +241,18 @@ class EmailSanitizationService
         // 2. Inject Custom HTML Definitions (HTML5, etc.) from config
         $customDef = config('purifier.custom_definition');
         if ($customDef && ($def = $config->getHTMLDefinition(true))) {
-             if (isset($customDef['elements'])) {
-                 foreach ($customDef['elements'] as $element) {
-                     call_user_func_array([$def, 'addElement'], $element);
-                 }
-             }
-             if (isset($customDef['attributes'])) {
-                 foreach ($customDef['attributes'] as $attribute) {
-                     call_user_func_array([$def, 'addAttribute'], $attribute);
-                 }
-             }
+            if (isset($customDef['elements'])) {
+                foreach ($customDef['elements'] as $element) {
+                    call_user_func_array([$def, 'addElement'], $element);
+                }
+            }
+            if (isset($customDef['attributes'])) {
+                foreach ($customDef['attributes'] as $attribute) {
+                    call_user_func_array([$def, 'addAttribute'], $attribute);
+                }
+            }
         }
-        
+
         error_reporting($old);
 
         Log::debug('[EmailSanitizationService] Purifying HTML with custom CSS rules', [
@@ -257,6 +260,7 @@ class EmailSanitizationService
         ]);
 
         $purifier = new \HTMLPurifier($config);
+
         return $purifier->purify($html);
     }
 
@@ -294,7 +298,6 @@ class EmailSanitizationService
     /**
      * Resolve CID (Content-ID) references in email HTML to actual Media URLs.
      *
-     * @param  \App\Models\Email  $email
      * @return string Updated HTML with resolved image sources
      */
     public function resolveInlineImages(\App\Models\Email $email): string
@@ -306,10 +309,10 @@ class EmailSanitizationService
             }
 
             // Refresh media relation if not loaded
-            if (!$email->relationLoaded('media')) {
+            if (! $email->relationLoaded('media')) {
                 $email->load('media');
             }
-            
+
             $attachments = $email->getMedia('attachments');
             if ($attachments->isEmpty()) {
                 return (string) $html;
@@ -317,7 +320,7 @@ class EmailSanitizationService
 
             foreach ($attachments as $media) {
                 $contentId = $media->getCustomProperty('content_id');
-                if (!$contentId) {
+                if (! $contentId) {
                     continue;
                 }
 
@@ -328,21 +331,22 @@ class EmailSanitizationService
                 } catch (\Exception $e) {
                     Log::warning('[EmailSanitizationService] Failed to generate route for media', [
                         'media_id' => $media->id,
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
                     ]);
+
                     continue;
                 }
-                
+
                 $variants = [
                     $cleanCid,
-                    '<' . $cleanCid . '>',
-                    '&lt;' . $cleanCid . '&gt;',
+                    '<'.$cleanCid.'>',
+                    '&lt;'.$cleanCid.'&gt;',
                 ];
 
                 foreach ($variants as $variant) {
                     $v = preg_quote($variant, '/');
                     $ev = preg_quote(urlencode($variant), '/');
-                    
+
                     // Matches src="cid:...", src='cid:...', src=\"cid:...\", src=\'cid:...\', or src=cid:...
                     $pattern = '/src\s*=\s*[\\\\\'"]*cid:('.$v.'|'.$ev.')[\\\\\'"]*/i';
                     $html = preg_replace($pattern, 'src="'.$url.'"', $html);
@@ -353,15 +357,16 @@ class EmailSanitizationService
             // but only for things that look like they are in a src attribute
             if (str_contains($html, 'cid:')) {
                 $baseUrl = route('api.media.show', ['media' => 'placeholder']);
-                $html = preg_replace('/(src\s*=\s*[\\\\\'"]*)cid:([^\\\\\'"\s>]+)/i', '$1' . $baseUrl . '/$2', $html);
+                $html = preg_replace('/(src\s*=\s*[\\\\\'"]*)cid:([^\\\\\'"\s>]+)/i', '$1'.$baseUrl.'/$2', $html);
             }
 
             return $html;
         } catch (\Throwable $e) {
             Log::error('[EmailSanitizationService] resolveInlineImages failed', [
                 'email_id' => $email->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+
             return $email->body_html ?? '';
         }
     }
@@ -393,7 +398,7 @@ class EmailSanitizationService
 
         // 5. Limit length
         if (mb_strlen($text) > $limit) {
-            $text = mb_substr($text, 0, $limit) . '...';
+            $text = mb_substr($text, 0, $limit).'...';
         }
 
         return $text;

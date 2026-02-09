@@ -18,7 +18,7 @@ class AttachmentController extends Controller
         $media = Media::findOrFail($mediaId);
 
         // Check if file exists (not just a placeholder)
-        if (!file_exists($media->getPath())) {
+        if (! file_exists($media->getPath())) {
             return response()->json([
                 'message' => 'Attachment not yet downloaded from cloud. Please use the on-demand download feature.',
                 'is_placeholder' => true,
@@ -47,7 +47,7 @@ class AttachmentController extends Controller
         }
 
         // Check for placeholder attachments (files not yet downloaded)
-        $placeholders = $mediaItems->filter(fn ($media) => !file_exists($media->getPath()));
+        $placeholders = $mediaItems->filter(fn ($media) => ! file_exists($media->getPath()));
         if ($placeholders->isNotEmpty()) {
             return response()->json([
                 'message' => 'Some attachments are not yet downloaded from cloud. Please download them individually first.',

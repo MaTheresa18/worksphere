@@ -22,14 +22,16 @@ class ResetEmailSyncCommand extends Command
         }
 
         $accountId = $this->option('account');
-        if (!$accountId) {
+        if (! $accountId) {
             $this->error('Please specify --account=ID or --all');
+
             return self::FAILURE;
         }
 
         $account = EmailAccount::find($accountId);
-        if (!$account) {
+        if (! $account) {
             $this->error("Email account #{$accountId} not found.");
+
             return self::FAILURE;
         }
 
@@ -39,7 +41,7 @@ class ResetEmailSyncCommand extends Command
     protected function resetAccount(EmailAccount $account): int
     {
         $keepAccount = $this->option('keep-account');
-        
+
         $this->info("Resetting email sync for: {$account->email}");
         $this->newLine();
 
@@ -55,15 +57,16 @@ class ResetEmailSyncCommand extends Command
             ]
         );
 
-        if (!$this->option('force') && !$this->option('no-interaction') && !$this->confirm('Are you sure you want to reset this account?')) {
+        if (! $this->option('force') && ! $this->option('no-interaction') && ! $this->confirm('Are you sure you want to reset this account?')) {
             $this->info('Operation cancelled.');
+
             return self::SUCCESS;
         }
 
         // Delete emails
         $emailCount = $account->emails()->count();
         $this->info("Deleting {$emailCount} emails...");
-        
+
         // Delete in chunks to avoid memory issues
         $account->emails()->chunkById(100, function ($emails) {
             foreach ($emails as $email) {
@@ -101,16 +104,18 @@ class ResetEmailSyncCommand extends Command
     protected function resetAllAccounts(): int
     {
         $accounts = EmailAccount::all();
-        
+
         if ($accounts->isEmpty()) {
             $this->info('No email accounts found.');
+
             return self::SUCCESS;
         }
 
         $this->warn("This will reset {$accounts->count()} email account(s).");
-        
-        if (!$this->option('force') && !$this->option('no-interaction') && !$this->confirm('Are you sure you want to proceed?')) {
+
+        if (! $this->option('force') && ! $this->option('no-interaction') && ! $this->confirm('Are you sure you want to proceed?')) {
             $this->info('Operation cancelled.');
+
             return self::SUCCESS;
         }
 
@@ -120,6 +125,7 @@ class ResetEmailSyncCommand extends Command
         }
 
         $this->info('All accounts have been reset.');
+
         return self::SUCCESS;
     }
 }

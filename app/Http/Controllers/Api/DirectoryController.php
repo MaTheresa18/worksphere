@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\DirectoryUserResource;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class DirectoryController extends Controller
 {
@@ -32,7 +31,7 @@ class DirectoryController extends Controller
             })
             ->where(function ($q) use ($query) {
                 $q->where('name', 'like', "%{$query}%")
-                  ->orWhere('email', 'like', "%{$query}%");
+                    ->orWhere('email', 'like', "%{$query}%");
             })
             // Exclude current user from results (optional, but usually desired for "sharing with others")
             ->where('id', '!=', $user->id)

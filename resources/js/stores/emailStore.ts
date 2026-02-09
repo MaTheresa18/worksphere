@@ -840,8 +840,6 @@ export const useEmailStore = defineStore("email", () => {
         deleteFolder,
         addLabel,
         deleteLabel,
-        addLabel,
-        deleteLabel,
         sendEmail,
         toggleImportant,
         setSelectedAccount,

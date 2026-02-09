@@ -103,13 +103,13 @@ const formatCurrency = (amount: number, currency: string = "USD") => {
     }).format(amount);
 };
 
+import { useDate } from "@/composables/useDate";
+
+const { formatDate: formatDateComposable } = useDate();
+
 const formatDate = (dateString: string) => {
     if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-    });
+    return formatDateComposable(dateString, "MMM d, yyyy");
 };
 
 const getStatusVariant = (status: string) => {

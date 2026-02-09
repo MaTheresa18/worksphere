@@ -15,12 +15,12 @@ return new class extends Migration
             // Forward crawler cursor - tracks newest synced UID
             $table->unsignedBigInteger('forward_uid_cursor')->nullable()->after('sync_cursor');
             $table->timestamp('last_forward_sync_at')->nullable()->after('forward_uid_cursor');
-            
+
             // Backfill crawler cursor - tracks oldest synced UID
             $table->unsignedBigInteger('backfill_uid_cursor')->nullable()->after('last_forward_sync_at');
             $table->boolean('backfill_complete')->default(false)->after('backfill_uid_cursor');
             $table->timestamp('last_backfill_at')->nullable()->after('backfill_complete');
-            
+
             // Sync started timestamp (to detect "new" emails after this point)
             $table->timestamp('sync_started_at')->nullable()->after('last_backfill_at');
         });

@@ -3,7 +3,9 @@ import { ref, computed, onMounted, watch } from "vue";
 import FullCalendar from "@fullcalendar/vue3";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import { format } from "date-fns";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate, formatDateTime } = useDate();
 import { ChevronLeft, ChevronRight } from "lucide-vue-next";
 import api from "@/lib/api";
 import { useRouter } from "vue-router";
@@ -78,8 +80,8 @@ async function fetchEvents(start, end) {
     try {
         const response = await api.get("/api/calendar/events", {
             params: {
-                start: format(start, "yyyy-MM-dd HH:mm:ss"),
-                end: format(end, "yyyy-MM-dd HH:mm:ss"),
+                start: formatDateTime(start, "yyyy-MM-dd HH:mm:ss"),
+                end: formatDateTime(end, "yyyy-MM-dd HH:mm:ss"),
             },
         });
         events.value = response.data.data.map((event) => ({
@@ -99,8 +101,8 @@ async function fetchHolidays(start, end) {
         const response = await api.get("/api/holidays", {
             params: {
                 country: props.countryCode,
-                start: format(start, "yyyy-MM-dd"),
-                end: format(end, "yyyy-MM-dd"),
+                start: formatDate(start, "yyyy-MM-dd"),
+                end: formatDate(end, "yyyy-MM-dd"),
             },
         });
         holidays.value = response.data.map((h) => ({
@@ -113,7 +115,7 @@ async function fetchHolidays(start, end) {
 }
 
 function handleDatesSet(dateInfo) {
-    currentTitle.value = format(dateInfo.view.currentStart, "MMMM yyyy");
+    currentTitle.value = formatDate(dateInfo.view.currentStart, "MMMM yyyy");
     fetchEvents(dateInfo.start, dateInfo.end);
     fetchHolidays(dateInfo.start, dateInfo.end);
 }

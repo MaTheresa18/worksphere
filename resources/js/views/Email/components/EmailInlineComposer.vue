@@ -668,7 +668,9 @@ import {
     AlertTriangleIcon,
     AlarmClockIcon,
 } from "lucide-vue-next";
-import { format } from "date-fns";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate } = useDate();
 import { watch } from "vue";
 import type { Email } from "@/types/models/email";
 import { useEmailStore } from "@/stores/emailStore";
@@ -1237,9 +1239,7 @@ function applyTemplate(templateId: string) {
     }
 }
 
-function formatDate(dateStr: string) {
-    return format(new Date(dateStr), "MMM d, yyyy, h:mm a");
-}
+// Local formatDate removed in favor of useDate composable
 
 const isSending = ref(false);
 
@@ -1442,7 +1442,7 @@ function setLink() {
 
 // --- Draft Logic ---
 function formatTime(date: Date) {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return formatDate(date, "h:mm a");
 }
 
 const saveDraft = async (silent = false) => {

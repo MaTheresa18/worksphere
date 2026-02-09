@@ -4,7 +4,9 @@ import axios from 'axios';
 import { Loader2, LayoutList, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import Badge from '@/components/ui/Badge.vue';
 import Card from '@/components/ui/Card.vue';
-import { format } from 'date-fns';
+import { useDate } from '@/composables/useDate';
+
+const { formatDate } = useDate();
 
 interface Props {
     title: string;
@@ -201,7 +203,7 @@ const getPriorityVariant = (priority: any) => {
                                 </h4>
                             </div>
                             <div class="flex-shrink-0 text-right">
-                                <div class="text-xs text-[var(--text-secondary)] mb-1">{{ format(new Date(ticket.created_at), 'MMM d') }}</div>
+                                <div class="text-xs text-[var(--text-secondary)] mb-1">{{ formatDate(ticket.created_at, 'MMM d') }}</div>
                                 <img
                                     v-if="ticket.assignee"
                                     :src="ticket.assignee.avatar_thumb_url || ticket.assignee.avatar_url"
@@ -240,7 +242,7 @@ const getPriorityVariant = (priority: any) => {
                             {{ ticket.title }}
                         </h4>
                         <div class="mt-auto pt-2 flex items-center justify-between text-xs text-[var(--text-secondary)] border-t border-[var(--border-muted)]">
-                            <span>{{ format(new Date(ticket.created_at), 'MMM d') }}</span>
+                            <span>{{ formatDate(ticket.created_at, 'MMM d') }}</span>
                              <img
                                 v-if="ticket.assignee"
                                 :src="ticket.assignee.avatar_thumb_url || ticket.assignee.avatar_url"

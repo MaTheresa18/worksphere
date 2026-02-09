@@ -34,10 +34,13 @@ class ProjectMemberResource extends JsonResource
             'is_qa_eligible' => $this->when($this->relationLoaded('teams'), function () {
                 // Get the team role from the loaded teams relation (should be only one if filtered correctly in controller)
                 $team = $this->teams->first();
-                if (! $team || ! $team->pivot) return false;
-                
+                if (! $team || ! $team->pivot) {
+                    return false;
+                }
+
                 $role = $team->pivot->role;
                 $rolePermissions = config("roles.team_role_permissions.{$role}", []);
+
                 return in_array('tasks.qa_review', $rolePermissions);
             }, false),
         ];

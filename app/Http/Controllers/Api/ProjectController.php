@@ -224,8 +224,6 @@ class ProjectController extends Controller
      * Authorize access to global project endpoints for non-admins based on team permissions.
      *
      * @param  \App\Models\User  $user
-     * @param  \App\Models\Project  $project
-     * @return void
      *
      * @throws \Symfony\Component\HttpKernel\Exception\HttpException
      */
@@ -246,19 +244,18 @@ class ProjectController extends Controller
             'team_id' => $team->id,
             'hasView' => $hasView,
             'hasViewAssigned' => $hasViewAssigned,
-            'isMember' => $project->hasMember($user)
+            'isMember' => $project->hasMember($user),
         ]);
 
-        if (!$hasView && !$hasViewAssigned) {
+        if (! $hasView && ! $hasViewAssigned) {
             abort(403, 'Unauthorized access to project resources.');
         }
 
         // For view_assigned, ensure user is a project member
-        if (!$hasView && $hasViewAssigned && !$project->hasMember($user)) {
+        if (! $hasView && $hasViewAssigned && ! $project->hasMember($user)) {
             abort(403, 'You do not have permission to view this specific project.');
         }
     }
-
 
     /**
      * Build the base project query with filters.
@@ -300,11 +297,11 @@ class ProjectController extends Controller
             })
             ->when($request->sort_by, function ($query, $sortBy) use ($request) {
                 $direction = $request->input('sort_direction', 'asc');
-                
+
                 // Allow sorting by team name if needed, though simpler to stick to project fields
                 if ($sortBy === 'team.name') {
-                     // Complex join sort, skip for now unless requested
-                     $query->orderBy('created_at', 'desc');
+                    // Complex join sort, skip for now unless requested
+                    $query->orderBy('created_at', 'desc');
                 } else {
                     $query->orderBy($sortBy, $direction);
                 }
@@ -691,7 +688,7 @@ class ProjectController extends Controller
         $hasViewAssigned = $this->permissionService->hasTeamPermission($user, $team, 'projects.view_assigned');
 
         if (! $hasView && ! $hasViewAssigned) {
-             abort(403, 'You do not have permission to view project members.');
+            abort(403, 'You do not have permission to view project members.');
         }
 
         $this->ensureProjectBelongsToTeam($team, $project);
@@ -701,14 +698,14 @@ class ProjectController extends Controller
                 abort(403, 'You do not have permission to view members of this project.');
             }
         }
-        
+
         // Members are accessed via relationship defined in Project model (belongsToMany User)
         // We can reuse UserResource or creating a simple customized response if needed.
         // For now, let's use a standard User resource or just simple collection.
         // The frontend expects: label, value, avatar, subtitle (role).
-        
-        // Let's return JSON directly to match what frontend likely wants, 
-        // OR return a ResourceCollection. 
+
+        // Let's return JSON directly to match what frontend likely wants,
+        // OR return a ResourceCollection.
         // The current QuickAssignModal expects `data` array.
 
         $members = $project->members()
@@ -719,12 +716,12 @@ class ProjectController extends Controller
             }])
             ->orderBy('name')
             ->get();
-            
-        // Minimal transformation for UI optimization if desired, 
-        // but creating a resource class is cleaner. 
+
+        // Minimal transformation for UI optimization if desired,
+        // but creating a resource class is cleaner.
         // Let's check what `TeamController::members` returns.
         // It likely returns UserResource.
-        
+
         // Using ProjectMemberResource to include pivot data
         return \App\Http\Resources\ProjectMemberResource::collection($members);
     }
@@ -738,11 +735,11 @@ class ProjectController extends Controller
 
         // Check permissions
         if ($user->id !== $project->team->owner_id && ! $project->hasMember($user)) {
-             // Allow if admin or specific permission?
-             // mimicking access control from members()
-             if (! $user->hasRole('administrator')) {
-                 abort(403, 'You do not have permission to view members of this project.');
-             }
+            // Allow if admin or specific permission?
+            // mimicking access control from members()
+            if (! $user->hasRole('administrator')) {
+                abort(403, 'You do not have permission to view members of this project.');
+            }
         }
 
         $members = $project->members()
@@ -767,7 +764,7 @@ class ProjectController extends Controller
         $hasViewAssigned = $this->permissionService->hasTeamPermission($user, $team, 'projects.view_assigned');
 
         if (! $hasView && ! $hasViewAssigned) {
-             abort(403, 'You do not have permission to perform this action.');
+            abort(403, 'You do not have permission to perform this action.');
         }
 
         $this->ensureProjectBelongsToTeam($team, $project);
@@ -902,7 +899,7 @@ class ProjectController extends Controller
         $hasViewAssigned = $this->permissionService->hasTeamPermission($user, $team, 'projects.view_assigned');
 
         if (! $hasView && ! $hasViewAssigned) {
-             abort(403, 'You do not have permission to perform this action.');
+            abort(403, 'You do not have permission to perform this action.');
         }
 
         $this->ensureProjectBelongsToTeam($team, $project);
@@ -912,7 +909,6 @@ class ProjectController extends Controller
                 abort(403, 'You do not have permission to view this project.');
             }
         }
-
 
         $events = [];
 

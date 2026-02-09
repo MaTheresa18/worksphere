@@ -18,10 +18,10 @@ class AuditLog extends Model
     protected static function booted(): void
     {
         static::created(function (AuditLog $log) {
-            if ($log->category === AuditCategory::Security || 
+            if ($log->category === AuditCategory::Security ||
                 $log->action === AuditAction::LoginFailed ||
                 $log->action === AuditAction::RateLimitExceeded) {
-                
+
                 try {
                     \App\Services\SecurityDashboardService::recordSuspiciousActivity($log);
                 } catch (\Throwable $e) {
@@ -136,7 +136,7 @@ class AuditLog extends Model
     {
         $userName = $this->user_name ?? 'System';
 
-        return "{$userName} " . $this->description_body;
+        return "{$userName} ".$this->description_body;
     }
 
     /**
@@ -172,9 +172,9 @@ class AuditLog extends Model
                 if ($key === 'status') {
                     $from = $oldValue ? ucwords(str_replace('_', ' ', is_string($oldValue) ? $oldValue : '')) : null;
                     $to = ucwords(str_replace('_', ' ', is_string($value) ? $value : ''));
-                    $changes[] = "status from " . ($from ?: 'Open') . " to " . $to;
+                    $changes[] = 'status from '.($from ?: 'Open').' to '.$to;
                 } elseif ($key === 'priority') {
-                    $changes[] = "priority to " . (is_string($value) ? ucwords($value) : $value);
+                    $changes[] = 'priority to '.(is_string($value) ? ucwords($value) : $value);
                 } elseif ($key === 'assigned_to') {
                     $name = $this->metadata['assignee_name'] ?? 'someone';
                     $changes[] = "assignee to {$name}";
@@ -188,11 +188,11 @@ class AuditLog extends Model
             }
 
             if (! empty($changes)) {
-                return "Updated " . implode(', ', $changes);
+                return 'Updated '.implode(', ', $changes);
             }
         }
 
-        return $this->action->label() . " {$modelName}";
+        return $this->action->label()." {$modelName}";
     }
 
     /**

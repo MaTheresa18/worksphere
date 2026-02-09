@@ -8,10 +8,6 @@ class ChannelAuthLogger
 {
     /**
      * Wrap a channel authentication callback with logging.
-     *
-     * @param string $channelName
-     * @param callable $callback
-     * @return callable
      */
     public static function wrap(string $channelName, callable $callback): callable
     {

@@ -26,7 +26,9 @@ import {
     Building2,
     ListChecks,
 } from "lucide-vue-next";
-import { isPast, parseISO } from "date-fns";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate: formatDateComposible, isPast, parseISO } = useDate();
 
 interface Task {
     public_id: string;
@@ -181,13 +183,9 @@ const getPriorityIcon = (priority: string | number) => {
     return ArrowDown;
 };
 
-const formatDate = (dateString?: string) => {
+const formatShortDate = (dateString?: string) => {
     if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-    });
+    return formatDateComposible(dateString);
 };
 
 const isOverdue = (dateString?: string, status?: any) => {
@@ -562,7 +560,7 @@ const isOverdue = (dateString?: string, status?: any) => {
                                 }"
                             >
                                 <Calendar class="w-4 h-4 opacity-70" />
-                                {{ formatDate(task.due_date) }}
+                                {{ formatShortDate(task.due_date) }}
                             </div>
                         </td>
 

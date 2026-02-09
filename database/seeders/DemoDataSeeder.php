@@ -2,17 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\AuditLog;
-use App\Models\Client;
-use App\Models\Invoice;
-use App\Models\InvoiceItem;
-use App\Models\Project;
-use App\Models\Task;
-use App\Models\TaskStatusHistory;
-use App\Models\Team;
-use App\Models\TeamRole;
-use App\Models\Ticket;
-use App\Models\User;
 use App\Enums\AuditAction;
 use App\Enums\AuditCategory;
 use App\Enums\AuditSeverity;
@@ -23,19 +12,31 @@ use App\Enums\TaskStatus;
 use App\Enums\TicketPriority;
 use App\Enums\TicketStatus;
 use App\Enums\TicketType;
+use App\Models\AuditLog;
+use App\Models\Client;
+use App\Models\Invoice;
+use App\Models\InvoiceItem;
+use App\Models\Project;
+use App\Models\Task;
+use App\Models\TaskStatusHistory;
+use App\Models\Team;
+use App\Models\Ticket;
+use App\Models\User;
+use Faker\Factory as Faker;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Faker\Factory as Faker;
 
 class DemoDataSeeder extends Seeder
 {
     protected $faker;
+
     protected $adminRole;
+
     protected $itRole;
+
     protected $userRole;
 
     /**
@@ -44,7 +45,7 @@ class DemoDataSeeder extends Seeder
     public function run(): void
     {
         $this->faker = Faker::create();
-        
+
         $this->command->info('Starting Workspace Demo Data Seeding...');
 
         // 1. Create Users
@@ -122,7 +123,7 @@ class DemoDataSeeder extends Seeder
             'Blue Horizon Customer Success', 'Vanguard Product Team', 'Legacy Ops Maintenance',
             'Nova Growth Marketing', 'Titan Analytics', 'Phoenix Recovery Unit',
             'Apollo Creative Studio', 'Eagle Eye Quality Assurance', 'Hermes Logistics Tech',
-            'Aura UX Design', 'Zenith Cloud Services', 'Pulse Realtime Systems'
+            'Aura UX Design', 'Zenith Cloud Services', 'Pulse Realtime Systems',
         ];
 
         $this->command->info('Seeding teams and assigning roles...');
@@ -152,9 +153,13 @@ class DemoDataSeeder extends Seeder
 
                 foreach ($teamMembers as $index => $member) {
                     $roleSlug = 'operator';
-                    if ($index === 0) $roleSlug = 'team_lead';
-                    elseif ($index === 1) $roleSlug = 'subject_matter_expert';
-                    elseif ($index === 2) $roleSlug = 'quality_assessor';
+                    if ($index === 0) {
+                        $roleSlug = 'team_lead';
+                    } elseif ($index === 1) {
+                        $roleSlug = 'subject_matter_expert';
+                    } elseif ($index === 2) {
+                        $roleSlug = 'quality_assessor';
+                    }
 
                     $team->addMember($member, $roleSlug);
                 }
@@ -171,7 +176,7 @@ class DemoDataSeeder extends Seeder
             'Veridian Dynamics', 'Aperture Science', 'Black Mesa', 'Abstergo', 'Anster',
             'Wonka Industries', 'Gringotts', 'Daily Planet', 'Vandelay Industries',
             'Dunder Mifflin', 'Saber', 'Pritchett\'s Closets', 'Acme Corp', 'Soylent Corp',
-            'MomCorp', 'Zuckerberg Space', 'Nakatomi Plaza', 'Sherwin-Williams (Fake)'
+            'MomCorp', 'Zuckerberg Space', 'Nakatomi Plaza', 'Sherwin-Williams (Fake)',
         ];
 
         $this->command->info('Seeding 30+ clients, projects, and 100+ invoices...');
@@ -182,7 +187,7 @@ class DemoDataSeeder extends Seeder
             $client = Client::updateOrCreate(
                 ['name' => $clientName],
                 [
-                    'email' => strtolower(str_replace([' ', '\''], '', $clientName)) . '@example.com',
+                    'email' => strtolower(str_replace([' ', '\''], '', $clientName)).'@example.com',
                     'contact_person' => $this->faker->name,
                     'phone' => $this->faker->phoneNumber,
                     'address' => $this->faker->address,
@@ -195,7 +200,7 @@ class DemoDataSeeder extends Seeder
             $projectCount = rand(1, 3);
             for ($i = 0; $i < $projectCount; $i++) {
                 $team = $teams->random();
-                
+
                 // Assign the first team found to the client
                 if ($i === 0) {
                     $client->update(['team_id' => $team->id]);
@@ -222,13 +227,15 @@ class DemoDataSeeder extends Seeder
                 if ($teamMembers->isNotEmpty()) {
                     $projectMemberCount = rand(min(3, $teamMembers->count()), min(8, $teamMembers->count()));
                     $projectMembers = $teamMembers->random($projectMemberCount);
-                    
+
                     foreach ($projectMembers as $index => $member) {
                         $role = 'member';
-                        if ($index === 0) $role = 'manager';
-                        
+                        if ($index === 0) {
+                            $role = 'manager';
+                        }
+
                         // Use the relation to attach
-                        if (!$project->members()->where('user_id', $member->id)->exists()) {
+                        if (! $project->members()->where('user_id', $member->id)->exists()) {
                             $project->members()->attach($member->id, [
                                 'role' => $role,
                                 'joined_at' => now()->subMonths(rand(1, 11)),
@@ -247,14 +254,16 @@ class DemoDataSeeder extends Seeder
     {
         // Use project members instead of team members for closer context
         $members = $project->members;
-        if ($project->tasks()->count() >= 10) return;
+        if ($project->tasks()->count() >= 10) {
+            return;
+        }
 
         $taskCount = rand(10, 20);
 
         for ($i = 0; $i < $taskCount; $i++) {
             $assignee = $members->isEmpty() ? null : $members->random();
             $status = $this->faker->randomElement(TaskStatus::cases());
-            
+
             $task = Task::create([
                 'project_id' => $project->id,
                 'title' => $this->faker->sentence(4),
@@ -282,18 +291,20 @@ class DemoDataSeeder extends Seeder
 
     protected function seedInvoices(Project $project, Client $client): void
     {
-        if ($project->invoices()->count() > 0) return;
+        if ($project->invoices()->count() > 0) {
+            return;
+        }
 
         $invoiceCount = rand(1, 3);
         for ($i = 0; $i < $invoiceCount; $i++) {
             $status = $this->faker->randomElement([InvoiceStatus::Paid, InvoiceStatus::Sent, InvoiceStatus::Overdue, InvoiceStatus::Draft]);
             $issueDate = now()->subMonths(rand(1, 11));
-            
+
             $invoice = Invoice::create([
                 'team_id' => $project->team_id,
                 'client_id' => $client->id,
                 'project_id' => $project->id,
-                'invoice_number' => 'INV-' . date('Ymd') . '-' . Str::upper(Str::random(6)),
+                'invoice_number' => 'INV-'.date('Ymd').'-'.Str::upper(Str::random(6)),
                 'status' => $status,
                 'issue_date' => $issueDate,
                 'due_date' => $issueDate->copy()->addDays(30),
@@ -333,7 +344,9 @@ class DemoDataSeeder extends Seeder
 
     protected function seedTickets(): void
     {
-        if (Ticket::count() >= 100) return;
+        if (Ticket::count() >= 100) {
+            return;
+        }
 
         $this->command->info('Seeding support tickets...');
         $users = User::all();

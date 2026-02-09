@@ -61,7 +61,7 @@ class ChatMediaService
             // Check individual file size
             if ($file->getSize() > self::MAX_FILE_SIZE_BYTES) {
                 throw new \InvalidArgumentException(
-                    "File " . htmlspecialchars($file->getClientOriginalName()) . " exceeds maximum size of 5MB."
+                    'File '.htmlspecialchars($file->getClientOriginalName()).' exceeds maximum size of 5MB.'
                 );
             }
 
@@ -71,7 +71,7 @@ class ChatMediaService
 
             if (! in_array($extension, $allowedTypes, true)) {
                 throw new \InvalidArgumentException(
-                    "File type ." . htmlspecialchars($extension) . " is not allowed."
+                    'File type .'.htmlspecialchars($extension).' is not allowed.'
                 );
             }
 
@@ -79,7 +79,7 @@ class ChatMediaService
             $mimeType = $file->getMimeType();
             if (! $this->isAllowedMimeType($mimeType)) {
                 throw new \InvalidArgumentException(
-                    "File MIME type " . htmlspecialchars($mimeType) . " is not allowed."
+                    'File MIME type '.htmlspecialchars($mimeType).' is not allowed.'
                 );
             }
 

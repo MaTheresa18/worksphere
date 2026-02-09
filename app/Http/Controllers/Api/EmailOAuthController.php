@@ -61,7 +61,7 @@ class EmailOAuthController extends Controller
             $requestState = $request->input('state');
 
             if (! $sessionState || $sessionState !== $requestState) {
-                return $isPopup 
+                return $isPopup
                     ? $this->returnPopupError('Invalid state')
                     : redirect($frontendUrl.'/email/settings?error=invalid_state');
             }
@@ -166,7 +166,7 @@ class EmailOAuthController extends Controller
             ]);
 
             return $isPopup
-                ? $this->returnPopupError('Connection failed: ' . $e->getMessage())
+                ? $this->returnPopupError('Connection failed: '.$e->getMessage())
                 : redirect($frontendUrl.'/email/settings?error='.urlencode('Connection failed. Please try again.'));
         }
     }

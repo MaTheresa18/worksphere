@@ -13,6 +13,8 @@ import {
 } from "lucide-vue-next";
 import axios from "axios";
 import { useRouter } from "vue-router";
+import { useDate } from "@/composables/useDate";
+const { formatDate: formatDateComposible } = useDate();
 
 const router = useRouter();
 
@@ -36,13 +38,9 @@ const formatCurrency = (amount: number) => {
     }).format(amount);
 };
 
-const formatDate = (dateString: string) => {
+const formatShortDate = (dateString: string) => {
     if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-    });
+    return formatDateComposible(dateString);
 };
 
 const getStatusColor = (status: string) => {
@@ -396,7 +394,7 @@ onMounted(() => {
                                         >
                                             <Clock class="w-3 h-3" />
                                             Due
-                                            {{ formatDate(invoice.due_date) }}
+                                            {{ formatShortDate(invoice.due_date) }}
                                         </span>
                                     </div>
                                 </div>

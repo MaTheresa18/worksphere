@@ -174,9 +174,9 @@ class PermissionService
      */
     public function getTeamPermissions(User $user, Team $team): Collection
     {
-                // Optimization: If user is owner, return all TEAM permissions (wildcard for team scope only)
+        // Optimization: If user is owner, return all TEAM permissions (wildcard for team scope only)
         if ($team->owner_id === $user->id) {
-             return $this->getAllTeamPermissionNames();
+            return $this->getAllTeamPermissionNames();
         }
 
         $cacheKey = "team_permissions:{$user->id}:{$team->id}:all";
@@ -200,7 +200,7 @@ class PermissionService
                     'user_id' => $user->id,
                     'team_id' => $team->id,
                     'team_role' => $teamRole?->value,
-                    'permissions_count' => $teamPermissions->merge($rolePermissions)->unique()->count()
+                    'permissions_count' => $teamPermissions->merge($rolePermissions)->unique()->count(),
                 ]);
 
                 return $teamPermissions->merge($rolePermissions)->unique()->values();

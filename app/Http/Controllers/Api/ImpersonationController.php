@@ -24,19 +24,20 @@ class ImpersonationController extends Controller
 
         // Confirm password for security
         if (! \Illuminate\Support\Facades\Hash::check($request->input('password'), $request->user()->password)) {
-             throw ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'password' => ['Incorrect password. Re-authentication required for this action.'],
             ]);
         }
 
         try {
             $this->impersonationService->impersonate($request->user(), $user);
+
             return response()->json([
                 'message' => "You are now impersonating {$user->name}.",
                 'redirect' => '/dashboard',
             ]);
         } catch (\Exception $e) {
-             return response()->json(['message' => $e->getMessage()], 403);
+            return response()->json(['message' => $e->getMessage()], 403);
         }
     }
 
@@ -47,6 +48,7 @@ class ImpersonationController extends Controller
     {
         try {
             $this->impersonationService->stopImpersonating();
+
             return response()->json([
                 'message' => 'Impersonation ended. Welcome back.',
                 'redirect' => '/admin/users',
@@ -55,7 +57,7 @@ class ImpersonationController extends Controller
             return response()->json(['message' => $e->getMessage()], 400);
         }
     }
-    
+
     /**
      * Check impersonation status.
      */

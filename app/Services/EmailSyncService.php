@@ -3,14 +3,14 @@
 namespace App\Services;
 
 use App\Contracts\EmailSyncServiceContract;
+use App\Enums\AuditAction;
+use App\Enums\AuditCategory;
 use App\Enums\EmailFolderType;
 use App\Enums\EmailSyncStatus;
 use App\Events\Email\EmailReceived;
 use App\Events\Email\SyncStatusChanged;
 use App\Jobs\BackfillEmailsJob;
 use App\Jobs\FetchLatestEmailsJob;
-use App\Jobs\FetchNewEmailsJob;
-use App\Jobs\SeedEmailAccountJob;
 use App\Jobs\SyncEmailFolderJob;
 use App\Models\Email;
 use App\Models\EmailAccount;
@@ -19,8 +19,6 @@ use App\Services\EmailAdapters\AdapterFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use App\Enums\AuditAction;
-use App\Enums\AuditCategory;
 
 class EmailSyncService implements EmailSyncServiceContract
 {
@@ -78,15 +76,15 @@ class EmailSyncService implements EmailSyncServiceContract
         // Find next folder that needs syncing
         $nextFolder = null;
         $disabledFolders = $account->disabled_folders ?? [];
-        
+
         foreach (EmailFolderType::syncOrder() as $folderType) {
             $folderKey = $folderType->value;
-            
+
             // Skip if folder is disabled by user
             if (in_array($folderKey, $disabledFolders)) {
                 continue;
             }
-            
+
             $folderData = $folders[$folderKey] ?? [];
 
             // Skip if completed
@@ -116,7 +114,7 @@ class EmailSyncService implements EmailSyncServiceContract
     public function fetchNewEmails(EmailAccount $account): int
     {
         // Forward crawler can run during any active sync status
-        if (!$account->canRunForwardCrawler()) {
+        if (! $account->canRunForwardCrawler()) {
             return 0;
         }
 
@@ -258,7 +256,7 @@ class EmailSyncService implements EmailSyncServiceContract
             ->where('backfill_complete', false)
             ->where(function ($q) {
                 $q->where('last_backfill_at', '<', now()->subMinutes(15))
-                  ->orWhereNull('last_backfill_at');
+                    ->orWhereNull('last_backfill_at');
             })
             // Only rescue if we actually started syncing recently (don't rescue ancient abandoned accounts? or do?)
             // Let's rely on is_active = true
@@ -268,14 +266,14 @@ class EmailSyncService implements EmailSyncServiceContract
             /** @var \App\Models\EmailAccount $account */
             // Check if job is actually queued? It's hard to check Redis from here reliably without overhead.
             // We just assume if DB timestamp is old, the job is dead or stuck.
-            
+
             Log::warning('[EmailSyncWatchdog] Rescuing stuck backfill', [
                 'account_id' => $account->id,
                 'last_backfill_at' => $account->last_backfill_at,
             ]);
 
             BackfillEmailsJob::dispatch($account->id);
-            
+
             // Update timestamp to prevent immediate re-dispatch next minute if queue is slow
             $account->update(['last_backfill_at' => now()]);
         }
@@ -288,7 +286,7 @@ class EmailSyncService implements EmailSyncServiceContract
             ->verified()
             ->where(function ($q) {
                 $q->where('last_forward_sync_at', '<', now()->subMinutes(10))
-                  ->orWhereNull('last_forward_sync_at');
+                    ->orWhereNull('last_forward_sync_at');
             })
             ->get();
 
@@ -300,7 +298,7 @@ class EmailSyncService implements EmailSyncServiceContract
             ]);
 
             FetchLatestEmailsJob::dispatch($account->id);
-            
+
             $account->update(['last_forward_sync_at' => now()]);
         }
     }
@@ -312,7 +310,7 @@ class EmailSyncService implements EmailSyncServiceContract
     {
         $adapter = AdapterFactory::make($account);
         $messages = $adapter->fetchIncrementalUpdates($account, false);
-        
+
         $count = 0;
         foreach ($messages as $emailData) {
             $this->storeEmail($account, $emailData, $emailData['folder'] ?? EmailFolderType::Inbox->value, true);
@@ -438,7 +436,7 @@ class EmailSyncService implements EmailSyncServiceContract
      * Uses updateOrCreate to prevent duplicates and DB::transaction for atomicity.
      * Retries up to 3 times on deadlock.
      *
-     * @param bool $broadcast Whether to broadcast realtime event (false for backfill)
+     * @param  bool  $broadcast  Whether to broadcast realtime event (false for backfill)
      */
     public function storeEmail(
         EmailAccount $account,
@@ -464,10 +462,10 @@ class EmailSyncService implements EmailSyncServiceContract
                     $matchAttributes = [
                         'email_account_id' => $account->id,
                     ];
-                    
-                    if (!empty($emailData['message_id'])) {
+
+                    if (! empty($emailData['message_id'])) {
                         $matchAttributes['message_id'] = $emailData['message_id'];
-                    } elseif (!empty($emailData['gmail_id'])) {
+                    } elseif (! empty($emailData['gmail_id'])) {
                         $matchAttributes['provider_id'] = $emailData['gmail_id'];
                     } else {
                         // Fallback compatible with old logic
@@ -479,20 +477,20 @@ class EmailSyncService implements EmailSyncServiceContract
                     // If the email already exists and is in a "special" folder (inbox, sent, etc),
                     // don't let it be overwritten by 'archive'.
                     $existingEmail = null;
-                    if (!empty($emailData['message_id'])) {
+                    if (! empty($emailData['message_id'])) {
                         $existingEmail = Email::where('email_account_id', $account->id)
                             ->where('message_id', $emailData['message_id'])
                             ->first();
                     }
 
-                    if (!$existingEmail && !empty($emailData['imap_uid'])) {
+                    if (! $existingEmail && ! empty($emailData['imap_uid'])) {
                         $existingEmail = Email::where('email_account_id', $account->id)
                             ->where('imap_uid', $emailData['imap_uid'])
                             ->where('folder', $folder)
                             ->first();
                     }
 
-                    if (!$existingEmail && !empty($emailData['gmail_id'])) {
+                    if (! $existingEmail && ! empty($emailData['gmail_id'])) {
                         $existingEmail = Email::where('email_account_id', $account->id)
                             ->where('provider_id', $emailData['gmail_id'])
                             ->first();
@@ -500,43 +498,45 @@ class EmailSyncService implements EmailSyncServiceContract
 
                     $targetFolder = $folder;
                     if ($existingEmail && $folder === EmailFolderType::Archive->value) {
-                         $currentFolder = $existingEmail->folder;
-                         if (in_array($currentFolder, [
-                             EmailFolderType::Inbox->value,
-                             EmailFolderType::Sent->value,
-                             EmailFolderType::Drafts->value,
-                             EmailFolderType::Trash->value,
-                             EmailFolderType::Spam->value
-                         ])) {
-                             $targetFolder = $currentFolder;
-                         }
+                        $currentFolder = $existingEmail->folder;
+                        if (in_array($currentFolder, [
+                            EmailFolderType::Inbox->value,
+                            EmailFolderType::Sent->value,
+                            EmailFolderType::Drafts->value,
+                            EmailFolderType::Trash->value,
+                            EmailFolderType::Spam->value,
+                        ])) {
+                            $targetFolder = $currentFolder;
+                        }
                     }
 
                     // [Security/Stability] Sanitize text fields for MySQL utf8mb4 compatibility
                     $sanitize = function (?string $text) {
-                        if ($text === null) return null;
-                        
+                        if ($text === null) {
+                            return null;
+                        }
+
                         // Use mb_convert_encoding with UTF-8 to UTF-8 to strip invalid bytes
                         // This is more reliable across PHP versions than iconv //IGNORE
                         $res = mb_convert_encoding($text, 'UTF-8', 'UTF-8');
-                        
+
                         // Strip NULL bytes which MySQL rejects in strings
-                        return str_replace("\0", "", $res);
+                        return str_replace("\0", '', $res);
                     };
 
                     $threadId = $emailData['thread_id'] ?? null;
 
                     // [Threading Heuristic] If thread_id is missing (common for standard IMAP)
-                    if (!$threadId && !empty($emailData['headers'])) {
+                    if (! $threadId && ! empty($emailData['headers'])) {
                         $headers = $emailData['headers'];
                         $references = $headers['references'] ?? $headers['References'] ?? '';
                         $inReplyTo = $headers['in-reply-to'] ?? $headers['In-Reply-To'] ?? '';
 
                         // Extract all message IDs from these headers
-                        preg_match_all('/<([^>]+)>/', $references . ' ' . $inReplyTo, $matches);
+                        preg_match_all('/<([^>]+)>/', $references.' '.$inReplyTo, $matches);
                         $parentIds = array_unique($matches[1] ?? []);
 
-                        if (!empty($parentIds)) {
+                        if (! empty($parentIds)) {
                             // Find if any of our emails match these IDs
                             $parent = Email::whereIn('message_id', $parentIds)
                                 ->where('user_id', $account->user_id)
@@ -549,7 +549,7 @@ class EmailSyncService implements EmailSyncServiceContract
                         }
 
                         // Fallback: If still no thread_id, use its own message_id as thread root
-                        if (!$threadId) {
+                        if (! $threadId) {
                             $threadId = $emailData['message_id'] ?? null;
                         }
                     }
@@ -591,7 +591,7 @@ class EmailSyncService implements EmailSyncServiceContract
                     );
 
                     // Update history_id in cursor if provided (Gmail API)
-                    if (!empty($emailData['history_id'])) {
+                    if (! empty($emailData['history_id'])) {
                         $cursor = $account->sync_cursor ?? [];
                         if (empty($cursor['history_id']) || $emailData['history_id'] > ($cursor['history_id'] ?? 0)) {
                             $cursor['history_id'] = $emailData['history_id'];
@@ -603,15 +603,15 @@ class EmailSyncService implements EmailSyncServiceContract
                     $isNew = $email->wasRecentlyCreated;
 
                     // Store attachments if they are provided in sync data
-                    if (!empty($emailData['attachments'])) {
+                    if (! empty($emailData['attachments'])) {
                         $placeholders = [];
                         $oldPlaceholders = $email->attachment_placeholders ?? [];
                         $existingMedia = $email->getMedia('attachments');
-                        
+
                         foreach ($emailData['attachments'] as $attachment) {
                             // Skip if already in Media Library (by name and approximate size)
                             $alreadyStored = $existingMedia->contains(function ($m) use ($attachment) {
-                                return $m->file_name === ($attachment['name'] ?? '') && 
+                                return $m->file_name === ($attachment['name'] ?? '') &&
                                        abs($m->size - ($attachment['size'] ?? 0)) < 1024;
                             });
 
@@ -620,17 +620,17 @@ class EmailSyncService implements EmailSyncServiceContract
                             }
 
                             // If lazy, we gathered metadata but skipped the content
-                            if (!empty($attachment['is_lazy'])) {
+                            if (! empty($attachment['is_lazy'])) {
                                 // Preserve all metadata (id, attachment_id, etc.) except the content
                                 $placeholder = $attachment;
                                 unset($placeholder['content']);
-                                
+
                                 // [Stability Fix] Try to preserve the old index if this attachment was already known
                                 $preservedIndex = null;
                                 foreach ($oldPlaceholders as $idx => $old) {
-                                    $matchByCid = !empty($attachment['content_id']) && !empty($old['content_id']) && $attachment['content_id'] === $old['content_id'];
+                                    $matchByCid = ! empty($attachment['content_id']) && ! empty($old['content_id']) && $attachment['content_id'] === $old['content_id'];
                                     $matchByName = ($attachment['name'] ?? '') === ($old['name'] ?? '') && abs(($attachment['size'] ?? 0) - ($old['size'] ?? 0)) < 1024;
-                                    
+
                                     if ($matchByCid || $matchByName) {
                                         $preservedIndex = $idx;
                                         break;
@@ -647,6 +647,7 @@ class EmailSyncService implements EmailSyncServiceContract
                                     }
                                     $placeholders[$nextIdx] = $placeholder;
                                 }
+
                                 continue;
                             }
 
@@ -656,6 +657,7 @@ class EmailSyncService implements EmailSyncServiceContract
                                         'email_id' => $email->id,
                                         'attachment' => $attachment['name'] ?? 'unknown',
                                     ]);
+
                                     continue;
                                 }
 
@@ -665,10 +667,10 @@ class EmailSyncService implements EmailSyncServiceContract
                                     ->toMediaCollection('attachments');
 
                                 // Store content_id and is_inline in custom properties
-                                if (!empty($attachment['content_id'])) {
+                                if (! empty($attachment['content_id'])) {
                                     $media->setCustomProperty('content_id', $attachment['content_id']);
                                 }
-                                if (!empty($attachment['is_inline'])) {
+                                if (! empty($attachment['is_inline'])) {
                                     $media->setCustomProperty('is_inline', true);
                                 }
                                 $media->save();
@@ -688,7 +690,7 @@ class EmailSyncService implements EmailSyncServiceContract
 
                     // [Graphics Fix] Resolve inline images if we have attachments and HTML body
                     // This replaces cid: links with actual Media URLs on the server-side.
-                    if ($email->has_attachments && !empty($email->body_html)) {
+                    if ($email->has_attachments && ! empty($email->body_html)) {
                         $resolvedHtml = $sanitizer->resolveInlineImages($email);
                         if ($resolvedHtml !== $email->body_html) {
                             $email->update(['body_html' => $resolvedHtml]);
@@ -725,15 +727,13 @@ class EmailSyncService implements EmailSyncServiceContract
         throw new \RuntimeException('Failed to store email after retries');
     }
 
-
-
     /**
      * Fetch body for an email on-demand.
      */
     public function fetchBody(Email $email): Email
     {
         // If already has body, return it
-        if (!empty($email->body_html) || !empty($email->body_plain)) {
+        if (! empty($email->body_html) || ! empty($email->body_plain)) {
             return $email;
         }
 
@@ -742,18 +742,18 @@ class EmailSyncService implements EmailSyncServiceContract
 
         try {
             $emailData = $adapter->fetchFullMessage($email);
-            
+
             // Update email with fetched data
             // We use storeEmail but force update logic logic?
             // Actually storeEmail uses updateOrCreate, so calling it with the data should work
             // and merge the new body/attachments.
             // Ensure we preserve existing ID/UID matching.
-            
+
             // If Gmail, $emailData has 'gmail_id'. If IMAP, 'imap_uid'.
             // storeEmail handles logic.
-            
+
             return $this->storeEmail($account, $emailData, $email->folder, false); // broadcast=false
-            
+
         } catch (\Throwable $e) {
             Log::error('[EmailSync] Failed to fetch body on-demand', [
                 'email_id' => $email->id,
@@ -769,14 +769,13 @@ class EmailSyncService implements EmailSyncServiceContract
     public function fetchRawSource(Email $email): string
     {
         $adapter = $this->getAdapterForAccount($email->emailAccount);
+
         return $adapter->fetchRawSource($email);
     }
 
     /**
      * Download a specific attachment from IMAP.
      *
-     * @param  \App\Models\Email  $email
-     * @param  int  $placeholderIndex
      * @return \Spatie\MediaLibrary\MediaCollections\Models\Media
      */
     public function downloadAttachment(Email $email, int $placeholderIndex)
@@ -815,7 +814,7 @@ class EmailSyncService implements EmailSyncServiceContract
     protected function determineImportance(array $headers): bool
     {
         // helper to get header value case-insensitively
-        $get = fn($key) => $headers[$key] ?? $headers[strtolower($key)] ?? null;
+        $get = fn ($key) => $headers[$key] ?? $headers[strtolower($key)] ?? null;
 
         // Check 'Importance' (High)
         $importance = $get('Importance');

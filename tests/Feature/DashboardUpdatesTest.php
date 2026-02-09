@@ -2,12 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
-use App\Enums\InvoiceStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
@@ -17,6 +17,7 @@ class DashboardUpdatesTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected Team $team;
 
     protected function setUp(): void
@@ -63,7 +64,7 @@ class DashboardUpdatesTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->user)
-            ->getJson('/api/dashboard?team_id=' . $this->team->public_id);
+            ->getJson('/api/dashboard?team_id='.$this->team->public_id);
 
         $response->assertOk()
             ->assertJsonPath('data.financial.collected.raw', 1000)
@@ -98,7 +99,7 @@ class DashboardUpdatesTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->user)
-            ->getJson('/api/dashboard?team_id=' . $this->team->public_id);
+            ->getJson('/api/dashboard?team_id='.$this->team->public_id);
 
         $response->assertOk()
             ->assertJsonPath('data.task_detail.completed.count', 1)
@@ -114,7 +115,7 @@ class DashboardUpdatesTest extends TestCase
         $this->team->members()->attach($limitedUser->id, ['role' => 'member', 'joined_at' => now()]);
 
         $response = $this->actingAs($limitedUser)
-            ->getJson('/api/dashboard?team_id=' . $this->team->public_id);
+            ->getJson('/api/dashboard?team_id='.$this->team->public_id);
 
         $response->assertOk()
             ->assertJsonPath('data.financial', null);
@@ -137,8 +138,8 @@ class DashboardUpdatesTest extends TestCase
 
         // Verify Regular User
         $response = $this->actingAs($regularUser)
-            ->getJson('/api/dashboard?team_id=' . $this->team->public_id);
-        
+            ->getJson('/api/dashboard?team_id='.$this->team->public_id);
+
         $response->assertOk()
             ->assertJsonPath('data.features.tickets_enabled', false)
             ->assertJsonMissing(['data.stats' => [['id' => 'tickets']]])
@@ -147,8 +148,8 @@ class DashboardUpdatesTest extends TestCase
 
         // Verify Support User
         $response = $this->actingAs($supportUser)
-            ->getJson('/api/dashboard?team_id=' . $this->team->public_id);
-        
+            ->getJson('/api/dashboard?team_id='.$this->team->public_id);
+
         $response->assertOk()
             ->assertJsonPath('data.features.tickets_enabled', true)
             ->assertJsonFragment(['id' => 'tickets'])

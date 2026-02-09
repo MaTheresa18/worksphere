@@ -1,6 +1,8 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Card, Button, Badge, Avatar, Input, Modal, Dropdown, DropdownItem, DropdownSeparator, Tooltip } from '@/components/ui';
+import { useDate } from '@/composables/useDate';
+const { formatDate: formatDateComposible } = useDate();
 import {
     Plus,
     Search,
@@ -71,6 +73,11 @@ function getColorClass(color) {
     };
     return colors[color] || 'bg-gray-500';
 }
+
+const formatShortDate = (dateString) => {
+    if (!dateString) return "-";
+    return formatDateComposible(dateString);
+};
 </script>
 
 <template>
@@ -207,7 +214,7 @@ function getColorClass(color) {
                     </div>
                     <div class="flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
                         <Calendar class="h-4 w-4" />
-                        {{ project.dueDate }}
+                        {{ formatShortDate(project.dueDate) }}
                     </div>
                 </div>
             </Card>
@@ -260,7 +267,7 @@ function getColorClass(color) {
                                 <span class="text-sm text-[var(--text-secondary)]">{{ project.members }} members</span>
                             </td>
                             <td class="px-5 py-4">
-                                <span class="text-sm text-[var(--text-secondary)]">{{ project.dueDate }}</span>
+                                <span class="text-sm text-[var(--text-secondary)]">{{ formatShortDate(project.dueDate) }}</span>
                             </td>
                             <td class="px-5 py-4 text-right">
                                 <div class="flex items-center justify-end gap-1">

@@ -20,6 +20,8 @@ import {
     Clock,
 } from "lucide-vue-next";
 import axios from "axios";
+import { useDate } from "@/composables/useDate";
+const { formatDate: formatDateComposible } = useDate();
 
 const router = useRouter();
 
@@ -46,13 +48,9 @@ const statusOptions = [
     { value: "completed", label: "Completed" },
 ];
 
-const formatDate = (dateString: string) => {
+const formatShortDate = (dateString: string) => {
     if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-    });
+    return formatDateComposible(dateString);
 };
 
 const getStatusVariant = (status: string) => {
@@ -304,7 +302,7 @@ onMounted(() => {
                                 class="flex items-center gap-1"
                             >
                                 <Calendar class="w-4 h-4" />
-                                <span>{{ formatDate(project.due_date) }}</span>
+                                <span>{{ formatShortDate(project.due_date) }}</span>
                             </div>
                         </div>
                     </div>

@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 class AnalyticsController extends Controller
 {
     protected $analyticsService;
+
     protected $analyticsTracker;
 
     public function __construct(

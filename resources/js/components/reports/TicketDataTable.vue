@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from 'vue';
 import axios from 'axios';
-import { format } from 'date-fns';
+import { useDate } from '@/composables/useDate';
+
+const { formatDate } = useDate();
 import Badge from '@/components/ui/Badge.vue';
 import Card from '@/components/ui/Card.vue';
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next';
@@ -287,7 +289,7 @@ const getStatusVariant = (status: any) => {
                                 <span class="text-[var(--text-primary)] font-medium">{{ ticket.assignee?.name || 'Unassigned' }}</span>
                             </div>
                         </td>
-                         <td class="px-6 py-4 text-[var(--text-secondary)]">{{ format(new Date(ticket.created_at), 'MMM d, yyyy') }}</td>
+                         <td class="px-6 py-4 text-[var(--text-secondary)]">{{ formatDate(ticket.created_at, 'MMM d, yyyy') }}</td>
                     </tr>
                 </tbody>
             </table>

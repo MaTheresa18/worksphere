@@ -4,7 +4,15 @@ import Avatar from "@/components/ui/Avatar.vue";
 import Badge from "@/components/ui/Badge.vue";
 import Card from "@/components/ui/Card.vue";
 import Button from "@/components/ui/Button.vue";
-import { format, startOfWeek, addDays, isSameDay, parseISO } from "date-fns";
+import { useDate } from "@/composables/useDate";
+
+const { 
+    formatDate: formatDateComposable, 
+    startOfWeek, 
+    addDays, 
+    isSameDay, 
+    parseISO 
+} = useDate();
 import { Filter, UserPlus, ChevronLeft, ChevronRight } from "lucide-vue-next";
 
 const props = defineProps<{
@@ -23,8 +31,8 @@ const weekDays = computed(() => {
     return Array.from({ length: 5 }, (_, i) => addDays(currentWeekStart.value, i));
 });
 
-const formatDate = (date: Date) => format(date, "MMM d");
-const formatDay = (date: Date) => format(date, "EEE");
+const formatDate = (date: Date) => formatDateComposable(date, "MMM d");
+const formatDay = (date: Date) => formatDateComposable(date, "EEE");
 
 const nextWeek = () => {
     currentWeekStart.value = addDays(currentWeekStart.value, 7);

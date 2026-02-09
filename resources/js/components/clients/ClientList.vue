@@ -14,6 +14,9 @@ import {
     Building2
 } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
+import { useDate } from '@/composables/useDate';
+
+const { formatDate: formatDateComposable } = useDate();
 
 const props = defineProps({
     clients: {
@@ -210,7 +213,7 @@ const toggleAll = (e) => emit('toggle-all', e.target.checked);
                                             </div>
                                         </td>
                                         <td class="px-6 py-3 text-[var(--text-secondary)] border border-[var(--border-default)]">
-                                            {{ new Date(client.created_at).toLocaleDateString() }}
+                                            {{ formatDateComposable(client.created_at) }}
                                         </td>
                                         <td class="px-6 py-3 text-right border border-[var(--border-default)]">
                                             <div class="flex items-center justify-end gap-2 transition-opacity">

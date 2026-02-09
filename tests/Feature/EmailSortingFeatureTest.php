@@ -13,6 +13,7 @@ class EmailSortingFeatureTest extends TestCase
     use RefreshDatabase;
 
     protected User $user;
+
     protected EmailAccount $account;
 
     protected function setUp(): void

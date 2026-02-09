@@ -26,10 +26,10 @@ class DemoModeTest extends TestCase
         app(AppSettingsService::class)->applyToConfig();
 
         $user = User::factory()->create();
-        
+
         // Mock a delete request to a path that should be blocked
         $response = $this->actingAs($user, 'sanctum')
-            ->deleteJson("/api/user/avatar");
+            ->deleteJson('/api/user/avatar');
 
         $response->assertStatus(403);
         $response->assertJson([
@@ -47,8 +47,8 @@ class DemoModeTest extends TestCase
         $user->assignRole('administrator');
 
         $response = $this->actingAs($user, 'sanctum')
-            ->putJson("/api/settings", [
-                'app.name' => 'Hacked App'
+            ->putJson('/api/settings', [
+                'app.name' => 'Hacked App',
             ]);
 
         $response->assertStatus(403);
@@ -63,7 +63,7 @@ class DemoModeTest extends TestCase
 
         // GET requests should be allowed
         $response = $this->actingAs($user, 'sanctum')
-            ->getJson("/api/user");
+            ->getJson('/api/user');
 
         $response->assertStatus(200);
         $this->assertTrue($response->json('data.is_demo_mode'));
@@ -79,7 +79,7 @@ class DemoModeTest extends TestCase
         $user = User::factory()->create();
 
         $response = $this->actingAs($user, 'sanctum')
-            ->deleteJson("/api/personal-tasks/some-mock-id");
+            ->deleteJson('/api/personal-tasks/some-mock-id');
 
         // Should NOT be 403 demo blocked. It might be 404 since the ID is mock, but not 403.
         $this->assertNotEquals(403, $response->status());

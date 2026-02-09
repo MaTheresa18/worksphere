@@ -26,7 +26,7 @@ class PruneEmailsJob implements ShouldQueue
     {
         $days = config('email.retention.trash', 30);
         $cutoff = Carbon::now()->subDays($days);
-        
+
         $folders = [
             EmailFolderType::Trash->value,
             EmailFolderType::Spam->value,
@@ -39,10 +39,10 @@ class PruneEmailsJob implements ShouldQueue
         // Use received_at for age determination
         foreach (Email::whereIn('folder', $folders)->where('received_at', '<', $cutoff)->cursor() as $email) {
             // Spatie Media Library handles deletion of files on model force delete
-            $email->forceDelete(); 
+            $email->forceDelete();
             $count++;
         }
-        
+
         if ($count > 0) {
             Log::info("Pruned (force deleted) $count emails from Trash/Spam/Drafts older than $days days.");
         }
@@ -52,7 +52,7 @@ class PruneEmailsJob implements ShouldQueue
     {
         $days = config('email.retention.body', 90);
         $cutoff = Carbon::now()->subDays($days);
-        
+
         $excludeFolders = [
             EmailFolderType::Trash->value,
             EmailFolderType::Spam->value,
@@ -64,7 +64,7 @@ class PruneEmailsJob implements ShouldQueue
             ->where('received_at', '<', $cutoff)
             ->where(function ($q) {
                 $q->whereNotNull('body_html')
-                  ->orWhereNotNull('body_plain');
+                    ->orWhereNotNull('body_plain');
             });
 
         $count = 0;
@@ -72,7 +72,7 @@ class PruneEmailsJob implements ShouldQueue
             try {
                 // Clear media/attachments
                 $email->clearMediaCollection('attachments');
-                
+
                 // Clear body
                 $email->update([
                     'body_html' => null,
@@ -82,7 +82,7 @@ class PruneEmailsJob implements ShouldQueue
                 ]);
                 $count++;
             } catch (\Throwable $e) {
-                Log::error("Failed to prune content for email {$email->id}: " . $e->getMessage());
+                Log::error("Failed to prune content for email {$email->id}: ".$e->getMessage());
             }
         }
 

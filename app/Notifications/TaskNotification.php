@@ -19,11 +19,17 @@ class TaskNotification extends Notification implements ShouldBroadcast, ShouldQu
      * Notification types.
      */
     public const TYPE_ASSIGNED = 'task_assigned';
+
     public const TYPE_UPDATED = 'task_updated';
+
     public const TYPE_QA_REVIEW = 'task_qa_review';
+
     public const TYPE_CLIENT_REVIEW = 'task_client_review';
+
     public const TYPE_COMPLETED = 'task_completed';
+
     public const TYPE_REJECTED = 'task_rejected';
+
     public const TYPE_ON_HOLD = 'task_on_hold';
 
     /**

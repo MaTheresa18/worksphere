@@ -1,5 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useDate } from '@/composables/useDate';
+const { formatDate } = useDate();
 import { useRoute, useRouter } from 'vue-router';
 import { Shield, ArrowLeft, Users, Key, Filter, Search, Calendar, Pencil, ChevronLeft, ChevronRight, Check } from 'lucide-vue-next';
 import { usePermissions, useRoles } from '@/composables/usePermissions.ts';
@@ -124,13 +126,7 @@ function handlePageChange(page) {
     }
 }
 
-function formatDate(date) {
-    return new Date(date).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    });
-}
+// Local formatDate removed in favor of useDate composable
 
 function getInitials(name) {
     return name

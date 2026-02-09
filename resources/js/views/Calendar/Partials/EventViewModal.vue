@@ -1,6 +1,8 @@
 <script setup>
 import { computed } from 'vue';
-import { format } from 'date-fns';
+import { useDate } from "@/composables/useDate";
+
+const { formatDate: formatDateComposable, formatDateTime: formatDateTimeComposable } = useDate();
 import { MapPin, Clock, AlignLeft, Calendar as CalendarIcon, Users, Edit, X, Trash2, Mail } from 'lucide-vue-next';
 import Modal from '@/components/ui/Modal.vue';
 import Button from '@/components/ui/Button.vue';
@@ -15,17 +17,14 @@ const emit = defineEmits(['update:open', 'edit', 'delete']);
 
 const formattedDate = computed(() => {
     if (!props.event) return '';
-    const start = new Date(props.event.start_time);
-    return format(start, 'EEEE, MMMM d, yyyy');
+    return formatDateComposable(props.event.start_time, 'EEEE, MMMM d, yyyy');
 });
 
 const formattedTime = computed(() => {
     if (!props.event) return '';
     if (props.event.is_all_day) return 'All Day';
     
-    const start = new Date(props.event.start_time);
-    const end = new Date(props.event.end_time);
-    return `${format(start, 'h:mm a')} - ${format(end, 'h:mm a')}`;
+    return `${formatDateTimeComposable(props.event.start_time, 'h:mm a')} - ${formatDateTimeComposable(props.event.end_time, 'h:mm a')}`;
 });
 
 const attendees = computed(() => {

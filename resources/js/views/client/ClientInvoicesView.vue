@@ -20,6 +20,8 @@ import {
     AlertCircle,
 } from "lucide-vue-next";
 import axios from "axios";
+import { useDate } from "@/composables/useDate";
+const { formatDate } = useDate();
 
 const route = useRoute();
 const router = useRouter();
@@ -55,13 +57,9 @@ const formatCurrency = (amount: number, currency: string = "USD") => {
     }).format(amount);
 };
 
-const formatDate = (dateString: string) => {
+const formatShortDate = (dateString: string) => {
     if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-    });
+    return formatDate(dateString);
 };
 
 const getStatusVariant = (status: string) => {
@@ -268,7 +266,7 @@ onMounted(() => {
                                         <span
                                             >Issued:
                                             {{
-                                                formatDate(invoice.issue_date)
+                                                formatShortDate(invoice.issue_date)
                                             }}</span
                                         >
                                         <span
@@ -277,11 +275,8 @@ onMounted(() => {
                                                     isOverdue(invoice),
                                             }"
                                         >
-                                            <Clock
-                                                class="w-3 h-3 inline mr-1"
-                                            />
                                             Due:
-                                            {{ formatDate(invoice.due_date) }}
+                                            {{ formatShortDate(invoice.due_date) }}
                                         </span>
                                     </div>
                                 </div>

@@ -119,7 +119,7 @@ class TaskWorkflowService
             }
 
             // Notify stakeholders suitable for QA submission (e.g. QA Lead, Assignee confirming submission)
-            $this->notifyStakeholders($task, \App\Notifications\TaskNotification::TYPE_QA_REVIEW, $user, "Submitted for QA");
+            $this->notifyStakeholders($task, \App\Notifications\TaskNotification::TYPE_QA_REVIEW, $user, 'Submitted for QA');
         }
 
         return $result;
@@ -212,7 +212,7 @@ class TaskWorkflowService
 
             // Notify stakeholders
             $type = $approved ? \App\Notifications\TaskNotification::TYPE_UPDATED : \App\Notifications\TaskNotification::TYPE_REJECTED; // Use UPDATED for PM review move, REJECTED for rejection
-            $message = $approved ? "QA Approved task" : "QA Rejected task: " . ($notes ?? 'Issues found');
+            $message = $approved ? 'QA Approved task' : 'QA Rejected task: '.($notes ?? 'Issues found');
             $this->notifyStakeholders($task, $type, $reviewer, $message);
         });
     }
@@ -461,9 +461,11 @@ class TaskWorkflowService
 
         if ($result) {
             $type = $targetStatus === TaskStatus::OnHold ? \App\Notifications\TaskNotification::TYPE_ON_HOLD : \App\Notifications\TaskNotification::TYPE_UPDATED;
-            $msg = $targetStatus === TaskStatus::OnHold ? "Task put on hold" : "Task resumed";
-            if ($notes) $msg .= ": $notes";
-            
+            $msg = $targetStatus === TaskStatus::OnHold ? 'Task put on hold' : 'Task resumed';
+            if ($notes) {
+                $msg .= ": $notes";
+            }
+
             $this->notifyStakeholders($task, $type, $user, $msg);
         }
 

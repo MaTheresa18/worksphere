@@ -75,8 +75,9 @@ class EmailAccountService
             try {
                 $gmailApi = app(\App\Services\GmailApiService::class);
                 $gmailApi->listLabels($account); // This triggers token refresh and basic API check
-                
+
                 $account->markAsVerified();
+
                 return [
                     'success' => true,
                     'message' => 'Gmail API connection successful',
@@ -84,9 +85,10 @@ class EmailAccountService
             } catch (\Throwable $e) {
                 $error = $e->getMessage();
                 $account->markAsError($error);
+
                 return [
                     'success' => false,
-                    'message' => 'Gmail API: ' . $error,
+                    'message' => 'Gmail API: '.$error,
                 ];
             }
         }
@@ -220,7 +222,7 @@ class EmailAccountService
     {
         $config = $this->oauthConfig[$provider] ?? null;
         if (! $config) {
-            throw new \InvalidArgumentException("Unknown provider: " . htmlspecialchars($provider));
+            throw new \InvalidArgumentException('Unknown provider: '.htmlspecialchars($provider));
         }
 
         $params = [

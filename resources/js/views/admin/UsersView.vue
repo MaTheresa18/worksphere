@@ -1,5 +1,7 @@
 <script setup>
 import { ref, onMounted, watch } from "vue";
+import { useDate } from "@/composables/useDate";
+const { formatDate, formatRelative } = useDate();
 import { useRouter } from "vue-router";
 import AppLayout from "@/layouts/AppLayout.vue";
 import api from "@/lib/api";
@@ -518,22 +520,8 @@ onMounted(() => {
                                             class="px-6 py-4 text-[var(--text-tertiary)]"
                                         >
                                             <div class="flex flex-col text-xs">
-                                                <span
-                                                    >Joined:
-                                                    {{
-                                                        new Date(
-                                                            user.created_at,
-                                                        ).toLocaleDateString()
-                                                    }}</span
-                                                >
-                                                <span v-if="user.last_active_at"
-                                                    >Last seen:
-                                                    {{
-                                                        new Date(
-                                                            user.last_active_at,
-                                                        ).toLocaleDateString()
-                                                    }}</span
-                                                >
+                                                <span>Joined: {{ formatDate(user.created_at) }}</span>
+                                                <span v-if="user.last_active_at">Last seen: {{ formatRelative(user.last_active_at) }}</span>
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 text-right">
@@ -674,9 +662,7 @@ onMounted(() => {
                             >
                                 <span>Joined</span>
                                 <span>{{
-                                    new Date(
-                                        user.created_at,
-                                    ).toLocaleDateString()
+                                    formatDate(user.created_at)
                                 }}</span>
                             </div>
                         </div>

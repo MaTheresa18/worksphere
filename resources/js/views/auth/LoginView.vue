@@ -470,6 +470,7 @@ async function handleRegister() {
         password: registerForm.value.password,
         password_confirmation: registerForm.value.confirmPassword,
         recaptcha_token: recaptchaToken,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     };
     console.log("[LoginView] Calling authStore.register with payload:", {
         ...payload,

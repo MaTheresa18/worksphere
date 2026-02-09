@@ -2,6 +2,8 @@
 import { ref } from "vue";
 import { Badge, Avatar } from "@/components/ui";
 import { Calendar, User } from "lucide-vue-next";
+import { useDate } from "@/composables/useDate";
+const { formatDate: formatDateComposible } = useDate();
 
 interface Task {
     public_id: string;
@@ -91,12 +93,9 @@ const getPriorityLabel = (priority: string | number) => {
     return "Low";
 };
 
-const formatDate = (dateString?: string) => {
+const formatShortDate = (dateString?: string) => {
     if (!dateString) return "";
-    return new Date(dateString).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-    });
+    return formatDateComposible(dateString, "MMM d");
 };
 
 // Drag & Drop
@@ -295,7 +294,7 @@ const onDragOver = (event: DragEvent) => {
                                     }"
                                 >
                                     <Calendar class="w-3 h-3" />
-                                    {{ formatDate(task.due_date) }}
+                                    {{ formatShortDate(task.due_date) }}
                                 </div>
                             </div>
                         </div>

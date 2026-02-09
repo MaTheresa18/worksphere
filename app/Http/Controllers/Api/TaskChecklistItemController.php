@@ -78,7 +78,7 @@ class TaskChecklistItemController extends Controller
         // Read-only logic: If in QA, only QA review can modify structure
         $isInReview = in_array($task->status, [TaskStatus::Submitted, TaskStatus::InQa, TaskStatus::PmReview]);
         $hasQaPermission = $this->permissionService->hasTeamPermission($user, $team, 'tasks.qa_review');
-        
+
         if ($isInReview && ! $hasQaPermission) {
             abort(403, 'Task checklist is locked while in review.');
         }
@@ -87,7 +87,7 @@ class TaskChecklistItemController extends Controller
         // We consider "Started" as anything not Open or Draft.
         $isStarted = ! in_array($task->status, [TaskStatus::Open, TaskStatus::Draft]);
         $canManageStarted = $task->created_by === $user->id || $this->permissionService->hasTeamPermission($user, $team, 'tasks.update');
-        
+
         if ($isStarted && ! $canManageStarted) {
             abort(403, 'Cannot add checklist items after task has started.');
         }
@@ -159,11 +159,11 @@ class TaskChecklistItemController extends Controller
         if ($task->status->isTerminal()) {
             abort(403, 'Checklist cannot be modified when task is completed or archived.');
         }
-        
+
         // Read-only logic: If in QA, only QA review can modify
         $isInReview = in_array($task->status, [TaskStatus::Submitted, TaskStatus::InQa, TaskStatus::PmReview]);
         $hasQaPermission = $this->permissionService->hasTeamPermission($user, $team, 'tasks.qa_review');
-        
+
         if ($isInReview && ! $hasQaPermission) {
             abort(403, 'Task checklist is locked while in review.');
         }
@@ -177,26 +177,26 @@ class TaskChecklistItemController extends Controller
         // Feature: Checklist actions disabled unless start task is pressed (In Progress)
         // This applies to changing status (completion)
         if (isset($request->status) && $task->status !== TaskStatus::InProgress) {
-             // Exception: Allow if simple text update? No, `status` set means completion toggle.
-             // Maybe allow PM/QA/Lead to toggle anytime? Req says "disabled unless start task is pressed".
-             // We can allow if user has 'tasks.update' (Admin/Lead override).
-             if (! $this->permissionService->hasTeamPermission($user, $team, 'tasks.update')) {
-                 abort(403, 'Task must be In Progress to complete checklist items.');
-             }
+            // Exception: Allow if simple text update? No, `status` set means completion toggle.
+            // Maybe allow PM/QA/Lead to toggle anytime? Req says "disabled unless start task is pressed".
+            // We can allow if user has 'tasks.update' (Admin/Lead override).
+            if (! $this->permissionService->hasTeamPermission($user, $team, 'tasks.update')) {
+                abort(403, 'Task must be In Progress to complete checklist items.');
+            }
         }
 
         // Text modification requires manage_checklist
         if (isset($request->text)) {
             if (! $this->permissionService->hasTeamPermission($user, $team, 'tasks.manage_checklist')) {
-                 abort(403, 'You do not have permission to modify the text of this checklist item.');
+                abort(403, 'You do not have permission to modify the text of this checklist item.');
             }
-             // Also enforce "Started" rule for text editing
-             $isStarted = ! in_array($task->status, [TaskStatus::Open, TaskStatus::Draft]);
-             $canManageStarted = $task->created_by === $user->id || $this->permissionService->hasTeamPermission($user, $team, 'tasks.update');
+            // Also enforce "Started" rule for text editing
+            $isStarted = ! in_array($task->status, [TaskStatus::Open, TaskStatus::Draft]);
+            $canManageStarted = $task->created_by === $user->id || $this->permissionService->hasTeamPermission($user, $team, 'tasks.update');
 
-             if ($isStarted && ! $canManageStarted) {
-                 abort(403, 'Cannot edit checklist items after task has started.');
-             }
+            if ($isStarted && ! $canManageStarted) {
+                abort(403, 'Cannot edit checklist items after task has started.');
+            }
         }
 
         // Ensure item belongs to task
@@ -246,11 +246,11 @@ class TaskChecklistItemController extends Controller
         if ($task->status->isTerminal()) {
             abort(403, 'Checklist cannot be modified when task is completed or archived.');
         }
-        
+
         // Read-only logic
         $isInReview = in_array($task->status, [TaskStatus::Submitted, TaskStatus::InQa, TaskStatus::PmReview]);
         $hasQaPermission = $this->permissionService->hasTeamPermission($user, $team, 'tasks.qa_review');
-        
+
         if ($isInReview && ! $hasQaPermission) {
             abort(403, 'Task checklist is locked while in review.');
         }
@@ -258,7 +258,7 @@ class TaskChecklistItemController extends Controller
         // New Requirement: Only Creator or TeamLead/SME can remove items if task is started
         $isStarted = ! in_array($task->status, [TaskStatus::Open, TaskStatus::Draft]);
         $canManageStarted = $task->created_by === $user->id || $this->permissionService->hasTeamPermission($user, $team, 'tasks.update');
-        
+
         if ($isStarted && ! $canManageStarted) {
             abort(403, 'Cannot remove checklist items after task has started.');
         }
@@ -294,7 +294,7 @@ class TaskChecklistItemController extends Controller
         // Read-only logic
         $isInReview = in_array($task->status, [TaskStatus::Submitted, TaskStatus::InQa, TaskStatus::PmReview]);
         $hasQaPermission = $this->permissionService->hasTeamPermission($user, $team, 'tasks.qa_review');
-        
+
         if ($isInReview && ! $hasQaPermission) {
             abort(403, 'Task checklist is locked while in review.');
         }
@@ -333,6 +333,7 @@ class TaskChecklistItemController extends Controller
             abort(403, 'You do not have permission to perform this action.');
         }
     }
+
     /**
      * Ensure project belongs to the team.
      */

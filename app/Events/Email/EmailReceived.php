@@ -2,8 +2,8 @@
 
 namespace App\Events\Email;
 
-use App\Models\Email;
 use App\Http\Resources\EmailResource;
+use App\Models\Email;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;

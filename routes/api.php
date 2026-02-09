@@ -242,7 +242,6 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce', 'demo'])->grou
         Route::get('/invites', [\App\Http\Controllers\Api\TeamController::class, 'pendingInvites']);
         Route::delete('/invites/{notificationId}', [\App\Http\Controllers\Api\TeamController::class, 'cancelInvite']);
 
-
         // Activity / Audit Trail
         Route::get('/activity', [\App\Http\Controllers\Api\TeamController::class, 'activity']);
         Route::get('/stats/financial', [\App\Http\Controllers\Api\TeamController::class, 'financialStats']);

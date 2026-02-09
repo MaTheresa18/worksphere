@@ -1,7 +1,8 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import api from "@/lib/api";
-import { format } from "date-fns";
+import { useDate } from "@/composables/useDate";
+const { formatDateTime } = useDate();
 
 // Alias api to axios
 const axios = api;
@@ -115,7 +116,7 @@ onMounted(() => {
                                 {{ ip.blocked_by?.name || 'System' }}
                             </td>
                             <td class="px-6 py-4 text-[var(--text-secondary)]">
-                                {{ ip.expires_at ? format(new Date(ip.expires_at), 'MMM d, yyyy HH:mm') : 'Permanent' }}
+                                {{ ip.expires_at ? formatDateTime(ip.expires_at, 'MMM d, yyyy HH:mm') : 'Permanent' }}
                             </td>
                             <td class="px-6 py-4 text-right">
                                 <button

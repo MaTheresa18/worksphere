@@ -3,11 +3,8 @@
 namespace App\Events;
 
 use App\Models\Task;
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
@@ -21,8 +18,7 @@ class TaskUpdated implements ShouldBroadcastNow
      */
     public function __construct(
         public Task $task
-    ) {
-    }
+    ) {}
 
     /**
      * Get the channels the event should broadcast on.
@@ -32,7 +28,7 @@ class TaskUpdated implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('projects.' . $this->task->project_id . '.tasks'),
+            new PrivateChannel('projects.'.$this->task->project_id.'.tasks'),
         ];
     }
 

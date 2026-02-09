@@ -57,10 +57,10 @@ class UserTaskController extends Controller
                         // We must ensure that logic knows we want archived.
                         // Setting a request variable here won't affect the later when() check relying on original request data easily unless we modify request or logic order.
                         // Better to handle it in the "include_archived" block or modify query here.
-                        
+
                         // Actually, the `include_archived` block is:
                         // when(! $request->boolean('include_archived'), ...)
-                        
+
                         // So if we select 'archived' status, we should ensure that block doesn't exclude it.
                         // Or we can rely on frontend sending `include_archived=true`.
                         // BUT, to be safe, let's explicitly include it if status says so.

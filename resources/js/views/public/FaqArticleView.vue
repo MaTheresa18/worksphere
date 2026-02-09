@@ -18,7 +18,9 @@ import {
     File as FileIcon,
 } from "lucide-vue-next";
 import api from "@/lib/api";
-import { format } from "date-fns";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate } = useDate();
 import useRecaptcha from "@/composables/useRecaptcha";
 import { useFingerprint } from "@/composables/useFingerprint";
 import RecaptchaChallengeModal from "@/components/common/RecaptchaChallengeModal.vue";
@@ -313,10 +315,7 @@ onMounted(() => {
                             >Updated
                             {{
                                 article.updated_at
-                                    ? format(
-                                          new Date(article.updated_at),
-                                          "MMM d, yyyy",
-                                      )
+                                    ? formatDate(article.updated_at, "MMM d, yyyy")
                                     : "Recently"
                             }}</span
                         >

@@ -94,18 +94,18 @@ class EmailService implements EmailServiceContract
             + count($data['bcc'] ?? []);
 
         if ($draft) {
-             $email = $this->updateDraft($draft, $data);
-             $email->update([
-                 'folder' => EmailFolderType::Sent->value,
-                 'is_draft' => false,
-                 'sent_at' => now(),
-                 'email_account_id' => $account->id,
-                 'from_email' => $account->email,
-                 'from_name' => $account->name ?? $user->name,
-             ]);
+            $email = $this->updateDraft($draft, $data);
+            $email->update([
+                'folder' => EmailFolderType::Sent->value,
+                'is_draft' => false,
+                'sent_at' => now(),
+                'email_account_id' => $account->id,
+                'from_email' => $account->email,
+                'from_name' => $account->name ?? $user->name,
+            ]);
         } else {
-             // Create email record first to handle media persistence
-             $email = $this->createEmailRecord($user, $account, $data, isSent: true);
+            // Create email record first to handle media persistence
+            $email = $this->createEmailRecord($user, $account, $data, isSent: true);
         }
 
         if ($recipientCount > config('email.batch_threshold', 10)) {
@@ -184,7 +184,7 @@ class EmailService implements EmailServiceContract
 
         // Process inline images (Base64 to CID)
         if (isset($data['body']) || isset($data['body_html'])) {
-             $this->processInlineImages($email);
+            $this->processInlineImages($email);
         }
 
         return $email->fresh();
@@ -359,16 +359,16 @@ class EmailService implements EmailServiceContract
     protected function processInlineImages(Email $email): void
     {
         $body = $email->body_html;
-        if (empty($body) || !str_contains($body, 'data:image/')) {
+        if (empty($body) || ! str_contains($body, 'data:image/')) {
             return;
         }
 
         // Use DOMDocument to parse HTML
-        $dom = new \DOMDocument();
+        $dom = new \DOMDocument;
         // Suppress errors for invalid HTML structure (common in email bodies)
         libxml_use_internal_errors(true);
         // UTF-8 hack
-        $dom->loadHTML('<?xml encoding="UTF-8">' . $body, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        $dom->loadHTML('<?xml encoding="UTF-8">'.$body, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
 
         $images = $dom->getElementsByTagName('img');
@@ -400,8 +400,8 @@ class EmailService implements EmailServiceContract
                     file_put_contents($tmpFilePath, $data);
 
                     // Generate a unique CID
-                    $cid = Str::random(20) . '@worksphere.local';
-                    $filename = 'image-' . Str::random(10) . '.' . $extension;
+                    $cid = Str::random(20).'@worksphere.local';
+                    $filename = 'image-'.Str::random(10).'.'.$extension;
 
                     // Attach to the email model using MediaLibrary
                     try {
@@ -415,19 +415,19 @@ class EmailService implements EmailServiceContract
                             ->toMediaCollection('attachments');
 
                         // Update src to CID
-                        $img->setAttribute('src', 'cid:' . $cid);
+                        $img->setAttribute('src', 'cid:'.$cid);
                         // Add data-cid attribute for reference/debugging
                         $img->setAttribute('data-cid', $cid);
                         $hasChanges = true;
 
                     } catch (\Exception $e) {
-                        \Illuminate\Support\Facades\Log::error('Failed to process inline image: ' . $e->getMessage(), [
+                        \Illuminate\Support\Facades\Log::error('Failed to process inline image: '.$e->getMessage(), [
                             'email_id' => $email->id,
                             'cid' => $cid,
-                            'exception' => $e
+                            'exception' => $e,
                         ]);
                     }
-                    
+
                     // Cleanup temp file (MediaLibrary moves it usually, but if copy is made, temp remains. addMedia from path usually copies)
                     // We should check if we need to delete. `addMedia` copies by default.
                     // unlink($tmpFilePath); // Safe to delete after add
@@ -436,7 +436,7 @@ class EmailService implements EmailServiceContract
         }
 
         if ($hasChanges) {
-             // Save the modified body
+            // Save the modified body
             $html = $dom->saveHTML();
             // Remove the UTF-8 hack and common additions by loadHTML
             $html = str_replace('<?xml encoding="UTF-8">', '', $html);
@@ -491,11 +491,11 @@ class EmailService implements EmailServiceContract
     public function sendReadReceipt(User $user, Email $email): void
     {
         // Must have a DNT header
-        $dnt = $email->headers['Disposition-Notification-To'] 
-            ?? $email->headers['disposition-notification-to'] 
+        $dnt = $email->headers['Disposition-Notification-To']
+            ?? $email->headers['disposition-notification-to']
             ?? null;
 
-        if (!$dnt) {
+        if (! $dnt) {
             return;
         }
 

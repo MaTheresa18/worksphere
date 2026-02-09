@@ -48,6 +48,7 @@ class CreateNewUser implements CreatesNewUsers
                     'email' => true,
                     'push' => true,
                 ],
+                'timezone' => $input['timezone'] ?? config('app.timezone'),
             ],
         ]);
         // Dispatch the Registered event to trigger email verification

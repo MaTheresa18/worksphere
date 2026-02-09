@@ -1,12 +1,12 @@
 <?php
 
+use App\Enums\EmailSyncStatus;
 use App\Models\Email;
 use App\Models\EmailAccount;
 use App\Models\EmailSyncLog;
 use App\Services\EmailSyncService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use App\Enums\EmailSyncStatus;
 
 require __DIR__.'/vendor/autoload.php';
 
@@ -33,13 +33,13 @@ try {
         // 2. Reset Accounts
         echo "Resetting accounts...\n";
         $accounts = EmailAccount::all();
-        
+
         $syncService = app(EmailSyncService::class);
 
         foreach ($accounts as $account) {
             // Reset to clean state
             $account->update([
-                'sync_status' => EmailSyncStatus::Pending, 
+                'sync_status' => EmailSyncStatus::Pending,
                 'sync_cursor' => null,
                 'forward_uid_cursor' => 0,
                 'backfill_uid_cursor' => 0,
@@ -50,9 +50,9 @@ try {
                 'sync_started_at' => null,
                 'initial_sync_completed_at' => null,
             ]);
-            
+
             echo "Reset account: {$account->email}\n";
-            
+
             // Restart Seed
             echo "Restarting Seed for {$account->email}...\n";
             $syncService->startSeed($account);
@@ -61,7 +61,7 @@ try {
 
     echo "Done.\n";
 } catch (\Throwable $e) {
-    echo "Error: " . $e->getMessage() . "\n";
+    echo 'Error: '.$e->getMessage()."\n";
 } finally {
     Schema::enableForeignKeyConstraints();
 }

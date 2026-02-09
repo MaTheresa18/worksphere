@@ -8,7 +8,9 @@ import {
     ArrowPathIcon
 } from "@heroicons/vue/24/outline";
 import api from "@/lib/api";
-import { formatDistanceToNow } from 'date-fns';
+import { useDate } from '@/composables/useDate';
+
+const { formatRelativeTime } = useDate();
 
 const activities = ref([]);
 const loading = ref(true);

@@ -66,7 +66,7 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
         'redirect_calendar' => env('GOOGLE_CALENDAR_REDIRECT_URI'),
         'safe_browsing_key' => env('GOOGLE_SAFE_BROWSING_KEY'),
-        'pubsub_topic' => env('GOOGLE_PUBSUB_TOPIC', 'projects/' . env('GOOGLE_PROJECT_ID') . '/topics/email-notifications'),
+        'pubsub_topic' => env('GOOGLE_PUBSUB_TOPIC', 'projects/'.env('GOOGLE_PROJECT_ID').'/topics/email-notifications'),
     ],
 
     'github' => [

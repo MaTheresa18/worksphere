@@ -13,11 +13,11 @@ class EmailSyncWatchdog extends Command
 
     public function handle(EmailSyncService $syncService): int
     {
-        $this->info("Starting Email Sync Watchdog...");
+        $this->info('Starting Email Sync Watchdog...');
 
         // 1. Kickstart any brand new accounts (Pending)
         $pendingAccounts = \App\Models\EmailAccount::where('sync_status', \App\Enums\EmailSyncStatus::Pending)->get();
-        
+
         foreach ($pendingAccounts as $account) {
             $this->info("Starting initial seed for: {$account->email}");
             $syncService->startSeed($account);

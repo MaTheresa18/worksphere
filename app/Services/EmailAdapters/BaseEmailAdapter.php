@@ -6,8 +6,8 @@ use App\Contracts\EmailProviderAdapter;
 use App\Enums\EmailFolderType;
 use App\Models\Email;
 use App\Models\EmailAccount;
-use App\Services\EmailSyncService;
 use App\Services\EmailSanitizationService;
+use App\Services\EmailSyncService;
 use Illuminate\Support\Facades\Log;
 use Webklex\PHPIMAP\Client;
 use Webklex\PHPIMAP\ClientManager;
@@ -155,7 +155,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
         }
 
         // Try alternative names if configured
-        $alternativesKey = $this->getProvider() . '_alternatives';
+        $alternativesKey = $this->getProvider().'_alternatives';
         $alternatives = config("email.imap_folders.{$alternativesKey}.{$folderType}", []);
 
         foreach ($alternatives as $altName) {
@@ -166,6 +166,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
                     'primary_name' => $primaryName,
                     'used_name' => $altName,
                 ]);
+
                 return $folder;
             }
         }
@@ -303,11 +304,10 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
      */
     /**
      * Parse message attributes into a standardized array.
-     * 
-     * @param mixed $message The IMAP message
-     * @param bool $skipAttachments Whether to skip downloading attachment content
-     * @param bool $fetchBody Whether to fetch body content (html/plain)
-     * @return array
+     *
+     * @param  mixed  $message  The IMAP message
+     * @param  bool  $skipAttachments  Whether to skip downloading attachment content
+     * @param  bool  $fetchBody  Whether to fetch body content (html/plain)
      */
     public function parseMessage($message, bool $skipAttachments = false, bool $fetchBody = true): array
     {
@@ -337,7 +337,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
             $preview = app(EmailSanitizationService::class)->generatePreview($bodyHtml ?: $textBody);
         } else {
             // Even if body is skipped, we might have a snippet/preview from headers in some providers,
-            // but for standard IMAP, we often need the body to get the preview. 
+            // but for standard IMAP, we often need the body to get the preview.
             // We'll leave it empty or null for now.
         }
 
@@ -353,7 +353,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
                 // [Graphics Fix] Check if attachment is inline (referenced in HTML)
                 // If so, we force download even in lazy mode to ensure graphics render correctly.
                 $isInline = false;
-                if ($contentId && $bodyHtml && str_contains($bodyHtml, 'cid:' . $contentId)) {
+                if ($contentId && $bodyHtml && str_contains($bodyHtml, 'cid:'.$contentId)) {
                     $isInline = true;
                 }
 
@@ -366,7 +366,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
                     'is_lazy' => $isInline ? false : $skipAttachments,
                 ];
 
-                if (!$attachmentData['is_lazy']) {
+                if (! $attachmentData['is_lazy']) {
                     $attachmentData['content'] = $attachment->getContent();
                 }
 
@@ -410,7 +410,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
      */
     protected function formatRecipients($attribute): array
     {
-        if (!$attribute || !method_exists($attribute, 'toArray')) {
+        if (! $attribute || ! method_exists($attribute, 'toArray')) {
             return [];
         }
 
@@ -433,13 +433,15 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
         try {
             // Suppress IMAP warnings that can cause fatal errors in Laravel (e.g. malformed addresses)
             $recipients = @$message->$method();
+
             return $this->formatRecipients($recipients);
         } catch (\Throwable $e) {
-            Log::warning("[BaseEmailAdapter] Failed to parse recipients", [
+            Log::warning('[BaseEmailAdapter] Failed to parse recipients', [
                 'method' => $method,
                 'message_id' => $message->getUid(),
                 'error' => $e->getMessage(),
             ]);
+
             return [];
         }
     }
@@ -487,7 +489,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
         $client->connect();
 
         $folder = $this->getFolderWithFallback($client, $folderType);
-        if (!$folder) {
+        if (! $folder) {
             return collect();
         }
 
@@ -524,7 +526,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
         $client->connect();
 
         $folder = $this->getFolderWithFallback($client, $folderType);
-        if (!$folder) {
+        if (! $folder) {
             return collect();
         }
 
@@ -562,6 +564,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
     public function createClient(EmailAccount $account, bool $fetchBody = true): Client
     {
         $config = $this->buildBaseConfig($account, $fetchBody);
+
         return $this->clientManager->make($config);
     }
 
@@ -608,7 +611,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
     protected function backfillFolder(Client $client, EmailAccount $account, EmailFolderType $folderType, EmailSyncService $syncService, int $batchSize): array
     {
         $folder = $this->getFolderWithFallback($client, $folderType->value);
-        if (!$folder) {
+        if (! $folder) {
             return ['fetched' => 0, 'has_more' => false];
         }
 
@@ -627,7 +630,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
                     $backfillCursor = $forwardCursor;
                 } else {
                     $latestUids = $this->fetchLatestUids($folder, 1);
-                    $backfillCursor = !empty($latestUids) ? max($latestUids) : $totalMessages;
+                    $backfillCursor = ! empty($latestUids) ? max($latestUids) : $totalMessages;
                 }
             }
 
@@ -644,13 +647,13 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
                 return [
                     'fetched' => 0,
                     'has_more' => $startUid > 1,
-                    'new_cursor' => $startUid
+                    'new_cursor' => $startUid,
                 ];
             }
 
             rsort($allUids);
             $uidsToProcess = array_slice($allUids, 0, $batchSize);
-            
+
             $fetched = 0;
             $minUid = $backfillCursor;
 
@@ -663,6 +666,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
 
                     if ($exists) {
                         $minUid = min($minUid, $uid);
+
                         continue;
                     }
 
@@ -697,6 +701,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
                 'folder' => $folderType->value,
                 'error' => $e->getMessage(),
             ]);
+
             return ['fetched' => 0, 'has_more' => false];
         }
     }
@@ -730,32 +735,32 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
     public function downloadAttachment(Email $email, int $placeholderIndex): \Spatie\MediaLibrary\MediaCollections\Models\Media
     {
         $placeholders = $email->attachment_placeholders ?? [];
-        if (!isset($placeholders[$placeholderIndex])) {
+        if (! isset($placeholders[$placeholderIndex])) {
             throw new \InvalidArgumentException('Attachment placeholder not found.');
         }
 
         $placeholder = $placeholders[$placeholderIndex];
         $account = $email->emailAccount;
-        
+
         $client = $this->createClient($account);
         $client->connect();
-        
+
         // For Gmail, always use [Gmail]/All Mail since UIDs are folder-specific
         // and All Mail contains all messages. For other providers, use the stored folder.
-        $imapFolderName = $this->getProvider() === 'gmail' 
+        $imapFolderName = $this->getProvider() === 'gmail'
             ? '[Gmail]/All Mail'
             : $this->getFolderName($email->folder);
-        
+
         $folder = $client->getFolder($imapFolderName);
-        
-        if (!$folder) {
+
+        if (! $folder) {
             throw new \RuntimeException("Folder '{$imapFolderName}' not found on IMAP server.");
         }
-        
+
         $message = $this->getMessageByUid($folder, $email->imap_uid);
 
-        if (!$message) {
-            throw new \RuntimeException("Message not found on IMAP server.");
+        if (! $message) {
+            throw new \RuntimeException('Message not found on IMAP server.');
         }
 
         // Find the attachment in the message by name and size (heuristic)
@@ -767,7 +772,7 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
                 $contentId = $attachment->id ? trim($attachment->id, '<>') : null;
 
                 // Match by name and size or Content-ID
-                if (($contentId && $contentId === $placeholder['content_id']) || 
+                if (($contentId && $contentId === $placeholder['content_id']) ||
                     ($name === $placeholder['name'] && abs($size - $placeholder['size']) < 1024)) {
                     $targetAttachment = $attachment;
                     break;
@@ -775,8 +780,8 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
             }
         }
 
-        if (!$targetAttachment) {
-            throw new \RuntimeException("Attachment not found in message.");
+        if (! $targetAttachment) {
+            throw new \RuntimeException('Attachment not found in message.');
         }
 
         // Store the attachment as Media
@@ -795,10 +800,10 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
         $email->update(['attachment_placeholders' => $placeholders]);
 
         // If it was an inline image, resolve it now
-        if (!empty($placeholder['content_id'])) {
+        if (! empty($placeholder['content_id'])) {
             $sanitizer = app(\App\Services\EmailSanitizationService::class);
             $email->update([
-                'body_html' => $sanitizer->resolveInlineImages($email)
+                'body_html' => $sanitizer->resolveInlineImages($email),
             ]);
         }
 
@@ -814,32 +819,32 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
         $client = $this->createClient($account);
         $client->connect();
 
-        $imapFolderName = $this->getProvider() === 'gmail' 
+        $imapFolderName = $this->getProvider() === 'gmail'
             ? '[Gmail]/All Mail'
             : $this->getFolderName($email->folder);
 
         $folder = $client->getFolder($imapFolderName);
-        if (!$folder) {
+        if (! $folder) {
             throw new \RuntimeException("Folder '{$imapFolderName}' not found on IMAP server.");
         }
 
         // Fetch raw body (RFC822)
         // Webklex\PHPIMAP uses 'body' for the raw content when not parsing
         $query = $folder->query()->where('UID', $email->imap_uid);
-        
-        // We need to fetch the raw message. 
-        // using getMessageByUid often parses it. 
-        // Let's use the client to fetch strictly the RFC822 content if possible, 
+
+        // We need to fetch the raw message.
+        // using getMessageByUid often parses it.
+        // Let's use the client to fetch strictly the RFC822 content if possible,
         // or get the message and dump its raw structure.
         // Actually, Webklex Message object has `getRawBody()` if available or we can construct it.
         // But `FT_PEEK` is default in config so we are safe.
-        
+
         $message = $query->getMessageByUid($email->imap_uid);
-        
-        if (!$message) {
-             throw new \RuntimeException("Message not found on IMAP server.");
+
+        if (! $message) {
+            throw new \RuntimeException('Message not found on IMAP server.');
         }
-        
+
         // In Webklex 5.x+, getHeader()->raw returns headers, and we can get body.
         // A simple way is to get the full raw message if supported.
         // Use `fetch` with 'RFC822' or 'BODY[]'.
@@ -848,21 +853,21 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
         // Looking at the library, $message->raw contains the raw header + body if fetched.
         // If not, we might need to rely on what we have.
         // However, standard IMAP fetch 'BODY[]' gives everything.
-        
-        // For now, let's try to return what we can access. 
-        // If we can't get the *exact* bytes easily without low-level commands, 
+
+        // For now, let's try to return what we can access.
+        // If we can't get the *exact* bytes easily without low-level commands,
         // we might rely on the library's `raw` attribute if it exists, or reconstruct.
-        
+
         // Wait, Webklex client doesn't always expose raw easily.
-        // Let's assume for now we can get it via `getRawBody()` which some forks have, 
+        // Let's assume for now we can get it via `getRawBody()` which some forks have,
         // or strictly checking documentation which says `raw` might be available.
         // Let's use a safe fallback:
-        
+
         // It seems `Webklex\PHPIMAP\Message` might not publicize raw output directly in all versions.
         // It seems `Webklex\PHPIMAP\Message` might not publicize raw output directly in all versions.
         // Let's try to get header and body and concatenate.
-        
-        return $message->getHeader()->raw . "\r\n\r\n" . $message->getBody();
+
+        return $message->getHeader()->raw."\r\n\r\n".$message->getBody();
     }
 
     /**
@@ -884,27 +889,28 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
         }
 
         // If not found or custom folder, try name directly
-        if (!$folder) {
-             try {
-                 $folder = $client->getFolder($folderName);
-             } catch (\Throwable $e) {
-                 // ignore
-             }
+        if (! $folder) {
+            try {
+                $folder = $client->getFolder($folderName);
+            } catch (\Throwable $e) {
+                // ignore
+            }
         }
 
-        if (!$folder) {
+        if (! $folder) {
             // Last resort: check if folder name is actually a path
             // For now, fail if not found
-             throw new \RuntimeException("Folder not found: {$email->folder}");
+            throw new \RuntimeException("Folder not found: {$email->folder}");
         }
 
         if ($email->imap_uid) {
             $message = $this->getMessageByUid($folder, $email->imap_uid);
             if ($message) {
-                 // skipAttachments=false, fetchBody=true
-                 $parsed = $this->parseMessage($message, false, true);
-                 $client->disconnect();
-                 return $parsed;
+                // skipAttachments=false, fetchBody=true
+                $parsed = $this->parseMessage($message, false, true);
+                $client->disconnect();
+
+                return $parsed;
             }
         }
 

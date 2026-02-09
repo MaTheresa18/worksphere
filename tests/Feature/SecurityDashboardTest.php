@@ -4,12 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\BlockedIp;
 use App\Models\User;
-use App\Models\AuditLog;
-use App\Enums\AuditAction;
-use App\Enums\AuditCategory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 use Spatie\Permission\Models\Permission;
+use Tests\TestCase;
 
 class SecurityDashboardTest extends TestCase
 {
@@ -52,7 +49,7 @@ class SecurityDashboardTest extends TestCase
         BlockedIp::create([
             'ip_address' => '127.0.0.1',
             'reason' => 'Expired block',
-            'expires_at' => now()->subMinute()
+            'expires_at' => now()->subMinute(),
         ]);
 
         $user = User::factory()->create();
@@ -70,21 +67,21 @@ class SecurityDashboardTest extends TestCase
         // Looking at controller: $this->authorize('create', BlockedIp::class);
         // We probably need to register a policy or define the gate inside AuthServiceProvider.
         // Or if we relying on 'security.view' for all access in this MVP step?
-        // Wait, I didn't create a Policy for BlockedIp! $this->authorize will look for one. 
+        // Wait, I didn't create a Policy for BlockedIp! $this->authorize will look for one.
         // I should fix the controller to check permission directly or create the policy.
-        
+
         // For now, let's assume I need to fix the controller authorization in the next step if this fails.
         // But let's write the test to surface that failure.
-        
+
         $payload = [
             'ip_address' => '1.2.3.4',
             'reason' => 'Malicious',
         ];
 
         $response = $this->actingAs($admin)->postJson('/api/admin/security/blocked-ips', $payload);
-        
+
         $response->assertStatus(201);
-        
+
         $this->assertDatabaseHas('blocked_ips', [
             'ip_address' => '1.2.3.4',
             'reason' => 'Malicious',

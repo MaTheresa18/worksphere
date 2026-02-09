@@ -1,15 +1,14 @@
 <?php
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
 
-$app = require_once __DIR__ . '/../bootstrap/app.php';
+$app = require_once __DIR__.'/../bootstrap/app.php';
 $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
 
-use App\Models\User;
 use App\Models\Team;
+use App\Models\User;
 use App\Services\PermissionService;
-use Illuminate\Support\Facades\Config;
 
 echo "Starting RBAC Scoping Verification...\n";
 
@@ -28,9 +27,9 @@ $globalScope = $service->getPermissionScope('users.view');
 $teamScope = $service->getPermissionScope('invoices.view');
 $unknownScope = $service->getPermissionScope('non.existent.permission');
 
-echo "users.view scope: " . $globalScope . " (Expected: global)\n";
-echo "invoices.view scope: " . $teamScope . " (Expected: team)\n";
-echo "non.existent scope: " . $unknownScope . " (Expected: global)\n";
+echo 'users.view scope: '.$globalScope." (Expected: global)\n";
+echo 'invoices.view scope: '.$teamScope." (Expected: team)\n";
+echo 'non.existent scope: '.$unknownScope." (Expected: global)\n";
 
 if ($globalScope !== 'global' || $teamScope !== 'team') {
     echo "❌ FAILED: Scope parsing is incorrect.\n";
@@ -44,7 +43,7 @@ echo "✅ PASSED: Scope parsing\n";
 // Should be FALSE because scope is global, even though user is Team Owner
 echo "\n--- Test A: Global Permission Check (users.view) ---\n";
 $canViewUsers = $service->hasTeamPermission($user, $team, 'users.view');
-echo "Has 'users.view' via Team Context: " . ($canViewUsers ? 'YES' : 'NO') . "\n";
+echo "Has 'users.view' via Team Context: ".($canViewUsers ? 'YES' : 'NO')."\n";
 
 if ($canViewUsers) {
     echo "❌ FAILED: Team Owner was granted global permission via team context!\n";
@@ -57,7 +56,7 @@ if ($canViewUsers) {
 // Should be TRUE because scope is team, and user is Team Owner
 echo "\n--- Test B: Team Permission Check (invoices.view) ---\n";
 $canViewInvoices = $service->hasTeamPermission($user, $team, 'invoices.view');
-echo "Has 'invoices.view' via Team Context: " . ($canViewInvoices ? 'YES' : 'NO') . "\n";
+echo "Has 'invoices.view' via Team Context: ".($canViewInvoices ? 'YES' : 'NO')."\n";
 
 if ($canViewInvoices) {
     echo "✅ PASSED: Team Owner granted team permission.\n";

@@ -2,19 +2,17 @@
 
 namespace App\Jobs;
 
-use App\Enums\EmailFolderType;
 use App\Enums\EmailSyncStatus;
-use App\Models\Email;
 use App\Models\EmailAccount;
 use App\Models\EmailSyncLog;
 use App\Services\EmailAdapters\AdapterFactory;
 use App\Services\EmailSyncService;
+use App\Support\EmailSyncLogger as Log;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use App\Support\EmailSyncLogger as Log;
 
 /**
  * Backfill Crawler - Fetches historical emails (UID < backfill_uid_cursor).
@@ -51,7 +49,7 @@ class BackfillEmailsJob implements ShouldQueue
     /**
      * Number of emails to fetch per batch.
      */
-    protected int $batchSize = 50; 
+    protected int $batchSize = 50;
 
     public function __construct(
         public int $accountId,
@@ -65,15 +63,16 @@ class BackfillEmailsJob implements ShouldQueue
      */
     public function uniqueId(): string
     {
-        return 'backfill-' . $this->accountId . '-' . ($this->folderType ?? 'all');
+        return 'backfill-'.$this->accountId.'-'.($this->folderType ?? 'all');
     }
 
     public function handle(EmailSyncService $syncService): void
     {
         $account = EmailAccount::find($this->accountId);
 
-        if (!$account) {
+        if (! $account) {
             Log::warning('[BackfillEmailsJob] Account not found', ['account_id' => $this->accountId]);
+
             return;
         }
 
@@ -86,12 +85,13 @@ class BackfillEmailsJob implements ShouldQueue
         ]);
 
         // Check if backfill can run
-        if (!$account->canRunBackfillCrawler()) {
+        if (! $account->canRunBackfillCrawler()) {
             Log::info('[BackfillEmailsJob] Backfill complete or account not ready', [
                 'account_id' => $this->accountId,
                 'backfill_complete' => $account->backfill_complete,
                 'sync_status' => $account->sync_status->value,
             ]);
+
             return;
         }
 
@@ -101,7 +101,7 @@ class BackfillEmailsJob implements ShouldQueue
 
         try {
             $adapter = AdapterFactory::make($account);
-            
+
             // Check if backfill is supported by adapter (interface now requires it)
             $result = $adapter->backfill($account, $this->folderType, $this->batchSize, false);
 
@@ -136,7 +136,7 @@ class BackfillEmailsJob implements ShouldQueue
             ]);
 
             // Check if backfill is complete
-            if ($hasMoreToFetch && !$account->backfill_complete) {
+            if ($hasMoreToFetch && ! $account->backfill_complete) {
                 Log::info('[BackfillEmailsJob] Dispatching next batch', [
                     'account_id' => $this->accountId,
                     'delay_seconds' => 5,
@@ -145,7 +145,7 @@ class BackfillEmailsJob implements ShouldQueue
                 // Self-dispatch for next batch with delay
                 self::dispatch($this->accountId, $this->folderType)
                     ->delay(now()->addSeconds(5));
-            } elseif (!$hasMoreToFetch) {
+            } elseif (! $hasMoreToFetch) {
                 // Mark backfill as complete
                 Log::info('[BackfillEmailsJob] No more to fetch, marking complete', [
                     'account_id' => $this->accountId,
@@ -196,7 +196,6 @@ class BackfillEmailsJob implements ShouldQueue
         );
     }
 
-
     public function failed(\Throwable $exception): void
     {
         Log::error('[BackfillEmailsJob] Job permanently failed', [
@@ -217,6 +216,6 @@ class BackfillEmailsJob implements ShouldQueue
 
     public function tags(): array
     {
-        return ['email', 'backfill-crawler', 'account:' . $this->accountId];
+        return ['email', 'backfill-crawler', 'account:'.$this->accountId];
     }
 }

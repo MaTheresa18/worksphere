@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Project;
 use App\Models\Team;
 use App\Models\User;
-use App\Models\Project;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -90,7 +90,7 @@ class ScopingPermissionsTest extends TestCase
         $teamA = Team::factory()->create();
         $teamB = Team::factory()->create();
         $user = User::factory()->create();
-        
+
         $teamA->addMember($user, 'team_lead');
 
         $response = $this->actingAs($user)
@@ -146,16 +146,15 @@ class ScopingPermissionsTest extends TestCase
         $projectsItem = $sidebar->firstWhere('id', 'projects');
         $children = collect($projectsItem['children']);
 
-
         // Verify Team Alpha branching
         $this->assertTrue($children->contains('label', 'Team Alpha'));
         // Verify Team Beta branching
         $this->assertTrue($children->contains('label', 'Team Beta'));
         $this->assertTrue($children->contains('label', 'Assigned Project'));
         $this->assertFalse($children->contains('label', 'Unassigned Project'));
-        
+
         // Count actual projects (excluding View All, New, Headers, Dividers)
-        $projects = $children->filter(fn($c) => !isset($c['type']) && !in_array($c['label'], ['View All Projects', 'New Project']));
+        $projects = $children->filter(fn ($c) => ! isset($c['type']) && ! in_array($c['label'], ['View All Projects', 'New Project']));
         $this->assertGreaterThanOrEqual(4, $projects->count()); // 3 from Alpha + 1 from Beta
     }
 
@@ -203,7 +202,7 @@ class ScopingPermissionsTest extends TestCase
 
         $team->addMember($user, 'team_lead');
         $response = $this->actingAs($user)->getJson("/api/projects/{$project->public_id}");
-        
+
         $response->assertStatus(200);
         $response->assertJsonPath('public_id', $project->public_id);
     }
@@ -215,7 +214,7 @@ class ScopingPermissionsTest extends TestCase
         $project = Project::factory()->create(['team_id' => $team->id]);
 
         $team->addMember($user, 'operator');
-        
+
         $response = $this->actingAs($user)->getJson("/api/projects/{$project->public_id}");
         $response->assertStatus(403);
     }

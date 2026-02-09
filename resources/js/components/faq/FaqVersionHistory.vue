@@ -1,7 +1,9 @@
 <script setup>
 import { ref, watch } from "vue";
 import api from "@/lib/api";
-import { format } from "date-fns";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate, formatDateTime } = useDate();
 import { 
     Clock, 
     RotateCcw, 
@@ -158,7 +160,7 @@ watch(() => props.articleId, (newId) => {
                             
                             <div class="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                                 <Calendar class="w-3 h-3" />
-                                {{ format(new Date(version.created_at), "MMM d, yyyy • h:mm a") }}
+                                {{ formatDateTime(version.created_at, "MMM d, yyyy • h:mm a") }}
                             </div>
                         </div>
 
@@ -211,7 +213,7 @@ watch(() => props.articleId, (newId) => {
                                 {{ selectedVersion.author?.name || 'Unknown' }}
                             </p>
                             <p class="text-xs text-[var(--text-secondary)]">
-                                Archived on {{ format(new Date(selectedVersion.created_at), "PPp") }}
+                                Archived on {{ formatDateTime(selectedVersion.created_at, "PPp") }}
                             </p>
                         </div>
                     </div>

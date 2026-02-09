@@ -31,6 +31,7 @@ class TeamMemberResource extends JsonResource
             }),
             'is_qa_eligible' => $this->whenPivotLoaded('team_user', function () {
                 $rolePermissions = config("roles.team_role_permissions.{$this->pivot->role}", []);
+
                 return in_array('tasks.qa_review', $rolePermissions);
             }),
             'joined_at' => $this->whenPivotLoaded('team_user', function () {

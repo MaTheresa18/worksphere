@@ -20,21 +20,21 @@ class ImpersonationService
     public function impersonate(User $impersonator, User $target): void
     {
         if ($impersonator->id === $target->id) {
-            throw new \InvalidArgumentException("You cannot impersonate yourself.");
+            throw new \InvalidArgumentException('You cannot impersonate yourself.');
         }
 
         if ($this->isImpersonating()) {
-            throw new \RuntimeException("You are already impersonating a user.");
+            throw new \RuntimeException('You are already impersonating a user.');
         }
 
         // Security Check: Prevent impersonating other admins
         if ($target->hasRole('administrator') || $target->hasPermissionTo('users.impersonate')) {
-             throw new \RuntimeException("You cannot impersonate another administrator.");
+            throw new \RuntimeException('You cannot impersonate another administrator.');
         }
-        
+
         // Store the original user ID in the session
         Session::put('impersonator_id', $impersonator->id);
-        
+
         // Log the user in as the target
         Auth::login($target);
 
@@ -56,7 +56,7 @@ class ImpersonationService
     public function stopImpersonating(): void
     {
         if (! $this->isImpersonating()) {
-             throw new \RuntimeException("No active impersonation session found.");
+            throw new \RuntimeException('No active impersonation session found.');
         }
 
         $impersonatorId = Session::get('impersonator_id');
@@ -66,7 +66,7 @@ class ImpersonationService
             // Fallback safety: Logout if original user not found
             Auth::logout();
             Session::forget('impersonator_id');
-            throw new \RuntimeException("Original user not found. You have been logged out.");
+            throw new \RuntimeException('Original user not found. You have been logged out.');
         }
 
         $target = Auth::user();

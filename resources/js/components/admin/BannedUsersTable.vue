@@ -1,7 +1,8 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import api from "@/lib/api";
-import { format } from "date-fns";
+import { useDate } from "@/composables/useDate";
+const { formatDate } = useDate();
 
 // Alias api to axios
 const axios = api;
@@ -78,7 +79,7 @@ const getStatusBadgeClass = (status) => {
                                 </span>
                             </td>
                             <td class="px-6 py-4 text-[var(--text-secondary)]">
-                                {{ format(new Date(user.created_at), 'MMM d, yyyy') }}
+                                {{ formatDate(user.created_at) }}
                             </td>
                              <td class="px-6 py-4 text-right">
                                 <router-link

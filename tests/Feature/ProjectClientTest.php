@@ -16,7 +16,9 @@ class ProjectClientTest extends TestCase
     use RefreshDatabase;
 
     protected User $owner;
+
     protected Team $team;
+
     protected Client $client;
 
     protected function setUp(): void
@@ -68,7 +70,7 @@ class ProjectClientTest extends TestCase
     public function test_can_update_project_client(): void
     {
         $project = Project::factory()->forTeam($this->team)->createdBy($this->owner)->create();
-        
+
         $response = $this->actingAs($this->owner)
             ->putJson("/api/teams/{$this->team->public_id}/projects/{$project->public_id}", [
                 'client_id' => $this->client->public_id,

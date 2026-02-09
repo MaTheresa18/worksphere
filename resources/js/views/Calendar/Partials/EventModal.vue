@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
-import { fromZonedTime, toZonedTime } from 'date-fns-tz';
-import { format } from 'date-fns';
+import { useDate } from "@/composables/useDate";
+const { formatDate: formatDateComposable, toZonedTime, fromZonedTime } = useDate();
 import api from '@/lib/api';
 import Modal from '@/components/ui/Modal.vue';
 import Input from '@/components/ui/Input.vue';
@@ -39,11 +39,20 @@ const toFormFormat = (isoString, timeZone) => {
     if (!isoString) return '';
     try {
         const utcDate = new Date(isoString);
-        const zoned = toZonedTime(utcDate, timeZone);
-        return format(zoned, "yyyy-MM-dd'T'HH:mm");
+        const zoned = hideSeconds(toZonedTime(utcDate, timeZone));
+        return formatDateComposable(zoned, "yyyy-MM-dd'T'HH:mm");
     } catch (e) {
         return isoString.slice(0, 16);
     }
+};
+
+/**
+ * Helper to zero out seconds and milliseconds for consistent comparison
+ */
+const hideSeconds = (date) => {
+    const d = new Date(date);
+    d.setSeconds(0, 0);
+    return d;
 };
 
 // Helper: Convert "YYYY-MM-DDTHH:mm" (User Time) -> UTC ISO String
@@ -86,8 +95,8 @@ watch(() => props.open, (isOpen) => {
             form.value = {
                 title: props.event.title,
                 description: props.event.description || '',
-                start_time: format(props.event.start_time, "yyyy-MM-dd'T'HH:mm"),
-                end_time: format(props.event.end_time, "yyyy-MM-dd'T'HH:mm"),
+                start_time: formatDateComposable(props.event.start_time, "yyyy-MM-dd'T'HH:mm"),
+                end_time: formatDateComposable(props.event.end_time, "yyyy-MM-dd'T'HH:mm"),
                 location: props.event.location || '',
                 is_all_day: props.event.is_all_day,
                 reminder_minutes_before: props.event.extendedProps?.reminder_minutes_before || 15,
@@ -109,8 +118,8 @@ watch(() => props.open, (isOpen) => {
             form.value = {
                 title: '',
                 description: '',
-                start_time: format(start, "yyyy-MM-dd'T'HH:mm"),
-                end_time: format(end, "yyyy-MM-dd'T'HH:mm"),
+                start_time: formatDateComposable(start, "yyyy-MM-dd'T'HH:mm"),
+                end_time: formatDateComposable(end, "yyyy-MM-dd'T'HH:mm"),
                 location: '',
                 is_all_day: false,
                 reminder_minutes_before: 15,
@@ -128,12 +137,33 @@ watch(() => form.value.timezone, (newZone, oldZone) => {
     if (form.value.start_time) {
         const utc = fromZonedTime(form.value.start_time, oldZone);
         const newZoned = toZonedTime(utc, newZone);
-        form.value.start_time = format(newZoned, "yyyy-MM-dd'T'HH:mm");
+        form.value.start_time = formatDateComposable(newZoned, "yyyy-MM-dd'T'HH:mm");
     }
     if (form.value.end_time) {
          const utc = fromZonedTime(form.value.end_time, oldZone);
         const newZoned = toZonedTime(utc, newZone);
-        form.value.end_time = format(newZoned, "yyyy-MM-dd'T'HH:mm");
+        form.value.end_time = formatDateComposable(newZoned, "yyyy-MM-dd'T'HH:mm");
+    }
+});
+
+// Handle All Day Toggle Format
+watch(() => form.value.is_all_day, (val) => {
+    if (val) {
+        // Convert datetime to date
+        if (form.value.start_time && form.value.start_time.includes('T')) {
+            form.value.start_time = form.value.start_time.split('T')[0];
+        }
+        if (form.value.end_time && form.value.end_time.includes('T')) {
+            form.value.end_time = form.value.end_time.split('T')[0];
+        }
+    } else {
+        // Convert date to datetime (append default time if missing)
+        if (form.value.start_time && !form.value.start_time.includes('T')) {
+            form.value.start_time = `${form.value.start_time}T09:00`;
+        }
+        if (form.value.end_time && !form.value.end_time.includes('T')) {
+            form.value.end_time = `${form.value.end_time}T10:00`;
+        }
     }
 });
 
@@ -237,15 +267,15 @@ async function deleteEvent() {
 
             <!-- Timezone -->
              <div class="space-y-2" v-if="!form.is_all_day">
-                <label class="text-sm font-medium text-[var(--text-secondary)]">Timezone</label>
+                <label class="text-sm font-medium text-(--text-secondary)">Timezone</label>
                 <TimezoneSelect v-model="form.timezone" />
             </div>
 
             <!-- Date & Time Section -->
-            <div class="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)]/50 p-4">
+            <div class="rounded-xl border border-(--border-default) bg-(--surface-secondary)/50 p-4">
                 <div class="flex items-center gap-2 mb-4">
-                    <Calendar class="w-4 h-4 text-[var(--text-tertiary)]" />
-                    <span class="text-sm font-medium text-[var(--text-secondary)]">Date & Time</span>
+                    <Calendar class="w-4 h-4 text-(--text-tertiary)" />
+                    <span class="text-sm font-medium text-(--text-secondary)">Date & Time</span>
                 </div>
                 
                 <div class="grid grid-cols-2 gap-4">
@@ -270,24 +300,24 @@ async function deleteEvent() {
                     <input 
                         type="checkbox" 
                         v-model="form.is_all_day"
-                        class="w-4 h-4 rounded border-[var(--border-default)] text-[var(--interactive-primary)] focus:ring-[var(--interactive-primary)]/30"
+                        class="w-4 h-4 rounded border-(--border-default) text-(--interactive-primary) focus:ring-(--interactive-primary)/30"
                     />
-                    <span class="text-sm text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">All-day event</span>
+                    <span class="text-sm text-(--text-secondary) group-hover:text-(--text-primary) transition-colors">All-day event</span>
                 </label>
             </div>
 
             <!-- Location -->
             <div class="space-y-2">
                 <div class="flex items-center gap-2">
-                    <MapPin class="w-4 h-4 text-[var(--text-tertiary)]" />
-                    <label class="text-sm font-medium text-[var(--text-primary)]">Location</label>
+                    <MapPin class="w-4 h-4 text-(--text-tertiary)" />
+                    <label class="text-sm font-medium text-(--text-primary)">Location</label>
                 </div>
                 <Input v-model="form.location" placeholder="Add a location or meeting link" />
             </div>
 
              <!-- Participants -->
             <div class="space-y-2">
-                <label class="text-sm font-medium text-[var(--text-secondary)]">Invite People</label>
+                <label class="text-sm font-medium text-(--text-secondary)">Invite People</label>
                         <ParticipantSelector
                             v-model="form.participants"
                             fetch-url="/api/directory/search"
@@ -305,10 +335,10 @@ async function deleteEvent() {
                 <input 
                     type="checkbox" 
                     v-model="sendInvite"
-                    class="w-4 h-4 rounded border-[var(--border-default)] text-[var(--interactive-primary)] focus:ring-[var(--interactive-primary)]/30"
+                    class="w-4 h-4 rounded border-(--border-default) text-(--interactive-primary) focus:ring-(--interactive-primary)/30"
                 />
-                <Mail class="w-4 h-4 text-[var(--text-tertiary)]" />
-                <span class="text-sm text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">
+                <Mail class="w-4 h-4 text-(--text-tertiary)" />
+                <span class="text-sm text-(--text-secondary) group-hover:text-(--text-primary) transition-colors">
                     Send email invitations
                 </span>
             </label>
@@ -316,8 +346,8 @@ async function deleteEvent() {
             <!-- Reminder -->
              <div class="space-y-2">
                 <div class="flex items-center gap-2">
-                    <Bell class="w-4 h-4 text-[var(--text-tertiary)]" />
-                    <label class="text-sm font-medium text-[var(--text-primary)]">Reminder</label>
+                    <Bell class="w-4 h-4 text-(--text-tertiary)" />
+                    <label class="text-sm font-medium text-(--text-primary)">Reminder</label>
                 </div>
                  <div class="flex items-center gap-2">
                     <Input 
@@ -326,19 +356,19 @@ async function deleteEvent() {
                         min="0"
                         placeholder="15"
                     />
-                    <span class="text-sm text-[var(--text-muted)]">minutes before</span>
+                    <span class="text-sm text-(--text-muted)">minutes before</span>
                 </div>
             </div>
             
             <!-- Description -->
             <div class="space-y-2">
                 <div class="flex items-center gap-2">
-                    <AlignLeft class="w-4 h-4 text-[var(--text-tertiary)]" />
-                    <label class="text-sm font-medium text-[var(--text-primary)]">Description</label>
+                    <AlignLeft class="w-4 h-4 text-(--text-tertiary)" />
+                    <label class="text-sm font-medium text-(--text-primary)">Description</label>
                 </div>
                 <textarea
                     v-model="form.description"
-                    class="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--text-primary)] p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--interactive-primary)]/30 focus:border-[var(--interactive-primary)] resize-none transition-all placeholder:text-[var(--text-tertiary)]"
+                    class="w-full rounded-lg border border-(--border-default) bg-(--surface-elevated) text-(--text-primary) p-3 text-sm focus:outline-none focus:ring-2 focus:ring-(--interactive-primary)/30 focus:border-(--interactive-primary) resize-none transition-all placeholder:text-(--text-tertiary)"
                     rows="3"
                     placeholder="Add notes, agenda, or any additional details..."
                 ></textarea>

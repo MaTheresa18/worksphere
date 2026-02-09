@@ -25,7 +25,9 @@ import {
 } from "lucide-vue-next";
 import Button from "@/components/ui/Button.vue";
 import Avatar from "@/components/ui/Avatar.vue";
-import { format } from "date-fns";
+import { useDate } from "@/composables/useDate";
+
+const { formatDate: formatDateComposable } = useDate();
 import {
     Dropdown,
     DropdownItem,
@@ -174,7 +176,7 @@ const triggerUpload = () => {
 
 const formatDate = (dateString) => {
     if (!dateString) return "-";
-    return format(new Date(dateString), "MMM d, yyyy");
+    return formatDateComposable(dateString, "MMM d, yyyy");
 };
 
 const formatSize = (bytes) => {

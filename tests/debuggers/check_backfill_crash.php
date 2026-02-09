@@ -1,9 +1,8 @@
 <?php
 
-use App\Models\EmailAccount;
 use App\Enums\EmailFolderType;
+use App\Models\EmailAccount;
 use App\Services\EmailAdapters\AdapterFactory;
-use Webklex\PHPIMAP\ClientManager;
 
 require __DIR__.'/vendor/autoload.php';
 
@@ -13,8 +12,9 @@ $kernel->bootstrap();
 
 $account = EmailAccount::first();
 
-if (!$account) {
-    echo "No account.\n"; exit;
+if (! $account) {
+    echo "No account.\n";
+    exit;
 }
 
 echo "Testing Backfill Logic (Part 2) for: {$account->email}\n";
@@ -28,20 +28,20 @@ $folder = $adapter->getFolderWithFallback($client, $folderType->value);
 
 // Targeted UIDs based on cursor 11768
 $uidsToTest = [11767, 11766, 11765, 11764, 11763];
-echo "Testing UIDs: " . implode(', ', $uidsToTest) . "\n";
+echo 'Testing UIDs: '.implode(', ', $uidsToTest)."\n";
 
 foreach ($uidsToTest as $uid) {
     echo "Fetching UID $uid... ";
     try {
         $msg = $folder->query()->getMessageByUid($uid);
         if ($msg) {
-            echo "Found. Parsing... ";
+            echo 'Found. Parsing... ';
             $data = $adapter->parseMessage($msg);
-            echo "Success! Subject: " . substr($data['subject'], 0, 30) . "\n";
+            echo 'Success! Subject: '.substr($data['subject'], 0, 30)."\n";
         } else {
             echo "Not found.\n";
         }
     } catch (\Throwable $e) {
-        echo "EXCEPTION: " . $e->getMessage() . "\n";
+        echo 'EXCEPTION: '.$e->getMessage()."\n";
     }
 }

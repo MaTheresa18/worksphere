@@ -20,11 +20,11 @@ class InvoiceTemplateController extends Controller
         $team = \App\Models\Team::where('public_id', $teamId)->firstOrFail();
 
         if (! $user->hasRole('administrator')) {
-             $permissionService = app(\App\Services\PermissionService::class);
-             
-             if (! $permissionService->hasTeamPermission($user, $team, 'invoice_templates.view')) {
+            $permissionService = app(\App\Services\PermissionService::class);
+
+            if (! $permissionService->hasTeamPermission($user, $team, 'invoice_templates.view')) {
                 abort(403, 'Unauthorized access to team templates.');
-             }
+            }
         }
 
         $templates = $this->service->getAllForTeam($teamId);
@@ -40,7 +40,7 @@ class InvoiceTemplateController extends Controller
         if (! $user->hasRole('administrator')) {
             $permissionService = app(\App\Services\PermissionService::class);
             if (! $permissionService->hasTeamPermission($user, $team, 'invoice_templates.create')) {
-                 abort(403, 'Unauthorized action.');
+                abort(403, 'Unauthorized action.');
             }
         }
 
@@ -88,14 +88,14 @@ class InvoiceTemplateController extends Controller
     public function show(Request $request, InvoiceTemplate $invoiceTemplate): JsonResponse
     {
         $user = $request->user();
-        
+
         if (! $user->hasRole('administrator')) {
-             // Resolve team
-             $team = \App\Models\Team::find($invoiceTemplate->team_id);
-             $permissionService = app(\App\Services\PermissionService::class);
-             if (!$team || ! $permissionService->hasTeamPermission($user, $team, 'invoice_templates.view')) {
+            // Resolve team
+            $team = \App\Models\Team::find($invoiceTemplate->team_id);
+            $permissionService = app(\App\Services\PermissionService::class);
+            if (! $team || ! $permissionService->hasTeamPermission($user, $team, 'invoice_templates.view')) {
                 abort(403, 'Unauthorized.');
-             }
+            }
         }
 
         return response()->json(['data' => $invoiceTemplate]);
@@ -106,11 +106,11 @@ class InvoiceTemplateController extends Controller
         $user = $request->user();
 
         if (! $user->hasRole('administrator')) {
-             $team = \App\Models\Team::find($invoiceTemplate->team_id);
-             $permissionService = app(\App\Services\PermissionService::class);
-             if (!$team || ! $permissionService->hasTeamPermission($user, $team, 'invoice_templates.update')) {
+            $team = \App\Models\Team::find($invoiceTemplate->team_id);
+            $permissionService = app(\App\Services\PermissionService::class);
+            if (! $team || ! $permissionService->hasTeamPermission($user, $team, 'invoice_templates.update')) {
                 abort(403, 'Unauthorized.');
-             }
+            }
         }
 
         $validated = $request->validate([
@@ -137,11 +137,11 @@ class InvoiceTemplateController extends Controller
         $user = $request->user();
 
         if (! $user->hasRole('administrator')) {
-             $team = \App\Models\Team::find($invoiceTemplate->team_id);
-             $permissionService = app(\App\Services\PermissionService::class);
-             if (!$team || ! $permissionService->hasTeamPermission($user, $team, 'invoice_templates.delete')) {
+            $team = \App\Models\Team::find($invoiceTemplate->team_id);
+            $permissionService = app(\App\Services\PermissionService::class);
+            if (! $team || ! $permissionService->hasTeamPermission($user, $team, 'invoice_templates.delete')) {
                 abort(403, 'Unauthorized.');
-             }
+            }
         }
 
         $this->service->delete($invoiceTemplate->id);
