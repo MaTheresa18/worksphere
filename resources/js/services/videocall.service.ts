@@ -5,7 +5,7 @@ export class VideoCallService extends BaseService {
    * Fetch TURN/STUN ICE server credentials for a chat.
    */
   async getTurnCredentials(chatId: string): Promise<{ ice_servers: RTCIceServer[] }> {
-    const response = await this.http.get(`/chat/${chatId}/call/turn-credentials`);
+    const response = await this.api.get(`/chat/${chatId}/call/turn-credentials`);
     return response.data;
   }
 
@@ -13,7 +13,7 @@ export class VideoCallService extends BaseService {
    * Initiate a call (notifies the other participant via broadcast).
    */
   async initiateCall(chatId: string, callType: 'video' | 'audio'): Promise<{ call_id: string; chat_id: string }> {
-    const response = await this.http.post(`/chat/${chatId}/call/initiate`, {
+    const response = await this.api.post(`/chat/${chatId}/call/initiate`, {
       call_type: callType,
     });
     return response.data;
@@ -28,7 +28,7 @@ export class VideoCallService extends BaseService {
     signalType: 'offer' | 'answer' | 'ice-candidate',
     signalData: Record<string, unknown>,
   ): Promise<void> {
-    await this.http.post(`/chat/${chatId}/call/signal`, {
+    await this.api.post(`/chat/${chatId}/call/signal`, {
       call_id: callId,
       signal_type: signalType,
       signal_data: signalData,
@@ -43,7 +43,7 @@ export class VideoCallService extends BaseService {
     callId: string,
     reason: 'hangup' | 'declined' | 'timeout' | 'failed' = 'hangup',
   ): Promise<void> {
-    await this.http.post(`/chat/${chatId}/call/end`, {
+    await this.api.post(`/chat/${chatId}/call/end`, {
       call_id: callId,
       reason,
     });
