@@ -14,13 +14,18 @@ import {
     Mail, 
     ArrowRight, 
     CheckCircle, 
+    CheckCircle2,
     AlertTriangle,
+    AlertCircle,
     Loader2,
     Server,
     Shield,
     Info,
     ExternalLink,
-    Check
+    Check,
+    Inbox,
+    Send,
+    Activity
 } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import api from "@/lib/api";
@@ -37,12 +42,15 @@ const emit = defineEmits(["update:open", "saved"]);
 const step = ref(1);
 const isLoading = ref(false);
 const isTestingConfig = ref(false);
+const isCheckingHealth = ref(false);
+const healthResults = ref<any>(null);
 const accountId = ref<string | null>(null);
 const remoteFolders = ref<any[]>([]);
 const selectedFolders = ref<string[]>([]); 
 
 const form = ref({
     provider: "",
+    account_type: "full", // 'full' or 'smtp'
     email: "",
     name: "",
     // Custom IMAP
@@ -57,9 +65,26 @@ const form = ref({
 });
 
 const providers = [
-    { id: "gmail", name: "Gmail", icon: Mail, color: "text-red-600", bg: "bg-red-100 dark:bg-red-900/20" },
-    { id: "outlook", name: "Outlook", icon: Mail, color: "text-blue-600", bg: "bg-blue-100 dark:bg-blue-900/20" },
-    { id: "custom", name: "Custom IMAP", icon: Server, color: "text-gray-600", bg: "bg-gray-100 dark:bg-gray-800" },
+    { id: "gmail", name: "Gmail", icon: Mail, image: "/static/images/brands/gmail.svg", color: "text-red-600", bg: "bg-red-50 dark:bg-red-900/10", type: 'full', supports_oauth: true },
+    { id: "outlook", name: "Outlook", icon: Mail, image: "/static/images/brands/outlook.svg", color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-900/10", type: 'full', supports_oauth: true },
+    { id: "yahoo", name: "Yahoo", icon: Mail, image: "/static/images/brands/yahoo.svg", color: "text-purple-600", bg: "bg-purple-50 dark:bg-purple-900/10", type: 'full', supports_oauth: false, 
+      imap: 'imap.mail.yahoo.com', iport: 993, ienc: 'ssl', smtp: 'smtp.mail.yahoo.com', sport: 465, senc: 'ssl' },
+    { id: "zoho", name: "Zoho", icon: Mail, color: "text-red-500", bg: "bg-red-50 dark:bg-red-900/10", type: 'full', supports_oauth: false,
+      imap: 'imap.zoho.com', iport: 993, ienc: 'ssl', smtp: 'smtp.zoho.com', sport: 465, senc: 'ssl' },
+    { id: "fastmail", name: "Fastmail", icon: Mail, color: "text-blue-800", bg: "bg-blue-50 dark:bg-blue-900/10", type: 'full', supports_oauth: false,
+      imap: 'imap.fastmail.com', iport: 993, ienc: 'ssl', smtp: 'smtp.fastmail.com', sport: 465, senc: 'ssl' },
+    { id: "yandex", name: "Yandex", icon: Mail, color: "text-red-600", bg: "bg-red-50 dark:bg-red-900/10", type: 'full', supports_oauth: false,
+      imap: 'imap.yandex.com', iport: 993, ienc: 'ssl', smtp: 'smtp.yandex.com', sport: 465, senc: 'ssl' },
+    { id: "gmx", name: "GMX", icon: Mail, color: "text-blue-700", bg: "bg-blue-50 dark:bg-blue-900/10", type: 'full', supports_oauth: false,
+      imap: 'imap.gmx.com', iport: 993, ienc: 'ssl', smtp: 'mail.gmx.com', sport: 587, senc: 'tls' },
+    { id: "webde", name: "Web.de", icon: Mail, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-900/10", type: 'full', supports_oauth: false,
+      imap: 'imap.web.de', iport: 993, ienc: 'ssl', smtp: 'smtp.web.de', sport: 587, senc: 'tls' },
+    { id: "sendgrid", name: "SendGrid", icon: Server, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/10", type: 'smtp', host: 'smtp.sendgrid.net', port: 587, enc: 'tls' },
+    { id: "ses", name: "Amazon SES", icon: Server, color: "text-orange-500", bg: "bg-orange-50 dark:bg-orange-900/10", type: 'smtp', host: 'email-smtp.us-east-1.amazonaws.com', port: 587, enc: 'tls' },
+    { id: "mailchimp", name: "Mailchimp", icon: Server, color: "text-yellow-600", bg: "bg-yellow-50 dark:bg-yellow-900/10", type: 'smtp', host: 'smtp.mandrillapp.com', port: 587, enc: 'tls' },
+    { id: "postmark", name: "Postmark", icon: Server, color: "text-yellow-500", bg: "bg-yellow-50 dark:bg-yellow-900/10", type: 'smtp', host: 'smtp.postmarkapp.com', port: 587, enc: 'tls' },
+    { id: "mailgun", name: "Mailgun", icon: Server, color: "text-red-500", bg: "bg-red-50 dark:bg-red-900/10", type: 'smtp', host: 'smtp.mailgun.org', port: 587, enc: 'tls' },
+    { id: "custom", name: "Other / Custom", icon: Server, color: "text-gray-600", bg: "bg-gray-100 dark:bg-gray-800", type: 'any' },
 ];
 
 const encryptionOptions = [
@@ -70,21 +95,25 @@ const encryptionOptions = [
 
 const steps = [
     { number: 1, title: 'Privacy' },
-    { number: 2, title: 'Provider' },
-    { number: 3, title: 'Connect' },
-    { number: 4, title: 'Folders' },
-    { number: 5, title: 'Finish' }
+    { number: 2, title: 'Mode' },
+    { number: 3, title: 'Provider' },
+    { number: 4, title: 'Connect' },
+    { number: 5, title: 'Health' },
+    { number: 6, title: 'Folders' },
+    { number: 7, title: 'Finish' }
 ];
 
-const totalSteps = 5;
+const totalSteps = 7;
 
 const reset = () => {
     step.value = 1;
     accountId.value = null;
     remoteFolders.value = [];
     selectedFolders.value = [];
+    healthResults.value = null;
     form.value = {
         provider: "",
+        account_type: "full",
         email: "",
         name: "",
         imap_host: "",
@@ -118,9 +147,55 @@ watch(() => props.open, (isOpen) => {
 });
 
 // Actions
-const selectProvider = (id: string) => {
-    form.value.provider = id;
-    step.value = 3;
+const selectProvider = (p: any) => {
+    form.value.provider = p.id;
+    
+    // Apply presets if available
+    if (p.type === 'smtp') {
+        form.value.smtp_host = p.host || "";
+        form.value.smtp_port = p.port || 587;
+        form.value.smtp_encryption = p.enc || "tls";
+        form.value.account_type = "smtp";
+    } else if (p.type === 'full') {
+        form.value.account_type = "full";
+        // Apply IMAP/SMTP presets for standard full providers if provided
+        if (p.imap) {
+            form.value.imap_host = p.imap;
+            form.value.imap_port = p.iport || 993;
+            form.value.imap_encryption = p.ienc || "ssl";
+        }
+        if (p.smtp) {
+            form.value.smtp_host = p.smtp;
+            form.value.smtp_port = p.sport || 587;
+            form.value.smtp_encryption = p.senc || "tls";
+        }
+    }
+
+    step.value = 4;
+};
+
+const runHealthCheck = async () => {
+    if (!form.value.email) {
+        toast.error("Please enter an email address first.");
+        return;
+    }
+
+    try {
+        isCheckingHealth.value = true;
+        // The endpoint is actually for saved accounts, but we can repurpose it 
+        // OR add a temporary check endpoint. 
+        // For now, let's assume we use a 'test-configuration' style approach or the service can be called via a temp route.
+        // Actually, let's add a temporary health check endpoint in the controller.
+        const { data } = await api.post("/api/email-accounts/pre-check", {
+            email: form.value.email
+        });
+        healthResults.value = data.data;
+        toast.success("Health check completed.");
+    } catch (e: any) {
+        toast.error("Health check failed.");
+    } finally {
+        isCheckingHealth.value = false;
+    }
 };
 
 const connectOAuth = async () => {
@@ -214,7 +289,12 @@ const connectCustom = async () => {
         
         accountId.value = data.data.id;
         toast.success("Account connected successfully!");
-        fetchRemoteFolders();
+        
+        if (form.value.account_type === 'smtp') {
+            step.value = 5; // Go to Health (then Finish)
+        } else {
+            fetchRemoteFolders();
+        }
     } catch (e: any) {
         toast.error(e.response?.data?.message || "Connection failed");
         isLoading.value = false;
@@ -307,20 +387,17 @@ onUnmounted(() => {
         :open="open" 
         @update:open="emit('update:open', $event)"
         title="Connect Email Account"
-        size="xl"
-        :show-close="false"
+        size="3xl"
     >
         <template #title>
-             <div class="flex justify-between items-center w-full">
-                <span>{{ props.account ? 'Edit Email Account' : 'Connect Email Account' }}</span>
-            </div>
+             <span>{{ props.account ? 'Edit Email Account' : 'Connect Email Account' }}</span>
         </template>
 
         <div class="space-y-8 min-h-[450px] flex flex-col">
             <!-- Stepper -->
             <StepperRoot
                 :model-value="step"
-                class="flex items-start justify-between px-10 w-full max-w-3xl mx-auto relative mb-10"
+                class="flex items-start justify-between px-10 w-full max-w-2xl mx-auto relative mb-10"
             >
                 <StepperItem
                     v-for="s in steps"
@@ -376,7 +453,7 @@ onUnmounted(() => {
                         <div v-if="step === 1" class="space-y-6 w-full max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 px-4">
                             <div class="text-center space-y-2">
                                 <h2 class="text-2xl font-bold tracking-tight bg-linear-to-r from-(--brand-primary) to-(--brand-primary-hover) bg-clip-text text-transparent">Private & Secure Email Sync</h2>
-                                <p class="text-(--text-secondary) text-sm max-w-md mx-auto">
+                                <p class="text-(--text-secondary) text-sm max-w-xl mx-auto">
                                     We prioritize your privacy with strict data retention policies.
                                 </p>
                             </div>
@@ -404,46 +481,102 @@ onUnmounted(() => {
                                 </div>
                             </div>
                         </div>
-    
-                        <!-- Step 2: Provider Selection -->
-                        <div v-else-if="step === 2" class="space-y-6 w-full max-w-md mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 px-4">
+
+                        <!-- Step 2: Account Type Selection -->
+                        <div v-else-if="step === 2" class="space-y-8 w-full max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 px-4">
                             <div class="text-center space-y-2">
-                                <h2 class="text-2xl font-bold tracking-tight">Select Provider</h2>
-                                <p class="text-(--text-secondary) text-sm">
-                                    Choose your email service provider to continue.
-                                </p>
+                                <h2 class="text-2xl font-bold tracking-tight">How will you use this account?</h2>
+                                <p class="text-(--text-secondary) text-sm">Select the mode that best fits your needs.</p>
                             </div>
-    
-                            <div class="grid grid-cols-1 gap-4">
-                                <button
-                                    v-for="p in providers"
-                                    :key="p.id"
-                                    @click="selectProvider(p.id)"
-                                    class="flex items-center gap-4 p-5 rounded-2xl border border-(--border-default) bg-(--surface-secondary)/50 backdrop-blur-sm hover:border-(--brand-primary) hover:shadow-xl hover:shadow-(--brand-primary)/5 hover:bg-(--surface-tertiary) transition-all group text-left relative overflow-hidden active:scale-[0.98]"
+
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <button 
+                                    @click="form.account_type = 'full'; step = 3"
+                                    class="p-8 rounded-3xl border-2 transition-all text-left space-y-4 relative group overflow-hidden"
+                                    :class="form.account_type === 'full' ? 'border-(--brand-primary) bg-(--brand-primary)/5 shadow-xl shadow-(--brand-primary)/10' : 'border-(--border-default) bg-(--surface-secondary)/30 hover:border-(--brand-primary)/40'"
                                 >
-                                    <div 
-                                        class="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-300 group-hover:scale-110 shadow-sm"
-                                        :class="p.bg"
-                                    >
-                                        <component :is="p.icon" class="w-7 h-7" :class="p.color" />
+                                    <div class="w-16 h-16 rounded-2xl bg-(--brand-primary)/10 flex items-center justify-center shrink-0">
+                                        <Inbox class="w-8 h-8 text-(--brand-primary)" />
                                     </div>
-                                    <div class="flex-1">
-                                        <h4 class="font-bold text-(--text-primary) text-lg">{{ p.name }}</h4>
-                                        <p class="text-xs text-(--text-secondary)">Connect your {{ p.name }} account</p>
+                                    <div class="space-y-2">
+                                        <h3 class="font-bold text-xl">Full Synchronization</h3>
+                                        <p class="text-sm text-(--text-secondary) leading-relaxed">
+                                            Sync all folders, read emails, and send replies. Perfect for personal or professional mailboxes.
+                                        </p>
                                     </div>
-                                    <ArrowRight class="w-5 h-5 text-(--brand-primary) ml-auto opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300" />
+                                    <div v-if="form.account_type === 'full'" class="absolute top-4 right-4 text-(--brand-primary)">
+                                        <CheckCircle2 class="w-6 h-6" />
+                                    </div>
+                                </button>
+
+                                <button 
+                                    @click="form.account_type = 'smtp'; step = 3"
+                                    class="p-8 rounded-3xl border-2 transition-all text-left space-y-4 relative group overflow-hidden"
+                                    :class="form.account_type === 'smtp' ? 'border-orange-500 bg-orange-500/5 shadow-xl shadow-orange-500/10' : 'border-(--border-default) bg-(--surface-secondary)/30 hover:border-orange-500/40'"
+                                >
+                                    <div class="w-16 h-16 rounded-2xl bg-orange-500/10 flex items-center justify-center shrink-0 text-orange-600">
+                                        <Send class="w-8 h-8" />
+                                    </div>
+                                    <div class="space-y-2">
+                                        <h3 class="font-bold text-xl">SMTP Only (Sending)</h3>
+                                        <p class="text-sm text-(--text-secondary) leading-relaxed">
+                                            For transactional providers like SendGrid or SES. Send emails without syncing an inbox.
+                                        </p>
+                                    </div>
+                                    <div v-if="form.account_type === 'smtp'" class="absolute top-4 right-4 text-orange-600">
+                                        <CheckCircle2 class="w-6 h-6" />
+                                    </div>
                                 </button>
                             </div>
                         </div>
     
-                        <!-- Step 3: Connection -->
-                        <div v-else-if="step === 3" class="space-y-6 w-full max-w-md mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 px-4">
+                        <!-- Step 3: Provider Selection -->
+                        <div v-else-if="step === 3" class="space-y-6 w-full max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 px-4">
+                            <div class="text-center space-y-2">
+                                <h2 class="text-2xl font-bold tracking-tight">
+                                    {{ form.account_type === 'smtp' ? 'Select SMTP Provider' : 'Select Email Provider' }}
+                                </h2>
+                                <p class="text-(--text-secondary) text-sm">
+                                    Choose the service you're currently using.
+                                </p>
+                            </div>
+    
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <button
+                                    v-for="p in providers.filter(p => p.type === form.account_type || p.type === 'any')"
+                                    :key="p.id"
+                                    @click="selectProvider(p)"
+                                    class="flex flex-col items-center gap-4 p-6 rounded-2xl border border-(--border-default) bg-(--surface-secondary)/50 backdrop-blur-sm hover:border-(--brand-primary) hover:shadow-xl hover:shadow-(--brand-primary)/5 hover:bg-(--surface-tertiary) transition-all group relative overflow-hidden active:scale-[0.98]"
+                                >
+                                    <div 
+                                        class="w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-300 group-hover:scale-110 shadow-sm overflow-hidden"
+                                        :class="p.bg"
+                                    >
+                                        <img v-if="p.image" :src="p.image" class="w-8 h-8 object-contain" :alt="p.name" />
+                                        <component v-else :is="p.icon" class="w-8 h-8" :class="p.color" />
+                                    </div>
+                                    <div class="text-center">
+                                        <h4 class="font-bold text-(--text-primary) text-sm">{{ p.name }}</h4>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+    
+                        <!-- Step 4: Connection -->
+                        <div v-else-if="step === 4" class="space-y-6 w-full max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 px-4">
                             <div class="text-center space-y-4">
                                 <div 
-                                    class="w-24 h-24 rounded-[32px] flex items-center justify-center mx-auto shadow-lg ring-8 ring-(--surface-secondary)/50"
+                                    class="w-24 h-24 rounded-[32px] flex items-center justify-center mx-auto shadow-lg ring-8 ring-(--surface-secondary)/50 overflow-hidden"
                                     :class="providers.find(p => p.id === form.provider)?.bg || 'bg-gray-100'"
                                 >
+                                    <img 
+                                        v-if="providers.find(p => p.id === form.provider)?.image" 
+                                        :src="providers.find(p => p.id === form.provider)?.image" 
+                                        class="w-12 h-12 object-contain" 
+                                        :alt="providers.find(p => p.id === form.provider)?.name" 
+                                    />
                                     <component 
+                                        v-else
                                         :is="providers.find(p => p.id === form.provider)?.icon" 
                                         class="w-12 h-12"
                                         :class="providers.find(p => p.id === form.provider)?.color"
@@ -452,13 +585,13 @@ onUnmounted(() => {
                                 <div>
                                     <h2 class="text-2xl font-bold tracking-tight">Connect {{ providers.find(p => p.id === form.provider)?.name }}</h2>
                                     <p class="text-(--text-secondary) text-sm mt-1">
-                                        {{ form.provider === 'custom' ? 'Enter your server details.' : 'Authenticate via popup window.' }}
+                                        {{ (form.provider === 'gmail' || form.provider === 'outlook') ? 'Authenticate via popup window.' : 'Enter your server details.' }}
                                     </p>
                                 </div>
                             </div>
     
                             <!-- OAuth Button -->
-                            <div v-if="form.provider !== 'custom'" class="w-full pt-4">
+                            <div v-if="form.provider === 'gmail' || form.provider === 'outlook'" class="w-full pt-4">
                                 <Button 
                                     size="lg" 
                                     class="w-full h-14 text-base relative overflow-hidden font-bold rounded-2xl shadow-lg hover:shadow-(--brand-primary)/25" 
@@ -474,207 +607,295 @@ onUnmounted(() => {
                                     <p>Ensure popups are allowed for this site. The authentication happens securely on your provider's page.</p>
                                 </div>
                             </div>
+    
+                            <!-- Manual Form -->
+                            <div v-else class="space-y-4">
+                                <div class="space-y-4">
+                                    <div class="space-y-2">
+                                        <label class="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) px-1">Account Info</label>
+                                        <div class="grid grid-cols-1 gap-2.5">
+                                            <Input v-model="form.email" placeholder="Email Address" class="h-11 rounded-xl" />
+                                            <Input v-model="form.name" placeholder="Display Name (e.g. Work Email)" class="h-11 rounded-xl" />
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="border-t border-dashed border-(--border-default) opacity-50 py-1"></div>
+                                    
+                                    <div v-if="form.account_type === 'full'" class="space-y-2">
+                                        <label class="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) px-1">Incoming (IMAP)</label>
+                                        <div class="grid grid-cols-12 gap-2.5">
+                                            <div class="col-span-6">
+                                                <Input v-model="form.imap_host" placeholder="imap.server.com" class="h-11 rounded-xl" />
+                                            </div>
+                                            <div class="col-span-3">
+                                                <Input v-model.number="form.imap_port" placeholder="Port" class="h-11 rounded-xl" />
+                                            </div>
+                                            <div class="col-span-3">
+                                                <select 
+                                                    v-model="form.imap_encryption" 
+                                                    class="w-full h-11 px-3 bg-(--surface-primary) border border-(--border-default) rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-(--brand-primary)/10 focus:border-(--brand-primary) transition-all"
+                                                >
+                                                    <option v-for="opt in encryptionOptions" :key="opt.value" :value="opt.value">
+                                                        {{ opt.label }}
+                                                    </option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="space-y-2">
+                                        <label class="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) px-1">Outgoing (SMTP)</label>
+                                        <div class="grid grid-cols-12 gap-2.5">
+                                            <div class="col-span-6">
+                                                <Input v-model="form.smtp_host" placeholder="smtp.server.com" class="h-11 rounded-xl" />
+                                            </div>
+                                            <div class="col-span-3">
+                                                <Input v-model.number="form.smtp_port" placeholder="Port" class="h-11 rounded-xl" />
+                                            </div>
+                                            <div class="col-span-3">
+                                                <select 
+                                                    v-model="form.smtp_encryption" 
+                                                    class="w-full h-11 px-3 bg-(--surface-primary) border border-(--border-default) rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-(--brand-primary)/10 focus:border-(--brand-primary) transition-all"
+                                                >
+                                                    <option v-for="opt in encryptionOptions" :key="opt.value" :value="opt.value">
+                                                        {{ opt.label }}
+                                                    </option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="border-t border-dashed border-(--border-default) opacity-50 py-1"></div>
+                                    
+                                    <div class="space-y-2">
+                                        <label class="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) px-1">Credentials</label>
+                                        <div class="grid grid-cols-1 gap-2.5">
+                                            <Input v-model="form.username" placeholder="Username (usually same as email)" class="h-11 rounded-xl" />
+                                            <Input v-model="form.password" type="password" :placeholder="form.account_type === 'smtp' ? 'API Key / Auth Token' : 'App Password / Login Password'" class="h-11 rounded-xl" />
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex gap-4 pt-4">
+                                    <Button 
+                                        variant="secondary" 
+                                        class="flex-1 rounded-xl h-12 font-bold"
+                                        :disabled="isLoading || isTestingConfig"
+                                        @click="testConfiguration"
+                                    >
+                                        <Loader2 v-if="isTestingConfig" class="w-4 h-4 animate-spin mr-2" />
+                                        <CheckCircle2 v-else class="w-4 h-4 mr-2" />
+                                        Test Connection
+                                    </Button>
+                                    <Button 
+                                        class="flex-1 rounded-xl h-12 font-bold shadow-lg shadow-(--brand-primary)/20"
+                                        :disabled="isLoading || isTestingConfig"
+                                        @click="connectCustom"
+                                    >
+                                        <Loader2 v-if="isLoading" class="w-4 h-4 animate-spin mr-2" />
+                                        <Check v-else class="w-4 h-4 mr-2" />
+                                        Connect
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
 
-                        <!-- Manual Form -->
-                        <div v-else class="space-y-4">
+                        <!-- Step 5: Health Check -->
+                        <div v-else-if="step === 5" class="space-y-6 w-full max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 px-4">
+                            <div class="text-center space-y-2">
+                                <h2 class="text-2xl font-bold tracking-tight text-(--text-primary)">Domain Health Status</h2>
+                                <p class="text-(--text-secondary) text-sm">
+                                    Verifying DNS settings for <strong class="text-(--text-primary)">{{ form.email }}</strong>
+                                </p>
+                            </div>
+
+                            <div v-if="!healthResults" class="flex flex-col items-center justify-center py-12 space-y-4 bg-(--surface-secondary)/20 rounded-3xl border border-dashed border-(--border-default)">
+                                <div class="w-20 h-20 rounded-full bg-(--brand-primary)/10 flex items-center justify-center animate-pulse">
+                                    <Activity class="w-10 h-10 text-(--brand-primary)" />
+                                </div>
+                                <Button @click="runHealthCheck" :disabled="isCheckingHealth" size="lg" class="shadow-lg shadow-(--brand-primary)/20">
+                                    <Loader2 v-if="isCheckingHealth" class="w-4 h-4 animate-spin mr-2" />
+                                    Run Health Check Now
+                                </Button>
+                                <p class="text-[11px] text-(--text-muted) max-w-sm text-center font-medium leading-relaxed">
+                                    This check verifies MX, SPF, DKIM, and DMARC records to ensure excellent deliverability and inbox security.
+                                </p>
+                            </div>
+
+                            <div v-else class="space-y-4">
+                                <div class="grid gap-3">
+                                    <!-- MX Record -->
+                                    <div class="p-5 rounded-3xl border transition-all duration-300" :class="healthResults.mx.status ? 'bg-emerald-500/3 border-emerald-500/20' : 'bg-red-500/3 border-red-500/20'">
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <span class="font-black text-[11px] uppercase tracking-widest text-(--text-secondary)">MX Records (Receiving)</span>
+                                            <span :class="healthResults.mx.status ? 'text-emerald-500' : 'text-red-500'" class="flex items-center gap-1.5 text-xs font-black">
+                                                <CheckCircle2 v-if="healthResults.mx.status" class="w-4 h-4" />
+                                                <AlertCircle v-else class="w-4 h-4" />
+                                                {{ healthResults.mx.status ? 'PASSED' : 'REQUIRED' }}
+                                            </span>
+                                        </div>
+                                        <p class="text-sm font-medium text-(--text-primary) leading-snug">{{ healthResults.mx.message }}</p>
+                                    </div>
+
+                                    <!-- SPF Record -->
+                                    <div class="p-5 rounded-3xl border transition-all duration-300" :class="healthResults.spf.status ? 'bg-emerald-500/3 border-emerald-500/20' : 'bg-yellow-500/3 border-yellow-500/20'">
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <span class="font-black text-[11px] uppercase tracking-widest text-(--text-secondary)">SPF Record (Identity)</span>
+                                            <span :class="healthResults.spf.status ? 'text-emerald-500' : 'text-yellow-600'" class="flex items-center gap-1.5 text-xs font-black">
+                                                <CheckCircle2 v-if="healthResults.spf.status" class="w-4 h-4" />
+                                                <AlertTriangle v-else class="w-4 h-4" />
+                                                 {{ healthResults.spf.status ? 'PASSED' : 'WARNING' }}
+                                            </span>
+                                        </div>
+                                        <p class="text-sm font-medium text-(--text-primary) leading-snug">{{ healthResults.spf.message }}</p>
+                                    </div>
+
+                                    <!-- DMARC Record -->
+                                    <div class="p-5 rounded-3xl border transition-all duration-300" :class="healthResults.dmarc.status ? 'bg-emerald-500/3 border-emerald-500/20' : 'bg-yellow-500/3 border-yellow-500/20'">
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <span class="font-black text-[11px] uppercase tracking-widest text-(--text-secondary)">DMARC Policy (Security)</span>
+                                            <span :class="healthResults.dmarc.status ? 'text-emerald-500' : 'text-yellow-600'" class="flex items-center gap-1.5 text-xs font-black">
+                                                <CheckCircle2 v-if="healthResults.dmarc.status" class="w-4 h-4" />
+                                                <AlertTriangle v-else class="w-4 h-4" />
+                                                {{ healthResults.dmarc.status ? 'PASSED' : 'WARNING' }}
+                                            </span>
+                                        </div>
+                                        <p class="text-sm font-medium text-(--text-primary) leading-snug">{{ healthResults.dmarc.message }}</p>
+                                    </div>
+                                </div>
+
+                                <div v-if="!healthResults.mx.status && form.account_type === 'full'" class="p-5 rounded-[24px] bg-red-500/10 border border-red-500/20 text-red-600 text-[13px] flex gap-4 font-medium animate-in zoom-in-95 duration-300 shadow-xl shadow-red-500/5">
+                                    <AlertCircle class="w-6 h-6 shrink-0" />
+                                    <p class="leading-relaxed">MX records are missing. You <strong>cannot receive emails</strong> in Full Synchronization mode until these are configured.</p>
+                                </div>
+                                <div v-else-if="!healthResults.spf.status || !healthResults.dmarc.status || !healthResults.mx.status" class="p-5 rounded-[24px] bg-yellow-500/10 border border-yellow-500/20 text-yellow-700 text-[13px] flex gap-4 font-medium animate-in zoom-in-95 duration-300 shadow-xl shadow-yellow-500/5">
+                                    <AlertTriangle class="w-6 h-6 shrink-0" />
+                                    <p class="leading-relaxed">Some health checks have warnings. Your emails may be flagged as spam by recipients, but you can still proceed.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 6: Folder Selection -->
+                        <div v-else-if="step === 6" class="w-full h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500 px-4">
+                            <div class="mb-6 text-center">
+                                <h2 class="text-2xl font-bold tracking-tight text-(--text-primary)">Sync Folders</h2>
+                                <p class="text-(--text-secondary) text-sm mt-1">
+                                    Select the folders you want to access in WorkSphere.
+                                </p>
+                            </div>
+        
+                            <div v-if="isLoading" class="flex-1 flex flex-col items-center justify-center min-h-[200px]">
+                                <Loader2 class="w-12 h-12 animate-spin text-(--brand-primary) mb-4 opacity-50" />
+                                <p class="text-base font-semibold text-(--text-secondary)">Discovering folders...</p>
+                            </div>
+        
+                            <div v-else class="flex-1 flex flex-col">
+                                 <div class="flex justify-end px-2 mb-3">
+                                    <button 
+                                        @click="selectedFolders = remoteFolders.map(f => f.name)"
+                                        class="text-xs font-black uppercase tracking-widest text-(--brand-primary) hover:text-(--brand-primary-hover) px-3 py-1.5 transition-colors"
+                                    >
+                                        Select All
+                                    </button>
+                                    <div class="w-px h-3 bg-(--border-default) self-center mx-1"></div>
+                                    <button 
+                                        @click="selectedFolders = []"
+                                        class="text-xs font-black uppercase tracking-widest text-(--text-muted) hover:text-(--text-secondary) px-3 py-1.5 transition-colors"
+                                    >
+                                        Deselect All
+                                    </button>
+                                </div>
+                                
+                                <div class="flex-1 overflow-y-auto border border-(--border-default) rounded-[32px] p-3 max-h-[380px] bg-(--surface-secondary)/20 backdrop-blur-xl space-y-2.5 scrollbar-thin">
+                                    <div 
+                                        v-for="folder in remoteFolders" 
+                                        :key="folder.name"
+                                        @click="toggleFolder(folder.name)"
+                                        class="flex items-center gap-4 p-5 rounded-[24px] cursor-pointer select-none transition-all duration-300 group border-2"
+                                        :class="selectedFolders.includes(folder.name) 
+                                            ? 'bg-(--brand-primary)/10 border-(--brand-primary) shadow-xl shadow-(--brand-primary)/10 scale-[1.02]' 
+                                            : 'bg-(--surface-primary)/50 border-(--border-subtle) hover:bg-(--surface-primary) hover:border-(--brand-primary)/40'"
+                                    >
+                                        <div class="relative flex items-center justify-center w-8 h-8 rounded-xl border-2 transition-all duration-300 shrink-0"
+                                             :class="selectedFolders.includes(folder.name) ? 'bg-(--brand-primary) border-(--brand-primary) shadow-sm' : 'border-(--border-strong) bg-(--surface-elevated) group-hover:border-(--brand-primary)/50'">
+                                            <Check v-if="selectedFolders.includes(folder.name)" class="w-5 h-5 text-white stroke-[3.5px]" />
+                                        </div>
+                                        <div class="flex flex-col min-w-0">
+                                            <span class="text-base font-black tracking-tight transition-colors" :class="selectedFolders.includes(folder.name) ? 'text-(--brand-primary)' : 'text-(--text-secondary) group-hover:text-(--text-primary)'">
+                                                {{ folder.name }}
+                                            </span>
+                                            <span class="text-[10px] font-black uppercase tracking-widest transition-colors" :class="selectedFolders.includes(folder.name) ? 'text-(--brand-primary)/70' : 'text-(--text-muted) opacity-50'">
+                                                {{ selectedFolders.includes(folder.name) ? 'Synchronized' : 'Hidden' }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div v-if="remoteFolders.length === 0" class="p-10 text-center text-(--text-muted) italic">
+                                        <p>No folders discovered.</p>
+                                        <p class="text-xs mt-2 font-black uppercase tracking-widest opacity-50">We will sync your Inbox by default.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+    
+                        <!-- Step 7: Finish -->
+                        <div v-else-if="step === 7" class="w-full max-w-md mx-auto py-12 px-4 text-center animate-in zoom-in-95 duration-500">
+                             <div class="w-24 h-24 rounded-full bg-emerald-500/10 flex items-center justify-center mb-8 mx-auto relative group">
+                                <div class="absolute inset-0 rounded-full bg-emerald-500/10 animate-ping duration-1000"></div>
+                                <CheckCircle2 class="w-12 h-12 text-emerald-600 transition-transform duration-500 group-hover:scale-110" />
+                            </div>
+    
                             <div class="space-y-4">
-                                <div class="space-y-2">
-                                    <label class="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) px-1">Account Info</label>
-                                    <div class="grid grid-cols-1 gap-2.5">
-                                        <Input v-model="form.email" placeholder="Email Address" class="h-11 rounded-xl" />
-                                        <Input v-model="form.name" placeholder="Display Name (e.g. Work Email)" class="h-11 rounded-xl" />
-                                    </div>
-                                </div>
-                                
-                                <div class="border-t border-dashed border-(--border-default) opacity-50 py-1"></div>
-                                
-                                <div class="space-y-2">
-                                    <label class="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) px-1">Incoming (IMAP)</label>
-                                    <div class="grid grid-cols-12 gap-2.5">
-                                        <div class="col-span-6">
-                                            <Input v-model="form.imap_host" placeholder="imap.server.com" class="h-11 rounded-xl" />
-                                        </div>
-                                        <div class="col-span-3">
-                                            <Input v-model.number="form.imap_port" placeholder="Port" class="h-11 rounded-xl" />
-                                        </div>
-                                        <div class="col-span-3">
-                                            <select 
-                                                v-model="form.imap_encryption" 
-                                                class="w-full h-11 px-3 bg-(--surface-primary) border border-(--border-default) rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-(--brand-primary)/10 focus:border-(--brand-primary) transition-all"
-                                            >
-                                                <option v-for="opt in encryptionOptions" :key="opt.value" :value="opt.value">
-                                                    {{ opt.label }}
-                                                </option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="space-y-2">
-                                    <label class="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) px-1">Outgoing (SMTP)</label>
-                                    <div class="grid grid-cols-12 gap-2.5">
-                                        <div class="col-span-6">
-                                            <Input v-model="form.smtp_host" placeholder="smtp.server.com" class="h-11 rounded-xl" />
-                                        </div>
-                                        <div class="col-span-3">
-                                            <Input v-model.number="form.smtp_port" placeholder="Port" class="h-11 rounded-xl" />
-                                        </div>
-                                        <div class="col-span-3">
-                                            <select 
-                                                v-model="form.smtp_encryption" 
-                                                class="w-full h-11 px-3 bg-(--surface-primary) border border-(--border-default) rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-(--brand-primary)/10 focus:border-(--brand-primary) transition-all"
-                                            >
-                                                <option v-for="opt in encryptionOptions" :key="opt.value" :value="opt.value">
-                                                    {{ opt.label }}
-                                                </option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="border-t border-dashed border-(--border-default) opacity-50 py-1"></div>
-                                
-                                <div class="space-y-2">
-                                    <label class="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) px-1">Credentials</label>
-                                    <div class="grid grid-cols-1 gap-2.5">
-                                        <Input v-model="form.username" placeholder="Username (usually same as email)" class="h-11 rounded-xl" />
-                                        <Input v-model="form.password" type="password" placeholder="App Password / Login Password" class="h-11 rounded-xl" />
-                                    </div>
-                                </div>
+                                <h2 class="text-4xl font-black tracking-tight text-(--text-primary)">You're all set!</h2>
+                                <p class="text-(--text-secondary) text-lg font-medium leading-relaxed">
+                                    Your account is now connected. We've started syncing your emails in the background.
+                                </p>
                             </div>
-                            
-                            <div class="flex gap-4 pt-4">
-                                <Button 
-                                    variant="secondary" 
-                                    class="flex-1 h-12 border-(--border-default) font-bold rounded-xl" 
-                                    :disabled="isLoading || isTestingConfig" 
-                                    @click="testConfiguration"
-                                >
-                                    <Loader2 v-if="isTestingConfig" class="w-4 h-4 animate-spin mr-2" />
-                                    <CheckCircle v-else class="w-4 h-4 mr-2 text-emerald-500" />
-                                    Test
-                                </Button>
-                                <Button 
-                                    class="flex-2 h-12 shadow-lg font-bold rounded-xl" 
-                                    :disabled="isLoading || isTestingConfig" 
-                                    @click="connectCustom"
-                                >
-                                    <Loader2 v-if="isLoading" class="w-4 h-4 animate-spin mr-2" />
-                                    <ArrowRight v-else class="w-4 h-4 mr-2" />
-                                    Connect Account
+    
+                            <div class="mt-12">
+                                <Button size="xl" class="min-w-[240px] rounded-2xl shadow-2xl shadow-(--brand-primary)/25" @click="emit('saved'); close()">
+                                    Return to Dashboard
                                 </Button>
                             </div>
                         </div>
-                    </div>
-    
-                    <!-- Step 4: Folder Selection -->
-                    <div v-else-if="step === 4" class="w-full h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-500 px-4">
-                        <div class="mb-6 text-center">
-                            <h2 class="text-2xl font-bold tracking-tight text-(--text-primary)">Sync Folders</h2>
-                            <p class="text-(--text-secondary) text-sm mt-1">
-                                Select the folders you want to access in WorkSphere.
-                            </p>
-                        </div>
-    
-                        <div v-if="isLoading" class="flex-1 flex flex-col items-center justify-center min-h-[200px]">
-                            <Loader2 class="w-12 h-12 animate-spin text-(--brand-primary) mb-4 opacity-50" />
-                            <p class="text-base font-semibold text-(--text-secondary)">Discovering folders...</p>
-                        </div>
-    
-                        <div v-else class="flex-1 flex flex-col">
-                             <div class="flex justify-end px-2 mb-3">
-                                <button 
-                                    @click="selectedFolders = remoteFolders.map(f => f.name)"
-                                    class="text-xs font-bold text-(--brand-primary) hover:text-(--brand-primary-hover) px-2 py-1 transition-colors"
-                                >
-                                    Select All
-                                </button>
-                                <div class="w-px h-3 bg-(--border-default) self-center mx-1"></div>
-                                <button 
-                                    @click="selectedFolders = []"
-                                    class="text-xs font-bold text-(--text-muted) hover:text-(--text-secondary) px-2 py-1 transition-colors"
-                                >
-                                    Deselect All
-                                </button>
-                            </div>
-                            
-                            <div class="flex-1 overflow-y-auto border border-(--border-default) rounded-[24px] p-3 max-h-[380px] bg-(--surface-secondary)/30 backdrop-blur-xl space-y-2 scrollbar-thin">
-                                <div 
-                                    v-for="folder in remoteFolders" 
-                                    :key="folder.name"
-                                    @click="toggleFolder(folder.name)"
-                                    class="flex items-center gap-4 p-4 rounded-2xl cursor-pointer select-none transition-all duration-300 group border-2"
-                                    :class="selectedFolders.includes(folder.name) 
-                                        ? 'bg-blue-500/10 border-blue-500 shadow-[0_8px_20px_-8px_rgba(59,130,246,0.3)] scale-[1.01]' 
-                                        : 'bg-(--surface-primary)/50 border-(--border-subtle) hover:bg-(--surface-primary) hover:border-blue-500/30'"
-                                >
-                                    <div class="relative flex items-center justify-center w-7 h-7 rounded-xl border-2 transition-all duration-300 shrink-0"
-                                         :class="selectedFolders.includes(folder.name) ? 'bg-blue-500 border-blue-500 shadow-sm' : 'border-(--border-strong) bg-(--surface-elevated) group-hover:border-blue-500/50'">
-                                        <Check v-if="selectedFolders.includes(folder.name)" class="w-5 h-5 text-white stroke-[3.5px]" />
-                                    </div>
-                                    <div class="flex flex-col min-w-0">
-                                        <span class="text-base font-black tracking-tight transition-colors" :class="selectedFolders.includes(folder.name) ? 'text-blue-600 dark:text-blue-400' : 'text-(--text-secondary) group-hover:text-(--text-primary)'">
-                                            {{ folder.name }}
-                                        </span>
-                                        <span class="text-[10px] font-black uppercase tracking-widest transition-colors" :class="selectedFolders.includes(folder.name) ? 'text-blue-600/70 dark:text-blue-400/60' : 'text-(--text-muted) opacity-50'">
-                                            {{ selectedFolders.includes(folder.name) ? 'Synchronized' : 'Hidden' }}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div v-if="remoteFolders.length === 0" class="p-10 text-center text-(--text-muted) italic">
-                                    <p>No folders discovered.</p>
-                                    <p class="text-xs mt-2 font-medium opacity-70">We will sync your Inbox by default.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Step 5: Finish -->
-                    <div v-else-if="step === 5" class="w-full max-w-md mx-auto pt-10 px-4 text-center">
-                        <div class="mx-auto w-24 h-24 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400 mb-6 shadow-sm ring-8 ring-green-50 dark:ring-green-900/10 shrink-0">
-                            <CheckCircle class="w-12 h-12" />
-                        </div>
-                        <h2 class="text-3xl font-bold mb-3 text-(--text-primary)">All Set!</h2>
-                        <p class="text-(--text-secondary) max-w-sm mx-auto mb-8 text-base">
-                            Your email account has been successfully connected. Syncing will run in the background.
-                        </p>
-                        <div class="flex justify-center w-full">
-                            <Button size="lg" class="px-8 min-w-[200px]" @click="emit('saved'); close()">
-                                Return to Settings
-                            </Button>
-                        </div>
-                    </div>
-                </Transition>
-            </div>
-        </div>
-
-        <template #footer>
-            <div class="flex w-full items-center justify-between pt-4 border-t border-(--border-default) mt-4" v-if="step < 5">
-                <Button variant="ghost" @click="step > 1 ? step-- : close()" :disabled="isLoading">
-                    {{ step === 1 ? 'Cancel' : 'Back' }}
-                </Button>
-
-                <div v-if="step === 1">
-                    <Button @click="step++">
-                        I Understand & Continue
-                    </Button>
+                    </Transition>
                 </div>
-                <div v-else-if="step === 4">
-                     <Button 
-                        :disabled="isLoading"
-                        @click="saveFolders"
-                        class="min-w-[120px]"
-                    >
-                         <Loader2 v-if="isLoading" class="w-4 h-4 animate-spin mr-2" />
-                        Finish Setup
-                    </Button>
-                </div>
-                 <!-- Other steps handle forward nav internally -->
-                 <div v-else></div>
             </div>
-        </template>
-    </Modal>
-</template>
+    
+            <template #footer>
+                <div class="flex w-full items-center justify-between pt-6 border-t border-(--border-default) mt-6" v-if="step < 7">
+                    <Button variant="ghost" @click="step > 1 ? step-- : close()" :disabled="isLoading || isTestingConfig" class="px-6 rounded-xl font-bold">
+                        {{ step === 1 ? 'Cancel' : 'Back' }}
+                    </Button>
+    
+                    <div v-if="step === 1">
+                        <Button @click="step++" class="px-8 rounded-xl font-black uppercase tracking-widest text-[11px] shadow-lg shadow-(--brand-primary)/10">
+                            I Understand & Continue
+                        </Button>
+                    </div>
+                    <div v-else-if="step === 5">
+                        <Button 
+                            class="px-8 rounded-xl font-black uppercase tracking-widest text-[11px] shadow-lg shadow-(--brand-primary)/10"
+                            :disabled="isCheckingHealth || (healthResults && !healthResults.mx.status && form.account_type === 'full')"
+                            @click="form.account_type === 'smtp' ? step = 7 : step = 6"
+                        >
+                            {{ (healthResults && !healthResults.mx.status && form.account_type === 'full') ? 'Fix DNS to Continue' : 'Next Step' }}
+                            <ArrowRight class="w-4 h-4 ml-2" />
+                        </Button>
+                    </div>
+                    <div v-else-if="step === 6">
+                         <Button 
+                            :disabled="isLoading"
+                            @click="saveFolders"
+                            class="px-8 rounded-xl font-black uppercase tracking-widest text-[11px] shadow-lg shadow-(--brand-primary)/10"
+                        >
+                             <Loader2 v-if="isLoading" class="w-4 h-4 animate-spin mr-2" />
+                            Finish Setup
+                        </Button>
+                    </div>
+                </div>
+            </template>
+        </Modal>
+    </template>
 <style scoped>
 .fade-enter-active,
 .fade-leave-active {

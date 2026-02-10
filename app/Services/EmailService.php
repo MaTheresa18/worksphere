@@ -223,6 +223,14 @@ class EmailService implements EmailServiceContract
     }
 
     /**
+     * Toggle pinned status.
+     */
+    public function togglePin(Email $email): Email
+    {
+        return $email->togglePin();
+    }
+
+    /**
      * Toggle important status.
      */
     public function toggleImportant(Email $email): Email
@@ -235,6 +243,9 @@ class EmailService implements EmailServiceContract
      */
     public function delete(Email $email): void
     {
+        // Invalidate body cache
+        app(CacheService::class)->forget("email_body:{$email->id}");
+
         // If already in trash, permanently delete
         if ($email->folder === EmailFolderType::Trash->value) {
             $email->forceDelete();

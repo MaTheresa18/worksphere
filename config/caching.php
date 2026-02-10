@@ -41,6 +41,8 @@ return [
         'audit_logs' => 300,          // 5 minutes
         'user_data' => 600,           // 10 minutes
         'navigation' => 3600,         // 1 hour
+        'email_body' => 86400,        // 24 hours
+        'email_folder_counts' => 300, // 5 minutes
         'default' => 600,             // 10 minutes
     ],
 

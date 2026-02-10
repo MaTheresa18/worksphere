@@ -11,6 +11,7 @@ import {
     RefreshCw,
     ExternalLink,
     AlertCircle,
+    Activity,
 } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import axios from "axios";
@@ -34,6 +35,10 @@ const showModal = ref(false);
 const editingAccount = ref(null);
 const isSaving = ref(false);
 const isTesting = ref({});
+const isCheckingHealth = ref({});
+const healthResults = ref(null);
+const showHealthModal = ref(false);
+const healthCheckAccount = ref(null);
 
 const isSystem = computed(() => props.mode === "system");
 
@@ -60,7 +65,11 @@ const folderTypes = [
     { value: "drafts", label: "Drafts", description: "Draft emails" },
     { value: "trash", label: "Trash", description: "Deleted emails" },
     { value: "spam", label: "Spam", description: "Spam/junk emails" },
-    { value: "archive", label: "Archive", description: "Gmail All Mail / Archived" },
+    {
+        value: "archive",
+        label: "Archive",
+        description: "Gmail All Mail / Archived",
+    },
 ];
 
 const remoteFolders = ref([]);
@@ -70,7 +79,9 @@ const fetchRemoteFolders = async (accountId) => {
     isLoadingRemoteFolders.value = true;
     remoteFolders.value = [];
     try {
-        const response = await axios.get(`/api/email-accounts/${accountId}/remote-folders`);
+        const response = await axios.get(
+            `/api/email-accounts/${accountId}/remote-folders`,
+        );
         remoteFolders.value = response.data.data;
     } catch (error) {
         console.error("Failed to fetch remote folders:", error);
@@ -270,6 +281,23 @@ const testConfiguration = async () => {
     }
 };
 
+const checkHealth = async (account) => {
+    isCheckingHealth.value[account.id] = true;
+    healthResults.value = null;
+    try {
+        const response = await axios.post(
+            `/api/email-accounts/${account.id}/health-check`,
+        );
+        healthResults.value = response.data.data;
+        healthCheckAccount.value = account;
+        showHealthModal.value = true;
+    } catch (error) {
+        toast.error("Failed to perform health check");
+    } finally {
+        isCheckingHealth.value[account.id] = false;
+    }
+};
+
 const connectOAuth = async (provider) => {
     try {
         const params = props.teamId ? `?team_id=${props.teamId}` : "";
@@ -310,14 +338,14 @@ const onWizardSaved = () => {
                     <Mail class="w-4 h-4 text-indigo-600" />
                 </div>
                 <div>
-                    <h3 class="font-medium text-[var(--text-primary)]">
+                    <h3 class="font-medium text-(--text-primary)">
                         {{
                             isSystem
                                 ? "System Email Accounts"
                                 : "Email Accounts"
                         }}
                     </h3>
-                    <p class="text-xs text-[var(--text-muted)]">
+                    <p class="text-xs text-(--text-muted)">
                         {{
                             isSystem
                                 ? "Connect accounts for system notifications. These accounts are for system internal use."
@@ -334,19 +362,19 @@ const onWizardSaved = () => {
 
         <!-- Loading -->
         <div v-if="isLoading" class="flex items-center justify-center py-8">
-            <RefreshCw class="w-6 h-6 animate-spin text-[var(--text-muted)]" />
+            <RefreshCw class="w-6 h-6 animate-spin text-(--text-muted)" />
         </div>
 
         <!-- Empty State -->
         <div
             v-else-if="accounts.length === 0"
-            class="text-center py-8 border border-dashed border-[var(--border-default)] rounded-lg"
+            class="text-center py-8 border border-dashed border-(--border-default) rounded-lg"
         >
             <Mail
-                class="w-10 h-10 text-[var(--text-muted)] mx-auto mb-2 opacity-50"
+                class="w-10 h-10 text-(--text-muted) mx-auto mb-2 opacity-50"
             />
             <p class="text-[var(--text-muted)]">No email accounts connected</p>
-            <p class="text-sm text-[var(--text-muted)] mb-4">
+            <p class="text-sm text-(--text-muted) mb-4">
                 Add an account to send emails from the application
             </p>
             <div class="flex items-center justify-center gap-2">
@@ -362,7 +390,7 @@ const onWizardSaved = () => {
             <div
                 v-for="account in accounts"
                 :key="account.id"
-                class="flex items-center justify-between p-4 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-default)]"
+                class="flex items-center justify-between p-4 bg-(--surface-secondary) rounded-lg border border-(--border-default)"
             >
                 <div class="flex items-center gap-3">
                     <div
@@ -383,7 +411,7 @@ const onWizardSaved = () => {
                     </div>
                     <div>
                         <div class="flex items-center gap-2">
-                            <p class="font-medium text-[var(--text-primary)]">
+                            <p class="font-medium text-(--text-primary)">
                                 {{ account.name }}
                             </p>
                             <span
@@ -402,20 +430,20 @@ const onWizardSaved = () => {
                                 >Shared</span
                             >
                             <!-- Badges -->
-                            <span 
+                            <span
                                 v-if="account.auth_type === 'oauth'"
                                 class="px-1.5 py-0.5 text-[10px] font-bold bg-indigo-500/10 text-indigo-600 rounded uppercase tracking-wider border border-indigo-500/20"
                             >
                                 OAuth
                             </span>
-                            <span 
+                            <span
                                 v-else
                                 class="px-1.5 py-0.5 text-[10px] font-bold bg-gray-500/10 text-gray-600 rounded uppercase tracking-wider border border-gray-500/20"
                             >
                                 IMAP
                             </span>
                         </div>
-                        <p class="text-sm text-[var(--text-secondary)]">
+                        <p class="text-sm text-(--text-secondary)">
                             {{ account.email }}
                         </p>
                         <div class="flex items-center gap-3 mt-1.5">
@@ -439,9 +467,11 @@ const onWizardSaved = () => {
                                 }}
                             </span>
                             <span
-                                class="text-[11px] text-[var(--text-muted)] font-medium capitalize flex items-center gap-1"
+                                class="text-[11px] text-(--text-muted) font-medium capitalize flex items-center gap-1"
                             >
-                                <span class="w-1 h-1 rounded-full bg-[var(--border-default)]"></span>
+                                <span
+                                    class="w-1 h-1 rounded-full bg-[var(--border-default)]"
+                                ></span>
                                 {{ account.provider }}
                             </span>
                         </div>
@@ -476,6 +506,22 @@ const onWizardSaved = () => {
                         variant="ghost"
                         size="icon"
                         class="h-8 w-8"
+                        @click="checkHealth(account)"
+                        :disabled="isCheckingHealth[account.id]"
+                        title="Run Health Check"
+                    >
+                        <Activity
+                            :class="[
+                                'w-4 h-4',
+                                isCheckingHealth[account.id] &&
+                                    'animate-bounce',
+                            ]"
+                        />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        class="h-8 w-8"
                         @click="openModal(account)"
                     >
                         <Edit2 class="w-4 h-4" />
@@ -490,7 +536,6 @@ const onWizardSaved = () => {
                     </Button>
                 </div>
             </div>
-
         </div>
 
         <!-- Add/Edit Modal -->
@@ -525,7 +570,7 @@ const onWizardSaved = () => {
                             'p-4 rounded-xl border text-center transition-all duration-200',
                             form.provider === provider.id
                                 ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600 dark:bg-indigo-500/10'
-                                : 'border-[var(--border-default)] hover:border-[var(--border-hover)] hover:bg-[var(--surface-hover)]',
+                                : 'border-(--border-default) hover:border-(--border-hover) hover:bg-(--surface-hover)',
                         ]"
                     >
                         <div class="flex flex-col items-center gap-2">
@@ -550,7 +595,7 @@ const onWizardSaved = () => {
                             </div>
 
                             <span
-                                class="text-sm font-medium text-[var(--text-primary)]"
+                                class="text-sm font-medium text-(--text-primary)"
                             >
                                 {{ provider.name }}
                             </span>
@@ -570,12 +615,12 @@ const onWizardSaved = () => {
                     </div>
                     <div>
                         <h3
-                            class="text-lg font-medium text-[var(--text-primary)]"
+                            class="text-lg font-medium text-(--text-primary)"
                         >
                             Connect with {{ selectedProvider.name }}
                         </h3>
                         <p
-                            class="text-sm text-[var(--text-secondary)] mt-1 max-w-xs mx-auto"
+                            class="text-sm text-(--text-secondary) mt-1 max-w-xs mx-auto"
                         >
                             You will be redirected to
                             {{ selectedProvider.name }} to authorize access to
@@ -597,7 +642,7 @@ const onWizardSaved = () => {
                     <div class="grid grid-cols-2 gap-4">
                         <div class="space-y-1.5">
                             <label
-                                class="text-sm font-medium text-[var(--text-primary)]"
+                                class="text-sm font-medium text-(--text-primary)"
                                 >Account Name *</label
                             >
                             <Input
@@ -607,7 +652,7 @@ const onWizardSaved = () => {
                         </div>
                         <div class="space-y-1.5">
                             <label
-                                class="text-sm font-medium text-[var(--text-primary)]"
+                                class="text-sm font-medium text-(--text-primary)"
                                 >Email Address *</label
                             >
                             <Input
@@ -620,12 +665,12 @@ const onWizardSaved = () => {
                         <!-- System Usage (Only for System Mode) -->
                         <div v-if="isSystem" class="col-span-2">
                             <label
-                                class="text-sm font-medium text-[var(--text-primary)]"
+                                class="text-sm font-medium text-(--text-primary)"
                                 >System Role</label
                             >
                             <select
                                 v-model="form.system_usage"
-                                class="w-full px-3 py-2 mt-1.5 text-sm bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                class="w-full px-3 py-2 mt-1.5 text-sm bg-(--surface-primary) border border-(--border-default) rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                             >
                                 <option value="">None / General</option>
                                 <option value="support">
@@ -638,7 +683,7 @@ const onWizardSaved = () => {
                                     Noreply (Automated Emails)
                                 </option>
                             </select>
-                            <p class="text-xs text-[var(--text-muted)] mt-1">
+                            <p class="text-xs text-(--text-muted) mt-1">
                                 Assign a specific role to this account. Only one
                                 active account per role is allowed.
                             </p>
@@ -646,21 +691,21 @@ const onWizardSaved = () => {
 
                         <!-- IMAP Settings -->
                         <div
-                            class="col-span-2 border-t border-[var(--border-default)] pt-4 mt-2"
+                            class="col-span-2 border-t border-(--border-default) pt-4 mt-2"
                         >
                             <div class="flex items-center gap-2 mb-3">
                                 <div
                                     class="w-1 h-4 bg-indigo-500 rounded-full"
                                 ></div>
                                 <p
-                                    class="text-sm font-medium text-[var(--text-primary)]"
+                                    class="text-sm font-medium text-(--text-primary)"
                                 >
                                     IMAP Settings (Incoming)
                                 </p>
                             </div>
                         </div>
                         <div class="space-y-1.5">
-                            <label class="text-sm text-[var(--text-secondary)]"
+                            <label class="text-sm text-(--text-secondary)"
                                 >IMAP Host</label
                             >
                             <Input
@@ -671,7 +716,7 @@ const onWizardSaved = () => {
                         <div class="grid grid-cols-2 gap-2">
                             <div class="space-y-1.5">
                                 <label
-                                    class="text-sm text-[var(--text-secondary)]"
+                                    class="text-sm text-(--text-secondary)"
                                     >Port</label
                                 >
                                 <Input
@@ -681,12 +726,12 @@ const onWizardSaved = () => {
                             </div>
                             <div class="space-y-1.5">
                                 <label
-                                    class="text-sm text-[var(--text-secondary)]"
+                                    class="text-sm text-(--text-secondary)"
                                     >Encryption</label
                                 >
                                 <select
                                     v-model="form.imap_encryption"
-                                    class="w-full px-3 py-2 text-sm bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                    class="w-full px-3 py-2 text-sm bg-(--surface-primary) border border-(--border-default) rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                                 >
                                     <option
                                         v-for="e in encryptionOptions"
@@ -701,21 +746,21 @@ const onWizardSaved = () => {
 
                         <!-- SMTP Settings -->
                         <div
-                            class="col-span-2 border-t border-[var(--border-default)] pt-4 mt-2"
+                            class="col-span-2 border-t border-(--border-default) pt-4 mt-2"
                         >
                             <div class="flex items-center gap-2 mb-3">
                                 <div
                                     class="w-1 h-4 bg-purple-500 rounded-full"
                                 ></div>
                                 <p
-                                    class="text-sm font-medium text-[var(--text-primary)]"
+                                    class="text-sm font-medium text-(--text-primary)"
                                 >
                                     SMTP Settings (Outgoing)
                                 </p>
                             </div>
                         </div>
                         <div class="space-y-1.5">
-                            <label class="text-sm text-[var(--text-secondary)]"
+                            <label class="text-sm text-(--text-secondary)"
                                 >SMTP Host</label
                             >
                             <Input
@@ -726,7 +771,7 @@ const onWizardSaved = () => {
                         <div class="grid grid-cols-2 gap-2">
                             <div class="space-y-1.5">
                                 <label
-                                    class="text-sm text-[var(--text-secondary)]"
+                                    class="text-sm text-(--text-secondary)"
                                     >Port</label
                                 >
                                 <Input
@@ -736,12 +781,12 @@ const onWizardSaved = () => {
                             </div>
                             <div class="space-y-1.5">
                                 <label
-                                    class="text-sm text-[var(--text-secondary)]"
+                                    class="text-sm text-(--text-secondary)"
                                     >Encryption</label
                                 >
                                 <select
                                     v-model="form.smtp_encryption"
-                                    class="w-full px-3 py-2 text-sm bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                    class="w-full px-3 py-2 text-sm bg-(--surface-primary) border border-(--border-default) rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                                 >
                                     <option
                                         v-for="e in encryptionOptions"
@@ -756,21 +801,21 @@ const onWizardSaved = () => {
 
                         <!-- Credentials -->
                         <div
-                            class="col-span-2 border-t border-[var(--border-default)] pt-4 mt-2"
+                            class="col-span-2 border-t border-(--border-default) pt-4 mt-2"
                         >
                             <div class="flex items-center gap-2 mb-3">
                                 <div
                                     class="w-1 h-4 bg-green-500 rounded-full"
                                 ></div>
                                 <p
-                                    class="text-sm font-medium text-[var(--text-primary)]"
+                                    class="text-sm font-medium text-(--text-primary)"
                                 >
                                     Authentication
                                 </p>
                             </div>
                         </div>
                         <div class="space-y-1.5">
-                            <label class="text-sm text-[var(--text-secondary)]"
+                            <label class="text-sm text-(--text-secondary)"
                                 >Username</label
                             >
                             <Input
@@ -779,7 +824,7 @@ const onWizardSaved = () => {
                             />
                         </div>
                         <div class="space-y-1.5">
-                            <label class="text-sm text-[var(--text-secondary)]"
+                            <label class="text-sm text-(--text-secondary)"
                                 >Password</label
                             >
                             <Input
@@ -794,26 +839,32 @@ const onWizardSaved = () => {
                 <!-- Folder Sync Settings (visible when editing any account type) -->
                 <div
                     v-if="editingAccount"
-                    class="border-t border-[var(--border-default)] pt-4 mt-2"
+                    class="border-t border-(--border-default) pt-4 mt-2"
                 >
                     <div class="flex items-center gap-2 mb-3">
-                        <div
-                            class="w-1 h-4 bg-amber-500 rounded-full"
-                        ></div>
+                        <div class="w-1 h-4 bg-amber-500 rounded-full"></div>
                         <p
-                            class="text-sm font-medium text-[var(--text-primary)]"
+                            class="text-sm font-medium text-(--text-primary)"
                         >
                             Folder Sync Settings
                         </p>
                     </div>
-                    <p class="text-xs text-[var(--text-muted)] mb-3">
-                        Toggle which folders to sync. Disabled folders won't be downloaded.
+                    <p class="text-xs text-(--text-muted) mb-3">
+                        Toggle which folders to sync. Disabled folders won't be
+                        downloaded.
                     </p>
                     <div class="grid grid-cols-2 gap-2">
                         <!-- Loading State -->
-                        <div v-if="isLoadingRemoteFolders && editingAccount" class="col-span-2 flex items-center justify-center py-4">
-                            <RefreshCw class="w-5 h-5 animate-spin text-[var(--text-muted)]" />
-                            <span class="ml-2 text-sm text-[var(--text-muted)]">Fetching folders...</span>
+                        <div
+                            v-if="isLoadingRemoteFolders && editingAccount"
+                            class="col-span-2 flex items-center justify-center py-4"
+                        >
+                            <RefreshCw
+                                class="w-5 h-5 animate-spin text-(--text-muted)"
+                            />
+                            <span class="ml-2 text-sm text-(--text-muted)"
+                                >Fetching folders...</span
+                            >
                         </div>
 
                         <!-- Fallback to hardcoded types if not editing or fetch failed -->
@@ -821,19 +872,29 @@ const onWizardSaved = () => {
                             <div
                                 v-for="folder in folderTypes"
                                 :key="folder.value"
-                                class="flex items-center justify-between p-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)]"
+                                class="flex items-center justify-between p-2 rounded-lg border border-(--border-default) bg-(--surface-primary)"
                             >
                                 <div class="flex flex-col">
-                                    <span class="text-sm font-medium text-[var(--text-primary)]">
+                                    <span
+                                        class="text-sm font-medium text-(--text-primary)"
+                                    >
                                         {{ folder.label }}
                                     </span>
-                                    <span class="text-xs text-[var(--text-muted)]">
+                                    <span
+                                        class="text-xs text-(--text-muted)"
+                                    >
                                         {{ folder.description }}
                                     </span>
                                 </div>
                                 <Switch
-                                    :checked="!form.disabled_folders.includes(folder.value)"
-                                    @update:checked="toggleFolderSync(folder.value)"
+                                    :checked="
+                                        !form.disabled_folders.includes(
+                                            folder.value,
+                                        )
+                                    "
+                                    @update:checked="
+                                        toggleFolderSync(folder.value)
+                                    "
                                 />
                             </div>
                         </template>
@@ -843,19 +904,35 @@ const onWizardSaved = () => {
                             <div
                                 v-for="folder in remoteFolders"
                                 :key="folder.id"
-                                class="flex items-center justify-between p-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)]"
+                                class="flex items-center justify-between p-2 rounded-lg border border-(--border-default) bg-(--surface-primary)"
                             >
                                 <div class="flex flex-col overflow-hidden">
-                                    <span class="text-sm font-medium text-[var(--text-primary)] truncate" :title="folder.name">
+                                    <span
+                                        class="text-sm font-medium text-(--text-primary) truncate"
+                                        :title="folder.name"
+                                    >
                                         {{ folder.name }}
                                     </span>
-                                    <span class="text-xs text-[var(--text-muted)] truncate" :title="folder.id">
-                                        {{ folder.type === 'system' ? 'System Folder' : 'Label' }}
+                                    <span
+                                        class="text-xs text-(--text-muted) truncate"
+                                        :title="folder.id"
+                                    >
+                                        {{
+                                            folder.type === "system"
+                                                ? "System Folder"
+                                                : "Label"
+                                        }}
                                     </span>
                                 </div>
                                 <Switch
-                                    :checked="!form.disabled_folders.includes(folder.id)"
-                                    @update:checked="toggleFolderSync(folder.id)"
+                                    :checked="
+                                        !form.disabled_folders.includes(
+                                            folder.id,
+                                        )
+                                    "
+                                    @update:checked="
+                                        toggleFolderSync(folder.id)
+                                    "
                                 />
                             </div>
                         </template>
@@ -896,7 +973,10 @@ const onWizardSaved = () => {
                         </Button>
                         <!-- Update button for OAuth accounts (only when editing) -->
                         <Button
-                            v-if="selectedProvider.supports_oauth && editingAccount"
+                            v-if="
+                                selectedProvider.supports_oauth &&
+                                editingAccount
+                            "
                             variant="primary"
                             @click="saveAccount"
                             :loading="isSaving"
@@ -906,6 +986,132 @@ const onWizardSaved = () => {
                     </div>
                 </div>
             </template>
+        </Modal>
+        <!-- Health Check Modal -->
+        <Modal
+            :open="showHealthModal"
+            @update:open="showHealthModal = $event"
+            title="Email Health Status"
+        >
+            <div v-if="healthResults" class="space-y-4">
+                <p class="text-sm text-(--text-secondary)">
+                    Health check results for
+                    <strong>{{ healthCheckAccount?.email }}</strong
+                    >.
+                </p>
+
+                <div class="space-y-3">
+                    <!-- MX Record -->
+                    <div
+                        class="p-3 rounded-lg border border-(--border-default)"
+                    >
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-medium text-(--text-primary)"
+                                >MX Records</span
+                            >
+                            <span
+                                :class="
+                                    healthResults.mx.status
+                                        ? 'text-emerald-600'
+                                        : 'text-red-600'
+                                "
+                            >
+                                <CheckCircle
+                                    v-if="healthResults.mx.status"
+                                    class="w-4 h-4"
+                                />
+                                <XCircle v-else class="w-4 h-4" />
+                            </span>
+                        </div>
+                        <p class="text-sm text-(--text-secondary)">
+                            {{ healthResults.mx.message }}
+                        </p>
+                        <div
+                            v-if="healthResults.mx.records"
+                            class="mt-2 text-xs text-(--text-muted) bg-(--surface-primary) p-2 rounded"
+                        >
+                            <div
+                                v-for="(rec, idx) in healthResults.mx.records"
+                                :key="idx"
+                            >
+                                {{ rec.host }} ({{ rec.ttl }})
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SPF Record -->
+                    <div
+                        class="p-3 rounded-lg border border-(--border-default)"
+                    >
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-medium text-(--text-primary)"
+                                >SPF Record</span
+                            >
+                            <span
+                                :class="
+                                    healthResults.spf.status
+                                        ? 'text-emerald-600'
+                                        : 'text-red-600'
+                                "
+                            >
+                                <CheckCircle
+                                    v-if="healthResults.spf.status"
+                                    class="w-4 h-4"
+                                />
+                                <XCircle v-else class="w-4 h-4" />
+                            </span>
+                        </div>
+                        <p class="text-sm text-(--text-secondary)">
+                            {{ healthResults.spf.message }}
+                        </p>
+                        <div
+                            v-if="healthResults.spf.record"
+                            class="mt-2 text-xs font-mono text-(--text-muted) bg-(--surface-primary) p-2 rounded break-all"
+                        >
+                            {{ healthResults.spf.record }}
+                        </div>
+                    </div>
+
+                    <!-- DMARC Record -->
+                    <div
+                        class="p-3 rounded-lg border border-(--border-default)"
+                    >
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-medium text-(--text-primary)"
+                                >DMARC Record</span
+                            >
+                            <span
+                                :class="
+                                    healthResults.dmarc.status
+                                        ? 'text-emerald-600'
+                                        : 'text-red-600'
+                                "
+                            >
+                                <CheckCircle
+                                    v-if="healthResults.dmarc.status"
+                                    class="w-4 h-4"
+                                />
+                                <XCircle v-else class="w-4 h-4" />
+                            </span>
+                        </div>
+                        <p class="text-sm text-(--text-secondary)">
+                            {{ healthResults.dmarc.message }}
+                        </p>
+                        <div
+                            v-if="healthResults.dmarc.record"
+                            class="mt-2 text-xs font-mono text-(--text-muted) bg-(--surface-primary) p-2 rounded break-all"
+                        >
+                            {{ healthResults.dmarc.record }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end mt-4">
+                    <Button variant="outline" @click="showHealthModal = false"
+                        >Close</Button
+                    >
+                </div>
+            </div>
         </Modal>
     </div>
 </template>

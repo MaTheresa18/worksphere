@@ -1,6 +1,9 @@
 name: "Pre-Clone Security Audit"
 on: [push, workflow_dispatch]
 
+permissions:
+  contents: read
+
 jobs:
   scan:
     runs-on: ubuntu-latest

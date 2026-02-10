@@ -1,4 +1,4 @@
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, getCurrentInstance, onUnmounted } from 'vue';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 
 const CONSENT_KEY = 'cookie_consent';
@@ -68,18 +68,33 @@ const clearFingerprint = () => {
     sessionStorage.removeItem(FINGERPRINT_KEY);
 };
 
+// Global event listener setup (only once)
+let isListenerSetup = false;
+const setupConsentListener = () => {
+    if (isListenerSetup) return;
+    if (typeof window === 'undefined') return;
+
+    window.addEventListener('consent-updated', (event: any) => { // Type cast to any to avoid CustomEvent issues
+        if (event.detail !== 'all') {
+            clearFingerprint();
+        }
+    });
+    isListenerSetup = true;
+};
+
 /**
  * Composable for fingerprint functionality
  */
 export function useFingerprint() {
-    // Listen for consent updates
-    onMounted(() => {
-        window.addEventListener('consent-updated', (event: CustomEvent) => {
-            if (event.detail !== 'all') {
-                clearFingerprint();
-            }
-        });
-    });
+    // Attempt to base the listener on lifecycle if inside component, otherwise just run it globally?
+    // Actually, `window.addEventListener` doesn't need to be in `onMounted` if we just want it to run.
+    // But we want to clean it up? No, this is a global store-like composable.
+    
+    // Simplest fix: Just allow the listener to be set up lazily when the composable is accessed, 
+    // but OUTSIDE of onMounted if we want it to work in router. 
+    // However, strictly speaking, we only need to listen for consent updates if we are active.
+    
+    setupConsentListener();
 
     return {
         getFingerprint,

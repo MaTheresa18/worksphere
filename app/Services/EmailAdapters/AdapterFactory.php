@@ -16,6 +16,12 @@ class AdapterFactory
     protected static array $adapters = [
         'gmail' => GmailAdapter::class,
         'outlook' => OutlookAdapter::class,
+        'yahoo' => YahooAdapter::class,
+        'zoho' => ZohoAdapter::class,
+        'fastmail' => FastmailAdapter::class,
+        'yandex' => YandexAdapter::class,
+        'gmx' => GmxAdapter::class,
+        'webde' => WebDeAdapter::class,
         'custom' => CustomImapAdapter::class,
     ];
 

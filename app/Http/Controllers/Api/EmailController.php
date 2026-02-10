@@ -8,6 +8,7 @@ use App\Http\Requests\SendEmailRequest;
 use App\Http\Resources\EmailResource;
 use App\Models\Email;
 use App\Models\EmailAccount;
+use App\Services\CacheService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -90,17 +91,16 @@ class EmailController extends Controller
 
         switch ($sortBy) {
             case 'sender':
-                // For threads, we can sort by the sender of the latest email
-                // or just MAX(from_name). Simplest is to sort by min/max based on order.
-                // However, without a join this is tricky in a pure aggregate query if we want meaningful thread sorting.
-                // But since we group by thread_key, we can aggregate.
+                $threadQuery->orderByRaw('MAX(is_pinned) DESC');
                 $threadQuery->orderByRaw("MAX(from_name) $sortOrder");
                 break;
             case 'subject':
+                $threadQuery->orderByRaw('MAX(is_pinned) DESC');
                 $threadQuery->orderByRaw("MAX(subject) $sortOrder");
                 break;
             case 'date':
             default:
+                $threadQuery->orderByRaw('MAX(is_pinned) DESC');
                 $threadQuery->orderBy('last_activity', $sortOrder);
                 break;
         }
@@ -179,20 +179,31 @@ class EmailController extends Controller
     }
 
     /**
-     * Get email body (on-demand fetch if missing).
+     * Get email body (on-demand fetch if missing, cached for 24h).
      */
     public function body(Email $email)
     {
         $this->authorize('view', $email);
 
-        if (empty($email->body_html) && empty($email->body_plain)) {
-            $email = $this->emailService->fetchBody($email);
-        }
+        $cache = app(CacheService::class);
 
-        return response()->json([
-            'body_html' => $email->body_html,
-            'body_plain' => $email->body_plain,
-        ]);
+        $data = $cache->remember(
+            "email_body:{$email->id}",
+            null, // Use category TTL (24h)
+            function () use ($email) {
+                if (empty($email->body_html) && empty($email->body_plain)) {
+                    $email = $this->emailService->fetchBody($email);
+                }
+
+                return [
+                    'body_html' => $email->body_html,
+                    'body_plain' => $email->body_plain,
+                ];
+            },
+            'email_body'
+        );
+
+        return response()->json($data);
     }
 
     /**
@@ -311,6 +322,10 @@ class EmailController extends Controller
 
         if ($request->has('is_starred')) {
             $this->emailService->toggleStar($email);
+        }
+
+        if ($request->has('is_pinned')) {
+            $this->emailService->togglePin($email);
         }
 
         if ($request->has('is_important')) {

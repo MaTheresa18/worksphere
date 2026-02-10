@@ -410,6 +410,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce', 'demo'])->grou
     Route::prefix('email-accounts')->middleware('throttle:30,1')->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\EmailAccountController::class, 'index']);
         Route::get('/providers', [\App\Http\Controllers\Api\EmailAccountController::class, 'providers']);
+        Route::post('/pre-check', [\App\Http\Controllers\Api\EmailAccountController::class, 'preCheck']);
         Route::post('/', [\App\Http\Controllers\Api\EmailAccountController::class, 'store']);
         Route::get('/{emailAccount}', [\App\Http\Controllers\Api\EmailAccountController::class, 'show']);
         Route::put('/{emailAccount}', [\App\Http\Controllers\Api\EmailAccountController::class, 'update']);
@@ -419,6 +420,7 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce', 'demo'])->grou
         Route::post('/{emailAccount}/sync', [\App\Http\Controllers\Api\EmailAccountController::class, 'sync']);
         Route::get('/{emailAccount}/remote-folders', [\App\Http\Controllers\Api\EmailAccountController::class, 'remoteFolders']);
         Route::get('/{emailAccount}/storage-usage', [\App\Http\Controllers\Api\EmailAccountController::class, 'getStorageUsage']);
+        Route::post('/{emailAccount}/health-check', [\App\Http\Controllers\Api\EmailAccountController::class, 'healthCheck']);
         // OAuth
         Route::get('/oauth/{provider}/redirect', [\App\Http\Controllers\Api\EmailOAuthController::class, 'redirect']);
         Route::post('/{emailAccount}/oauth/refresh', [\App\Http\Controllers\Api\EmailOAuthController::class, 'refresh']);

@@ -376,6 +376,7 @@
                                             : 'bg-(--surface-primary) border-l-transparent hover:bg-(--surface-secondary) opacity-90',
                                 ]"
                                 @click="handleSelect(email)"
+                                @contextmenu="handleRightClick(email)"
                             >
                                 <!-- Drag handle (Gmail style dot grid) -->
                                 <div
@@ -416,7 +417,8 @@
                                         :class="{
                                             'opacity-100':
                                                 email.is_starred ||
-                                                email.is_important,
+                                                email.is_important ||
+                                                email.is_pinned,
                                         }"
                                     >
                                         <div
@@ -454,6 +456,12 @@
                                                         email.is_important,
                                                 }"
                                             />
+                                        </div>
+                                        <div
+                                            v-if="email.is_pinned"
+                                            class="p-0.5 text-blue-500"
+                                        >
+                                            <PinIcon class="w-3.5 h-3.5 fill-current" />
                                         </div>
                                     </div>
                                 </div>
@@ -516,6 +524,19 @@
                                             <div
                                                 class="hidden group-hover:flex items-center gap-1"
                                             >
+                                                <button
+                                                    @click.stop="
+                                                        store.togglePin(email.id)
+                                                    "
+                                                    class="p-1 hover:bg-(--surface-tertiary) rounded-md transition-colors"
+                                                    :title="email.is_pinned ? 'Unpin' : 'Pin to Top'"
+                                                >
+                                                    <component
+                                                        :is="email.is_pinned ? PinOffIcon : PinIcon"
+                                                        class="w-4 h-4 text-(--text-secondary)"
+                                                        :class="{ 'text-blue-500 fill-current': email.is_pinned }"
+                                                    />
+                                                </button>
                                                 <button
                                                     @click.stop="
                                                         store.deleteEmails([
@@ -584,36 +605,98 @@
                                 >
                                     <ContextMenuItem
                                         @select="
-                                            handleMarkRead(
-                                                email,
-                                                !email.is_read,
-                                            )
+                                            selectedEmailIds.size > 1
+                                                ? store.markEmailsAsRead(
+                                                      Array.from(
+                                                          selectedEmailIds,
+                                                      ),
+                                                      !email.is_read,
+                                                  )
+                                                : handleMarkRead(
+                                                      email,
+                                                      !email.is_read,
+                                                  )
                                         "
-                                        class="w-full text-left px-4 py-2 text-sm text-(--text-primary) hover:bg-(--surface-tertiary) flex items-center gap-2 cursor-pointer outline-none select-none"
+                                        class="w-full text-left px-4 py-2 text-sm text-(--text-primary) hover:bg-(--surface-tertiary) flex items-center justify-between cursor-pointer outline-none select-none"
                                     >
-                                        <component
-                                            :is="
-                                                email.is_read
-                                                    ? MailIcon
-                                                    : MailOpenIcon
-                                            "
-                                            class="w-4 h-4 text-(--text-secondary)"
-                                        />
-                                        {{
-                                            email.is_read
-                                                ? "Mark as Unread"
-                                                : "Mark as Read"
-                                        }}
+                                        <div class="flex items-center gap-2">
+                                            <component
+                                                :is="
+                                                    email.is_read
+                                                        ? MailIcon
+                                                        : MailOpenIcon
+                                                "
+                                                class="w-4 h-4 text-(--text-secondary)"
+                                            />
+                                            {{
+                                                selectedEmailIds.size > 1
+                                                    ? `Mark ${selectedEmailIds.size} as ${email.is_read ? "Unread" : "Read"}`
+                                                    : `Mark as ${email.is_read ? "Unread" : "Read"}`
+                                            }}
+                                        </div>
+                                        <span
+                                            class="text-[10px] text-(--text-muted) font-medium opacity-50"
+                                            >M</span
+                                        >
+                                    </ContextMenuItem>
+                                    <ContextMenuItem
+                                        @select="
+                                            selectedEmailIds.size > 1
+                                                ? store.togglePinEmails(
+                                                      Array.from(
+                                                          selectedEmailIds,
+                                                      ),
+                                                      !email.is_pinned,
+                                                  )
+                                                : store.togglePin(email.id)
+                                        "
+                                        class="w-full text-left px-4 py-2 text-sm text-(--text-primary) hover:bg-(--surface-tertiary) flex items-center justify-between cursor-pointer outline-none select-none"
+                                    >
+                                        <div class="flex items-center gap-2">
+                                            <component
+                                                :is="
+                                                    email.is_pinned
+                                                        ? PinOffIcon
+                                                        : PinIcon
+                                                "
+                                                class="w-4 h-4 text-(--text-secondary)"
+                                                :class="{
+                                                    'text-blue-500 fill-current':
+                                                        email.is_pinned,
+                                                }"
+                                            />
+                                            {{
+                                                selectedEmailIds.size > 1
+                                                    ? `${email.is_pinned ? "Unpin" : "Pin"} ${selectedEmailIds.size} emails`
+                                                    : email.is_pinned
+                                                      ? "Unpin from top"
+                                                      : "Pin to top"
+                                            }}
+                                        </div>
                                     </ContextMenuItem>
                                     <ContextMenuSeparator
                                         class="h-px bg-(--border-default) my-1"
                                     />
                                     <ContextMenuItem
-                                        @select="handleDelete(email)"
-                                        class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 cursor-pointer outline-none select-none"
+                                        @select="
+                                            selectedEmailIds.size > 1
+                                                ? store.deleteEmails(
+                                                      Array.from(
+                                                          selectedEmailIds,
+                                                      ),
+                                                  )
+                                                : handleDelete(email)
+                                        "
+                                        class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center justify-between cursor-pointer outline-none select-none"
                                     >
-                                        <TrashIcon class="w-4 h-4" />
-                                        Delete
+                                        <div class="flex items-center gap-2">
+                                            <TrashIcon class="w-4 h-4" />
+                                            {{
+                                                selectedEmailIds.size > 1
+                                                    ? `Delete ${selectedEmailIds.size} emails`
+                                                    : "Delete"
+                                            }}
+                                        </div>
                                     </ContextMenuItem>
                                     <ContextMenuSeparator
                                         class="h-px bg-(--border-default) my-1"
@@ -636,6 +719,7 @@
                                         class="h-px bg-(--border-default) my-1"
                                     ></div>
                                     <ContextMenuItem
+                                        v-if="selectedEmailIds.size <= 1"
                                         @select="
                                             $emit('compose', { replyTo: email })
                                         "
@@ -645,6 +729,7 @@
                                         Reply
                                     </ContextMenuItem>
                                     <ContextMenuItem
+                                        v-if="selectedEmailIds.size <= 1"
                                         @select="
                                             $emit('compose', { forward: email })
                                         "
@@ -721,6 +806,8 @@ import {
     ReplyIcon,
     ForwardIcon,
     AlertCircleIcon,
+    PinIcon,
+    PinOffIcon,
 } from "lucide-vue-next";
 import { useEmailStore } from "@/stores/emailStore";
 import { storeToRefs } from "pinia";
@@ -788,6 +875,14 @@ function handleMarkRead(email: any, isRead: boolean) {
 function handleDelete(email: any) {
     if (confirm("Delete this email?")) {
         store.deleteEmails([email.id]);
+    }
+}
+
+function handleRightClick(email: any) {
+    // If targeted email is not already in the selection, clear selection and select only this one
+    if (!selectedEmailIds.value.has(email.id)) {
+        selectedEmailIds.value.clear();
+        selectedEmailIds.value.add(email.id);
     }
 }
 

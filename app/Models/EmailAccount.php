@@ -12,6 +12,10 @@ class EmailAccount extends Model
 {
     use \Illuminate\Database\Eloquent\Factories\HasFactory;
 
+    public const TYPE_FULL = 'full';
+
+    public const TYPE_SMTP = 'smtp';
+
     public function getRouteKeyName()
     {
         return 'public_id';
@@ -54,6 +58,7 @@ class EmailAccount extends Model
         'storage_used',
         'storage_limit',
         'storage_updated_at',
+        'account_type',
         // Dual crawler fields
         'forward_uid_cursor',
         'last_forward_sync_at',
@@ -138,6 +143,66 @@ class EmailAccount extends Model
         ],
         'custom' => [
             'name' => 'Custom IMAP/SMTP',
+            'supports_oauth' => false,
+        ],
+        'yahoo' => [
+            'name' => 'Yahoo Mail',
+            'imap_host' => 'imap.mail.yahoo.com',
+            'imap_port' => 993,
+            'imap_encryption' => 'ssl',
+            'smtp_host' => 'smtp.mail.yahoo.com',
+            'smtp_port' => 465,
+            'smtp_encryption' => 'ssl',
+            'supports_oauth' => true,
+        ],
+        'zoho' => [
+            'name' => 'Zoho Mail',
+            'imap_host' => 'imap.zoho.com',
+            'imap_port' => 993,
+            'imap_encryption' => 'ssl',
+            'smtp_host' => 'smtp.zoho.com',
+            'smtp_port' => 465,
+            'smtp_encryption' => 'ssl',
+            'supports_oauth' => true,
+        ],
+        'fastmail' => [
+            'name' => 'Fastmail',
+            'imap_host' => 'imap.fastmail.com',
+            'imap_port' => 993,
+            'imap_encryption' => 'ssl',
+            'smtp_host' => 'smtp.fastmail.com',
+            'smtp_port' => 465,
+            'smtp_encryption' => 'ssl',
+            'supports_oauth' => false,
+        ],
+        'yandex' => [
+            'name' => 'Yandex Mail',
+            'imap_host' => 'imap.yandex.com',
+            'imap_port' => 993,
+            'imap_encryption' => 'ssl',
+            'smtp_host' => 'smtp.yandex.com',
+            'smtp_port' => 465,
+            'smtp_encryption' => 'ssl',
+            'supports_oauth' => true,
+        ],
+        'gmx' => [
+            'name' => 'GMX',
+            'imap_host' => 'imap.gmx.com',
+            'imap_port' => 993,
+            'imap_encryption' => 'ssl',
+            'smtp_host' => 'mail.gmx.com',
+            'smtp_port' => 587,
+            'smtp_encryption' => 'tls',
+            'supports_oauth' => false,
+        ],
+        'webde' => [
+            'name' => 'Web.de',
+            'imap_host' => 'imap.web.de',
+            'imap_port' => 993,
+            'imap_encryption' => 'ssl',
+            'smtp_host' => 'smtp.web.de',
+            'smtp_port' => 587,
+            'smtp_encryption' => 'tls',
             'supports_oauth' => false,
         ],
     ];
@@ -301,6 +366,11 @@ class EmailAccount extends Model
     public function isOAuth(): bool
     {
         return $this->auth_type === 'oauth';
+    }
+
+    public function isSmtpOnly(): bool
+    {
+        return $this->account_type === self::TYPE_SMTP;
     }
 
     public function isTokenExpired(): bool

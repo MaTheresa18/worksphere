@@ -22,9 +22,9 @@ class EmailOAuthController extends Controller
      */
     public function redirect(Request $request, string $provider): JsonResponse|RedirectResponse
     {
-        if (! in_array($provider, ['gmail', 'outlook'])) {
+        if (! isset(EmailAccount::PROVIDERS[$provider]) || ! EmailAccount::PROVIDERS[$provider]['supports_oauth']) {
             return response()->json([
-                'message' => 'Unsupported provider.',
+                'message' => 'Unsupported or non-OAuth provider.',
             ], 400);
         }
 

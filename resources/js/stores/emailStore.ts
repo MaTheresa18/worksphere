@@ -261,8 +261,12 @@ export const useEmailStore = defineStore("email", () => {
 
                     date: e.date || e.received_at, // Prefer 'date' accessor
 
+                    thread_id: e.thread_id || null,
+
                     is_read: Boolean(e.is_read),
                     is_starred: Boolean(e.is_starred),
+                    is_pinned: Boolean(e.is_pinned),
+                    is_important: Boolean(e.is_important),
                     is_draft: Boolean(e.is_draft),
 
                     has_attachments: Boolean(e.has_attachments),
@@ -584,6 +588,25 @@ export const useEmailStore = defineStore("email", () => {
         await emailService.toggleStar(id);
     }
 
+    async function togglePin(id: string) {
+        // Optimistic update
+        const email = emails.value.find((e) => e.id === id);
+        if (email) email.is_pinned = !email.is_pinned;
+
+        await axios.patch(`/api/emails/${id}`, { is_pinned: true }); // Value is toggled server-side
+    }
+
+    async function togglePinEmails(ids: string[], pin: boolean) {
+        // Optimistic
+        ids.forEach((id) => {
+            const email = emails.value.find((e) => e.id === id);
+            if (email) email.is_pinned = pin;
+        });
+        
+        // Parallel requests for now, or could implement a bulk endpoint later
+        await Promise.all(ids.map((id) => axios.patch(`/api/emails/${id}`, { is_pinned: true })));
+    }
+
     async function toggleImportant(id: string) {
         // Optimistic update
         const email = emails.value.find((e) => e.id === id);
@@ -841,6 +864,8 @@ export const useEmailStore = defineStore("email", () => {
         addLabel,
         deleteLabel,
         sendEmail,
+        togglePin,
+        togglePinEmails,
         toggleImportant,
         setSelectedAccount,
         moveEmail,

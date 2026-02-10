@@ -49,6 +49,7 @@ class Email extends Model implements HasMedia
         'received_at',
         'sanitized_at',
         'is_important',
+        'is_pinned',
     ];
 
     protected $appends = [
@@ -75,6 +76,7 @@ class Email extends Model implements HasMedia
             'scheduled_at' => 'datetime',
             'received_at' => 'datetime',
             'sanitized_at' => 'datetime',
+            'is_pinned' => 'boolean',
         ];
     }
 
@@ -154,6 +156,11 @@ class Email extends Model implements HasMedia
         return $query->where('is_starred', true);
     }
 
+    public function scopePinned($query)
+    {
+        return $query->where('is_pinned', true);
+    }
+
     public function scopeUnread($query)
     {
         return $query->where('is_read', false);
@@ -219,6 +226,16 @@ class Email extends Model implements HasMedia
     public function toggleImportant(): self
     {
         $this->update(['is_important' => ! $this->is_important]);
+
+        return $this;
+    }
+
+    /**
+     * Toggle pinned status.
+     */
+    public function togglePin(): self
+    {
+        $this->update(['is_pinned' => ! $this->is_pinned]);
 
         return $this;
     }

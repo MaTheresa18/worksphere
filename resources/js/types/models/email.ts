@@ -50,7 +50,9 @@ export interface Email {
     is_read: boolean;
     is_starred: boolean;
     is_important: boolean;
+    is_pinned: boolean;
     is_draft: boolean;
+    thread_id?: string | null;
     thread_count?: number;
     
     has_attachments: boolean;

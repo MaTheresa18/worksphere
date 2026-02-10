@@ -12,7 +12,8 @@ class EmailAccountController extends Controller
 {
     public function __construct(
         protected EmailAccountService $emailAccountService,
-        protected \App\Services\SystemEmailService $systemEmailService
+        protected \App\Services\SystemEmailService $systemEmailService,
+        protected \App\Services\EmailHealthCheckService $emailHealthCheckService
     ) {}
 
     /**
@@ -77,10 +78,11 @@ class EmailAccountController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255',
-            'provider' => 'required|string|in:custom,gmail,outlook',
+            'provider' => 'required|string|in:custom,gmail,outlook,yahoo,zoho,fastmail,yandex,gmx,webde',
             'auth_type' => 'required|string|in:password,oauth',
+            'account_type' => 'nullable|string|in:full,smtp',
             // Custom IMAP/SMTP settings
-            'imap_host' => 'required_if:provider,custom|nullable|string|max:255',
+            'imap_host' => 'required_if:account_type,full|nullable|string|max:255',
             'imap_port' => 'nullable|integer|min:1|max:65535',
             'imap_encryption' => 'nullable|string|in:ssl,tls,none',
             'smtp_host' => 'required_if:provider,custom|nullable|string|max:255',
@@ -161,6 +163,7 @@ class EmailAccountController extends Controller
 
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
+            'account_type' => 'sometimes|string|in:full,smtp',
             'imap_host' => 'nullable|string|max:255',
             'imap_port' => 'nullable|integer|min:1|max:65535',
             'imap_encryption' => 'nullable|string|in:ssl,tls,none',
@@ -266,17 +269,17 @@ class EmailAccountController extends Controller
     public function testConfiguration(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'provider' => 'required|string|in:custom,gmail,outlook',
             'auth_type' => 'required|string|in:password,oauth',
+            'account_type' => 'nullable|string|in:full,smtp',
             'email' => 'required|email',
             'username' => 'nullable|string',
             'password' => 'nullable|string',
             'smtp_host' => 'required|string',
             'smtp_port' => 'required|integer',
             'smtp_encryption' => 'required|string|in:ssl,tls,none',
-            'imap_host' => 'sometimes|required|string',
-            'imap_port' => 'sometimes|required|integer',
-            'imap_encryption' => 'sometimes|required|string|in:ssl,tls,none',
+            'imap_host' => 'required_if:account_type,full|nullable|string',
+            'imap_port' => 'required_if:account_type,full|nullable|integer',
+            'imap_encryption' => 'required_if:account_type,full|nullable|string|in:ssl,tls,none',
             'access_token' => 'nullable|string',
         ]);
 
@@ -340,6 +343,7 @@ class EmailAccountController extends Controller
             'email' => $account->email,
             'provider' => $account->provider,
             'auth_type' => $account->auth_type,
+            'account_type' => $account->account_type,
             'imap_host' => $account->imap_host,
             'imap_port' => $account->imap_port,
             'imap_encryption' => $account->imap_encryption,
@@ -401,6 +405,43 @@ class EmailAccountController extends Controller
                 'attachments_count' => $attachmentsCount,
                 'limit_bytes' => $emailAccount->storage_limit,
             ],
+        ]);
+    }
+
+    /**
+     * Perform a health check on the email account (DNS: MX, SPF, DMARC, DKIM).
+     */
+    public function healthCheck(EmailAccount $emailAccount): JsonResponse
+    {
+        $this->authorize('view', $emailAccount);
+
+        $results = $this->emailHealthCheckService->checkHealth($emailAccount);
+
+        return response()->json([
+            'data' => $results,
+        ]);
+    }
+
+    /**
+     * Perform a health check on a domain before saving the account.
+     */
+    public function preCheck(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        $domain = substr(strrchr($validated['email'], '@'), 1);
+
+        $results = [
+            'mx' => $this->emailHealthCheckService->checkMx($domain),
+            'spf' => $this->emailHealthCheckService->checkSpf($domain),
+            'dmarc' => $this->emailHealthCheckService->checkDmarc($domain),
+            'dkim' => $this->emailHealthCheckService->checkDkim($domain),
+        ];
+
+        return response()->json([
+            'data' => $results,
         ]);
     }
 }

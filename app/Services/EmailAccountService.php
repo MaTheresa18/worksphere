@@ -62,8 +62,11 @@ class EmailAccountService
 
         $account = EmailAccount::create($data);
 
-        // Start initial seed (Phase 1)
-        app(\App\Services\EmailSyncService::class)->startSeed($account);
+        // Skip sync for SMTP-only accounts
+        if (! $account->isSmtpOnly()) {
+            // Start initial seed (Phase 1)
+            app(\App\Services\EmailSyncService::class)->startSeed($account);
+        }
 
         return $account;
     }
@@ -102,20 +105,22 @@ class EmailAccountService
             ];
         }
 
-        // 2. Test IMAP
-        $imapResult = $this->testImapConnection($account);
-        if (! $imapResult['success']) {
-            return [
-                'success' => false,
-                'message' => 'IMAP: '.$imapResult['message'],
-            ];
+        // 2. Test IMAP (Skip if SMTP-only)
+        if (! $account->isSmtpOnly()) {
+            $imapResult = $this->testImapConnection($account);
+            if (! $imapResult['success']) {
+                return [
+                    'success' => false,
+                    'message' => 'IMAP: '.$imapResult['message'],
+                ];
+            }
         }
 
         $account->markAsVerified();
 
         return [
             'success' => true,
-            'message' => 'Connection successful (SMTP and IMAP)',
+            'message' => $account->isSmtpOnly() ? 'SMTP connection successful' : 'Connection successful (SMTP and IMAP)',
         ];
     }
 
@@ -289,6 +294,7 @@ class EmailAccountService
             throw new \InvalidArgumentException("Unknown provider: {$provider}");
         }
 
+        /** @var \Illuminate\Http\Client\Response $response */
         $response = Http::asForm()->post($config['token_url'], [
             'client_id' => $this->getClientId($provider),
             'client_secret' => $this->getClientSecret($provider),
@@ -325,6 +331,7 @@ class EmailAccountService
         }
 
         try {
+            /** @var \Illuminate\Http\Client\Response $response */
             $response = Http::asForm()->post($config['token_url'], [
                 'client_id' => $this->getClientId($account->provider),
                 'client_secret' => $this->getClientSecret($account->provider),
@@ -394,6 +401,7 @@ class EmailAccountService
     {
         try {
             if ($provider === 'gmail') {
+                /** @var \Illuminate\Http\Client\Response $response */
                 $response = Http::withToken($accessToken)
                     ->get('https://www.googleapis.com/oauth2/v2/userinfo');
 
@@ -401,6 +409,7 @@ class EmailAccountService
             }
 
             if ($provider === 'outlook') {
+                /** @var \Illuminate\Http\Client\Response $response */
                 $response = Http::withToken($accessToken)
                     ->get('https://graph.microsoft.com/v1.0/me');
 

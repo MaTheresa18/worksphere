@@ -44,6 +44,7 @@ class EmailResource extends JsonResource
             'date' => $this->received_at ? $this->received_at->toIso8601String() : ($this->created_at ? $this->created_at->toIso8601String() : now()->toIso8601String()),
 
             // Threading
+            'thread_id' => $this->thread_id,
             'thread_count' => $this->thread_count ?? 1,
 
             // Revert to flat structure matching Model
@@ -58,6 +59,8 @@ class EmailResource extends JsonResource
             // Flags
             'is_read' => (bool) $this->is_read,
             'is_starred' => (bool) $this->is_starred,
+            'is_pinned' => (bool) $this->is_pinned,
+            'is_important' => (bool) $this->is_important,
             'is_draft' => (bool) $this->is_draft,
 
             // Attachments

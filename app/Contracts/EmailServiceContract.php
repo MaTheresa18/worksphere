@@ -76,6 +76,16 @@ interface EmailServiceContract
     public function toggleStar(Email $email): Email;
 
     /**
+     * Toggle pinned status.
+     */
+    public function togglePin(Email $email): Email;
+
+    /**
+     * Toggle important status.
+     */
+    public function toggleImportant(Email $email): Email;
+
+    /**
      * Soft delete an email.
      */
     public function delete(Email $email): void;
