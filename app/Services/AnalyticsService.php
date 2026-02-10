@@ -133,6 +133,7 @@ class AnalyticsService
 
         return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($period) {
             $startDate = $this->getStartDate($period);
+            $stayTimes = $this->getAverageStayTimes($period);
 
             return PageView::query()->select([
                 'path',
@@ -148,9 +149,56 @@ class AnalyticsService
                     'path' => $p->path,
                     'views' => number_format($p->views),
                     'unique' => number_format($p->unique_visits),
-                    'avgTime' => '-',
+                    'avgTime' => isset($stayTimes[$p->path]) ? $this->formatDuration($stayTimes[$p->path]) : '-',
                 ])->toArray();
         });
+    }
+
+    /**
+     * Calculate average stay time per page
+     */
+    protected function getAverageStayTimes(string $period): array
+    {
+        $startDate = $this->getStartDate($period);
+
+        // Get all page views for the period, grouped by session and ordered by time
+        $views = PageView::query()
+            ->where('created_at', '>=', $startDate)
+            ->orderBy('session_id')
+            ->orderBy('created_at')
+            ->get(['session_id', 'path', 'created_at']);
+
+        $stayTimes = []; // [path => [total_seconds, count]]
+
+        $grouped = $views->groupBy('session_id');
+
+        foreach ($grouped as $sessionId => $sessionViews) {
+            for ($i = 0; $i < count($sessionViews) - 1; $i++) {
+                $current = $sessionViews[$i];
+                $next = $sessionViews[$i + 1];
+
+                $duration = $next->created_at->diffInSeconds($current->created_at);
+
+                // Sanity check: if > 30 mins, probably not a continuous stay
+                if ($duration > 1800) {
+                    continue;
+                }
+
+                if (! isset($stayTimes[$current->path])) {
+                    $stayTimes[$current->path] = ['total' => 0, 'count' => 0];
+                }
+
+                $stayTimes[$current->path]['total'] += $duration;
+                $stayTimes[$current->path]['count'] += 1;
+            }
+        }
+
+        $results = [];
+        foreach ($stayTimes as $path => $data) {
+            $results[$path] = $data['count'] > 0 ? $data['total'] / $data['count'] : 0;
+        }
+
+        return $results;
     }
 
     /**
@@ -292,12 +340,12 @@ class AnalyticsService
             $startDate = $this->getStartDate($period);
 
             return PageView::query()
-                ->select('country', 'city', 'iso_code', 'lat', 'lon', DB::raw('count(*) as count'))
+                ->select('country', 'city', 'iso_code', 'lat', 'lon', 'device_type', DB::raw('count(*) as count'))
                 ->where('created_at', '>=', $startDate)
                 ->whereNotNull('iso_code')
-                ->groupBy('country', 'city', 'iso_code', 'lat', 'lon')
+                ->groupBy('country', 'city', 'iso_code', 'lat', 'lon', 'device_type')
                 ->orderByDesc('count')
-                ->limit(100)
+                ->limit(200)
                 ->get()
                 ->toArray();
         });
