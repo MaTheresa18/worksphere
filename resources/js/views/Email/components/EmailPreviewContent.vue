@@ -39,7 +39,7 @@
                             <AlertCircleIcon class="w-4 h-4 fill-current/10" />
                         </div>
                         <h1
-                            class="!text-[24px] font-bold text-(--text-primary) leading-tight truncate"
+                            class="text-[24px]! font-bold text-(--text-primary) leading-tight truncate"
                             :title="email.subject"
                         >
                             {{ email.subject }}
@@ -563,7 +563,7 @@
                 </div>
 
                 <div
-                    v-if="hasBlockedImages"
+                    v-if="hasBlockedImages && !isBlockedImagesDismissed"
                     class="rounded-xl bg-(--surface-secondary) border border-(--border-default) p-4 flex items-center justify-between gap-4 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300"
                 >
                     <div class="flex items-center gap-3">
@@ -574,12 +574,21 @@
                             Tracking images are hidden for your privacy.
                         </div>
                     </div>
-                    <button
-                        @click="showImages = true"
-                        class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-(--surface-elevated) border border-(--border-default) text-(--text-primary) hover:border-(--interactive-primary)/30 transition-all shadow-sm"
-                    >
-                        Show Images
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button
+                            @click="showImages = true"
+                            class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-(--surface-elevated) border border-(--border-default) text-(--text-primary) hover:border-(--interactive-primary)/30 transition-all shadow-sm"
+                        >
+                            Show Images
+                        </button>
+                        <button
+                            @click="isBlockedImagesDismissed = true"
+                            class="text-(--text-muted) hover:text-(--text-primary) hover:bg-(--surface-tertiary) p-1.5 rounded-lg transition-colors"
+                            title="Dismiss"
+                        >
+                            <XIcon class="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -796,6 +805,7 @@ const emit = defineEmits<{
 // --- Security & Privacy ---
 const showImages = ref(false);
 const hasBlockedImages = ref(false);
+const isBlockedImagesDismissed = ref(false);
 const selectedAttachments = ref<Set<string>>(new Set());
 const isAttachmentsExpanded = ref(false);
 const isToExpanded = ref(false);
@@ -1012,6 +1022,7 @@ watch(
     () => {
         showImages.value = false;
         hasBlockedImages.value = false;
+        isBlockedImagesDismissed.value = false;
         selectedAttachments.value.clear();
         checkAndFetchBody();
     },
@@ -1408,6 +1419,20 @@ function setupImageSyncRetry(img: HTMLImageElement) {
     const maxRetries = 10;
     const interval = 5000; // 5 seconds
     const originalSrc = img.getAttribute("data-original-src") || img.src;
+
+    // Security Check: Validate generic URL structure to prevent javascript: or vbscript: execution
+    // We allow http/https, relative paths, and data URIs (though data URIs are usually blocked elsewhere)
+    if (
+        !originalSrc ||
+        /^\s*(javascript|vbscript|data):/i.test(originalSrc) ||
+        !/^(https?:\/\/|\/|data:image\/)/i.test(originalSrc)
+    ) {
+        console.warn(
+            "[EmailPreview] Blocked unsafe image source retry:",
+            originalSrc,
+        );
+        return;
+    }
 
     const attemptReload = () => {
         if (retries >= maxRetries) {

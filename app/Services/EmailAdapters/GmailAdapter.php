@@ -285,8 +285,11 @@ class GmailAdapter extends BaseEmailAdapter
 
         if ($fetchBody) {
             $body = $this->extractGmailBody($payload);
-            $attachments = $this->extractGmailAttachments($payload, $body['html'], $skipAttachments, $message->getId(), $account);
         }
+
+        // Always extract attachment metadata regardless of fetchBody
+        // When fetchBody=false, attachments are created as lazy placeholders (no content downloaded)
+        $attachments = $this->extractGmailAttachments($payload, $body['html'], $skipAttachments, $message->getId(), $account);
 
         return [
             'message_id' => $getHeader('Message-ID'),
@@ -305,7 +308,7 @@ class GmailAdapter extends BaseEmailAdapter
             'history_id' => $message->getHistoryId(),
             'is_read' => ! in_array('UNREAD', $message->getLabelIds() ?? []),
             'is_starred' => in_array('STARRED', $message->getLabelIds() ?? []),
-            'has_attachments' => ! empty($attachments) || ($fetchBody && $this->hasGmailAttachments($payload)),
+            'has_attachments' => ! empty($attachments) || $this->hasGmailAttachments($payload),
             'attachments' => $attachments,
             'imap_uid' => null,
             'date' => $message->getInternalDate() ? date('Y-m-d H:i:s', $message->getInternalDate() / 1000) : now(),

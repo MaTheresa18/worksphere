@@ -398,11 +398,31 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
             'headers' => $headers,
             'is_read' => $message->getFlags()->contains('Seen'),
             'is_starred' => $message->getFlags()->contains('Flagged'),
-            'has_attachments' => $message->hasAttachments(),
+            // When fetch_body=false, MIME structure isn't loaded so hasAttachments() may
+            // return false. Fall back to header-based detection (Content-Type).
+            'has_attachments' => $message->hasAttachments() || $this->detectAttachmentsFromHeaders($headers),
             'attachments' => $attachments,
             'imap_uid' => (int) $message->getUid(),
             'date' => $message->getDate()?->first()?->toDate(),
         ];
+    }
+
+    /**
+     * Detect attachments from email headers when MIME body isn't available.
+     *
+     * When the IMAP client is created with fetch_body=false, the MIME structure
+     * isn't loaded, so hasAttachments() returns false. This method provides a
+     * lightweight fallback by checking the Content-Type header.
+     */
+    protected function detectAttachmentsFromHeaders(array $headers): bool
+    {
+        $contentType = strtolower($headers['content-type'] ?? '');
+
+        // multipart/mixed = standard email with attachments
+        // multipart/related = email with inline images
+        // multipart/alternative = just plain+HTML versions (no attachments)
+        return str_contains($contentType, 'multipart/mixed')
+            || str_contains($contentType, 'multipart/related');
     }
 
     /**
