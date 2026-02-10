@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useChatStore } from '@/stores/chat';
@@ -7,6 +7,8 @@ import { useChat } from '@/composables/useChat';
 import { useThemeStore } from '@/stores/theme';
 import { useToast } from '@/composables/useToast';
 import { chatService } from '@/services/chat.service';
+import { useVideoCall } from '@/composables/useVideoCall';
+import { useVideoCallStore } from '@/stores/videocall';
 
 // Components
 import ChatSidebar from './components/sidebar/ChatSidebar.vue';
@@ -15,6 +17,8 @@ import MessageList from './components/chat/MessageList.vue';
 import ChatComposer from './components/chat/ChatComposer.vue';
 import ChatInfoDrawer from './components/drawer/ChatInfoDrawer.vue';
 import ChatSearchModal from './components/chat/ChatSearchModal.vue';
+import VideoCallModal from './components/call/VideoCallModal.vue';
+import IncomingCallOverlay from './components/call/IncomingCallOverlay.vue';
 
 const route = useRoute();
 const authStore = useAuthStore();
@@ -178,11 +182,47 @@ const handleRetryMessage = async (message: any) => {
     // Let's filter it out strictly speaking, but for MVP re-sending is key.
 };
 
+// Video call setup
+const videoCall = useVideoCall();
+const videoCallStore = useVideoCallStore();
+
+function handleStartCall(callType: 'video' | 'audio') {
+    if (!activeChat.value) return;
+    const other = activeChat.value.participants.find(p => p.public_id !== currentUserPublicId.value);
+    if (!other) return;
+    videoCall.startCall(activeChat.value.public_id, callType, {
+        publicId: other.public_id,
+        name: other.name,
+        avatar: other.avatar || null,
+    });
+}
+
+// Listen for broadcast events dispatched from useChatRealtime
+function onIncomingCall(e: Event) {
+    videoCall.handleIncomingCall((e as CustomEvent).detail);
+}
+function onCallSignal(e: Event) {
+    videoCall.handleSignal((e as CustomEvent).detail);
+}
+function onCallEnded(e: Event) {
+    videoCall.handleCallEnded((e as CustomEvent).detail);
+}
+
 // Lifecycle
 onMounted(() => {
     if (route.params.chatId) {
         selectChat(String(route.params.chatId));
     }
+
+    window.addEventListener('videocall:incoming', onIncomingCall);
+    window.addEventListener('videocall:signal', onCallSignal);
+    window.addEventListener('videocall:ended', onCallEnded);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('videocall:incoming', onIncomingCall);
+    window.removeEventListener('videocall:signal', onCallSignal);
+    window.removeEventListener('videocall:ended', onCallEnded);
 });
 
 // Watch drawer to fetch media and storage stats
@@ -269,6 +309,8 @@ const handleDeclineInvite = (id: any) => declineInvite(Number(id));
         @toggle-drawer="drawerOpen = !drawerOpen"
         @toggle-sidebar="showSidebar = !showSidebar"
         @toggle-search="toggleSearch"
+        @start-video-call="handleStartCall('video')"
+        @start-voice-call="handleStartCall('audio')"
       />
       
       <!-- Empty Header -->
@@ -367,6 +409,10 @@ const handleDeclineInvite = (id: any) => declineInvite(Number(id));
         :chat-id="activeChat.public_id"
         @jump="jumpToMessage"
     />
+
+    <!-- Video/Audio Call -->
+    <VideoCallModal />
+    <IncomingCallOverlay />
   </div>
 </template>
 

@@ -32,6 +32,22 @@ const chatRealtime = useChatRealtime();
 const avatar = useAvatar();
 const toast = useToast();
 
+// Video call
+import { useVideoCall } from '@/composables/useVideoCall';
+const videoCall = useVideoCall();
+
+function handleStartCall(callType: 'video' | 'audio') {
+    const chat = props.window.chat;
+    if (chat.type !== 'dm') return;
+    const other = chat.participants.find((p: any) => p.public_id !== currentUserPublicId.value);
+    if (!other) return;
+    videoCall.startCall(chat.public_id, callType, {
+        publicId: other.public_id,
+        name: other.name,
+        avatar: other.avatar || null,
+    });
+}
+
 
 
 // Instance Identity for Debugging
@@ -733,6 +749,23 @@ function isOwnMessage(msg: Message): boolean {
                 <span class="minichat-window-title">{{ chatTitle }}</span>
             </div>
             <div class="minichat-window-actions">
+                <!-- Call buttons (DM only) -->
+                <template v-if="window.chat.type === 'dm'">
+                    <button
+                        class="minichat-window-action"
+                        title="Voice Call"
+                        @click.stop="handleStartCall('audio')"
+                    >
+                        <Icon name="Phone" :size="14" />
+                    </button>
+                    <button
+                        class="minichat-window-action"
+                        title="Video Call"
+                        @click.stop="handleStartCall('video')"
+                    >
+                        <Icon name="Video" :size="14" />
+                    </button>
+                </template>
                 <button
                     class="minichat-window-action"
                     title="Open full page"

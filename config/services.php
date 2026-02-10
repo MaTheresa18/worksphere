@@ -91,4 +91,20 @@ return [
         'key' => env('GIPHY_API_KEY'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Cloudflare TURN/STUN (WebRTC Video Calls)
+    |--------------------------------------------------------------------------
+    |
+    | Used for NAT traversal in peer-to-peer video/audio calls.
+    | Create a TURN App in Cloudflare Dashboard → Calls to get credentials.
+    | Free tier: 1 TB/month.
+    |
+    */
+
+    'cloudflare' => [
+        'turn_key_id' => env('CLOUDFLARE_TURN_KEY_ID'),
+        'turn_api_token' => env('CLOUDFLARE_TURN_API_TOKEN'),
+    ],
+
 ];

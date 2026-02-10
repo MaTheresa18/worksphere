@@ -56,9 +56,21 @@ export function useChatRealtime() {
         handleTypingStarted(chatId, event.user_public_id);
       })
       .listen('.TypingStopped', (event: { user_public_id: string }) => {
-        console.log(`[ChatRealtime] ⌨️ RECEIVED .TypingStopped on ${channelName}`, JSON.stringify(event, null, 2));
-        handleTypingStopped(chatId, event.user_public_id);
-      });
+      console.log(`[ChatRealtime] ⌨️ RECEIVED .TypingStopped on ${channelName}`, JSON.stringify(event, null, 2));
+      handleTypingStopped(chatId, event.user_public_id);
+    })
+    .listen('.CallInitiated', (event: any) => {
+      console.log(`[ChatRealtime] 📞 RECEIVED .CallInitiated on ${channelName}`, event);
+      window.dispatchEvent(new CustomEvent('videocall:incoming', { detail: event }));
+    })
+    .listen('.CallSignal', (event: any) => {
+      console.log(`[ChatRealtime] 📡 RECEIVED .CallSignal on ${channelName}`, event);
+      window.dispatchEvent(new CustomEvent('videocall:signal', { detail: event }));
+    })
+    .listen('.CallEnded', (event: any) => {
+      console.log(`[ChatRealtime] 📴 RECEIVED .CallEnded on ${channelName}`, event);
+      window.dispatchEvent(new CustomEvent('videocall:ended', { detail: event }));
+    });
 
     // Log subscription success/failure
     if ((channel as any).subscription) {

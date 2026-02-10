@@ -27,6 +27,8 @@ const emit = defineEmits<{
     toggleDrawer: [];
     toggleSidebar: [];
     toggleSearch: [];
+    startVideoCall: [];
+    startVoiceCall: [];
 }>();
 
 const authStore = useAuthStore();
@@ -215,6 +217,24 @@ watch(
 
         <!-- Right: Actions -->
         <div class="flex items-center gap-1 lg:gap-2 shrink-0">
+            <!-- Call Buttons (DM only) -->
+            <template v-if="chat.type === 'dm'">
+                <button
+                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) text-(--text-primary) transition-colors"
+                    title="Voice Call"
+                    @click="emit('startVoiceCall')"
+                >
+                    <Icon name="Phone" size="18" />
+                </button>
+                <button
+                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) text-(--text-primary) transition-colors"
+                    title="Video Call"
+                    @click="emit('startVideoCall')"
+                >
+                    <Icon name="Video" size="18" />
+                </button>
+            </template>
+
             <!-- Theme Switcher -->
             <div class="relative">
                 <button

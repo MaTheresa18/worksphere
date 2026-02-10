@@ -43,7 +43,7 @@ class SecurityHeaders
         $response->headers->remove('X-Powered-By');
 
         // Permissions Policy (formerly Feature Policy)
-        $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+        $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(self), camera=(self)');
 
         // Content Security Policy (skip for Horizon and Pulse which use inline scripts/Livewire)
         if (! $request->is('horizon*', 'pulse*')) {

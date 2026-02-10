@@ -903,6 +903,12 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce', 'demo'])->grou
         Route::post('/{chat}/rejoin', [\App\Http\Controllers\Api\Chat\ChatApiController::class, 'rejoin']);
         Route::post('/{chat}/kick/{userPublicId}', [\App\Http\Controllers\Api\Chat\ChatApiController::class, 'kick']);
         Route::delete('/{chat}', [\App\Http\Controllers\Api\Chat\ChatApiController::class, 'delete']);
+
+        // Video/Audio Call Signaling
+        Route::get('/{chat}/call/turn-credentials', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'turnCredentials']);
+        Route::post('/{chat}/call/initiate', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'initiate']);
+        Route::post('/{chat}/call/signal', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'signal']);
+        Route::post('/{chat}/call/end', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'end']);
     });
 
     // Personal Notes
