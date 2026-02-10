@@ -39,6 +39,8 @@ const isCheckingHealth = ref({});
 const healthResults = ref(null);
 const showHealthModal = ref(false);
 const healthCheckAccount = ref(null);
+const showDeleteModal = ref(false);
+const accountToDelete = ref(null);
 
 const isSystem = computed(() => props.mode === "system");
 
@@ -221,15 +223,24 @@ const saveAccount = async () => {
     }
 };
 
-const deleteAccount = async (id) => {
-    if (!confirm("Are you sure you want to delete this email account?")) return;
+const confirmDelete = (account) => {
+    accountToDelete.value = account;
+    showDeleteModal.value = true;
+};
+
+const deleteAccount = async () => {
+    const id = accountToDelete.value?.id;
+    if (!id) return;
 
     try {
         await axios.delete(`/api/email-accounts/${id}`);
         toast.success("Email account deleted");
+        showDeleteModal.value = false;
         await fetchAccounts();
     } catch (error) {
         toast.error("Failed to delete email account");
+    } finally {
+        accountToDelete.value = null;
     }
 };
 
@@ -373,7 +384,7 @@ const onWizardSaved = () => {
             <Mail
                 class="w-10 h-10 text-(--text-muted) mx-auto mb-2 opacity-50"
             />
-            <p class="text-[var(--text-muted)]">No email accounts connected</p>
+            <p class="text-(--text-muted)">No email accounts connected</p>
             <p class="text-sm text-(--text-muted) mb-4">
                 Add an account to send emails from the application
             </p>
@@ -470,7 +481,7 @@ const onWizardSaved = () => {
                                 class="text-[11px] text-(--text-muted) font-medium capitalize flex items-center gap-1"
                             >
                                 <span
-                                    class="w-1 h-1 rounded-full bg-[var(--border-default)]"
+                                    class="w-1 h-1 rounded-full bg-(--border-default)"
                                 ></span>
                                 {{ account.provider }}
                             </span>
@@ -529,8 +540,8 @@ const onWizardSaved = () => {
                     <Button
                         variant="ghost"
                         size="icon"
-                        class="h-8 w-8 text-[var(--color-error)]"
-                        @click="deleteAccount(account.id)"
+                        class="h-8 w-8 text-error"
+                        @click="confirmDelete(account)"
                     >
                         <Trash2 class="w-4 h-4" />
                     </Button>
@@ -1112,6 +1123,34 @@ const onWizardSaved = () => {
                     >
                 </div>
             </div>
+        </Modal>
+
+        <!-- Delete Confirmation Modal -->
+        <Modal
+            :open="showDeleteModal"
+            @update:open="showDeleteModal = $event"
+            title="Delete Email Account"
+            size="sm"
+        >
+            <div class="space-y-4">
+                <div class="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-500/10 rounded-lg border border-red-100 dark:border-red-500/20">
+                    <AlertCircle class="w-5 h-5 text-red-600" />
+                    <p class="text-sm text-red-600 font-medium">This action cannot be undone.</p>
+                </div>
+                
+                <p class="text-sm text-(--text-secondary)">
+                    Are you sure you want to delete the email account 
+                    <strong>{{ accountToDelete?.email }}</strong>? 
+                    All associated data and synchronization settings will be removed.
+                </p>
+            </div>
+
+            <template #footer>
+                <div class="flex justify-end gap-2">
+                    <Button variant="ghost" @click="showDeleteModal = false">Cancel</Button>
+                    <Button variant="danger" @click="deleteAccount">Delete Account</Button>
+                </div>
+            </template>
         </Modal>
     </div>
 </template>

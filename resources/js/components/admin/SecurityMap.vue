@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, ref, watch, onUnmounted } from 'vue';
+import { useThemeStore } from '@/stores/theme';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
@@ -15,31 +16,55 @@ const props = defineProps({
     }
 });
 
+const themeStore = useThemeStore();
 const mapContainer = ref(null);
 let map = null;
+let currentTileLayer = null;
 let heatLayer = null;
 let markers = [];
 
-const initMap = () => {
-    if (!mapContainer.value) return;
+const getTileUrl = () => {
+    return themeStore.isDark 
+        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+};
 
-    // Dark styled tiles (CartoDB Dark Matter)
-    const storeTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+const updateTileLayer = () => {
+    if (!map) return;
+    
+    if (currentTileLayer) {
+        map.removeLayer(currentTileLayer);
+    }
+    
+    currentTileLayer = L.tileLayer(getTileUrl(), {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 19
     });
+    
+    currentTileLayer.addTo(map);
+};
+
+const initMap = () => {
+    if (!mapContainer.value) return;
 
     map = L.map(mapContainer.value, {
         center: [20, 0],
         zoom: 2,
-        layers: [storeTiles],
         zoomControl: false,
         attributionControl: false
     });
 
+    updateTileLayer();
+
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 };
+
+
+
+watch(() => themeStore.isDark, () => {
+    updateTileLayer();
+});
 
 const updateMapData = () => {
     if (!map) return;
@@ -119,13 +144,16 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="relative w-full h-[500px] rounded-2xl overflow-hidden border border-[var(--border-default)] bg-[#111]">
+    <div :class="[
+        'relative w-full h-[500px] rounded-2xl overflow-hidden border border-(--border-default) transition-colors duration-300',
+        themeStore.isDark ? 'bg-[#111]' : 'bg-[#f8f9fa]'
+    ]">
         <div ref="mapContainer" class="w-full h-full z-10"></div>
         
         <!-- Overlay for loading -->
         <div v-if="loading" class="absolute inset-0 z-20 bg-black/40 flex items-center justify-center backdrop-blur-[2px]">
             <div class="flex flex-col items-center gap-3">
-                <div class="w-10 h-10 border-4 border-[var(--interactive-primary)] border-t-transparent rounded-full animate-spin"></div>
+                <div class="w-10 h-10 border-4 border-(--interactive-primary) border-t-transparent rounded-full animate-spin"></div>
                 <span class="text-sm font-medium text-white">Loading Threat Data...</span>
             </div>
         </div>
@@ -150,7 +178,7 @@ onUnmounted(() => {
 <style>
 /* Leaflet dark theme tweaks */
 .leaflet-container {
-    background: #111 !important;
+    background: transparent !important;
 }
 
 .custom-map-popup .leaflet-popup-content-wrapper {

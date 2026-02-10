@@ -269,6 +269,7 @@ class EmailAccountController extends Controller
     public function testConfiguration(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'provider' => 'required|string|in:custom,gmail,outlook,yahoo,zoho,fastmail,yandex,gmx,webde',
             'auth_type' => 'required|string|in:password,oauth',
             'account_type' => 'nullable|string|in:full,smtp',
             'email' => 'required|email',

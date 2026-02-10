@@ -126,7 +126,7 @@ class EmailOAuthController extends Controller
                 ]);
 
                 return $isPopup
-                    ? $this->returnPopupSuccess($existingAccount->public_id, 'updated')
+                    ? $this->returnPopupSuccess($existingAccount->public_id, 'updated', $email)
                     : redirect($frontendUrl.'/email/settings?email_connected=updated');
             }
 
@@ -156,7 +156,7 @@ class EmailOAuthController extends Controller
             app(\App\Services\EmailSyncService::class)->startSeed($account);
 
             return $isPopup
-                ? $this->returnPopupSuccess($account->public_id, 'created')
+                ? $this->returnPopupSuccess($account->public_id, 'created', $email)
                 : redirect($frontendUrl.'/email/settings?email_connected=success');
 
         } catch (\Throwable $e) {
@@ -177,13 +177,14 @@ class EmailOAuthController extends Controller
     /**
      * Return success script for popup
      */
-    protected function returnPopupSuccess(string $accountId, string $status)
+    protected function returnPopupSuccess(string $accountId, string $status, string $email = '')
     {
         return view('email.oauth.callback', [
             'status' => 'success',
             'title' => 'Connection Successful',
             'accountId' => $accountId,
             'operationStatus' => $status,
+            'email' => $email,
             'nonce' => request()->attributes->get('csp_nonce'), // Try to get nonce from request attributes common in CSP packages
         ]);
     }

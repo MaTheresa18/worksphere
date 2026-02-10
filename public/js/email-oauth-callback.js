@@ -6,12 +6,14 @@
     const message = container.dataset.message;
     const accountId = container.dataset.accountId;
     const operationStatus = container.dataset.operationStatus;
+    const emailAddress = container.dataset.email;
 
     function notifyOpener(type, data) {
         try {
             if (window.opener) {
                 window.opener.postMessage({
                     type: type,
+                    email: emailAddress,
                     ...data
                 }, '*');
             }

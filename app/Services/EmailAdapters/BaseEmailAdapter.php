@@ -635,6 +635,17 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
             return ['fetched' => 0, 'has_more' => false];
         }
 
+        // [Health Check] Skip if folder is disabled by user
+        $disabledFolders = $account->disabled_folders ?? [];
+        if (in_array($folderType->value, $disabledFolders)) {
+            Log::debug("[{$this->getProvider()}Adapter] Skipping backfill for disabled folder", [
+                'account_id' => $account->id,
+                'folder' => $folderType->value,
+            ]);
+
+            return ['fetched' => 0, 'has_more' => false];
+        }
+
         try {
             $examine = $folder->examine();
             $totalMessages = $examine['exists'] ?? 0;
@@ -664,6 +675,11 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
 
             $allUids = $this->fetchUidRange($folder, $startUid, $endUid);
             if (empty($allUids)) {
+                // [Loop Fix] Even if empty, move cursor back to avoid infinite retry on same window
+                if ($startUid < $backfillCursor) {
+                    $account->update(['backfill_uid_cursor' => $startUid]);
+                }
+
                 return [
                     'fetched' => 0,
                     'has_more' => $startUid > 1,
@@ -704,17 +720,21 @@ abstract class BaseEmailAdapter implements EmailProviderAdapter
                 }
             }
 
-            if ($minUid < $backfillCursor) {
-                $account->update(['backfill_uid_cursor' => $minUid]);
+            // Update minUid to the start of the window if we processed everything in the window (or they already existed)
+            // This prevents getting stuck if we process a batch but don't reach the target min.
+            // However, we only move it as far as the lowest UID we actually saw or the start of the window.
+            $nextCursor = min($minUid, empty($allUids) ? $startUid : min($allUids));
+
+            if ($nextCursor < $backfillCursor) {
+                $account->update(['backfill_uid_cursor' => $nextCursor]);
             }
 
-            $remainingInWindow = count($allUids) - count($uidsToProcess);
-            $hasMore = $remainingInWindow > 0 || $startUid > 1;
+            $hasMore = $nextCursor > 1;
 
             return [
                 'fetched' => $fetched,
                 'has_more' => $hasMore,
-                'new_cursor' => $minUid,
+                'new_cursor' => $nextCursor,
             ];
         } catch (\Throwable $e) {
             Log::error("[{$this->getProvider()}Adapter] Folder backfill exception", [

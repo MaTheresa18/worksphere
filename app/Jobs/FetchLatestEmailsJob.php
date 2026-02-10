@@ -104,8 +104,11 @@ class FetchLatestEmailsJob implements ShouldBeUnique, ShouldQueue
                 $client = $adapter->createClient($account, false);
                 $client->connect();
 
-                // [CRITICAL FIX] Only fetch from INBOX for forward sync.
-                $folders = [EmailFolderType::Inbox];
+                // [CRITICAL FIX] Fetch from all subscribed folders for forward sync.
+                $disabledFolders = $account->disabled_folders ?? [];
+                $folders = collect(EmailFolderType::cases())->filter(function ($type) use ($disabledFolders) {
+                    return ! in_array($type->value, $disabledFolders);
+                });
 
                 foreach ($folders as $folderType) {
                     $fetched = $this->fetchForwardForFolder(

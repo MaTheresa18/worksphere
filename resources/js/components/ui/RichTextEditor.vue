@@ -455,205 +455,223 @@ function confirmBorderColor() {
     showBorderColorModal.value = false;
 }
 
-const toolbarButtons = computed(() => [
-    {
-        icon: Code,
-        action: toggleSource,
-        isActive: () => showSource.value,
-        title: "View Source",
-    },
-    { divider: true },
-    {
-        icon: Heading1,
-        action: () =>
-            editor.value.chain().focus().toggleHeading({ level: 1 }).run(),
-        isActive: () => editor.value?.isActive("heading", { level: 1 }),
-        title: "Heading 1",
-        disabled: () => showSource.value,
-    },
-    {
-        icon: Heading2,
-        action: () =>
-            editor.value.chain().focus().toggleHeading({ level: 2 }).run(),
-        isActive: () => editor.value?.isActive("heading", { level: 2 }),
-        title: "Heading 2",
-        disabled: () => showSource.value,
-    },
-    { divider: true },
-    {
-        icon: AlignLeft,
-        action: () => editor.value.chain().focus().setTextAlign("left").run(),
-        isActive: () => editor.value?.isActive({ textAlign: "left" }),
-        title: "Align Left",
-        disabled: () => showSource.value,
-    },
-    {
-        icon: AlignCenter,
-        action: () => editor.value.chain().focus().setTextAlign("center").run(),
-        isActive: () => editor.value?.isActive({ textAlign: "center" }),
-        title: "Align Center",
-        disabled: () => showSource.value,
-    },
-    {
-        icon: AlignRight,
-        action: () => editor.value.chain().focus().setTextAlign("right").run(),
-        isActive: () => editor.value?.isActive({ textAlign: "right" }),
-        title: "Align Right",
-        disabled: () => showSource.value,
-    },
-    {
-        icon: AlignJustify,
-        action: () =>
-            editor.value.chain().focus().setTextAlign("justify").run(),
-        isActive: () => editor.value?.isActive({ textAlign: "justify" }),
-        title: "Align Justify",
-        disabled: () => showSource.value,
-    },
-    { divider: true },
-    {
-        icon: Bold,
-        action: () => editor.value.chain().focus().toggleBold().run(),
-        isActive: () => editor.value?.isActive("bold"),
-        title: "Bold",
-        disabled: () => showSource.value,
-    },
-    {
-        icon: Italic,
-        action: () => editor.value.chain().focus().toggleItalic().run(),
-        isActive: () => editor.value?.isActive("italic"),
-        title: "Italic",
-        disabled: () => showSource.value,
-    },
-    {
-        icon: UnderlineIcon,
-        action: () => editor.value.chain().focus().toggleUnderline().run(),
-        isActive: () => editor.value?.isActive("underline"),
-        title: "Underline",
-        disabled: () => showSource.value,
-    },
-    {
-        icon: Strikethrough,
-        action: () => editor.value.chain().focus().toggleStrike().run(),
-        isActive: () => editor.value?.isActive("strike"),
-        title: "Strikethrough",
-        disabled: () => showSource.value,
-    },
-    {
-        icon: Palette,
-        action: setColor,
-        isActive: () => editor.value?.isActive("textStyle"),
-        title: "Text Color",
-        disabled: () => showSource.value,
-    },
-    {
-        type: "dropdown",
-        icon: Type,
-        title: "Font Family",
-        items: fontOptions.map((font) => ({
-            label: font.label,
-            action: () => setFont(font.value),
-            isActive: () =>
-                editor.value?.isActive("textStyle", { fontFamily: font.value }),
-        })),
-        disabled: () => showSource.value,
-    },
-    { divider: true },
-    {
-        icon: List,
-        action: () => editor.value.chain().focus().toggleBulletList().run(),
-        isActive: () => editor.value?.isActive("bulletList"),
-        title: "Bullet List",
-        disabled: () => showSource.value,
-    },
-    {
-        icon: ListOrdered,
-        action: () => editor.value.chain().focus().toggleOrderedList().run(),
-        isActive: () => editor.value?.isActive("orderedList"),
-        title: "Numbered List",
-        disabled: () => showSource.value,
-    },
-    { divider: true },
-    {
-        icon: Quote,
-        action: () => editor.value.chain().focus().toggleBlockquote().run(),
-        isActive: () => editor.value?.isActive("blockquote"),
-        title: "Quote",
-        disabled: () => showSource.value,
-    },
-    {
-        icon: Code, // Using same icon? Maybe generic FileCode better but Code is fine
-        action: () => editor.value.chain().focus().toggleCodeBlock().run(),
-        isActive: () => editor.value?.isActive("codeBlock"),
-        title: "Code Block",
-        disabled: () => showSource.value,
-    },
-    { divider: true },
-    {
-        icon: LinkIcon,
-        action: setLink,
-        isActive: () => editor.value?.isActive("link"),
-        title: "Add Link",
-        disabled: () => showSource.value,
-    },
-    {
-        icon: Unlink,
-        action: () => editor.value.chain().focus().unsetLink().run(),
-        isActive: () => false,
-        disabled: () => !editor.value?.isActive("link") || showSource.value,
-        title: "Remove Link",
-    },
-    {
-        icon: MonitorPlay,
-        action: addVideo,
-        isActive: () => editor.value?.isActive("youtube"),
-        title: "Add YouTube Video",
-        disabled: () => showSource.value,
-    },
-    {
-        icon: TableIcon,
-        action: openTableModal,
-        isActive: () => editor.value?.isActive("table"),
-        title: "Insert Table",
-        disabled: () => showSource.value,
-    },
-    { divider: true },
-    {
-        icon: Undo,
-        action: () => editor.value.chain().focus().undo().run(),
-        isActive: () => false,
-        disabled: () => !editor.value?.can().undo() || showSource.value,
-        title: "Undo",
-    },
-    {
-        icon: Redo,
-        action: () => editor.value.chain().focus().redo().run(),
-        isActive: () => false,
-        disabled: () => !editor.value?.can().redo() || showSource.value,
-        title: "Redo",
-    },
+const toolbarGroups = computed(() => [
+    [
+        {
+            icon: Code,
+            action: toggleSource,
+            isActive: () => showSource.value,
+            title: "View Source",
+        },
+    ],
+    [
+        {
+            icon: Undo,
+            action: () => editor.value.chain().focus().undo().run(),
+            isActive: () => false,
+            disabled: () => !editor.value?.can().undo() || showSource.value,
+            title: "Undo",
+        },
+        {
+            icon: Redo,
+            action: () => editor.value.chain().focus().redo().run(),
+            isActive: () => false,
+            disabled: () => !editor.value?.can().redo() || showSource.value,
+            title: "Redo",
+        },
+    ],
+    [
+        {
+            icon: Heading1,
+            action: () =>
+                editor.value.chain().focus().toggleHeading({ level: 1 }).run(),
+            isActive: () => editor.value?.isActive("heading", { level: 1 }),
+            title: "Heading 1",
+            disabled: () => showSource.value,
+        },
+        {
+            icon: Heading2,
+            action: () =>
+                editor.value.chain().focus().toggleHeading({ level: 2 }).run(),
+            isActive: () => editor.value?.isActive("heading", { level: 2 }),
+            title: "Heading 2",
+            disabled: () => showSource.value,
+        },
+    ],
+    [
+        {
+            icon: AlignLeft,
+            action: () =>
+                editor.value.chain().focus().setTextAlign("left").run(),
+            isActive: () => editor.value?.isActive({ textAlign: "left" }),
+            title: "Align Left",
+            disabled: () => showSource.value,
+        },
+        {
+            icon: AlignCenter,
+            action: () =>
+                editor.value.chain().focus().setTextAlign("center").run(),
+            isActive: () => editor.value?.isActive({ textAlign: "center" }),
+            title: "Align Center",
+            disabled: () => showSource.value,
+        },
+        {
+            icon: AlignRight,
+            action: () =>
+                editor.value.chain().focus().setTextAlign("right").run(),
+            isActive: () => editor.value?.isActive({ textAlign: "right" }),
+            title: "Align Right",
+            disabled: () => showSource.value,
+        },
+        {
+            icon: AlignJustify,
+            action: () =>
+                editor.value.chain().focus().setTextAlign("justify").run(),
+            isActive: () => editor.value?.isActive({ textAlign: "justify" }),
+            title: "Align Justify",
+            disabled: () => showSource.value,
+        },
+    ],
+    [
+        {
+            icon: Bold,
+            action: () => editor.value.chain().focus().toggleBold().run(),
+            isActive: () => editor.value?.isActive("bold"),
+            title: "Bold",
+            disabled: () => showSource.value,
+        },
+        {
+            icon: Italic,
+            action: () => editor.value.chain().focus().toggleItalic().run(),
+            isActive: () => editor.value?.isActive("italic"),
+            title: "Italic",
+            disabled: () => showSource.value,
+        },
+        {
+            icon: UnderlineIcon,
+            action: () => editor.value.chain().focus().toggleUnderline().run(),
+            isActive: () => editor.value?.isActive("underline"),
+            title: "Underline",
+            disabled: () => showSource.value,
+        },
+        {
+            icon: Strikethrough,
+            action: () => editor.value.chain().focus().toggleStrike().run(),
+            isActive: () => editor.value?.isActive("strike"),
+            title: "Strikethrough",
+            disabled: () => showSource.value,
+        },
+        {
+            icon: Palette,
+            action: setColor,
+            isActive: () => editor.value?.isActive("textStyle"),
+            title: "Text Color",
+            disabled: () => showSource.value,
+        },
+        {
+            type: "dropdown",
+            icon: Type,
+            title: "Font Family",
+            items: fontOptions.map((font) => ({
+                label: font.label,
+                action: () => setFont(font.value),
+                isActive: () =>
+                    editor.value?.isActive("textStyle", {
+                        fontFamily: font.value,
+                    }),
+            })),
+            disabled: () => showSource.value,
+        },
+    ],
+    [
+        {
+            icon: List,
+            action: () => editor.value.chain().focus().toggleBulletList().run(),
+            isActive: () => editor.value?.isActive("bulletList"),
+            title: "Bullet List",
+            disabled: () => showSource.value,
+        },
+        {
+            icon: ListOrdered,
+            action: () =>
+                editor.value.chain().focus().toggleOrderedList().run(),
+            isActive: () => editor.value?.isActive("orderedList"),
+            title: "Numbered List",
+            disabled: () => showSource.value,
+        },
+    ],
+    [
+        {
+            icon: Quote,
+            action: () => editor.value.chain().focus().toggleBlockquote().run(),
+            isActive: () => editor.value?.isActive("blockquote"),
+            title: "Quote",
+            disabled: () => showSource.value,
+        },
+        {
+            icon: Code,
+            action: () => editor.value.chain().focus().toggleCodeBlock().run(),
+            isActive: () => editor.value?.isActive("codeBlock"),
+            title: "Code Block",
+            disabled: () => showSource.value,
+        },
+    ],
+    [
+        {
+            icon: LinkIcon,
+            action: setLink,
+            isActive: () => editor.value?.isActive("link"),
+            title: "Add Link",
+            disabled: () => showSource.value,
+        },
+        {
+            icon: Unlink,
+            action: () => editor.value.chain().focus().unsetLink().run(),
+            isActive: () => false,
+            disabled: () => !editor.value?.isActive("link") || showSource.value,
+            title: "Remove Link",
+        },
+        {
+            icon: MonitorPlay,
+            action: addVideo,
+            isActive: () => editor.value?.isActive("youtube"),
+            title: "Add YouTube Video",
+            disabled: () => showSource.value,
+        },
+        {
+            icon: TableIcon,
+            action: openTableModal,
+            isActive: () => editor.value?.isActive("table"),
+            title: "Insert Table",
+            disabled: () => showSource.value,
+        },
+    ],
 ]);
 
 const bubbleMenuButtons = computed(() => {
-    const textButtons = toolbarButtons.value.filter(
-        (btn) =>
-            [
-                "Bold",
-                "Italic",
-                "Underline",
-                "Strikethrough",
-                "Text Color",
-                "Add Link",
-                "Font Family",
-                "Heading 1",
-                "Heading 2",
-            ].includes(btn.title) ||
-            [
-                "Align Left",
-                "Align Center",
-                "Align Right",
-                "Align Justify",
-            ].includes(btn.title),
-    );
+    // Flatten toolbarGroups for specific titles
+    const textButtons = toolbarGroups.value
+        .flat()
+        .filter(
+            (btn) =>
+                [
+                    "Bold",
+                    "Italic",
+                    "Underline",
+                    "Strikethrough",
+                    "Text Color",
+                    "Add Link",
+                    "Font Family",
+                    "Heading 1",
+                    "Heading 2",
+                ].includes(btn.title) ||
+                [
+                    "Align Left",
+                    "Align Center",
+                    "Align Right",
+                    "Align Justify",
+                ].includes(btn.title),
+        );
 
     // If inside a table, append table operations with a divider
     if (editor.value?.isActive("table")) {
@@ -664,17 +682,19 @@ const bubbleMenuButtons = computed(() => {
 });
 
 const floatingMenuButtons = computed(() =>
-    toolbarButtons.value.filter((btn) =>
-        [
-            "Bullet List",
-            "Numbered List",
-            "Quote",
-            "Code Block",
-            "Add YouTube Video",
-            "Image",
-            "Insert Table",
-        ].includes(btn.title),
-    ),
+    toolbarGroups.value
+        .flat()
+        .filter((btn) =>
+            [
+                "Bullet List",
+                "Numbered List",
+                "Quote",
+                "Code Block",
+                "Add YouTube Video",
+                "Image",
+                "Insert Table",
+            ].includes(btn.title),
+        ),
 );
 
 // Table-specific operations for when inside a table
@@ -747,20 +767,20 @@ const tableOperations = computed(() => [
     {
         icon: Copy,
         action: () => {
-             // Select table first
-             const { state, view } = editor.value;
-             const { selection } = state;
-             const { $from } = selection;
-             for (let depth = $from.depth; depth > 0; depth--) {
-                 const node = $from.node(depth);
-                 if (node.type.name === 'table') {
-                     const pos = $from.before(depth);
-                     const tableSelection = NodeSelection.create(state.doc, pos);
-                     view.dispatch(state.tr.setSelection(tableSelection));
-                     // Try to copy
-                     document.execCommand('copy');
-                     break;
-                 }
+            // Select table first
+            const { state, view } = editor.value;
+            const { selection } = state;
+            const { $from } = selection;
+            for (let depth = $from.depth; depth > 0; depth--) {
+                const node = $from.node(depth);
+                if (node.type.name === "table") {
+                    const pos = $from.before(depth);
+                    const tableSelection = NodeSelection.create(state.doc, pos);
+                    view.dispatch(state.tr.setSelection(tableSelection));
+                    // Try to copy
+                    document.execCommand("copy");
+                    break;
+                }
             }
         },
         title: "Copy Table",
@@ -768,33 +788,33 @@ const tableOperations = computed(() => [
     {
         icon: Scissors,
         action: () => {
-             // Select table first
-             const { state, view } = editor.value;
-             const { selection } = state;
-             const { $from } = selection;
-             // Find table node by walking up
-             for (let depth = $from.depth; depth > 0; depth--) {
-                 const node = $from.node(depth);
-                 if (node.type.name === 'table') {
-                     const pos = $from.before(depth);
-                     const nodeSize = node.nodeSize;
-                     
-                     // 1. Select the table for copying
-                     const tableSelection = NodeSelection.create(state.doc, pos);
-                     const selectionTr = state.tr.setSelection(tableSelection);
-                     view.dispatch(selectionTr);
-                     
-                     // 2. Focus and Copy
-                     view.focus();
-                     document.execCommand('copy');
-                     
-                     // 3. Explicitly delete the specific table range
-                     // We fetch the latest state to ensure we're working with current doc
-                     const currentTr = view.state.tr.delete(pos, pos + nodeSize);
-                     view.dispatch(currentTr);
-                     
-                     break;
-                 }
+            // Select table first
+            const { state, view } = editor.value;
+            const { selection } = state;
+            const { $from } = selection;
+            // Find table node by walking up
+            for (let depth = $from.depth; depth > 0; depth--) {
+                const node = $from.node(depth);
+                if (node.type.name === "table") {
+                    const pos = $from.before(depth);
+                    const nodeSize = node.nodeSize;
+
+                    // 1. Select the table for copying
+                    const tableSelection = NodeSelection.create(state.doc, pos);
+                    const selectionTr = state.tr.setSelection(tableSelection);
+                    view.dispatch(selectionTr);
+
+                    // 2. Focus and Copy
+                    view.focus();
+                    document.execCommand("copy");
+
+                    // 3. Explicitly delete the specific table range
+                    // We fetch the latest state to ensure we're working with current doc
+                    const currentTr = view.state.tr.delete(pos, pos + nodeSize);
+                    view.dispatch(currentTr);
+
+                    break;
+                }
             }
         },
         title: "Cut Table",
@@ -802,20 +822,20 @@ const tableOperations = computed(() => [
     {
         icon: BoxSelect,
         action: () => {
-             const { state, view } = editor.value;
-             const { selection } = state;
-             const { $from } = selection;
-             
-             // Find table node by walking up
-             for (let depth = $from.depth; depth > 0; depth--) {
-                 const node = $from.node(depth);
-                 if (node.type.name === 'table') {
-                     // Create NodeSelection for the table
-                     const pos = $from.before(depth);
-                     const tableSelection = NodeSelection.create(state.doc, pos);
-                     view.dispatch(state.tr.setSelection(tableSelection));
-                     break;
-                 }
+            const { state, view } = editor.value;
+            const { selection } = state;
+            const { $from } = selection;
+
+            // Find table node by walking up
+            for (let depth = $from.depth; depth > 0; depth--) {
+                const node = $from.node(depth);
+                if (node.type.name === "table") {
+                    // Create NodeSelection for the table
+                    const pos = $from.before(depth);
+                    const tableSelection = NodeSelection.create(state.doc, pos);
+                    view.dispatch(state.tr.setSelection(tableSelection));
+                    break;
+                }
             }
         },
         title: "Select Table",
@@ -824,101 +844,117 @@ const tableOperations = computed(() => [
 
 const containerClasses = computed(() =>
     cn(
-        "rounded-xl border transition-all",
-        "bg-[var(--surface-elevated)]",
-        props.disabled && "opacity-50 bg-[var(--surface-secondary)]",
+        "rounded-none border transition-all flex flex-col min-h-0",
+        "bg-(--surface-elevated)/80 backdrop-blur-md",
+        props.disabled && "opacity-50 bg-(--surface-secondary)",
         props.error
-            ? "border-[var(--color-error)]"
-            : "border-[var(--border-default)] focus-within:border-[var(--interactive-primary)]",
+            ? "border-error"
+            : "border-(--border-default) focus-within:border-(--interactive-primary)",
     ),
 );
 </script>
 
 <template>
-    <div class="space-y-1.5">
+    <div class="space-y-1.5 flex flex-col h-full min-h-0">
         <label
             v-if="label"
-            class="block text-sm font-medium text-[var(--text-primary)]"
+            class="block text-sm font-medium text-(--text-primary)"
         >
             {{ label }}
         </label>
 
-        <div :class="containerClasses">
+        <div
+            :class="containerClasses"
+            class="flex-1 overflow-hidden shadow-sm transition-shadow"
+        >
             <!-- Toolbar (Static) -->
             <div
-                class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-[var(--border-muted)] bg-[var(--surface-secondary)] rounded-t-xl"
+                class="flex flex-wrap items-center gap-1 px-3 py-1.5 border-b border-(--border-muted) bg-(--surface-secondary) backdrop-blur-md rounded-t-none"
             >
                 <template
-                    v-for="(button, index) in toolbarButtons"
-                    :key="index"
+                    v-for="(group, gIndex) in toolbarGroups"
+                    :key="gIndex"
                 >
-                    <div
-                        v-if="button.divider"
-                        class="w-px h-5 mx-1 bg-[var(--border-default)]"
-                    />
-                    <Dropdown
-                        v-else-if="button.type === 'dropdown'"
-                        :items="button.items"
-                        :disabled="button.disabled?.()"
-                    >
-                        <template #trigger>
+                    <div class="flex items-center gap-0.5">
+                        <template v-for="(button, index) in group" :key="index">
+                            <Dropdown
+                                v-if="button.type === 'dropdown'"
+                                :items="button.items"
+                                :disabled="button.disabled?.()"
+                            >
+                                <template #trigger>
+                                    <button
+                                        type="button"
+                                        :title="button.title"
+                                        :class="
+                                            cn(
+                                                'p-1.5 rounded-lg transition-all hover:bg-(--surface-secondary) active:scale-95',
+                                                'flex items-center gap-1',
+                                                button.disabled?.() &&
+                                                    'opacity-40 cursor-not-allowed hover:bg-transparent',
+                                            )
+                                        "
+                                        :disabled="button.disabled?.()"
+                                    >
+                                        <component
+                                            :is="button.icon"
+                                            class="h-4 w-4"
+                                        />
+                                    </button>
+                                </template>
+                            </Dropdown>
                             <button
+                                v-else
                                 type="button"
                                 :title="button.title"
+                                :disabled="disabled || button.disabled?.()"
                                 :class="
                                     cn(
-                                        'p-1.5 rounded-lg transition-colors hover:bg-[var(--surface-tertiary)]',
-                                        'flex items-center gap-1',
-                                        button.disabled?.() &&
-                                            'opacity-50 cursor-not-allowed hover:bg-transparent',
+                                        'p-1.5 rounded-lg transition-all',
+                                        'hover:bg-(--surface-secondary) active:scale-95 text-(--text-secondary)',
+                                        'disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent',
+                                        button.isActive?.() &&
+                                            'bg-(--brand-primary)/10 text-(--brand-primary)',
                                     )
                                 "
-                                :disabled="button.disabled?.()"
+                                @click="button.action"
                             >
                                 <component :is="button.icon" class="h-4 w-4" />
                             </button>
                         </template>
-                    </Dropdown>
-                    <button
-                        v-else
-                        type="button"
-                        :title="button.title"
-                        :disabled="disabled || button.disabled?.()"
-                        :class="
-                            cn(
-                                'p-1.5 rounded-lg transition-colors',
-                                'hover:bg-[var(--surface-tertiary)]',
-                                'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent',
-                                button.isActive?.() &&
-                                    'bg-[var(--interactive-primary)] text-white hover:bg-[var(--interactive-primary-hover)]',
-                            )
-                        "
-                        @click="button.action"
-                    >
-                        <component :is="button.icon" class="h-4 w-4" />
-                    </button>
+                    </div>
+                    <!-- Divider -->
+                    <div
+                        v-if="gIndex < toolbarGroups.length - 1"
+                        class="w-px h-4 bg-(--border-default)/60 mx-1"
+                    />
                 </template>
+
+                <!-- Custom Actions Slot -->
+                <div class="ml-auto flex items-center gap-1.5">
+                    <slot name="toolbar-after"></slot>
+                </div>
             </div>
 
             <!-- Editor -->
             <!-- Editor (Visual) -->
-            <div v-if="!showSource" class="relative">
+            <div
+                v-if="!showSource"
+                class="relative flex-1 flex flex-col overflow-hidden min-h-0"
+            >
                 <BubbleMenu
                     v-if="editor"
-                    class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-lg"
+                    class="flex flex-wrap items-center gap-0.5 px-2 py-1 rounded-lg border border-(--border-default) bg-(--surface-elevated)/95 backdrop-blur-md shadow-xl"
                     :tippy-options="{ duration: 100, appendTo: 'parent' }"
                     :editor="editor"
                     :should-show="
                         ({ editor: ed }) => {
-                            // Hide bubble menu for images and YouTube embeds (they have their own controls)
                             if (
                                 ed.isActive('image') ||
                                 ed.isActive('youtube')
                             ) {
                                 return false;
                             }
-                            // Only show when there's actual text selection
-                            // This works for text inside tables too!
                             return !ed.state.selection.empty;
                         }
                     "
@@ -929,7 +965,7 @@ const containerClasses = computed(() =>
                     >
                         <div
                             v-if="button.divider"
-                            class="w-px h-4 mx-1 bg-[var(--border-default)]"
+                            class="w-px h-3 mx-1 bg-(--border-default)/50"
                         />
                         <Dropdown
                             v-else-if="button.type === 'dropdown'"
@@ -940,11 +976,11 @@ const containerClasses = computed(() =>
                                 <button
                                     type="button"
                                     :title="button.title"
-                                    class="p-1 rounded hover:bg-[var(--surface-tertiary)] flex items-center gap-1"
+                                    class="p-1 px-1.5 rounded-md hover:bg-(--surface-tertiary) flex items-center gap-1 transition-all"
                                 >
                                     <component
                                         :is="button.icon"
-                                        class="h-4 w-4"
+                                        class="h-3.5 w-3.5 text-(--text-secondary)"
                                     />
                                 </button>
                             </template>
@@ -956,21 +992,23 @@ const containerClasses = computed(() =>
                             :disabled="disabled || button.disabled?.()"
                             :class="
                                 cn(
-                                    'p-1.5 rounded hover:bg-[var(--surface-tertiary)]',
+                                    'p-1 px-1.5 rounded-md hover:bg-(--surface-tertiary) transition-all',
                                     button.isActive?.() &&
-                                        'text-[var(--interactive-primary)]',
+                                        'text-(--brand-primary) bg-(--brand-primary)/10',
+                                    !button.isActive?.() &&
+                                        'text-(--text-secondary)',
                                 )
                             "
                             @click="button.action"
                         >
-                            <component :is="button.icon" class="h-4 w-4" />
+                            <component :is="button.icon" class="h-3.5 w-3.5" />
                         </button>
                     </template>
                 </BubbleMenu>
 
                 <FloatingMenu
                     v-if="editor"
-                    class="flex items-center gap-1 px-2 py-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-lg"
+                    class="flex items-center gap-0.5 px-2 py-1 rounded-lg border border-(--border-default) bg-(--surface-elevated)/95 backdrop-blur-md shadow-xl"
                     :tippy-options="{ duration: 100, appendTo: 'parent' }"
                     :editor="editor"
                 >
@@ -983,51 +1021,51 @@ const containerClasses = computed(() =>
                             :title="button.title"
                             :class="
                                 cn(
-                                    'p-1.5 rounded hover:bg-[var(--surface-tertiary)]',
+                                    'p-1 px-1.5 rounded-md hover:bg-(--surface-tertiary) text-(--text-secondary) transition-all',
                                     button.isActive?.() &&
-                                        'text-[var(--interactive-primary)]',
+                                        'text-(--brand-primary) bg-(--brand-primary)/10',
                                 )
                             "
                             @click="button.action"
                         >
-                            <component :is="button.icon" class="h-4 w-4" />
+                            <component :is="button.icon" class="h-3.5 w-3.5" />
                         </button>
                     </template>
                 </FloatingMenu>
 
-                <EditorContent
-                    :editor="editor"
-                    :class="
-                        cn(
-                            'prose prose-sm max-w-none',
-                            'prose-p:my-2 prose-p:text-[var(--text-primary)]',
-                            'prose-strong:text-[var(--text-primary)]',
-                            'prose-ul:my-2 prose-ol:my-2 prose-li:my-0',
-                            'prose-blockquote:border-l-[var(--interactive-primary)] prose-blockquote:text-[var(--text-secondary)]',
-                            'prose-code:text-[var(--text-primary)] prose-code:bg-[var(--surface-secondary)] prose-code:px-1 prose-code:rounded',
-                            'prose-pre:bg-[var(--surface-secondary)] prose-pre:text-[var(--text-primary)]',
-                        )
-                    "
-                    :style="{ minHeight }"
-                />
+                <div class="flex-1 overflow-y-auto w-full custom-scrollbar p-6">
+                    <EditorContent
+                        :editor="editor"
+                        :class="
+                            cn(
+                                'prose prose-sm max-w-none w-full min-h-full',
+                                'prose-p:my-3 prose-p:text-(--text-primary) prose-p:leading-relaxed',
+                                'prose-strong:text-(--text-primary)',
+                                'prose-ul:my-3 prose-ol:my-3 prose-li:my-1',
+                                'prose-blockquote:border-l-2 prose-blockquote:border-(--brand-primary)/40 prose-blockquote:text-(--text-secondary) prose-blockquote:italic prose-blockquote:bg-(--surface-secondary)/20 prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg',
+                                'prose-code:text-(--text-primary) prose-code:bg-(--surface-secondary) prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:font-medium',
+                                'prose-pre:bg-(--surface-secondary) prose-pre:text-(--text-primary) prose-pre:p-4 prose-pre:rounded-xl prose-pre:border prose-pre:border-(--border-default)',
+                            )
+                        "
+                    />
+                </div>
             </div>
 
             <!-- Source (Code) -->
-            <div v-else class="h-full w-full">
+            <div v-else class="flex-1 w-full min-h-0">
                 <textarea
                     :value="modelValue"
                     @input="emit('update:modelValue', $event.target.value)"
-                    class="w-full h-full p-4 font-mono text-sm bg-[var(--surface-primary)] text-[var(--text-primary)] resize-none focus:outline-none"
-                    :style="{ minHeight }"
+                    class="w-full h-full p-4 font-mono text-sm bg-(--surface-primary) text-(--text-primary) resize-none focus:outline-none custom-scrollbar"
                     spellcheck="false"
                 ></textarea>
             </div>
         </div>
 
-        <p v-if="hint && !error" class="text-xs text-[var(--text-muted)]">
+        <p v-if="hint && !error" class="text-xs text-(--text-muted)">
             {{ hint }}
         </p>
-        <p v-if="error" class="text-xs text-[var(--color-error)]">
+        <p v-if="error" class="text-xs text-error">
             {{ error }}
         </p>
 
@@ -1059,7 +1097,7 @@ const containerClasses = computed(() =>
             <div class="flex justify-center pb-2">
                 <Sketch
                     v-model="colorValue"
-                    class="!w-full !max-w-none !shadow-none !bg-transparent !box-border"
+                    class="w-full! max-w-none! shadow-none! bg-transparent! box-border!"
                     :preset-colors="[
                         '#000000',
                         '#ffffff',
@@ -1086,7 +1124,7 @@ const containerClasses = computed(() =>
                 />
             </div>
             <div
-                class="flex justify-end gap-3 pt-2 border-t border-[var(--border-default)]"
+                class="flex justify-end gap-3 pt-2 border-t border-(--border-default)"
             >
                 <Button variant="ghost" @click="showColorModal = false"
                     >Cancel</Button
@@ -1095,18 +1133,18 @@ const containerClasses = computed(() =>
             </div>
         </Modal>
 
-        <!-- Table Modal -->
         <Modal
             v-model:open="showTableModal"
             title="Insert Table"
             description="Choose the number of rows and columns for your table."
             size="sm"
+            class="border-(--border-default)"
         >
             <div class="space-y-4 pt-2">
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label
-                            class="block text-sm font-medium text-[var(--text-secondary)] mb-1"
+                            class="block text-sm font-medium text-(--text-secondary) mb-1"
                             >Rows</label
                         >
                         <Input
@@ -1118,7 +1156,7 @@ const containerClasses = computed(() =>
                     </div>
                     <div>
                         <label
-                            class="block text-sm font-medium text-[var(--text-secondary)] mb-1"
+                            class="block text-sm font-medium text-(--text-secondary) mb-1"
                             >Columns</label
                         >
                         <Input
@@ -1156,7 +1194,7 @@ const containerClasses = computed(() =>
             <div class="flex justify-center pb-2">
                 <Sketch
                     v-model="borderColorValue"
-                    class="!w-full !max-w-none !shadow-none !bg-transparent !box-border"
+                    class="w-full! max-w-none! shadow-none! bg-transparent! box-border!"
                     :preset-colors="[
                         '#000000',
                         '#ffffff',
@@ -1183,7 +1221,7 @@ const containerClasses = computed(() =>
                 />
             </div>
             <div
-                class="flex justify-end gap-3 pt-2 border-t border-[var(--border-default)]"
+                class="flex justify-end gap-3 pt-2 border-t border-(--border-default)"
             >
                 <Button variant="ghost" @click="showBorderColorModal = false"
                     >Cancel</Button

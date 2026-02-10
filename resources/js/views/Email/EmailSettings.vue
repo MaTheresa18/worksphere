@@ -346,12 +346,12 @@ const handleMediaDelete = async (id) => {
     const parentId = isSignature
         ? selectedSignatureId.value
         : selectedTemplateId.value;
-    
+
     try {
         const endpoint = isSignature
-             ? `/api/emails/signatures/${parentId}/media/${id}`
-             : `/api/emails/templates/${parentId}/media/${id}`;
-        
+            ? `/api/emails/signatures/${parentId}/media/${id}`
+            : `/api/emails/templates/${parentId}/media/${id}`;
+
         await api.delete(endpoint);
         fetchMedia();
     } catch (e) {
@@ -485,10 +485,14 @@ function getUsageDetails(account: any) {
                 <ArrowLeftIcon class="w-5 h-5 text-(--text-secondary)" />
             </Button>
             <div class="space-y-1">
-                <h1 class="text-3xl font-bold tracking-tight text-(--text-primary)">
+                <h1
+                    class="text-3xl font-bold tracking-tight text-(--text-primary)"
+                >
                     Email Settings
                 </h1>
-                <p class="text-(--text-secondary) text-sm font-medium opacity-80">
+                <p
+                    class="text-(--text-secondary) text-sm font-medium opacity-80"
+                >
                     Configuration and management for your email experience.
                 </p>
             </div>
@@ -497,7 +501,9 @@ function getUsageDetails(account: any) {
         <div class="flex flex-col lg:flex-row gap-6">
             <!-- Sidebar Navigation -->
             <div class="w-full lg:w-72 shrink-0">
-                <nav class="space-y-2 p-1 bg-(--surface-secondary)/20 rounded-2xl border border-(--border-subtle) backdrop-blur-sm">
+                <nav
+                    class="space-y-2 p-1 bg-(--surface-secondary)/20 rounded-2xl border border-(--border-subtle) backdrop-blur-sm"
+                >
                     <button
                         v-for="tab in tabs"
                         :key="tab.id"
@@ -509,23 +515,31 @@ function getUsageDetails(account: any) {
                                 : 'text-(--text-secondary) hover:bg-(--surface-secondary)/50 hover:text-(--text-primary)',
                         ]"
                     >
-                        <div 
+                        <div
                             class="w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0"
-                            :class="activeTab === tab.id ? 'bg-(--brand-primary)/10' : 'bg-(--surface-tertiary)/50 group-hover:bg-(--surface-tertiary)'"
+                            :class="
+                                activeTab === tab.id
+                                    ? 'bg-(--brand-primary)/10'
+                                    : 'bg-(--surface-tertiary)/50 group-hover:bg-(--surface-tertiary)'
+                            "
                         >
                             <component :is="tab.icon" class="w-4 h-4" />
                         </div>
                         <div class="flex flex-col items-start min-w-0">
                             <span class="truncate">{{ tab.label }}</span>
-                            <span 
-                                v-if="tab.description" 
+                            <span
+                                v-if="tab.description"
                                 class="text-[10px] opacity-60 font-normal truncate max-w-full"
-                                :class="activeTab === tab.id ? 'text-(--brand-primary)' : 'text-(--text-muted)'"
+                                :class="
+                                    activeTab === tab.id
+                                        ? 'text-(--brand-primary)'
+                                        : 'text-(--text-muted)'
+                                "
                             >
                                 {{ tab.description }}
                             </span>
                         </div>
-                        <ChevronRightIcon 
+                        <ChevronRightIcon
                             v-if="activeTab === tab.id"
                             class="w-4 h-4 ml-auto"
                         />
@@ -542,13 +556,19 @@ function getUsageDetails(account: any) {
                     "
                     class="overflow-hidden min-h-[500px] flex flex-col"
                 >
-                    <div class="border-b border-(--border-default) p-5 flex items-center justify-between bg-(--surface-primary)">
+                    <div
+                        class="border-b border-(--border-default) p-5 flex items-center justify-between bg-(--surface-primary)"
+                    >
                         <div class="flex items-center gap-3">
                             <h2 class="text-lg font-bold text-(--text-primary)">
-                                {{ activeTab === "signatures" ? "Signatures" : "Templates" }}
+                                {{
+                                    activeTab === "signatures"
+                                        ? "Signatures"
+                                        : "Templates"
+                                }}
                             </h2>
                             <!-- Status Indicator -->
-                             <div
+                            <div
                                 v-if="saveStatus === 'saved'"
                                 class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20"
                             >
@@ -587,7 +607,7 @@ function getUsageDetails(account: any) {
                     <div class="flex flex-1 flex-col md:flex-row h-full">
                         <!-- List Column -->
                         <div
-                            class="w-full md:w-72 border-b md:border-b-0 md:border-r border-(--border-default) bg-(--surface-secondary)/20 flex flex-col shrink-0"
+                            class="w-full md:w-72 border-b md:border-b-0 md:border-r border-(--border-default) bg-(--brand-primary)/5 backdrop-blur-sm flex flex-col shrink-0"
                         >
                             <div class="p-4 border-b border-(--border-default)">
                                 <div class="relative">
@@ -602,7 +622,9 @@ function getUsageDetails(account: any) {
                                     />
                                 </div>
                             </div>
-                            <div class="flex-1 overflow-y-auto p-3 space-y-1.5 max-h-[300px] md:max-h-[600px]">
+                            <div
+                                class="flex-1 overflow-y-auto p-3 space-y-1.5 max-h-[300px] md:max-h-[600px]"
+                            >
                                 <template v-if="activeTab === 'signatures'">
                                     <button
                                         v-for="sig in filteredSignatures"
@@ -611,16 +633,24 @@ function getUsageDetails(account: any) {
                                         class="w-full text-left px-3.5 py-3 rounded-xl text-sm transition-all flex items-center justify-between group relative overflow-hidden"
                                         :class="
                                             selectedSignatureId === sig.id
-                                                ? 'bg-(--surface-primary) shadow-sm text-(--brand-primary) font-semibold border border-(--border-default) scale-[1.02]'
-                                                : 'text-(--text-secondary) hover:bg-(--surface-secondary)/50 hover:text-(--text-primary)'
+                                                ? 'bg-(--surface-primary) shadow-md text-(--brand-primary) font-semibold border border-(--brand-primary)/20 scale-[1.02]'
+                                                : 'text-(--text-secondary) hover:bg-(--brand-primary)/10 hover:text-(--text-primary)'
                                         "
                                     >
-                                        <div class="flex items-center gap-3 min-w-0">
-                                            <PenToolIcon class="w-4 h-4 shrink-0 opacity-50" />
-                                            <span class="truncate">{{ sig.name }}</span>
+                                        <div
+                                            class="flex items-center gap-3 min-w-0"
+                                        >
+                                            <PenToolIcon
+                                                class="w-4 h-4 shrink-0 opacity-50"
+                                            />
+                                            <span class="truncate">{{
+                                                sig.name
+                                            }}</span>
                                         </div>
                                         <button
-                                            @click.stop="handleDeleteSignature(sig.id)"
+                                            @click.stop="
+                                                handleDeleteSignature(sig.id)
+                                            "
                                             class="opacity-0 group-hover:opacity-100 p-1.5 text-(--text-muted) hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
                                         >
                                             <Trash2Icon class="w-4 h-4" />
@@ -635,62 +665,100 @@ function getUsageDetails(account: any) {
                                         class="w-full text-left px-3.5 py-3 rounded-xl text-sm transition-all flex flex-col gap-1 group relative overflow-hidden"
                                         :class="
                                             selectedTemplateId === tpl.id
-                                                ? 'bg-(--surface-primary) shadow-sm text-(--brand-primary) font-semibold border border-(--border-default) scale-[1.02]'
-                                                : 'text-(--text-secondary) hover:bg-(--surface-secondary)/50 hover:text-(--text-primary)'
+                                                ? 'bg-(--surface-primary) shadow-md text-(--brand-primary) font-semibold border border-(--brand-primary)/20 scale-[1.02]'
+                                                : 'text-(--text-secondary) hover:bg-(--brand-primary)/10 hover:text-(--text-primary)'
                                         "
                                     >
-                                        <div class="flex items-center justify-between w-full min-w-0 gap-2">
-                                            <div class="flex items-center gap-3 min-w-0">
-                                                <FileTextIcon class="w-4 h-4 shrink-0 opacity-50" />
-                                                <span class="truncate font-semibold">{{ tpl.name }}</span>
+                                        <div
+                                            class="flex items-center justify-between w-full min-w-0 gap-2"
+                                        >
+                                            <div
+                                                class="flex items-center gap-3 min-w-0"
+                                            >
+                                                <FileTextIcon
+                                                    class="w-4 h-4 shrink-0 opacity-50"
+                                                />
+                                                <span
+                                                    class="truncate font-semibold"
+                                                    >{{ tpl.name }}</span
+                                                >
                                             </div>
                                             <button
-                                                @click.stop="handleDeleteTemplate(tpl.id)"
+                                                @click.stop="
+                                                    handleDeleteTemplate(tpl.id)
+                                                "
                                                 class="opacity-0 group-hover:opacity-100 p-1.5 text-(--text-muted) hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all shrink-0"
                                             >
                                                 <Trash2Icon class="w-4 h-4" />
                                             </button>
                                         </div>
-                                         <span 
+                                        <span
                                             class="text-xs font-normal truncate pl-7"
-                                            :class="selectedTemplateId === tpl.id ? 'text-(--brand-primary)/70' : 'text-(--text-muted)'"
-                                         >
-                                            {{ tpl.subject || '(No Subject)' }}
-                                         </span>
+                                            :class="
+                                                selectedTemplateId === tpl.id
+                                                    ? 'text-(--brand-primary)/70'
+                                                    : 'text-(--text-muted)'
+                                            "
+                                        >
+                                            {{ tpl.subject || "(No Subject)" }}
+                                        </span>
                                     </button>
                                 </template>
                             </div>
                         </div>
 
                         <!-- Editor Column -->
-                        <div class="flex-1 flex flex-col min-w-0 bg-(--surface-primary)">
+                        <div
+                            class="flex-1 flex flex-col min-w-0 bg-(--surface-primary) relative"
+                        >
+                            <!-- Top Accent Strip -->
+                            <div
+                                class="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-(--brand-primary)/50 via-(--brand-primary) to-(--brand-primary)/50 z-10"
+                            ></div>
                             <template
                                 v-if="
-                                    (activeTab === 'signatures' && selectedSignatureId) ||
-                                    (activeTab === 'templates' && selectedTemplateId)
+                                    (activeTab === 'signatures' &&
+                                        selectedSignatureId) ||
+                                    (activeTab === 'templates' &&
+                                        selectedTemplateId)
                                 "
                             >
-                                <div class="p-6 border-b border-(--border-default) bg-(--surface-primary) space-y-4">
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div
+                                    class="p-6 border-b border-(--border-default) bg-(--surface-primary) space-y-4"
+                                >
+                                    <div
+                                        class="grid grid-cols-1 md:grid-cols-2 gap-4"
+                                    >
                                         <div class="space-y-1.5">
-                                            <label class="block text-[10px] font-bold uppercase tracking-wider text-(--text-muted) ml-1">Configuration Name</label>
+                                            <label
+                                                class="block text-[10px] font-bold uppercase tracking-wider text-(--text-muted) ml-1"
+                                                >Configuration Name</label
+                                            >
                                             <Input
-                                                v-if="activeTab === 'signatures'"
+                                                v-if="
+                                                    activeTab === 'signatures'
+                                                "
                                                 v-model="signatureName"
                                                 @blur="handleSaveSignature"
                                                 placeholder="e.g. Personal Signature"
-                                                class="bg-(--surface-secondary)/30 border-(--border-default) focus:bg-(--surface-primary) transition-all"
+                                                class="bg-(--surface-primary) border-(--border-default) focus:border-(--brand-primary) shadow-inner transition-all"
                                             />
                                             <Input
                                                 v-else
                                                 v-model="templateName"
                                                 @blur="handleSaveTemplate"
                                                 placeholder="e.g. Support Response"
-                                                class="bg-(--surface-secondary)/30 border-(--border-default) focus:bg-(--surface-primary) transition-all"
+                                                class="bg-(--surface-primary) border-(--border-default) focus:border-(--brand-primary) shadow-inner transition-all"
                                             />
                                         </div>
-                                        <div v-if="activeTab === 'templates'" class="space-y-1.5">
-                                             <label class="block text-[10px] font-bold uppercase tracking-wider text-(--text-muted) ml-1">Email Subject Line</label>
+                                        <div
+                                            v-if="activeTab === 'templates'"
+                                            class="space-y-1.5"
+                                        >
+                                            <label
+                                                class="block text-[10px] font-bold uppercase tracking-wider text-(--text-muted) ml-1"
+                                                >Email Subject Line</label
+                                            >
                                             <Input
                                                 v-model="templateSubject"
                                                 @blur="handleSaveTemplate"
@@ -700,127 +768,294 @@ function getUsageDetails(account: any) {
                                         </div>
                                     </div>
                                 </div>
- 
-                                <div class="flex-1 flex flex-col relative min-h-[450px]">
-                                     <!-- Toolbar / Media Toggle -->
-                                    <div class="px-4 py-2 border-b border-(--border-default) bg-(--surface-secondary)/20 flex justify-end">
-                                        <button
-                                            @click="showMediaBar = !showMediaBar"
-                                            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-(--text-secondary) hover:text-(--brand-primary) hover:bg-(--brand-primary)/5 font-semibold transition-all"
-                                        >
-                                            <ImageIcon class="w-4 h-4" />
-                                            {{ showMediaBar ? 'Close Media Library' : 'Insert Media' }}
-                                        </button>
-                                    </div>
+
+                                <div
+                                    class="flex-1 flex flex-col relative min-h-[450px]"
+                                >
+                                    <!-- Toolbar / Media Toggle -->
 
                                     <div class="flex-1 flex">
-                                         <!-- Editor -->
-                                        <div class="flex-1 flex flex-col">
-                                             <RichTextEditor
-                                                v-if="activeTab === 'signatures'"
+                                        <!-- Editor -->
+                                        <div
+                                            class="flex-1 flex flex-col min-h-0"
+                                        >
+                                            <RichTextEditor
+                                                v-if="
+                                                    activeTab === 'signatures'
+                                                "
                                                 ref="signatureEditorRef"
-                                                v-model="activeSignature.content"
+                                                v-model="
+                                                    activeSignature.content
+                                                "
                                                 :content="signatureContent"
-                                                @update:modelValue="debouncedSaveSignature"
+                                                @update:modelValue="
+                                                    debouncedSaveSignature
+                                                "
                                                 placeholder="Write your signature..."
-                                                class="flex-1 border-0 rounded-none focus-within:ring-0"
-                                            />
+                                                class="flex-1"
+                                            >
+                                                <template #toolbar-after>
+                                                    <button
+                                                        type="button"
+                                                        @click="
+                                                            showMediaBar =
+                                                                !showMediaBar
+                                                        "
+                                                        class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-all text-(--text-secondary) hover:bg-(--surface-secondary) active:scale-95"
+                                                        :class="
+                                                            showMediaBar &&
+                                                            'bg-(--brand-primary)/10 text-(--brand-primary)'
+                                                        "
+                                                    >
+                                                        <ImageIcon
+                                                            class="w-4 h-4"
+                                                        />
+                                                        <span
+                                                            class="text-sm font-medium"
+                                                            >{{
+                                                                showMediaBar
+                                                                    ? "Close Media"
+                                                                    : "Insert Media"
+                                                            }}</span
+                                                        >
+                                                    </button>
+                                                </template>
+                                            </RichTextEditor>
                                             <RichTextEditor
                                                 v-else
                                                 ref="templateEditorRef"
                                                 v-model="activeTemplate.body"
                                                 :content="templateContent"
-                                                @update:modelValue="debouncedSaveTemplate"
+                                                @update:modelValue="
+                                                    debouncedSaveTemplate
+                                                "
                                                 placeholder="Write your template..."
-                                                class="flex-1 border-0 rounded-none focus-within:ring-0"
-                                            />
+                                                class="flex-1"
+                                            >
+                                                <template #toolbar-after>
+                                                    <button
+                                                        type="button"
+                                                        @click="
+                                                            showMediaBar =
+                                                                !showMediaBar
+                                                        "
+                                                        class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-all text-(--text-secondary) hover:bg-(--surface-secondary) active:scale-95"
+                                                        :class="
+                                                            showMediaBar &&
+                                                            'bg-(--brand-primary)/10 text-(--brand-primary)'
+                                                        "
+                                                    >
+                                                        <ImageIcon
+                                                            class="w-4 h-4"
+                                                        />
+                                                        <span
+                                                            class="text-sm font-medium"
+                                                            >{{
+                                                                showMediaBar
+                                                                    ? "Close Media"
+                                                                    : "Insert Media"
+                                                            }}</span
+                                                        >
+                                                    </button>
+                                                </template>
+                                            </RichTextEditor>
                                         </div>
 
                                         <!-- Media Sidebar (Inline) -->
-                                        <div 
+                                        <div
                                             v-if="showMediaBar"
                                             class="w-72 border-l border-(--border-default) bg-(--surface-secondary)/10 flex flex-col animate-in slide-in-from-right duration-300"
                                         >
-                                            <div class="p-4 border-b border-(--border-default)">
-                                                <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-widest">Media Assets</h3>
+                                            <div
+                                                class="p-4 border-b border-(--border-default)"
+                                            >
+                                                <h3
+                                                    class="text-[10px] font-bold text-(--text-muted) uppercase tracking-widest"
+                                                >
+                                                    Media Assets
+                                                </h3>
                                             </div>
-                                            
-                                            <div 
+
+                                            <div
                                                 class="flex-1 p-3 overflow-y-auto"
-                                                @dragover.prevent="isDragging = true"
-                                                @dragleave.prevent="isDragging = false"
+                                                @dragover.prevent="
+                                                    isDragging = true
+                                                "
+                                                @dragleave.prevent="
+                                                    isDragging = false
+                                                "
                                                 @drop.prevent="handleDrop"
                                             >
                                                 <!-- Drop Zone Overlay -->
-                                                 <div
+                                                <div
                                                     v-if="isDragging"
                                                     class="absolute inset-0 bg-(--brand-primary)/10 z-50 flex items-center justify-center border-2 border-dashed border-(--brand-primary) m-2 rounded-lg pointer-events-none"
                                                 >
-                                                    <span class="text-(--brand-primary) font-bold">Drop files here</span>
+                                                    <span
+                                                        class="text-(--brand-primary) font-bold"
+                                                        >Drop files here</span
+                                                    >
                                                 </div>
 
-                                                  <!-- Upload Button -->
-                                                <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-(--border-default) rounded-2xl bg-(--surface-primary) hover:border-(--brand-primary) hover:bg-(--brand-primary)/5 cursor-pointer transition-all mb-5 group">
-                                                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                                                        <PlusIcon class="w-7 h-7 text-(--text-muted) group-hover:text-(--brand-primary) mb-1.5 transition-colors" />
-                                                        <p class="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) group-hover:text-(--brand-primary)">Upload Asset</p>
+                                                <!-- Upload Button -->
+                                                <label
+                                                    class="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-(--border-default) rounded-2xl bg-(--surface-primary) hover:border-(--brand-primary) hover:bg-(--brand-primary)/5 cursor-pointer transition-all mb-5 group"
+                                                >
+                                                    <div
+                                                        class="flex flex-col items-center justify-center pt-5 pb-6"
+                                                    >
+                                                        <PlusIcon
+                                                            class="w-7 h-7 text-(--text-muted) group-hover:text-(--brand-primary) mb-1.5 transition-colors"
+                                                        />
+                                                        <p
+                                                            class="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) group-hover:text-(--brand-primary)"
+                                                        >
+                                                            Upload Asset
+                                                        </p>
                                                     </div>
-                                                    <input type="file" class="hidden" multiple accept="image/*" @change="(e) => handleMediaUpload(Array.from(e.target.files))" />
+                                                    <input
+                                                        type="file"
+                                                        class="hidden"
+                                                        multiple
+                                                        accept="image/*"
+                                                        @change="
+                                                            (e) =>
+                                                                handleMediaUpload(
+                                                                    Array.from(
+                                                                        e.target
+                                                                            .files,
+                                                                    ),
+                                                                )
+                                                        "
+                                                    />
                                                 </label>
 
-                                                 <!-- Upload Queue -->
-                                                <div v-if="mediaUploadQueue.length > 0" class="space-y-2 mb-5">
-                                                    <div v-for="(item, idx) in mediaUploadQueue" :key="idx" class="text-[10px] bg-(--surface-secondary)/50 p-2.5 rounded-xl border border-(--border-subtle) animate-in slide-in-from-top-2">
-                                                        <div class="flex justify-between mb-1.5">
-                                                            <span class="truncate max-w-[120px] font-medium">{{ item.file.name }}</span>
-                                                            <span 
-                                                                class="font-bold uppercase tracking-tighter"
-                                                                :class="{'text-(--brand-primary)': item.status === 'uploading', 'text-red-500': item.status === 'error'}"
+                                                <!-- Upload Queue -->
+                                                <div
+                                                    v-if="
+                                                        mediaUploadQueue.length >
+                                                        0
+                                                    "
+                                                    class="space-y-2 mb-5"
+                                                >
+                                                    <div
+                                                        v-for="(
+                                                            item, idx
+                                                        ) in mediaUploadQueue"
+                                                        :key="idx"
+                                                        class="text-[10px] bg-(--surface-secondary)/50 p-2.5 rounded-xl border border-(--border-subtle) animate-in slide-in-from-top-2"
+                                                    >
+                                                        <div
+                                                            class="flex justify-between mb-1.5"
+                                                        >
+                                                            <span
+                                                                class="truncate max-w-[120px] font-medium"
+                                                                >{{
+                                                                    item.file
+                                                                        .name
+                                                                }}</span
                                                             >
-                                                                {{ item.status }}
+                                                            <span
+                                                                class="font-bold uppercase tracking-tighter"
+                                                                :class="{
+                                                                    'text-(--brand-primary)':
+                                                                        item.status ===
+                                                                        'uploading',
+                                                                    'text-red-500':
+                                                                        item.status ===
+                                                                        'error',
+                                                                }"
+                                                            >
+                                                                {{
+                                                                    item.status
+                                                                }}
                                                             </span>
                                                         </div>
-                                                        <div class="w-full bg-(--surface-tertiary) rounded-full h-1 overflow-hidden">
-                                                            <div class="bg-(--brand-primary) h-1 rounded-full transition-all duration-300" :style="{ width: item.progress + '%' }"></div>
+                                                        <div
+                                                            class="w-full bg-(--surface-tertiary) rounded-full h-1 overflow-hidden"
+                                                        >
+                                                            <div
+                                                                class="bg-(--brand-primary) h-1 rounded-full transition-all duration-300"
+                                                                :style="{
+                                                                    width:
+                                                                        item.progress +
+                                                                        '%',
+                                                                }"
+                                                            ></div>
                                                         </div>
                                                     </div>
                                                 </div>
 
                                                 <!-- Grid -->
-                                                <div v-if="mediaLoading" class="flex justify-center py-4">
-                                                    <Loader2 class="w-5 h-5 animate-spin text-(--text-muted)" />
+                                                <div
+                                                    v-if="mediaLoading"
+                                                    class="flex justify-center py-4"
+                                                >
+                                                    <Loader2
+                                                        class="w-5 h-5 animate-spin text-(--text-muted)"
+                                                    />
                                                 </div>
-                                                
-                                                <div v-else class="grid grid-cols-2 gap-2">
+
+                                                <div
+                                                    v-else
+                                                    class="grid grid-cols-2 gap-2"
+                                                >
                                                     <div
                                                         v-for="media in mediaFiles"
                                                         :key="media.id"
                                                         class="group relative aspect-square rounded-md border border-(--border-default) bg-(--surface-primary) overflow-hidden cursor-pointer hover:ring-2 hover:ring-(--brand-primary)"
                                                         draggable="true"
-                                                        @dragstart="(e) => {
-                                                            e.dataTransfer.setData('text/plain', media.url);
-                                                            e.dataTransfer.setData('text/html', `<img src='${media.url}' />`);
-                                                        }"
-                                                        @click="insertImage(media)"
+                                                        @dragstart="
+                                                            (e) => {
+                                                                e.dataTransfer.setData(
+                                                                    'text/plain',
+                                                                    media.url,
+                                                                );
+                                                                e.dataTransfer.setData(
+                                                                    'text/html',
+                                                                    `<img src='${media.url}' />`,
+                                                                );
+                                                            }
+                                                        "
+                                                        @click="
+                                                            insertImage(media)
+                                                        "
                                                     >
                                                         <img
-                                                            :src="media.thumbnail_url || media.url"
+                                                            :src="
+                                                                media.thumbnail_url ||
+                                                                media.url
+                                                            "
                                                             class="w-full h-full object-cover"
                                                             loading="lazy"
                                                         />
-                                                         <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                                                                <button 
-                                                                    @click.stop="handleMediaDelete(media.id)"
-                                                                    class="p-1 rounded bg-red-500 text-white hover:bg-red-600"
-                                                                    title="Delete"
-                                                                >
-                                                                    <Trash2Icon class="w-3 h-3" />
-                                                                </button>
-                                                         </div>
+                                                        <div
+                                                            class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1"
+                                                        >
+                                                            <button
+                                                                @click.stop="
+                                                                    handleMediaDelete(
+                                                                        media.id,
+                                                                    )
+                                                                "
+                                                                class="p-1 rounded bg-red-500 text-white hover:bg-red-600"
+                                                                title="Delete"
+                                                            >
+                                                                <Trash2Icon
+                                                                    class="w-3 h-3"
+                                                                />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
 
-                                                <div v-if="!mediaLoading && mediaFiles.length === 0" class="text-center py-8 text-(--text-muted) text-xs">
+                                                <div
+                                                    v-if="
+                                                        !mediaLoading &&
+                                                        mediaFiles.length === 0
+                                                    "
+                                                    class="text-center py-8 text-(--text-muted) text-xs"
+                                                >
                                                     No media found.
                                                 </div>
                                             </div>
@@ -828,13 +1063,27 @@ function getUsageDetails(account: any) {
                                     </div>
                                 </div>
                             </template>
-                             <div v-else class="flex flex-col items-center justify-center p-12 text-center h-full min-h-[450px] animate-in fade-in zoom-in duration-500">
-                                <div class="w-16 h-16 rounded-2xl bg-(--surface-secondary) flex items-center justify-center mb-4 shadow-sm">
-                                    <SettingsIcon class="w-8 h-8 text-(--text-muted) opacity-50" />
+                            <div
+                                v-else
+                                class="flex flex-col items-center justify-center p-12 text-center h-full min-h-[450px] animate-in fade-in zoom-in duration-500"
+                            >
+                                <div
+                                    class="w-16 h-16 rounded-2xl bg-(--surface-secondary) flex items-center justify-center mb-4 shadow-sm"
+                                >
+                                    <SettingsIcon
+                                        class="w-8 h-8 text-(--text-muted) opacity-50"
+                                    />
                                 </div>
-                                <h3 class="text-(--text-primary) text-xl font-bold tracking-tight">Select an item to edit</h3>
-                                <p class="text-(--text-secondary) text-sm mt-2 max-w-xs mx-auto leading-relaxed">
-                                    Pick a signature or template from the sidebar to manage its content and assets.
+                                <h3
+                                    class="text-(--text-primary) text-xl font-bold tracking-tight"
+                                >
+                                    Select an item to edit
+                                </h3>
+                                <p
+                                    class="text-(--text-secondary) text-sm mt-2 max-w-xs mx-auto leading-relaxed"
+                                >
+                                    Pick a signature or template from the
+                                    sidebar to manage its content and assets.
                                 </p>
                             </div>
                         </div>
@@ -847,18 +1096,36 @@ function getUsageDetails(account: any) {
                 </div>
 
                 <!-- Storage Tab -->
-                <Card v-else-if="activeTab === 'storage'" class="overflow-hidden border-(--border-default) shadow-sm">
+                <Card
+                    v-else-if="activeTab === 'storage'"
+                    class="overflow-hidden border-(--border-default) shadow-sm"
+                >
                     <div class="p-8">
                         <div class="flex items-center gap-3 mb-8">
-                            <div class="w-10 h-10 rounded-xl bg-(--brand-primary)/10 flex items-center justify-center">
-                                <HardDriveIcon class="w-5 h-5 text-(--brand-primary)" />
+                            <div
+                                class="w-10 h-10 rounded-xl bg-(--brand-primary)/10 flex items-center justify-center"
+                            >
+                                <HardDriveIcon
+                                    class="w-5 h-5 text-(--brand-primary)"
+                                />
                             </div>
-                            <h2 class="text-xl font-bold text-(--text-primary)">Storage Allocation</h2>
+                            <h2 class="text-xl font-bold text-(--text-primary)">
+                                Storage Allocation
+                            </h2>
                         </div>
 
-                        <div v-if="loadingStorage" class="flex flex-col items-center justify-center py-24 gap-4">
-                             <Loader2 class="w-10 h-10 animate-spin text-(--brand-primary)" />
-                             <p class="text-sm font-medium text-(--text-secondary)">Analyzing storage usage...</p>
+                        <div
+                            v-if="loadingStorage"
+                            class="flex flex-col items-center justify-center py-24 gap-4"
+                        >
+                            <Loader2
+                                class="w-10 h-10 animate-spin text-(--brand-primary)"
+                            />
+                            <p
+                                class="text-sm font-medium text-(--text-secondary)"
+                            >
+                                Analyzing storage usage...
+                            </p>
                         </div>
                         <div v-else class="space-y-6">
                             <div
@@ -897,15 +1164,27 @@ function getUsageDetails(account: any) {
                                 :key="account.id"
                                 class="p-6 rounded-2xl border border-(--border-default) bg-(--surface-secondary)/10 hover:bg-(--surface-secondary)/20 transition-all group"
                             >
-                                <div class="flex items-center justify-between mb-6">
+                                <div
+                                    class="flex items-center justify-between mb-6"
+                                >
                                     <div class="flex items-center gap-4">
-                                        <div class="w-12 h-12 rounded-xl bg-(--surface-primary) flex items-center justify-center text-xl shadow-sm border border-(--border-subtle) group-hover:scale-110 transition-transform">
+                                        <div
+                                            class="w-12 h-12 rounded-xl bg-(--surface-primary) flex items-center justify-center text-xl shadow-sm border border-(--border-subtle) group-hover:scale-110 transition-transform"
+                                        >
                                             {{ account.email[0].toUpperCase() }}
                                         </div>
                                         <div>
-                                            <div class="font-bold text-(--text-primary) text-lg">{{ account.email }}</div>
-                                            <div class="text-xs font-semibold text-(--text-muted) uppercase tracking-wider flex items-center gap-2">
-                                                <span class="w-2 h-2 rounded-full bg-(--brand-primary)"></span>
+                                            <div
+                                                class="font-bold text-(--text-primary) text-lg"
+                                            >
+                                                {{ account.email }}
+                                            </div>
+                                            <div
+                                                class="text-xs font-semibold text-(--text-muted) uppercase tracking-wider flex items-center gap-2"
+                                            >
+                                                <span
+                                                    class="w-2 h-2 rounded-full bg-(--brand-primary)"
+                                                ></span>
                                                 {{ account.provider }}
                                             </div>
                                         </div>
@@ -921,25 +1200,9 @@ function getUsageDetails(account: any) {
     </div>
 </template>
 
-
 <style scoped>
 /* Force RichTextEditor to integrate seamlessly */
 :deep(.prose) {
     max-width: none;
-}
-
-/* Override inner container rounding and borders */
-:deep(.rounded-xl) {
-    border-radius: 0 !important;
-    border: none !important;
-}
-
-:deep(.rounded-t-xl) {
-    border-radius: 0 !important;
-}
-
-/* Ensure editor toolbar border bottom matches */
-:deep(.border-b) {
-    border-bottom: 1px solid var(--border-default) !important;
 }
 </style>

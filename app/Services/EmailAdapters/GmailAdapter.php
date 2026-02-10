@@ -357,6 +357,9 @@ class GmailAdapter extends BaseEmailAdapter
             $filename = $part->getFilename();
             $mimeType = $part->getMimeType();
             $body = $part->getBody();
+            if (!$body) {
+                return;
+            }
             $attachmentId = $body->getAttachmentId();
             $contentId = null;
 
@@ -491,23 +494,43 @@ class GmailAdapter extends BaseEmailAdapter
             $messages = collect($result['messages'] ?? []);
 
             if ($messages->isEmpty()) {
+                // If we have a page token but no messages, we must advance to the next page
+                // to avoid getting stuck in an infinite loop.
+                if (!empty($result['nextPageToken'])) {
+                    $cursor = $account->sync_cursor ?? [];
+                    $cursor['backfill_page_token'] = $result['nextPageToken'];
+                    $account->update(['sync_cursor' => $cursor]);
+
+                    return [
+                        'fetched' => 0,
+                        'has_more' => true,
+                        'new_cursor' => $result['nextPageToken'],
+                    ];
+                }
+
                 return ['fetched' => 0, 'has_more' => false];
             }
 
-            // [NEW] Update backfill_page_token on the model immediately so storeEmail sees it and preserves it
+            // [NEW] Update backfill_page_token on the model immediately
             $cursor = $account->sync_cursor ?? [];
             $cursor['backfill_page_token'] = $result['nextPageToken'] ?? null;
-            $account->sync_cursor = $cursor;
-            $account->save();
+            $account->update(['sync_cursor' => $cursor]);
 
             $fetched = 0;
             foreach ($messages as $msgSummary) {
                 try {
+                    // Check if message already exists by provider_id to avoid redundant full fetch
+                    $exists = Email::where('email_account_id', $account->id)
+                        ->where('provider_id', $msgSummary->getId())
+                        ->exists();
+
+                    if ($exists) {
+                        continue;
+                    }
+
                     $fullMsg = $this->apiService->getMessage($account, $msgSummary->getId(), $fetchBody ? 'full' : 'metadata');
                     $emailData = $this->parseGmailMessage($fullMsg, true, $account, $fetchBody);
 
-                    // Store using sync service (provider agnostic)
-                    // We explicitly disable broadcasting for backfill
                     app(EmailSyncService::class)->storeEmail($account, $emailData, $labelId, false);
                     $fetched++;
                 } catch (\Throwable $e) {
