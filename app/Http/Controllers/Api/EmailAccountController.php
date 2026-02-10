@@ -433,12 +433,23 @@ class EmailAccountController extends Controller
         ]);
 
         $domain = substr(strrchr($validated['email'], '@'), 1);
+        $user = $request->user();
+
+        // Check for existing accounts for this user
+        $existing = EmailAccount::where('user_id', $user->id)
+            ->where('email', $validated['email'])
+            ->get();
 
         $results = [
             'mx' => $this->emailHealthCheckService->checkMx($domain),
             'spf' => $this->emailHealthCheckService->checkSpf($domain),
             'dmarc' => $this->emailHealthCheckService->checkDmarc($domain),
             'dkim' => $this->emailHealthCheckService->checkDkim($domain),
+            'existing_account' => [
+                'has_full_sync' => $existing->where('account_type', 'full')->isNotEmpty(),
+                'has_smtp_only' => $existing->where('account_type', 'smtp')->isNotEmpty(),
+                'providers' => $existing->pluck('provider')->unique()->values()->toArray(),
+            ]
         ];
 
         return response()->json([

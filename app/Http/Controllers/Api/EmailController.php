@@ -80,9 +80,9 @@ class EmailController extends Controller
                 COALESCE(thread_id, CAST(id AS CHAR)) as thread_key,
                 MAX(received_at) as last_activity,
                 COUNT(*) as thread_count,
-                MAX(id) as latest_email_id
+                MAX(id) as latest_email_id,
+                MAX(has_attachments) as has_attachments
             ')
-            ->groupBy('thread_key')
             ->groupBy('thread_key');
 
         // Apply Sorting
@@ -124,6 +124,7 @@ class EmailController extends Controller
             }
 
             $email->thread_count = $threadStat->thread_count;
+            $email->has_attachments = (bool) $threadStat->has_attachments;
 
             return $email;
         })->filter();
@@ -195,15 +196,12 @@ class EmailController extends Controller
                     $email = $this->emailService->fetchBody($email);
                 }
 
-                return [
-                    'body_html' => $email->body_html,
-                    'body_plain' => $email->body_plain,
-                ];
+                return new EmailResource($email->fresh(['labels', 'emailAccount', 'media']));
             },
             'email_body'
         );
 
-        return response()->json($data);
+        return $data;
     }
 
     /**

@@ -339,14 +339,21 @@ const runHealthCheck = async () => {
 
     try {
         isCheckingHealth.value = true;
-        // The endpoint is actually for saved accounts, but we can repurpose it
-        // OR add a temporary check endpoint.
-        // For now, let's assume we use a 'test-configuration' style approach or the service can be called via a temp route.
-        // Actually, let's add a temporary health check endpoint in the controller.
         const { data } = await api.post("/api/email-accounts/pre-check", {
             email: form.value.email,
         });
         healthResults.value = data.data;
+        
+        // Smart Logic: Check for duplicates
+        if (healthResults.value.existing_account) {
+            const existing = healthResults.value.existing_account;
+            if (existing.has_full_sync && form.value.account_type === 'smtp') {
+                toast.warning(`${form.value.email} is already connected with Full Sync. SMTP-only setup is not recommended.`);
+            } else if (existing.has_full_sync && form.value.account_type === 'full') {
+                toast.info(`${form.value.email} is already connected. Checking health only.`);
+            }
+        }
+        
         toast.success("Health check completed.");
     } catch (e: any) {
         toast.error("Health check failed.");
@@ -431,6 +438,12 @@ const handleOAuthMessage = (event: MessageEvent) => {
             form.value.email = event.data.email;
         }
         toast.success("Account connected successfully!");
+        
+        // Refresh health check if we have email
+        if (form.value.email) {
+            runHealthCheck();
+        }
+        
         step.value = 5; // Go to Health Check step next
     } else if (event.data?.type === "oauth_error") {
         window.removeEventListener("message", handleOAuthMessage);
@@ -450,6 +463,12 @@ const connectCustom = async () => {
 
         accountId.value = data.data.id;
         toast.success("Account connected successfully!");
+        
+        // Proactive health check after connection if not already run
+        if (!healthResults.value) {
+            runHealthCheck();
+        }
+        
         step.value = 5; // Always go to Health Check for full sync too
     } catch (e: any) {
         toast.error(e.response?.data?.message || "Connection failed");
@@ -530,7 +549,7 @@ const saveFolders = async () => {
         await api.put(`/api/email-accounts/${accountId.value}`, {
             disabled_folders: disabled,
         });
-        emit("saved");
+        // emit("saved"); // MOVED to Step 7 "Return to Dashboard"
         step.value = 7;
     } catch (e) {
         toast.error("Failed to save folder preferences");
@@ -801,6 +820,10 @@ onUnmounted(() => {
                                         : "Select Email Provider"
                                 }}
                             </h2>
+                            <div v-if="healthResults?.existing_account?.has_full_sync" class="mt-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[12px] text-amber-600 flex items-center gap-3">
+                                <AlertTriangle class="w-4 h-4 shrink-0" />
+                                <p>You already have a <strong>Full Sync</strong> account for this email. We recommend using it instead of adding another SMTP-only account.</p>
+                            </div>
                             <p class="text-(--text-secondary) text-sm">
                                 Choose the service you're currently using.
                             </p>
@@ -964,7 +987,16 @@ onUnmounted(() => {
                                             v-model="form.email"
                                             placeholder="Email Address"
                                             class="h-11 rounded-xl"
+                                            @blur="form.email && runHealthCheck()"
                                         />
+                                        <div v-if="healthResults?.existing_account?.has_full_sync" class="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-600 flex items-start gap-2">
+                                            <AlertTriangle class="w-4 h-4 shrink-0 mt-0.5" />
+                                            <div>
+                                                <p class="font-bold">Account already exists</p>
+                                                <p v-if="form.account_type === 'smtp'">A Full Sync account for this email is already connected. Adding SMTP-only is redundant.</p>
+                                                <p v-else>A Full Sync account for this email is already connected. You can edit it instead.</p>
+                                            </div>
+                                        </div>
                                         <Input
                                             v-model="form.name"
                                             placeholder="Display Name (e.g. Work Email)"
@@ -1099,7 +1131,7 @@ onUnmounted(() => {
                                 </Button>
                                 <Button
                                     class="flex-1 rounded-xl h-12 font-bold shadow-lg shadow-(--brand-primary)/20"
-                                    :disabled="isLoading || isTestingConfig"
+                                    :disabled="isLoading || isTestingConfig || (form.account_type === 'smtp' && healthResults?.existing_account?.has_full_sync)"
                                     @click="connectCustom"
                                 >
                                     <Loader2
@@ -1107,7 +1139,7 @@ onUnmounted(() => {
                                         class="w-4 h-4 animate-spin mr-2"
                                     />
                                     <Check v-else class="w-4 h-4 mr-2" />
-                                    Connect
+                                    {{ (form.account_type === 'smtp' && healthResults?.existing_account?.has_full_sync) ? 'Already Connected' : 'Connect' }}
                                 </Button>
                             </div>
                         </div>
@@ -1478,13 +1510,13 @@ onUnmounted(() => {
                     <!-- Step 7: Finish -->
                     <div
                         v-else-if="step === 7"
-                        class="w-full max-w-md mx-auto py-12 px-4 text-center animate-in zoom-in-95 duration-500"
+                        class="flex-1 w-full max-w-2xl mx-auto flex flex-col items-center justify-center text-center p-8 space-y-8 animate-in fade-in duration-500"
                     >
                         <div
                             class="w-24 h-24 rounded-full bg-emerald-500/10 flex items-center justify-center mb-8 mx-auto relative group"
                         >
                             <div
-                                class="absolute inset-0 rounded-full bg-emerald-500/10 animate-ping duration-1000"
+                                class="rounded-full bg-emerald-500/10 animate-ping duration-1000"
                             ></div>
                             <CheckCircle2
                                 class="w-12 h-12 text-emerald-600 transition-transform duration-500 group-hover:scale-110"

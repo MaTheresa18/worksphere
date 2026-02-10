@@ -992,15 +992,14 @@ const loadingBody = ref(false);
 async function checkAndFetchBody() {
     if (!props.email) return;
 
-    // If we have no body content, fetch it
     if (!props.email.body_html && !props.email.body_plain) {
         loadingBody.value = true;
         try {
             const data = await store.fetchEmailBody(props.email.id);
-            if (data && (data.body_html || data.body_plain)) {
+            if (data) {
                 // Update local object to trigger reactivity in this component
-                props.email.body_html = data.body_html;
-                props.email.body_plain = data.body_plain;
+                // Use Object.assign to merge all new properties (attachments, flags, etc.)
+                Object.assign(props.email, data);
             }
         } catch (e) {
             console.error("Failed to fetch email body", e);
@@ -1425,7 +1424,7 @@ function setupImageSyncRetry(img: HTMLImageElement) {
     if (
         !originalSrc ||
         /^\s*(javascript|vbscript|data):/i.test(originalSrc) ||
-        !/^(https?:\/\/|\/|data:image\/)/i.test(originalSrc)
+        !/^(https?:\/\/|\/|data:image\/|blob:)/i.test(originalSrc)
     ) {
         console.warn(
             "[EmailPreview] Blocked unsafe image source retry:",

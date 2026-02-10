@@ -340,13 +340,25 @@ export const useEmailStore = defineStore("email", () => {
     async function fetchEmailBody(id: string) {
         try {
             const response = await axios.get(`/api/emails/${id}/body`);
-            if (response.data) {
-                const email = emails.value.find((e) => e.id === id);
+            // The response is now a full EmailResource (wrapped in 'data' by Laravel)
+            const e = response.data?.data || response.data;
+            
+            if (e) {
+                const email = emails.value.find((item) => item.id === id);
                 if (email) {
-                    email.body_html = response.data.body_html;
-                    email.body_plain = response.data.body_plain;
+                    // Map common fields to ensure consistency with fetchEmails logic
+                    email.body_html = e.body_html;
+                    email.body_plain = e.body_plain;
+                    email.has_attachments = Boolean(e.has_attachments);
+                    email.attachments = e.attachments || [];
+                    
+                    // Update flags just in case they changed
+                    email.is_read = Boolean(e.is_read);
+                    email.is_starred = Boolean(e.is_starred);
+                    
+                    // You could also do Object.assign(email, mappedData) if you trust the mapping
                 }
-                return response.data;
+                return e;
             }
         } catch (error) {
             console.error("Failed to fetch email body:", error);
