@@ -101,6 +101,9 @@ import { Info as InfoIcon } from "lucide-vue-next";
 import { Modal, Button, Checkbox } from "@/components/ui"; // Correct import now
 import axios from "axios";
 import { toast } from "vue-sonner";
+import { useFingerprint } from "@/composables/useFingerprint";
+
+const { getFingerprint } = useFingerprint();
 
 const route = useRoute();
 const router = useRouter();
@@ -126,6 +129,7 @@ const completeRegistration = async () => {
             token: token.value,
             agreed: true,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            fingerprint: await getFingerprint(),
         });
 
         toast.success("Account created successfully!");

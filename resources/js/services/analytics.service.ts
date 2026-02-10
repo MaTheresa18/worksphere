@@ -28,11 +28,12 @@ export const analyticsService = {
         return axios.get<{ data: any[] }>(`${BASE_URL}/geo-stats`, { params: { period } });
     },
 
-    trackPageVisit(path: string) {
+    trackPageVisit(path: string, fingerprint?: string | null) {
         return axios.post('/api/analytics/track', {
             path,
             url: window.location.href,
-            referer: document.referrer
+            referer: document.referrer,
+            fingerprint
         });
     },
 

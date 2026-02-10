@@ -96,6 +96,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, WebAuth
         'password_last_updated_at',
         'presence_preference',
         'last_seen_at',
+        'registration_fingerprint',
     ];
 
     /**

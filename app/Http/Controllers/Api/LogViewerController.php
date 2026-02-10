@@ -65,6 +65,14 @@ class LogViewerController extends Controller
         $parsedLogs = [];
         $currentLog = null;
 
+        // Statistics counters
+        $stats = [
+            'total' => 0,
+            'errors' => 0,
+            'warnings' => 0,
+            'envs' => [],
+        ];
+
         foreach ($lines as $line) {
             if (empty(trim($line))) {
                 continue;
@@ -74,6 +82,16 @@ class LogViewerController extends Controller
                 // Save previous log if exists
                 if ($currentLog) {
                     $parsedLogs[] = $currentLog;
+                    
+                    // Update stats
+                    $stats['total']++;
+                    $level = $currentLog['level'];
+                    if (in_array($level, ['error', 'critical', 'alert', 'emergency'])) {
+                        $stats['errors']++;
+                    } elseif (in_array($level, ['warning', 'notice'])) {
+                        $stats['warnings']++;
+                    }
+                    $stats['envs'][$currentLog['env']] = ($stats['envs'][$currentLog['env']] ?? 0) + 1;
                 }
 
                 $currentLog = [
@@ -92,10 +110,17 @@ class LogViewerController extends Controller
         }
         if ($currentLog) {
             $parsedLogs[] = $currentLog;
+            
+            // Update stats for last log
+            $stats['total']++;
+            $level = $currentLog['level'];
+            if (in_array($level, ['error', 'critical', 'alert', 'emergency'])) {
+                $stats['errors']++;
+            } elseif (in_array($level, ['warning', 'notice'])) {
+                $stats['warnings']++;
+            }
+            $stats['envs'][$currentLog['env']] = ($stats['envs'][$currentLog['env']] ?? 0) + 1;
         }
-
-        // Reverse to show newest first
-        $parsedLogs = array_reverse($parsedLogs);
 
         // Filtering
         if ($level = $request->input('level')) {
@@ -109,6 +134,26 @@ class LogViewerController extends Controller
                 return stripos($log['message'], $search) !== false || stripos($log['stack_trace'], $search) !== false;
             });
         }
+
+        // Sorting
+        $sortBy = $request->input('sort_by', 'timestamp');
+        $sortDirection = $request->input('sort_direction', 'desc');
+
+        usort($parsedLogs, function ($a, $b) use ($sortBy, $sortDirection) {
+            $valA = $a[$sortBy] ?? '';
+            $valB = $b[$sortBy] ?? '';
+
+            if ($sortBy === 'timestamp') {
+                return $sortDirection === 'asc' 
+                    ? strcmp($valA, $valB) 
+                    : strcmp($valB, $valA);
+            }
+            
+            // Case-insensitive string comparison for other fields
+            return $sortDirection === 'asc'
+                ? strcasecmp($valA, $valB)
+                : strcasecmp($valB, $valA);
+        });
 
         // Pagination manually
         $page = $request->input('page', 1);
@@ -125,6 +170,7 @@ class LogViewerController extends Controller
                 'per_page' => (int) $perPage,
                 'total' => $total,
                 'last_page' => ceil($total / $perPage),
+                'statistics' => $stats,
             ],
         ]);
     }

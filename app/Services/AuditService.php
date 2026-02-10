@@ -392,7 +392,19 @@ class AuditService
             });
         }
 
-        return $query->latest();
+        // Sorting
+        $sortBy = $filters['sort_by'] ?? 'created_at';
+        $sortDirection = $filters['sort_direction'] ?? 'desc';
+
+        // Allow sorting by specific columns
+        $allowedSorts = ['created_at', 'action', 'category', 'severity', 'user_name', 'ip_address'];
+        if (in_array($sortBy, $allowedSorts)) {
+            $query->orderBy($sortBy, $sortDirection);
+        } else {
+            $query->latest();
+        }
+
+        return $query;
     }
 
     /**
@@ -430,19 +442,45 @@ class AuditService
      *
      * @return array<string, mixed>
      */
-    public function getStatistics(?int $days = 30): array
+    public function getStatistics(array $filters = [], ?int $days = 30): array
     {
-        $startDate = now()->subDays($days);
+        // Base query with filters applied
+        $baseQuery = $this->query($filters);
 
-        $total = AuditLog::where('created_at', '>=', $startDate)->count();
+        // If date range is not in filters, apply default lookback
+        if (! isset($filters['date_from'])) {
+            $startDate = now()->subDays($days);
+            $baseQuery->where('created_at', '>=', $startDate);
+        }
 
-        $byCategory = AuditLog::where('created_at', '>=', $startDate)
+        // Clone query for different aggregations to avoid mutating the base
+        $total = (clone $baseQuery)->count();
+
+        // Logs today
+        $logsToday = (clone $baseQuery)
+            ->where('created_at', '>=', now()->startOfDay())
+            ->count();
+
+        // Critical count (excluding 'info', 'notice', 'warning' which are non-critical)
+        // Adjust severity levels based on your AuditSeverity enum
+        $criticalCount = (clone $baseQuery)
+            ->whereIn('severity', [
+                AuditSeverity::Error,
+                AuditSeverity::Critical,
+                AuditSeverity::Alert,
+                AuditSeverity::Emergency,
+            ])
+            ->count();
+
+        $byCategory = (clone $baseQuery)
+            ->reorder() // Clear any existing order by clauses (e.g. from default sort) which conflict with group by
             ->selectRaw('category, count(*) as count')
             ->groupBy('category')
             ->pluck('count', 'category')
             ->toArray();
 
-        $byAction = AuditLog::where('created_at', '>=', $startDate)
+        $byAction = (clone $baseQuery)
+            ->reorder()
             ->selectRaw('action, count(*) as count')
             ->groupBy('action')
             ->orderByDesc('count')
@@ -452,6 +490,8 @@ class AuditService
 
         return [
             'total' => $total,
+            'logs_today' => $logsToday,
+            'critical_count' => $criticalCount,
             'by_category' => $byCategory,
             'top_actions' => $byAction,
             'period_days' => $days,

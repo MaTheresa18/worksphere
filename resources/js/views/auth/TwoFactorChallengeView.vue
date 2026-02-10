@@ -172,6 +172,8 @@ async function verify() {
         return;
     }
 
+    if (isLoading.value) return;
+
     if (!useRecoveryCode.value) {
         if (
             currentConfig.value &&

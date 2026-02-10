@@ -37,6 +37,8 @@ class AuditLogController extends Controller
             'date_from',
             'date_to',
             'search',
+            'sort_by',
+            'sort_direction',
         ]);
 
         $perPage = min($request->integer('per_page', 25), 100);
@@ -79,8 +81,20 @@ class AuditLogController extends Controller
     {
         $this->authorize('viewAny', AuditLog::class);
 
+        $filters = $request->only([
+            'action',
+            'category',
+            'severity',
+            'user_id',
+            'team_id',
+            'auditable_type',
+            'date_from',
+            'date_to',
+            'search',
+        ]);
+
         $days = $request->integer('days', 30);
-        $statistics = $this->auditService->getStatistics($days);
+        $statistics = $this->auditService->getStatistics($filters, $days);
 
         return response()->json([
             'data' => $statistics,

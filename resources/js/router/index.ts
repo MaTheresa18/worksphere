@@ -1316,11 +1316,20 @@ router.beforeEach(
 
 import { analyticsService } from "@/services/analytics.service";
 
-router.afterEach((to) => {
+router.afterEach(async (to) => {
     NProgress.done();
 
     // Track page visit in SPA
-    analyticsService.trackPageVisit(to.path);
+    // Dynamically import to split code
+    try {
+        const { useFingerprint } = await import("@/composables/useFingerprint");
+        const { getFingerprint } = useFingerprint();
+        const fingerprint = await getFingerprint();
+        analyticsService.trackPageVisit(to.path, fingerprint);
+    } catch (e) {
+        // Fallback if fingerprint content fails
+        analyticsService.trackPageVisit(to.path);
+    }
 });
 
 export default router;

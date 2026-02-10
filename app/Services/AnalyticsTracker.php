@@ -93,6 +93,7 @@ class AnalyticsTracker
             'iso_code' => $location->iso_code,
             'lat' => $location->lat,
             'lon' => $location->lon,
+            'fingerprint' => $request->input('fingerprint'), // Capture fingerprint from request if present
             'created_at' => now(),
         ], $overrides);
     }

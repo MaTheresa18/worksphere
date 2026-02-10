@@ -38,6 +38,9 @@ const {
     siteKey: recaptchaSiteKey,
 } = useRecaptcha();
 
+import { useFingerprint } from "@/composables/useFingerprint";
+const { getFingerprint } = useFingerprint();
+
 // Passkey support
 import { useWebAuthn } from "@/composables/useWebAuthn";
 const {
@@ -377,6 +380,8 @@ async function handleLogin() {
 async function handle2FA() {
     clearErrors();
 
+    if (authStore.isLoading) return;
+
     if (twoFactorForm.value.useRecoveryCode) {
         if (!twoFactorForm.value.recoveryCode) {
             errors.value.twoFactorGeneral = "Recovery code is required";
@@ -471,6 +476,7 @@ async function handleRegister() {
         password_confirmation: registerForm.value.confirmPassword,
         recaptcha_token: recaptchaToken,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        fingerprint: await getFingerprint(),
     };
     console.log("[LoginView] Calling authStore.register with payload:", {
         ...payload,

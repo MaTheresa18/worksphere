@@ -1,11 +1,11 @@
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue';
-import { useDate } from '@/composables/useDate';
+import { ref, onMounted, watch, computed } from "vue";
+import { useDate } from "@/composables/useDate";
 const { formatDateTime } = useDate();
-import { useRouter } from 'vue-router';
-import api from '@/lib/api';
-import { debounce } from 'lodash';
-import { Button, Badge, SearchInput, SelectFilter } from '@/components/ui';
+import { useRouter } from "vue-router";
+import api from "@/lib/api";
+import { debounce } from "lodash";
+import { Button, Badge, SearchInput, SelectFilter } from "@/components/ui";
 import {
     Loader2,
     Download,
@@ -24,9 +24,12 @@ import {
     Edit,
     Trash2,
     RefreshCw,
-    Settings
-} from 'lucide-vue-next';
-import { toast } from 'vue-sonner';
+    Settings,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown,
+} from "lucide-vue-next";
+import { toast } from "vue-sonner";
 
 const router = useRouter();
 
@@ -34,19 +37,31 @@ const router = useRouter();
 const logs = ref([]);
 const isLoading = ref(false);
 const isExporting = ref(false);
-const searchQuery = ref('');
-const actionFilter = ref('');
-const categoryFilter = ref('');
-const severityFilter = ref('');
-const dateRange = ref({ start: '', end: '' });
+const searchQuery = ref("");
+const actionFilter = ref("");
+const categoryFilter = ref("");
+const severityFilter = ref("");
+const dateRange = ref({ start: "", end: "" });
 const perPage = ref(20);
 const showFilters = ref(false);
+const sortBy = ref("created_at");
+const sortDirection = ref("desc");
+
+const handleSort = (column) => {
+    if (sortBy.value === column) {
+        sortDirection.value = sortDirection.value === "asc" ? "desc" : "asc";
+    } else {
+        sortBy.value = column;
+        sortDirection.value = "desc"; // Default to desc for new column
+    }
+    fetchLogs(1);
+};
 
 // Filter options from API
 const filterOptions = ref({
     actions: [],
     categories: [],
-    severities: []
+    severities: [],
 });
 
 // Statistics
@@ -54,7 +69,7 @@ const statistics = ref({
     total_logs: 0,
     logs_today: 0,
     critical_count: 0,
-    by_category: {}
+    by_category: {},
 });
 
 const pagination = ref({
@@ -63,71 +78,85 @@ const pagination = ref({
     total: 0,
     per_page: 20,
     from: 0,
-    to: 0
+    to: 0,
 });
 
 const jumpToPage = ref(1);
 
-watch(() => pagination.value.current_page, (newPage) => {
-    jumpToPage.value = newPage;
-});
+watch(
+    () => pagination.value.current_page,
+    (newPage) => {
+        jumpToPage.value = newPage;
+    },
+);
 
 const handlePageJump = () => {
     const page = parseInt(jumpToPage.value);
     if (page && page >= 1 && page <= pagination.value.last_page) {
         fetchLogs(page);
-        jumpToPage.value = '';
+        jumpToPage.value = "";
     } else {
-        toast.error(`Please enter a page between 1 and ${pagination.value.last_page}`);
+        toast.error(
+            `Please enter a page between 1 and ${pagination.value.last_page}`,
+        );
     }
 };
 
 // Icon mapping for actions
 const actionIconMap = {
-    'login': LogIn,
-    'logout': LogOut,
-    'login_failed': AlertTriangle,
-    'password_reset': Key,
-    'password_changed': Key,
-    'email_verified': CheckCircle,
-    'created': UserPlus,
-    'updated': Edit,
-    'deleted': Trash2,
-    'role_assigned': Shield,
-    'role_removed': Shield,
-    'permission_granted': Key,
-    'permission_revoked': Key,
-    'data_exported': Download,
-    'settings_changed': Settings,
-    'mfa_enabled': Shield,
-    'mfa_disabled': Shield,
-    'session_revoked': LogOut,
-    'account_locked': AlertTriangle,
-    'account_unlocked': CheckCircle
+    login: LogIn,
+    logout: LogOut,
+    login_failed: AlertTriangle,
+    password_reset: Key,
+    password_changed: Key,
+    email_verified: CheckCircle,
+    created: UserPlus,
+    updated: Edit,
+    deleted: Trash2,
+    role_assigned: Shield,
+    role_removed: Shield,
+    permission_granted: Key,
+    permission_revoked: Key,
+    data_exported: Download,
+    settings_changed: Settings,
+    mfa_enabled: Shield,
+    mfa_disabled: Shield,
+    session_revoked: LogOut,
+    account_locked: AlertTriangle,
+    account_unlocked: CheckCircle,
 };
 
 // Category color mapping
 const categoryColors = {
-    'authentication': 'bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800 dark:text-blue-400',
-    'authorization': 'bg-purple-500/10 text-purple-600 border-purple-200 dark:border-purple-800 dark:text-purple-400',
-    'user_management': 'bg-green-500/10 text-green-600 border-green-200 dark:border-green-800 dark:text-green-400',
-    'team_management': 'bg-cyan-500/10 text-cyan-600 border-cyan-200 dark:border-cyan-800 dark:text-cyan-400',
-    'data_modification': 'bg-orange-500/10 text-orange-600 border-orange-200 dark:border-orange-800 dark:text-orange-400',
-    'security': 'bg-red-500/10 text-red-600 border-red-200 dark:border-red-800 dark:text-red-400',
-    'system': 'bg-gray-500/10 text-gray-600 border-gray-200 dark:border-gray-700 dark:text-gray-400',
-    'api': 'bg-indigo-500/10 text-indigo-600 border-indigo-200 dark:border-indigo-800 dark:text-indigo-400'
+    authentication:
+        "bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800 dark:text-blue-400",
+    authorization:
+        "bg-purple-500/10 text-purple-600 border-purple-200 dark:border-purple-800 dark:text-purple-400",
+    user_management:
+        "bg-green-500/10 text-green-600 border-green-200 dark:border-green-800 dark:text-green-400",
+    team_management:
+        "bg-cyan-500/10 text-cyan-600 border-cyan-200 dark:border-cyan-800 dark:text-cyan-400",
+    data_modification:
+        "bg-orange-500/10 text-orange-600 border-orange-200 dark:border-orange-800 dark:text-orange-400",
+    security:
+        "bg-red-500/10 text-red-600 border-red-200 dark:border-red-800 dark:text-red-400",
+    system: "bg-gray-500/10 text-gray-600 border-gray-200 dark:border-gray-700 dark:text-gray-400",
+    api: "bg-indigo-500/10 text-indigo-600 border-indigo-200 dark:border-indigo-800 dark:text-indigo-400",
 };
 
 // Severity color mapping
 const severityColors = {
-    'debug': 'bg-gray-500/10 text-gray-500 border-gray-200 dark:border-gray-700',
-    'info': 'bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800',
-    'notice': 'bg-cyan-500/10 text-cyan-600 border-cyan-200 dark:border-cyan-800',
-    'warning': 'bg-yellow-500/10 text-yellow-600 border-yellow-200 dark:border-yellow-800',
-    'error': 'bg-red-500/10 text-red-600 border-red-200 dark:border-red-800',
-    'critical': 'bg-red-600/20 text-red-700 border-red-300 dark:border-red-700 dark:text-red-400',
-    'alert': 'bg-orange-600/20 text-orange-700 border-orange-300 dark:border-orange-700 dark:text-orange-400',
-    'emergency': 'bg-red-700/30 text-red-800 border-red-400 dark:border-red-600 dark:text-red-300'
+    debug: "bg-gray-500/10 text-gray-500 border-gray-200 dark:border-gray-700",
+    info: "bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800",
+    notice: "bg-cyan-500/10 text-cyan-600 border-cyan-200 dark:border-cyan-800",
+    warning:
+        "bg-yellow-500/10 text-yellow-600 border-yellow-200 dark:border-yellow-800",
+    error: "bg-red-500/10 text-red-600 border-red-200 dark:border-red-800",
+    critical:
+        "bg-red-600/20 text-red-700 border-red-300 dark:border-red-700 dark:text-red-400",
+    alert: "bg-orange-600/20 text-orange-700 border-orange-300 dark:border-orange-700 dark:text-orange-400",
+    emergency:
+        "bg-red-700/30 text-red-800 border-red-400 dark:border-red-600 dark:text-red-300",
 };
 
 // Active filters count
@@ -153,14 +182,16 @@ const fetchLogs = debounce(async (page = 1) => {
             category: categoryFilter.value,
             severity: severityFilter.value,
             date_from: dateRange.value.start,
-            date_to: dateRange.value.end
+            date_to: dateRange.value.end,
         };
 
         const cleanParams = Object.fromEntries(
-            Object.entries(params).filter(([_, v]) => v != null && v !== '')
+            Object.entries(params).filter(([_, v]) => v != null && v !== ""),
         );
 
-        const response = await api.get('/api/audit-logs', { params: cleanParams });
+        const response = await api.get("/api/audit-logs", {
+            params: cleanParams,
+        });
         logs.value = response.data.data;
         pagination.value = {
             current_page: response.data.meta.current_page,
@@ -168,11 +199,11 @@ const fetchLogs = debounce(async (page = 1) => {
             total: response.data.meta.total,
             per_page: response.data.meta.per_page,
             from: response.data.meta.from,
-            to: response.data.meta.to
+            to: response.data.meta.to,
         };
     } catch (error) {
-        console.error('Failed to fetch audit logs:', error);
-        toast.error('Failed to load audit logs');
+        console.error("Failed to fetch audit logs:", error);
+        toast.error("Failed to load audit logs");
     } finally {
         isLoading.value = false;
     }
@@ -181,26 +212,45 @@ const fetchLogs = debounce(async (page = 1) => {
 // Fetch filter options
 const fetchFilters = async () => {
     try {
-        const response = await api.get('/api/audit-logs/filters');
+        const response = await api.get("/api/audit-logs/filters");
         filterOptions.value = response.data;
     } catch (error) {
-        console.error('Failed to fetch filter options:', error);
+        console.error("Failed to fetch filter options:", error);
     }
 };
 
 // Fetch statistics
+// Fetch statistics
 const fetchStatistics = async () => {
     try {
-        const response = await api.get('/api/audit-logs/statistics');
+        const params = {
+            search: searchQuery.value,
+            action: actionFilter.value,
+            category: categoryFilter.value,
+            severity: severityFilter.value,
+            date_from: dateRange.value.start,
+            date_to: dateRange.value.end,
+        };
+
+        const cleanParams = Object.fromEntries(
+            Object.entries(params).filter(([_, v]) => v != null && v !== ""),
+        );
+
+        const response = await api.get("/api/audit-logs/statistics", {
+            params: cleanParams,
+        });
         statistics.value = response.data.data;
     } catch (error) {
-        console.error('Failed to fetch statistics:', error);
+        console.error("Failed to fetch statistics:", error);
     }
 };
 
 // View log details
 const viewLogDetails = (log) => {
-    router.push({ name: 'system-log-details', params: { public_id: log.public_id } });
+    router.push({
+        name: "system-log-details",
+        params: { public_id: log.public_id },
+    });
 };
 
 // Export logs
@@ -214,20 +264,24 @@ const exportLogs = async () => {
             date_from: dateRange.value.start,
             date_to: dateRange.value.end,
             search: searchQuery.value,
-            limit: 10000
+            limit: 10000,
         };
 
         const cleanParams = Object.fromEntries(
-            Object.entries(params).filter(([_, v]) => v != null && v !== '')
+            Object.entries(params).filter(([_, v]) => v != null && v !== ""),
         );
 
-        const response = await api.get('/api/audit-logs/export', { params: cleanParams });
+        const response = await api.get("/api/audit-logs/export", {
+            params: cleanParams,
+        });
 
-        const blob = new Blob([JSON.stringify(response.data.data, null, 2)], { type: 'application/json' });
+        const blob = new Blob([JSON.stringify(response.data.data, null, 2)], {
+            type: "application/json",
+        });
         const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = url;
-        link.download = `audit-logs-${new Date().toISOString().split('T')[0]}.json`;
+        link.download = `audit-logs-${new Date().toISOString().split("T")[0]}.json`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -235,8 +289,8 @@ const exportLogs = async () => {
 
         toast.success(`Exported ${response.data.meta.total} audit logs`);
     } catch (error) {
-        console.error('Failed to export logs:', error);
-        toast.error('Failed to export audit logs');
+        console.error("Failed to export logs:", error);
+        toast.error("Failed to export audit logs");
     } finally {
         isExporting.value = false;
     }
@@ -244,11 +298,11 @@ const exportLogs = async () => {
 
 // Clear all filters
 const clearFilters = () => {
-    searchQuery.value = '';
-    actionFilter.value = '';
-    categoryFilter.value = '';
-    severityFilter.value = '';
-    dateRange.value = { start: '', end: '' };
+    searchQuery.value = "";
+    actionFilter.value = "";
+    categoryFilter.value = "";
+    severityFilter.value = "";
+    dateRange.value = { start: "", end: "" };
 };
 
 // Get action icon
@@ -258,13 +312,25 @@ const getActionIcon = (action) => {
 
 // Format action label
 const formatActionLabel = (action) => {
-    return action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return action.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 };
 
 // Watchers
-watch([searchQuery, actionFilter, categoryFilter, severityFilter, perPage, () => dateRange.value.start, () => dateRange.value.end], () => {
-    fetchLogs(1);
-});
+watch(
+    [
+        searchQuery,
+        actionFilter,
+        categoryFilter,
+        severityFilter,
+        perPage,
+        () => dateRange.value.start,
+        () => dateRange.value.end,
+    ],
+    () => {
+        fetchLogs(1);
+        fetchStatistics();
+    },
+);
 
 onMounted(() => {
     fetchLogs();
@@ -276,22 +342,31 @@ onMounted(() => {
 <template>
     <div class="space-y-6">
         <!-- Toolbar and Stats are layout specific, but Toolbar actions are tied to this component logic -->
-        
-         <!-- Header / Toolbar Actions -->
-         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+
+        <!-- Header / Toolbar Actions -->
+        <div
+            class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+        >
             <!-- Left side empty in this component, handled by parent if needed -->
-             <div></div>
-             
+            <div></div>
+
             <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
                 <Button
                     variant="outline"
                     size="sm"
                     @click="showFilters = !showFilters"
-                    :class="{ 'ring-2 ring-[var(--interactive-primary)]': activeFiltersCount > 0 }"
+                    :class="{
+                        'ring-2 ring-[var(--interactive-primary)]':
+                            activeFiltersCount > 0,
+                    }"
                 >
                     <Filter class="w-4 h-4" />
                     Filters
-                    <Badge v-if="activeFiltersCount > 0" variant="primary" class="ml-1 h-5 min-w-5 px-1.5">
+                    <Badge
+                        v-if="activeFiltersCount > 0"
+                        variant="primary"
+                        class="ml-1 h-5 min-w-5 px-1.5"
+                    >
                         {{ activeFiltersCount }}
                     </Badge>
                 </Button>
@@ -310,54 +385,95 @@ onMounted(() => {
                     @click="fetchLogs(pagination.current_page)"
                     title="Refresh"
                 >
-                    <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': isLoading }" />
+                    <RefreshCw
+                        class="w-4 h-4"
+                        :class="{ 'animate-spin': isLoading }"
+                    />
                 </Button>
             </div>
         </div>
 
         <!-- Statistics Cards -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] p-4">
+            <div
+                class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] p-4"
+            >
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                    <div
+                        class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center"
+                    >
                         <FileText class="w-5 h-5 text-blue-600" />
                     </div>
                     <div>
-                        <p class="text-2xl font-bold text-[var(--text-primary)]">{{ statistics.total_logs?.toLocaleString() || 0 }}</p>
-                        <p class="text-xs text-[var(--text-muted)]">Total Logs</p>
+                        <p
+                            class="text-2xl font-bold text-[var(--text-primary)]"
+                        >
+                            {{ statistics.total?.toLocaleString() || 0 }}
+                        </p>
+                        <p class="text-xs text-[var(--text-muted)]">
+                            Total Logs
+                        </p>
                     </div>
                 </div>
             </div>
-            <div class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] p-4">
+            <div
+                class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] p-4"
+            >
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                    <div
+                        class="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center"
+                    >
                         <Clock class="w-5 h-5 text-green-600" />
                     </div>
                     <div>
-                        <p class="text-2xl font-bold text-[var(--text-primary)]">{{ statistics.logs_today || 0 }}</p>
+                        <p
+                            class="text-2xl font-bold text-[var(--text-primary)]"
+                        >
+                            {{ statistics.logs_today || 0 }}
+                        </p>
                         <p class="text-xs text-[var(--text-muted)]">Today</p>
                     </div>
                 </div>
             </div>
-            <div class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] p-4">
+            <div
+                class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] p-4"
+            >
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
+                    <div
+                        class="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center"
+                    >
                         <AlertTriangle class="w-5 h-5 text-red-600" />
                     </div>
                     <div>
-                        <p class="text-2xl font-bold text-[var(--text-primary)]">{{ statistics.critical_count || 0 }}</p>
-                        <p class="text-xs text-[var(--text-muted)]">Critical Events</p>
+                        <p
+                            class="text-2xl font-bold text-[var(--text-primary)]"
+                        >
+                            {{ statistics.critical_count || 0 }}
+                        </p>
+                        <p class="text-xs text-[var(--text-muted)]">
+                            Critical Events
+                        </p>
                     </div>
                 </div>
             </div>
-            <div class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] p-4">
+            <div
+                class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] p-4"
+            >
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                    <div
+                        class="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center"
+                    >
                         <Shield class="w-5 h-5 text-purple-600" />
                     </div>
                     <div>
-                        <p class="text-2xl font-bold text-[var(--text-primary)]">{{ statistics.by_category?.security || 0 }}</p>
-                        <p class="text-xs text-[var(--text-muted)]">Security Events</p>
+                        <p
+                            class="text-2xl font-bold text-[var(--text-primary)]"
+                        >
+                            {{ statistics.by_category?.security || 0 }}
+                        </p>
+                        <p class="text-xs text-[var(--text-muted)]">
+                            Security Events
+                        </p>
                     </div>
                 </div>
             </div>
@@ -372,9 +488,14 @@ onMounted(() => {
             leave-from-class="opacity-100 translate-y-0"
             leave-to-class="opacity-0 -translate-y-2"
         >
-            <div v-if="showFilters" class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] p-4 space-y-4 overflow-visible relative z-20">
+            <div
+                v-if="showFilters"
+                class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] p-4 space-y-4 overflow-visible relative z-20"
+            >
                 <div class="flex items-center justify-between">
-                    <h3 class="text-sm font-medium text-[var(--text-primary)]">Filter Logs</h3>
+                    <h3 class="text-sm font-medium text-[var(--text-primary)]">
+                        Filter Logs
+                    </h3>
                     <button
                         v-if="activeFiltersCount > 0"
                         @click="clearFilters"
@@ -384,9 +505,14 @@ onMounted(() => {
                         Clear all
                     </button>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div
+                    class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+                >
                     <div class="space-y-1.5">
-                        <label class="text-xs font-medium text-[var(--text-secondary)]">Action</label>
+                        <label
+                            class="text-xs font-medium text-[var(--text-secondary)]"
+                            >Action</label
+                        >
                         <SelectFilter
                             v-model="actionFilter"
                             :options="filterOptions.actions"
@@ -394,7 +520,10 @@ onMounted(() => {
                         />
                     </div>
                     <div class="space-y-1.5">
-                        <label class="text-xs font-medium text-[var(--text-secondary)]">Category</label>
+                        <label
+                            class="text-xs font-medium text-[var(--text-secondary)]"
+                            >Category</label
+                        >
                         <SelectFilter
                             v-model="categoryFilter"
                             :options="filterOptions.categories"
@@ -402,7 +531,10 @@ onMounted(() => {
                         />
                     </div>
                     <div class="space-y-1.5">
-                        <label class="text-xs font-medium text-[var(--text-secondary)]">Severity</label>
+                        <label
+                            class="text-xs font-medium text-[var(--text-secondary)]"
+                            >Severity</label
+                        >
                         <SelectFilter
                             v-model="severityFilter"
                             :options="filterOptions.severities"
@@ -410,11 +542,22 @@ onMounted(() => {
                         />
                     </div>
                     <div class="space-y-1.5">
-                        <label class="text-xs font-medium text-[var(--text-secondary)]">Date Range</label>
+                        <label
+                            class="text-xs font-medium text-[var(--text-secondary)]"
+                            >Date Range</label
+                        >
                         <div class="flex items-center gap-2">
-                            <input v-model="dateRange.start" type="date" class="input h-9 text-sm flex-1" />
+                            <input
+                                v-model="dateRange.start"
+                                type="date"
+                                class="input h-9 text-sm flex-1"
+                            />
                             <span class="text-[var(--text-muted)]">-</span>
-                            <input v-model="dateRange.end" type="date" class="input h-9 text-sm flex-1" />
+                            <input
+                                v-model="dateRange.end"
+                                type="date"
+                                class="input h-9 text-sm flex-1"
+                            />
                         </div>
                     </div>
                 </div>
@@ -435,7 +578,7 @@ onMounted(() => {
                         { value: 20, label: '20' },
                         { value: 50, label: '50' },
                         { value: 100, label: '100' },
-                        { value: 200, label: '200' }
+                        { value: 200, label: '200' },
                     ]"
                     :show-placeholder="false"
                     size="lg"
@@ -444,25 +587,168 @@ onMounted(() => {
         </div>
 
         <!-- Logs Table -->
-        <div class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] overflow-hidden flex flex-col h-[calc(100vh-26rem)]">
+        <div
+            class="bg-[var(--surface-elevated)] rounded-xl border border-[var(--border-default)] overflow-hidden flex flex-col h-[calc(100vh-26rem)]"
+        >
             <div class="overflow-y-auto flex-1">
                 <table class="w-full text-left text-sm">
-                    <thead class="bg-[var(--surface-secondary)] text-[var(--text-secondary)] font-medium sticky top-0 z-10 border-b border-[var(--border-default)]">
+                    <thead
+                        class="bg-[var(--surface-secondary)] text-[var(--text-secondary)] font-medium sticky top-0 z-10 border-b border-[var(--border-default)]"
+                    >
                         <tr>
-                            <th class="px-4 py-3 whitespace-nowrap">Action</th>
-                            <th class="px-4 py-3 whitespace-nowrap">Category</th>
-                            <th class="px-4 py-3 whitespace-nowrap">User</th>
-                            <th class="px-4 py-3 whitespace-nowrap">IP Address</th>
-                            <th class="px-4 py-3 whitespace-nowrap">Severity</th>
-                            <th class="px-4 py-3 whitespace-nowrap text-right">Time</th>
+                            <th
+                                class="px-4 py-3 whitespace-nowrap cursor-pointer hover:bg-(--surface-tertiary) transition-colors group"
+                                @click="handleSort('action')"
+                            >
+                                <div class="flex items-center gap-1">
+                                    Action
+                                    <component
+                                        :is="
+                                            sortBy === 'action'
+                                                ? sortDirection === 'asc'
+                                                    ? ArrowUp
+                                                    : ArrowDown
+                                                : ArrowUpDown
+                                        "
+                                        class="w-3 h-3"
+                                        :class="
+                                            sortBy === 'action'
+                                                ? 'text-(--text-primary)'
+                                                : 'text-(--text-tertiary) opacity-0 group-hover:opacity-100'
+                                        "
+                                    />
+                                </div>
+                            </th>
+                            <th
+                                class="px-4 py-3 whitespace-nowrap cursor-pointer hover:bg-(--surface-tertiary) transition-colors group hidden md:table-cell"
+                                @click="handleSort('category')"
+                            >
+                                <div class="flex items-center gap-1">
+                                    Category
+                                    <component
+                                        :is="
+                                            sortBy === 'category'
+                                                ? sortDirection === 'asc'
+                                                    ? ArrowUp
+                                                    : ArrowDown
+                                                : ArrowUpDown
+                                        "
+                                        class="w-3 h-3"
+                                        :class="
+                                            sortBy === 'category'
+                                                ? 'text-(--text-primary)'
+                                                : 'text-(--text-tertiary) opacity-0 group-hover:opacity-100'
+                                        "
+                                    />
+                                </div>
+                            </th>
+                            <th
+                                class="px-4 py-3 whitespace-nowrap cursor-pointer hover:bg-(--surface-tertiary) transition-colors group hidden lg:table-cell"
+                                @click="handleSort('user_name')"
+                            >
+                                <div class="flex items-center gap-1">
+                                    User
+                                    <component
+                                        :is="
+                                            sortBy === 'user_name'
+                                                ? sortDirection === 'asc'
+                                                    ? ArrowUp
+                                                    : ArrowDown
+                                                : ArrowUpDown
+                                        "
+                                        class="w-3 h-3"
+                                        :class="
+                                            sortBy === 'user_name'
+                                                ? 'text-(--text-primary)'
+                                                : 'text-(--text-tertiary) opacity-0 group-hover:opacity-100'
+                                        "
+                                    />
+                                </div>
+                            </th>
+                            <th
+                                class="px-4 py-3 whitespace-nowrap cursor-pointer hover:bg-(--surface-tertiary) transition-colors group hidden xl:table-cell"
+                                @click="handleSort('ip_address')"
+                            >
+                                <div class="flex items-center gap-1">
+                                    IP Address
+                                    <component
+                                        :is="
+                                            sortBy === 'ip_address'
+                                                ? sortDirection === 'asc'
+                                                    ? ArrowUp
+                                                    : ArrowDown
+                                                : ArrowUpDown
+                                        "
+                                        class="w-3 h-3"
+                                        :class="
+                                            sortBy === 'ip_address'
+                                                ? 'text-(--text-primary)'
+                                                : 'text-(--text-tertiary) opacity-0 group-hover:opacity-100'
+                                        "
+                                    />
+                                </div>
+                            </th>
+                            <th
+                                class="px-4 py-3 whitespace-nowrap cursor-pointer hover:bg-(--surface-tertiary) transition-colors group"
+                                @click="handleSort('severity')"
+                            >
+                                <div class="flex items-center gap-1">
+                                    Severity
+                                    <component
+                                        :is="
+                                            sortBy === 'severity'
+                                                ? sortDirection === 'asc'
+                                                    ? ArrowUp
+                                                    : ArrowDown
+                                                : ArrowUpDown
+                                        "
+                                        class="w-3 h-3"
+                                        :class="
+                                            sortBy === 'severity'
+                                                ? 'text-(--text-primary)'
+                                                : 'text-(--text-tertiary) opacity-0 group-hover:opacity-100'
+                                        "
+                                    />
+                                </div>
+                            </th>
+                            <th
+                                class="px-4 py-3 whitespace-nowrap text-right cursor-pointer hover:bg-(--surface-tertiary) transition-colors group"
+                                @click="handleSort('created_at')"
+                            >
+                                <div
+                                    class="flex items-center justify-end gap-1"
+                                >
+                                    Time
+                                    <component
+                                        :is="
+                                            sortBy === 'created_at'
+                                                ? sortDirection === 'asc'
+                                                    ? ArrowUp
+                                                    : ArrowDown
+                                                : ArrowUpDown
+                                        "
+                                        class="w-3 h-3"
+                                        :class="
+                                            sortBy === 'created_at'
+                                                ? 'text-(--text-primary)'
+                                                : 'text-(--text-tertiary) opacity-0 group-hover:opacity-100'
+                                        "
+                                    />
+                                </div>
+                            </th>
                             <th class="px-4 py-3 w-16"></th>
                         </tr>
                     </thead>
                     <Transition name="fade" mode="out-in">
                         <tbody v-if="isLoading" key="loading">
                             <tr>
-                                <td colspan="7" class="px-4 py-12 text-center text-[var(--text-muted)]">
-                                    <div class="flex flex-col items-center gap-2">
+                                <td
+                                    colspan="7"
+                                    class="px-4 py-12 text-center text-[var(--text-muted)]"
+                                >
+                                    <div
+                                        class="flex flex-col items-center gap-2"
+                                    >
                                         <Loader2 class="w-6 h-6 animate-spin" />
                                         <span>Loading logs...</span>
                                     </div>
@@ -471,15 +757,24 @@ onMounted(() => {
                         </tbody>
                         <tbody v-else-if="logs.length === 0" key="empty">
                             <tr>
-                                <td colspan="7" class="px-4 py-12 text-center text-[var(--text-muted)]">
-                                    <div class="flex flex-col items-center gap-2">
+                                <td
+                                    colspan="7"
+                                    class="px-4 py-12 text-center text-[var(--text-muted)]"
+                                >
+                                    <div
+                                        class="flex flex-col items-center gap-2"
+                                    >
                                         <FileText class="w-8 h-8 opacity-50" />
                                         <span>No audit logs found.</span>
                                     </div>
                                 </td>
                             </tr>
                         </tbody>
-                        <tbody v-else key="content" class="divide-y divide-[var(--border-default)]">
+                        <tbody
+                            v-else
+                            key="content"
+                            class="divide-y divide-[var(--border-default)]"
+                        >
                             <tr
                                 v-for="log in logs"
                                 :key="log.public_id"
@@ -488,44 +783,94 @@ onMounted(() => {
                             >
                                 <td class="px-4 py-3">
                                     <div class="flex items-center gap-2">
-                                        <div class="w-7 h-7 rounded-lg bg-[var(--surface-tertiary)] flex items-center justify-center text-[var(--text-muted)]">
-                                            <component :is="getActionIcon(log.action)" class="w-3.5 h-3.5" />
+                                        <div
+                                            class="w-7 h-7 rounded-lg bg-[var(--surface-tertiary)] flex items-center justify-center text-[var(--text-muted)]"
+                                        >
+                                            <component
+                                                :is="getActionIcon(log.action)"
+                                                class="w-3.5 h-3.5"
+                                            />
                                         </div>
-                                        <span class="font-medium text-[var(--text-primary)]">{{ formatActionLabel(log.action) }}</span>
+                                        <span
+                                            class="font-medium text-[var(--text-primary)]"
+                                            >{{
+                                                formatActionLabel(log.action)
+                                            }}</span
+                                        >
                                     </div>
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3 hidden md:table-cell">
                                     <span
-                                        :class="[categoryColors[log.category] || categoryColors.system, 'inline-flex px-2 py-0.5 text-xs font-medium rounded-full border capitalize']"
+                                        :class="[
+                                            categoryColors[log.category] ||
+                                                categoryColors.system,
+                                            'inline-flex px-2 py-0.5 text-xs font-medium rounded-full border capitalize',
+                                        ]"
                                     >
-                                        {{ log.category?.replace(/_/g, ' ') }}
+                                        {{ log.category?.replace(/_/g, " ") }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3 hidden lg:table-cell">
                                     <div class="flex items-center gap-2">
-                                        <div class="w-6 h-6 rounded-full bg-[var(--surface-tertiary)] flex items-center justify-center text-[10px] font-bold text-[var(--text-muted)]">
-                                            {{ log.user_name?.split(' ').map(n => n[0]).slice(0, 2).join('') || '?' }}
+                                        <div
+                                            class="w-6 h-6 rounded-full bg-[var(--surface-tertiary)] flex items-center justify-center text-[10px] font-bold text-[var(--text-muted)]"
+                                        >
+                                            {{
+                                                log.user_name
+                                                    ?.split(" ")
+                                                    .map((n) => n[0])
+                                                    .slice(0, 2)
+                                                    .join("") || "?"
+                                            }}
                                         </div>
                                         <div class="flex flex-col">
-                                            <span class="text-sm text-[var(--text-primary)]">{{ log.user_name || 'System' }}</span>
-                                            <span v-if="log.user_email" class="text-xs text-[var(--text-muted)]">{{ log.user_email }}</span>
+                                            <span
+                                                class="text-sm text-[var(--text-primary)]"
+                                                >{{
+                                                    log.user_name || "System"
+                                                }}</span
+                                            >
+                                            <span
+                                                v-if="log.user_email"
+                                                class="text-xs text-[var(--text-muted)]"
+                                                >{{ log.user_email }}</span
+                                            >
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 font-mono text-xs text-[var(--text-secondary)]">
-                                    <div>{{ log.context?.ip_address || log.ip_address || '-' }}</div>
-                                    <div v-if="log.context?.location" class="text-[var(--text-muted)] truncate max-w-[150px]" :title="`${log.context.location.city}, ${log.context.location.state}, ${log.context.location.country}`">
-                                        {{ log.context.location.city }}, {{ log.context.location.iso_code }}
+                                <td
+                                    class="px-4 py-3 font-mono text-xs text-[var(--text-secondary)] hidden xl:table-cell"
+                                >
+                                    <div>
+                                        {{
+                                            log.context?.ip_address ||
+                                            log.ip_address ||
+                                            "-"
+                                        }}
+                                    </div>
+                                    <div
+                                        v-if="log.context?.location"
+                                        class="text-[var(--text-muted)] truncate max-w-[150px]"
+                                        :title="`${log.context.location.city}, ${log.context.location.state}, ${log.context.location.country}`"
+                                    >
+                                        {{ log.context.location.city }},
+                                        {{ log.context.location.iso_code }}
                                     </div>
                                 </td>
                                 <td class="px-4 py-3">
                                     <span
-                                        :class="[severityColors[log.severity] || severityColors.info, 'inline-flex px-2 py-0.5 text-xs font-medium rounded border capitalize']"
+                                        :class="[
+                                            severityColors[log.severity] ||
+                                                severityColors.info,
+                                            'inline-flex px-2 py-0.5 text-xs font-medium rounded border capitalize',
+                                        ]"
                                     >
                                         {{ log.severity }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-3 text-right text-xs text-[var(--text-secondary)] whitespace-nowrap">
+                                <td
+                                    class="px-4 py-3 text-right text-xs text-[var(--text-secondary)] whitespace-nowrap"
+                                >
                                     {{ formatDateTime(log.created_at) }}
                                 </td>
                                 <td class="px-4 py-3 text-right">
@@ -543,9 +888,23 @@ onMounted(() => {
             </div>
 
             <!-- Pagination -->
-            <div class="px-4 py-3 border-t border-[var(--border-default)] bg-[var(--surface-elevated)] flex items-center justify-between">
+            <div
+                class="px-4 py-3 border-t border-[var(--border-default)] bg-[var(--surface-elevated)] flex items-center justify-between"
+            >
                 <div class="text-xs text-[var(--text-tertiary)]">
-                    Showing <span class="font-medium text-[var(--text-primary)]">{{ pagination.from || 0 }}</span> to <span class="font-medium text-[var(--text-primary)]">{{ pagination.to || 0 }}</span> of <span class="font-medium text-[var(--text-primary)]">{{ pagination.total }}</span> results
+                    Showing
+                    <span class="font-medium text-[var(--text-primary)]">{{
+                        pagination.from || 0
+                    }}</span>
+                    to
+                    <span class="font-medium text-[var(--text-primary)]">{{
+                        pagination.to || 0
+                    }}</span>
+                    of
+                    <span class="font-medium text-[var(--text-primary)]">{{
+                        pagination.total
+                    }}</span>
+                    results
                 </div>
                 <div class="flex items-center gap-2">
                     <Button
@@ -557,21 +916,25 @@ onMounted(() => {
                         Previous
                     </Button>
                     <div class="flex items-center gap-2">
-                        <input 
+                        <input
                             v-model="jumpToPage"
-                            type="number" 
-                            min="1" 
+                            type="number"
+                            min="1"
                             :max="pagination.last_page"
                             class="h-8 w-14 text-sm text-center rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-1 focus:outline-none focus:ring-2 focus:ring-[var(--interactive-primary)]/20 focus:border-[var(--interactive-primary)]"
                             @keydown.enter="handlePageJump"
                         />
-                        <span class="text-xs text-[var(--text-secondary)]">of {{ pagination.last_page }}</span>
+                        <span class="text-xs text-[var(--text-secondary)]"
+                            >of {{ pagination.last_page }}</span
+                        >
                     </div>
                     <Button
                         variant="outline"
                         size="sm"
                         @click="fetchLogs(pagination.current_page + 1)"
-                        :disabled="pagination.current_page === pagination.last_page"
+                        :disabled="
+                            pagination.current_page === pagination.last_page
+                        "
                     >
                         Next
                     </Button>

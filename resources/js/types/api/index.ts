@@ -53,6 +53,7 @@ export interface RegisterRequest {
   password: string;
   password_confirmation: string;
   recaptcha_token?: string;
+  fingerprint?: string;
 }
 
 export interface AuthResponse {

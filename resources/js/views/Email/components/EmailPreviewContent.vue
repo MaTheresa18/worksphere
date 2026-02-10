@@ -12,7 +12,7 @@
         <div
             v-if="!isPopup"
             class="border-b border-(--border-default) bg-linear-to-b from-(--surface-secondary) to-transparent preview-animate-item transition-all duration-200"
-            :class="isHeaderExpanded ? 'p-6' : 'p-3'"
+            :class="isHeaderExpanded ? 'p-4 md:p-6' : 'p-3'"
         >
             <div class="flex justify-between items-start gap-4">
                 <div class="flex items-center gap-3 flex-1 min-w-0">

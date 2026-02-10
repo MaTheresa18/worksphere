@@ -26,6 +26,19 @@ class AuthController extends Controller
      */
     public function register(RegisterRequest $request): JsonResponse
     {
+        // Rate Limit Check by Fingerprint
+        if ($fingerprint = $request->fingerprint) {
+            $count = User::where('registration_fingerprint', $fingerprint)
+                ->where('created_at', '>=', now()->subHour())
+                ->count();
+
+            if ($count >= 5) {
+                return response()->json([
+                    'message' => 'Too many accounts created from this device. Please try again later.',
+                ], 429);
+            }
+        }
+
         $timezone = $request->timezone;
 
         if (! $timezone && $request->ip()) {
@@ -44,6 +57,7 @@ class AuthController extends Controller
             'status' => 'active',
             'is_password_set' => true,
             'password_last_updated_at' => now(),
+            'registration_fingerprint' => $request->fingerprint,
             'preferences' => [
                 'appearance' => [
                     'mode' => 'system',
@@ -668,6 +682,19 @@ class AuthController extends Controller
             'agreed' => 'required|accepted',
         ]);
 
+        // Rate Limit Check by Fingerprint
+        if ($fingerprint = $request->fingerprint) {
+            $count = User::where('registration_fingerprint', $fingerprint)
+                ->where('created_at', '>=', now()->subHour())
+                ->count();
+
+            if ($count >= 5) {
+                return response()->json([
+                    'message' => 'Too many accounts created from this device. Please try again later.',
+                ], 429);
+            }
+        }
+
         $cacheKey = "social_completion_{$request->token}";
         $data = \Illuminate\Support\Facades\Cache::get($cacheKey);
 
@@ -702,6 +729,7 @@ class AuthController extends Controller
                     ],
                     'provider' => $data['provider'], // Legacy compat
                     'provider_id' => $data['provider_id'], // Legacy compat
+                    'registration_fingerprint' => $request->fingerprint,
                 ]);
 
                 // Explicitly mark as verified

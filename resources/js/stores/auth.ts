@@ -404,6 +404,7 @@ export const useAuthStore = defineStore('auth', () => {
         password: data.password,
         password_confirmation: data.confirmPassword || data.password_confirmation || data.password,
         recaptcha_token: data.recaptcha_token,
+        fingerprint: data.fingerprint,
       };
       console.log('[AuthStore] Calling authService.register');
 

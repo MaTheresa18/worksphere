@@ -49,23 +49,14 @@
                 flex: selectedEmailId || isComposing,
             }"
         >
-            <!-- Back button for mobile (email view) -->
-            <div
-                v-if="selectedEmailId && !isComposing"
-                class="md:hidden fixed top-20 left-4 z-40"
-            >
-                <button
-                    @click="selectedEmailId = null"
-                    class="bg-(--surface-elevated) p-2 rounded-full shadow-lg border border-(--border-default) text-(--text-primary)"
-                >
-                    &larr; Back
-                </button>
-            </div>
-
             <EmailPreviewPane
                 ref="previewPaneRef"
                 :email="selectedEmail"
                 @tab-closed="handleTabClosed"
+                @back="
+                    selectedEmailId = null;
+                    isComposing = false;
+                "
             />
         </main>
     </div>
@@ -90,7 +81,14 @@ const selectedEmail = computed(() => {
 watch(
     [selectedEmailId, loading],
     async ([newId, isLoading]) => {
-        console.log("[EmailIndex] Watcher: selectedEmailId=", newId, "loading=", isLoading, "foundEmail=", !!selectedEmail.value);
+        console.log(
+            "[EmailIndex] Watcher: selectedEmailId=",
+            newId,
+            "loading=",
+            isLoading,
+            "foundEmail=",
+            !!selectedEmail.value,
+        );
         if (newId && !isLoading && !selectedEmail.value) {
             console.log("[EmailIndex] Fetching missing email:", newId);
             await store.fetchEmailById(newId);

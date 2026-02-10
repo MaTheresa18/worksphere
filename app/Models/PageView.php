@@ -19,6 +19,7 @@ class PageView extends Model
         'method',
         'referer',
         'user_agent',
+        'fingerprint',
         'device_type',
         'browser',
         'browser',

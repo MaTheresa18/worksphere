@@ -2,6 +2,27 @@
     <div
         class="flex-1 flex flex-col h-full bg-(--surface-primary) overflow-hidden min-h-0"
     >
+        <!-- Mobile Header (Back Button) -->
+        <div
+            v-if="props.email"
+            class="md:hidden shrink-0 h-14 flex items-center gap-3 px-4 border-b border-(--border-default) bg-(--surface-secondary) z-10"
+        >
+            <button
+                @click="emit('back')"
+                class="p-2 -ml-2 text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--surface-tertiary) rounded-full transition-colors"
+                title="Back to list"
+            >
+                <ArrowLeftIcon class="w-5 h-5" />
+            </button>
+            <div class="flex-1 min-w-0">
+                <h2
+                    class="text-sm font-semibold text-(--text-primary) truncate"
+                >
+                    {{ props.email?.subject || "(No Subject)" }}
+                </h2>
+            </div>
+        </div>
+
         <!-- Email Content Area -->
         <div class="flex-1 overflow-hidden min-h-0 relative flex flex-col">
             <!-- Loading State -->
@@ -63,7 +84,7 @@
                         </p>
                         <span
                             class="text-xs text-(--text-muted) whitespace-nowrap"
-                            >{{ formatDate(msg.date, 'smart') }}</span
+                            >{{ formatDate(msg.date, "smart") }}</span
                         >
                     </div>
 
@@ -417,6 +438,7 @@ import {
     StarIcon,
     MailIcon as MailUnreadIcon,
     InfoIcon,
+    ArrowLeftIcon,
 } from "lucide-vue-next";
 import axios from "axios";
 import EmailPreviewContent from "./EmailPreviewContent.vue";
@@ -458,6 +480,7 @@ watch(
 const emit = defineEmits<{
     compose: [];
     "tab-closed": [tabId: string];
+    back: [];
 }>();
 
 const store = useEmailStore();
