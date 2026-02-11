@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from 'vue';
+import { ref } from 'vue';
 import { useVideoCallStore, type CallType } from '@/stores/videocall';
 import { videoCallService } from '@/services/videocall.service';
 import { useAuthStore } from '@/stores/auth';
@@ -6,16 +6,20 @@ import { toast } from 'vue-sonner';
 
 /**
  * Core WebRTC composable encapsulating the full lifecycle of a peer-to-peer call.
- * Handles media acquisition, RTCPeerConnection, ICE, and SDP exchange.
+ * 
+ * This is a SINGLETON — all components share the same WebRTC connection and state.
+ * The module-level variables ensure only one peer connection exists at a time.
  */
+
+let peerConnection: RTCPeerConnection | null = null;
+let ringtoneAudio: HTMLAudioElement | null = null;
+let ringtoneTimeout: ReturnType<typeof setTimeout> | null = null;
+const pendingCandidates = ref<RTCIceCandidateInit[]>([]);
+let initialized = false;
+
 export function useVideoCall() {
   const store = useVideoCallStore();
   const authStore = useAuthStore();
-
-  let peerConnection: RTCPeerConnection | null = null;
-  let ringtoneAudio: HTMLAudioElement | null = null;
-  let ringtoneTimeout: ReturnType<typeof setTimeout> | null = null;
-  const pendingCandidates = ref<RTCIceCandidateInit[]>([]);
 
   // ============================================================================
   // Media
@@ -391,9 +395,28 @@ export function useVideoCall() {
     store.reset();
   }
 
-  onUnmounted(() => {
-    cleanup();
-  });
+  // ============================================================================
+  // Global Event Listener Setup (call once from AppLayout)
+  // ============================================================================
+
+  function setupGlobalListeners() {
+    if (initialized) return;
+    initialized = true;
+
+    function onIncomingCall(e: Event) {
+      handleIncomingCall((e as CustomEvent).detail);
+    }
+    function onCallSignal(e: Event) {
+      handleSignal((e as CustomEvent).detail);
+    }
+    function onCallEnded(e: Event) {
+      handleCallEnded((e as CustomEvent).detail);
+    }
+
+    window.addEventListener('videocall:incoming', onIncomingCall);
+    window.addEventListener('videocall:signal', onCallSignal);
+    window.addEventListener('videocall:ended', onCallEnded);
+  }
 
   return {
     // Actions
@@ -405,5 +428,6 @@ export function useVideoCall() {
     handleSignal,
     handleCallEnded,
     cleanup,
+    setupGlobalListeners,
   };
 }

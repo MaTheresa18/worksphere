@@ -16,6 +16,9 @@ import RoleChangeNotificationModal from "@/components/RoleChangeNotificationModa
 import WelcomeModal from "@/components/WelcomeModal.vue";
 import LegalUpdateModal from "@/components/LegalUpdateModal.vue";
 import MiniChatLauncher from "@/components/minichat/MiniChatLauncher.vue";
+import VideoCallModal from "@/views/chat/components/call/VideoCallModal.vue";
+import IncomingCallOverlay from "@/views/chat/components/call/IncomingCallOverlay.vue";
+import { useVideoCall } from "@/composables/useVideoCall";
 import { appConfig } from "@/config/app";
 
 const route = useRoute();
@@ -51,8 +54,14 @@ const mainStyles = computed(() => ({
 
 // Start all listeners when the app layout mounts (user is authenticated)
 // We add a delay to ensure session cookies are fully propagated after login/2FA
+// Video call singleton — set up global event listeners once
+const videoCall = useVideoCall();
+
 onMounted(async () => {
     printSecurityWarning();
+
+    // Initialize global video call event listeners
+    videoCall.setupGlobalListeners();
 
     // Delay listener initialization to prevent race conditions after 2FA session regeneration
     // This gives the browser time to fully process new session/CSRF cookies
@@ -242,6 +251,10 @@ function handleRoleChangeLogout() {
 
         <WelcomeModal />
         <LegalUpdateModal />
+
+        <!-- Video/Audio Call UI (global — always in DOM) -->
+        <VideoCallModal />
+        <IncomingCallOverlay />
     </div>
 </template>
 

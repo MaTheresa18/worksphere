@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, computed, onMounted, onUnmounted } from 'vue';
+import { ref, watch, nextTick, computed } from 'vue';
 import { useVideoCallStore } from '@/stores/videocall';
 import { useVideoCall } from '@/composables/useVideoCall';
 import { Icon, Avatar } from '@/components/ui';
 import { useAvatar } from '@/composables/useAvatar';
 
 const store = useVideoCallStore();
-const { endCall } = useVideoCall();
+const { endCall } = useVideoCall();  // singleton — shares same peer connection
 const avatar = useAvatar();
 
 const localVideoRef = ref<HTMLVideoElement | null>(null);
