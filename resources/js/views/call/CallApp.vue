@@ -156,6 +156,12 @@ async function acquireMedia(): Promise<MediaStream | null> {
                         video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
                     });
                     localStream.value = stream;
+                    
+                    console.log("[Call] Local media acquired:", {
+                        audio: stream.getAudioTracks().length > 0 ? 'YES' : 'NO',
+                        video: stream.getVideoTracks().length > 0 ? 'YES' : 'NO'
+                    });
+                    
                     return stream;
                 }
             } catch (e) {
@@ -171,6 +177,12 @@ async function acquireMedia(): Promise<MediaStream | null> {
         });
         localStream.value = stream;
         isCameraOff.value = true; // Force camera off state UI
+        
+        console.log("[Call] Local media acquired:", {
+            audio: stream.getAudioTracks().length > 0 ? 'YES' : 'NO',
+            video: 'NO (Audio-only mode)'
+        });
+        
         return stream;
     } catch (e: any) {
         console.error("[Call] Media acquisition failed:", e);
@@ -328,6 +340,14 @@ function createPeer(targetPublicId: string, initiator: boolean, stream: MediaStr
             video: remoteStream.getVideoTracks().length,
             active: remoteStream.active
         });
+        
+        // Detailed track logging
+        remoteStream.getTracks().forEach(track => {
+            console.log(`[Call] Remote track from ${normalizedTargetId}: ${track.kind} (${track.id}) enabled=${track.enabled}`);
+            track.onmute = () => console.warn(`[Call] Remote ${track.kind} track from ${normalizedTargetId} MUTED (data flow stopped)`);
+            track.onunmute = () => console.log(`[Call] Remote ${track.kind} track from ${normalizedTargetId} UNMUTED (data flow resumed)`);
+        });
+
         remoteStreams.set(normalizedTargetId, remoteStream);
     });
 
@@ -606,6 +626,15 @@ onMounted(async () => {
     try {
         callData.value = JSON.parse(raw);
         sessionStorage.removeItem("callData");
+        
+        console.log("[Call] Initialized with data:", {
+            callId: callData.value.callId,
+            chatId: callData.value.chatId,
+            chatType: (callData.value as any).chatType || 'dm',
+            callType: callData.value.callType,
+            direction: callData.value.direction,
+            selfId: callData.value.selfPublicId
+        });
     } catch {
         error.value = "Data parse error.";
         callState.value = "error";
