@@ -358,7 +358,7 @@ class ChatEngine
             'user_public_id' => $message->user->public_id ?? null,
             'user_name' => $message->user->name ?? ($message->type === 'system' ? 'System' : 'Deactivated User'),
             'user_avatar' => $message->user->avatar_url ?? null,
-            'content' => $message->content ?? '',
+            'content' => self::sanitize($message->content ?? ''),
             'created_at' => $message->created_at->toIso8601String(),
             'is_seen' => $isSeen,
             'seen' => $isSeen,

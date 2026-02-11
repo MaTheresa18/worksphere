@@ -41,11 +41,23 @@ class CallEnded implements ShouldBroadcastNow
         ];
     }
 
-    public function broadcastOn(): PrivateChannel
+    public function broadcastOn(): array
     {
         $prefix = $this->chatType === 'dm' ? 'dm' : 'group';
+        $channels = [new PrivateChannel("{$prefix}.{$this->chatPublicId}")];
 
-        return new PrivateChannel("{$prefix}.{$this->chatPublicId}");
+        // Get all participants in the chat to notify them on their user channel
+        $chat = \App\Models\Chat\Chat::where('public_id', $this->chatPublicId)->first();
+        if ($chat) {
+            foreach ($chat->participants as $participant) {
+                // Broadcast to all participants EXCEPT the ender
+                if ($participant->public_id !== $this->enderPublicId) {
+                    $channels[] = new PrivateChannel("user.{$participant->public_id}");
+                }
+            }
+        }
+
+        return $channels;
     }
 
     public function broadcastAs(): string

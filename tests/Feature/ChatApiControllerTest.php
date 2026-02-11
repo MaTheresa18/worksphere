@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\Chat;
-use App\Models\ChatMessage;
+use App\Models\Chat\Chat;
+use App\Models\Chat\ChatMessage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;

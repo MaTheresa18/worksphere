@@ -178,6 +178,14 @@ export function useChatRealtime() {
              toast.error(`${event.invite.invitee_name} declined your invitation`);
         }
         chatStore.fetchInvites();
+      })
+      .listen('.CallInitiated', (event: any) => {
+        console.log(`[ChatRealtime] 📞 RECEIVED .CallInitiated on USER channel ${channelName}`, event);
+        window.dispatchEvent(new CustomEvent('videocall:incoming', { detail: event }));
+      })
+      .listen('.CallEnded', (event: any) => {
+        console.log(`[ChatRealtime] 📴 RECEIVED .CallEnded on USER channel ${channelName}`, event);
+        window.dispatchEvent(new CustomEvent('videocall:ended', { detail: event }));
       });
 
     subscribedChannels.value.add(channelName);

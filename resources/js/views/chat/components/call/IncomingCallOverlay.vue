@@ -37,7 +37,7 @@ const callTypeLabel = computed(() => {
     >
       <div
         v-if="store.isIncoming"
-        class="fixed bottom-6 right-6 z-10000 w-80 bg-(--surface-elevated) border border-(--border-default) rounded-2xl shadow-2xl overflow-hidden"
+        class="fixed bottom-4 right-4 left-4 sm:left-auto sm:right-6 sm:bottom-6 z-10000 sm:w-80 bg-(--surface-elevated) border border-(--border-default) rounded-2xl shadow-2xl overflow-hidden"
       >
         <!-- Animated gradient top bar -->
         <div class="h-1 bg-linear-to-r from-green-400 via-emerald-500 to-teal-500 animate-pulse" />

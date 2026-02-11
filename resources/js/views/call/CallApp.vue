@@ -92,9 +92,7 @@ const isVideoCall = computed(() => callData.value?.callType === "video");
 
 const localHasVideo = computed(() => {
     if (!localStream.value) return false;
-    return localStream.value
-        .getVideoTracks()
-        .some((t) => t.enabled && t.readyState === "live");
+    return localStream.value.getVideoTracks().length > 0;
 });
 
 const stateLabel = computed(() => {
@@ -132,12 +130,7 @@ const previewRemoteName = computed(() => {
 // Watchers
 // ============================================================================
 
-watch(localStream, async (stream) => {
-    await nextTick();
-    if (localVideoRef.value && stream) {
-        localVideoRef.value.srcObject = stream;
-    }
-});
+// Local stream handling is now unified via v-src-object directive or ref in template
  
 
 async function acquireMedia(): Promise<MediaStream | null> {
@@ -148,17 +141,24 @@ async function acquireMedia(): Promise<MediaStream | null> {
     try {
         if (type === "video") {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: true,
-                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
-                });
-                localStream.value = stream;
-                return stream;
+                // Pre-check for camera availability
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const hasCamera = devices.some(device => device.kind === 'videoinput');
+                
+                if (!hasCamera) {
+                    console.warn("[Call] No camera found on this device.");
+                    videoFallback.value = true;
+                } else {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: true,
+                        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+                    });
+                    localStream.value = stream;
+                    return stream;
+                }
             } catch (e) {
-                console.warn("[Call] Camera unavailable, fallback to audio");
+                console.warn("[Call] Camera access error or unavailable, fallback to audio", e);
                 videoFallback.value = true;
-                // Fallthrough to audio-only if camera fails? 
-                // Or just proceed with audio only stream if caught.
             }
         }
         
@@ -188,13 +188,21 @@ function mungeSdp(sdp: string): string {
         const parsed = sdpTransform.parse(sdp);
         if (parsed.media) {
             parsed.media = parsed.media.map((m: any) => {
-                if (m.maxMessageSize !== undefined) m.maxMessageSize = 65536;
-                if (m.sctpPort === 0) m.sctpPort = 5000;
+                // Fix for: a=max-message-size:1073741823 Invalid SDP line
+                // We cap it to a more standard value.
+                if (m.maxMessageSize !== undefined) {
+                    m.maxMessageSize = 65536; 
+                }
+                // Ensure SCTP port is set if missing (older simple-peer/browser versions)
+                if (m.protocol === 'UDP/DTLS/SCTP' && m.sctpPort === undefined) {
+                    m.sctpPort = 5000;
+                }
                 return m;
             });
         }
         return sdpTransform.write(parsed);
     } catch (e) {
+        console.warn("[Call] SDP munging failed, fallback to raw", e);
         return sdp;
     }
 }
@@ -675,7 +683,7 @@ onBeforeUnmount(() => cleanup());
                 >
                     <video
                         v-if="localHasVideo && !isCameraOff && !isAudioOnly"
-                        ref="localVideoRef"
+                        v-src-object="localStream"
                         autoplay
                         muted
                         playsinline
@@ -846,10 +854,10 @@ onBeforeUnmount(() => cleanup());
     height: 100%;
     z-index: 10;
     position: relative;
-    padding: 16px;
-    gap: 16px;
+    padding: 12px;
+    gap: 12px;
     justify-content: center;
-    align-content: center;
+    align-items: center;
 }
 
 /* Grid Layout Logic */
@@ -872,12 +880,11 @@ onBeforeUnmount(() => cleanup());
 @media (max-width: 768px) {
     .grid-wrapper { padding: 8px; gap: 8px; }
     
+    .grid-1-1 .grid-wrapper { flex-direction: column; }
+    
     .grid-2-2 .grid-wrapper, 
     .grid-3-2 .grid-wrapper {
-        grid-template-columns: 1fr; /* Stack vertically on small mobile? Or 2 cols? */
-        /* If 4 people on phone, 2x2 is tiny. Stacking vertical is better scroll or squeeze. */
-        /* Let's try 2 cols optimized. */
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: 1fr; /* Stack vertically for more width on narrow screens */
         grid-auto-rows: 1fr;
     }
 }
@@ -902,18 +909,35 @@ onBeforeUnmount(() => cleanup());
     width: 100%;
     height: 100%;
     object-fit: cover;
+    background: #000;
+}
+
+/* On very narrow screens, contain might be better to avoid losing too much context */
+@media (max-width: 400px) {
+    .video-element {
+        object-fit: contain;
+    }
 }
 
 /* Local PiP Mode */
 .grid-1-1 .video-cell.local.pip-mode {
     position: absolute;
-    bottom: 100px; /* Above controls */
-    right: 20px;
-    width: 120px;
-    height: 160px; /* Portrait aspect usually better for Pip */
+    bottom: 110px; /* Above controls */
+    right: 16px;
+    width: 100px;
+    height: 140px;
     z-index: 30;
     box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 12px;
+}
+@media (max-width: 640px) {
+    .grid-1-1 .video-cell.local.pip-mode {
+        width: 80px;
+        height: 110px;
+        bottom: 100px;
+        right: 12px;
+    }
 }
 .grid-1-1 .video-cell.remote {
     /* Fullscreen remote */
@@ -999,10 +1023,10 @@ onBeforeUnmount(() => cleanup());
     background: rgba(20, 20, 25, 0.8);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    padding: 12px 24px;
-    border-radius: 24px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-    border: 1px solid rgba(255,255,255,0.08);
+    padding: 10px 20px;
+    border-radius: 32px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.12);
 }
 
 .control-btn {
