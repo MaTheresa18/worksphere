@@ -66,6 +66,7 @@ const isAudioOnly = computed(() => callData.value?.callType === 'audio');
 const participants = ref<Participant[]>([]);
 const peers = new Map<string, Peer.Instance>();
 const remoteStreams = reactive(new Map<string, MediaStream>());
+const iceServers = ref<RTCIceServer[]>([]);
 
 // Directive for srcObject property (Vue doesn't bind to .srcObject property by default)
 const vSrcObject = {
@@ -223,6 +224,15 @@ async function joinCall() {
     if (!callData.value) return;
 
     try {
+        // 0. Fetch ICE credentials (TURN/STUN) for NAT traversal
+        try {
+            const turnData = await videoCallService.getTurnCredentials(callData.value.chatId);
+            iceServers.value = turnData.ice_servers;
+            console.log("[Call] ICE Servers configured:", iceServers.value.length);
+        } catch (e) {
+            console.warn("[Call] Failed to fetch TURN credentials, using defaults", e);
+        }
+
         // 1. Tell API we are joining
         const { participants: currentParticipants } = await videoCallService.joinCall(
             callData.value.chatId,
@@ -273,7 +283,22 @@ function createPeer(targetPublicId: string, initiator: boolean, stream: MediaStr
         stream,
         trickle: true,
         sdpTransform: (sdp) => mungeSdp(sdp),
+        config: { 
+            iceServers: iceServers.value.length > 0 ? iceServers.value : undefined 
+        }
     });
+
+    // Debug connection state
+    // @ts-ignore
+    const pc = peer._pc as RTCPeerConnection;
+    if (pc) {
+        pc.oniceconnectionstatechange = () => {
+            console.log(`[Call] ICE State for ${normalizedTargetId}: ${pc.iceConnectionState}`);
+        };
+        pc.onconnectionstatechange = () => {
+            console.log(`[Call] Connection State for ${normalizedTargetId}: ${pc.connectionState}`);
+        };
+    }
 
     peer.on("signal", (signal) => {
         // Targeted signal
