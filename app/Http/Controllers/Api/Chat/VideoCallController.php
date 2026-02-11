@@ -120,7 +120,7 @@ class VideoCallController extends Controller
 
         $request->validate([
             'call_id' => 'required|string|max:64',
-            'signal_type' => 'required|in:offer,answer,ice-candidate',
+            'signal_type' => 'required|in:offer,answer,ice-candidate,signal',
             'signal_data' => 'required|array',
         ]);
 

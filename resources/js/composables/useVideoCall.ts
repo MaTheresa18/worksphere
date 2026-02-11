@@ -22,9 +22,8 @@ let broadcastChannel: BroadcastChannel | null = null;
 let ringtoneAudio: HTMLAudioElement | null = null;
 let ringtoneTimeout: ReturnType<typeof setTimeout> | null = null;
 
-// Pending offer + ICE candidates for incoming calls (received before user accepts)
-const pendingOffer = ref<RTCSessionDescriptionInit | null>(null);
-const pendingCandidates = ref<RTCIceCandidateInit[]>([]);
+// Pending signals (offer + ICE candidates) for incoming calls (received before user accepts)
+const pendingSignals = ref<any[]>([]);
 
 export function useVideoCall() {
   const store = useVideoCallStore();
@@ -40,6 +39,9 @@ export function useVideoCall() {
     const left = window.screenX + window.outerWidth - width - 24;
     const top = window.screenY + 80;
 
+    console.log('[VideoCall] Opening popup for call:', callId);
+    console.log('[VideoCall] Popup dimensions:', { width, height, left, top });
+
     callPopup = window.open(
       `/call/${callId}`,
       `worksphere-call-${callId}`,
@@ -47,6 +49,7 @@ export function useVideoCall() {
     );
 
     if (!callPopup) {
+      console.error('[VideoCall] ❌ Popup blocked by browser');
       toast.error('Popup Blocked', {
         description: 'Please allow popups for this site to make calls.',
       });
@@ -54,9 +57,12 @@ export function useVideoCall() {
       return;
     }
 
+    console.log('[VideoCall] Popup opened successfully');
+
     // Monitor popup close
     const checkInterval = setInterval(() => {
       if (callPopup?.closed) {
+        console.log('[VideoCall] Popup window closed detected via interval');
         clearInterval(checkInterval);
         handlePopupClosed();
       }
@@ -64,7 +70,7 @@ export function useVideoCall() {
   }
 
   function handlePopupClosed() {
-    console.log('[VideoCall] Popup was closed');
+    console.log('[VideoCall] handlePopupClosed: cleaning up state');
     callPopup = null;
     cleanup();
   }
@@ -75,15 +81,17 @@ export function useVideoCall() {
 
   function ensureBroadcastChannel() {
     if (broadcastChannel) return;
+    console.log('[VideoCall] Initializing BroadcastChannel "worksphere-call"');
     broadcastChannel = new BroadcastChannel('worksphere-call');
     broadcastChannel.onmessage = (event) => {
       const msg = event.data;
       if (!msg) return;
 
-      console.log('[VideoCall] BroadcastChannel message:', msg);
+      console.log('[VideoCall] 📥 Broadcast message received:', msg);
 
       switch (msg.type) {
         case 'state':
+          console.log('[VideoCall] Syncing state from popup:', msg.state);
           if (msg.state === 'connected') {
             store.setState('connected');
             stopRingtone();
@@ -107,9 +115,10 @@ export function useVideoCall() {
   // ============================================================================
 
   async function startCall(chatId: string, callType: CallType, remoteUser: { publicId: string; name: string; avatar: string | null }) {
-    console.log('[VideoCall] startCall:', { chatId, callType, remoteUser: remoteUser.name });
+    console.log('[VideoCall] startCall initiated:', { chatId, callType, remoteUser: remoteUser.name });
 
     if (store.isCallActive) {
+      console.warn('[VideoCall] Blocked: call already active');
       toast.warning('You are already in a call');
       return;
     }
@@ -117,9 +126,9 @@ export function useVideoCall() {
     store.setState('initiating');
 
     try {
-      // Tell server to notify the other user
+      console.log('[VideoCall] Requesting call initiation from API...');
       const { call_id } = await videoCallService.initiateCall(chatId, callType);
-      console.log('[VideoCall] Call initiated, callId:', call_id);
+      console.log('[VideoCall] API response: call_id =', call_id);
 
       store.setCall({
         callId: call_id,
@@ -131,30 +140,34 @@ export function useVideoCall() {
       });
 
       store.setState('ringing');
+      console.log('[VideoCall] Playing outgoing ringtone');
       playRingtone('outgoing');
 
       // Ring timeout
       ringtoneTimeout = setTimeout(() => {
         if (store.callState === 'ringing') {
+          console.log('[VideoCall] Outgoing call timeout (45s)');
           endCall('timeout');
         }
       }, 45000);
 
       // Store call data for the popup to read
-      sessionStorage.setItem('callData', JSON.stringify({
+      const dataToStore = {
         callId: call_id,
         chatId,
         callType,
         direction: 'outgoing',
         remoteUser,
         selfPublicId: authStore.user?.public_id,
-      }));
+      };
+      console.log('[VideoCall] Storing outgoing callData in sessionStorage');
+      sessionStorage.setItem('callData', JSON.stringify(dataToStore));
 
       ensureBroadcastChannel();
       openCallPopup(call_id);
 
     } catch (err) {
-      console.error('[VideoCall] Failed to start call:', err);
+      console.error('[VideoCall] ❌ Failed to start call:', err);
       toast.error('Failed to start call');
       cleanup();
     }
@@ -172,13 +185,17 @@ export function useVideoCall() {
     caller_avatar: string | null;
     chat_id: string;
   }) {
-    console.log('[VideoCall] handleIncomingCall:', data);
+    console.log('[VideoCall] 📞 handleIncomingCall:', data);
 
     // Ignore our own events
-    if (data.caller_public_id === authStore.user?.public_id) return;
+    if (data.caller_public_id === authStore.user?.public_id) {
+        console.log('[VideoCall] Ignoring own CallInitiated event');
+        return;
+    }
 
     // If already in a call, auto-decline
     if (store.isCallActive) {
+      console.warn('[VideoCall] Already in call, auto-declining incoming call');
       videoCallService.endCall(data.chat_id, data.call_id, 'declined').catch(() => {});
       return;
     }
@@ -197,11 +214,13 @@ export function useVideoCall() {
     });
 
     store.setState('ringing');
+    console.log('[VideoCall] Playing incoming ringtone');
     playRingtone('incoming');
 
     // Auto-decline after 45 seconds
     ringtoneTimeout = setTimeout(() => {
       if (store.callState === 'ringing' && !store.currentCall?.isOutgoing) {
+        console.log('[VideoCall] Incoming call auto-decline (45s timeout)');
         declineCall();
       }
     }, 45000);
@@ -209,58 +228,62 @@ export function useVideoCall() {
 
   function handleSignal(data: {
     call_id: string;
-    signal_type: 'offer' | 'answer' | 'ice-candidate';
+    signal_type: 'offer' | 'answer' | 'ice-candidate' | 'signal';
     signal_data: any;
     sender_public_id: string;
   }) {
     // Ignore our own signals
     if (data.sender_public_id === authStore.user?.public_id) return;
-    if (!store.currentCall || store.currentCall.callId !== data.call_id) return;
+    
+    // Check if the signal is for the current call
+    if (!store.currentCall || store.currentCall.callId !== data.call_id) {
+        console.log('[VideoCall] Received signal for non-active call:', data.call_id);
+        return;
+    }
+
+    console.log(`[VideoCall] 📡 Received signal: ${data.signal_type} for call ${data.call_id}`);
 
     // If the popup is open, it handles signals via its own Echo subscription.
-    // But we still need to buffer offer + ICE candidates that arrive BEFORE
+    // But we still need to buffer signals that arrive BEFORE
     // the user clicks Accept (i.e., before the popup opens).
-    if (callPopup && !callPopup.closed) return; // popup handles it
-
-    const { signal_type, signal_data } = data;
-
-    switch (signal_type) {
-      case 'offer':
-        console.log('[VideoCall] Saving pending offer (user has not accepted yet)');
-        pendingOffer.value = signal_data;
-        break;
-      case 'ice-candidate':
-        console.log('[VideoCall] Queuing ICE candidate (popup not open yet)');
-        pendingCandidates.value.push(signal_data);
-        break;
-      case 'answer':
-        // Rare: answer arrives before popup — ignore (popup will handle renegotiation)
-        break;
+    if (callPopup && !callPopup.closed) {
+        console.log('[VideoCall] Popup is active, delegating signal handling to popup');
+        return; 
     }
+
+    console.log(`[VideoCall] Buffering signal: ${data.signal_type}`);
+    pendingSignals.value.push(data.signal_data);
   }
 
   async function acceptCall() {
-    if (!store.currentCall) return;
+    if (!store.currentCall) {
+        console.error('[VideoCall] acceptCall: no currentCall in store!');
+        return;
+    }
     const { callId, chatId, callType, remoteUser } = store.currentCall;
+    console.log('[VideoCall] User accepted call:', callId);
 
     stopRingtone();
     store.setState('connecting');
 
-    // Store call data for the popup, INCLUDING the pending offer and candidates
-    sessionStorage.setItem('callData', JSON.stringify({
+    // Store call data for the popup, INCLUDING the pending signals
+    const dataToStore = {
       callId,
       chatId,
       callType,
       direction: 'incoming',
       remoteUser,
-      pendingOffer: pendingOffer.value,
-      pendingCandidates: pendingCandidates.value,
+      pendingSignals: pendingSignals.value,
       selfPublicId: authStore.user?.public_id,
-    }));
+    };
+    
+    console.log('[VideoCall] Storing incoming callData in sessionStorage', {
+        signalCount: pendingSignals.value.length
+    });
+    sessionStorage.setItem('callData', JSON.stringify(dataToStore));
 
     // Clear pending data
-    pendingOffer.value = null;
-    pendingCandidates.value = [];
+    pendingSignals.value = [];
 
     ensureBroadcastChannel();
     openCallPopup(callId);
@@ -338,8 +361,7 @@ export function useVideoCall() {
 
   function cleanup() {
     stopRingtone();
-    pendingOffer.value = null;
-    pendingCandidates.value = [];
+    pendingSignals.value = [];
     callPopup = null;
     store.reset();
   }

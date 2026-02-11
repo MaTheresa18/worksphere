@@ -25,7 +25,7 @@ export class VideoCallService extends BaseService {
   async sendSignal(
     chatId: string,
     callId: string,
-    signalType: 'offer' | 'answer' | 'ice-candidate',
+    signalType: 'offer' | 'answer' | 'ice-candidate' | 'signal',
     signalData: Record<string, unknown>,
   ): Promise<void> {
     await this.api.post(`/api/chat/${chatId}/call/signal`, {

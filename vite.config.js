@@ -29,6 +29,10 @@ export default defineConfig(({ mode, command }) => ({
     resolve: {
         alias: {
             '@': fileURLToPath(new URL('./resources/js', import.meta.url)),
+            util: fileURLToPath(new URL('./node_modules/util/util.js', import.meta.url)),
+            process: fileURLToPath(new URL('./node_modules/process/browser.js', import.meta.url)),
+            buffer: fileURLToPath(new URL('./node_modules/buffer/index.js', import.meta.url)),
+            events: fileURLToPath(new URL('./node_modules/events/events.js', import.meta.url)),
         },
     },
     server: {
@@ -57,5 +61,12 @@ export default defineConfig(({ mode, command }) => ({
     },
     esbuild: {
         drop: command === 'build' && mode === 'production' ? ['console', 'debugger'] : [],
+    },
+    optimizeDeps: {
+        include: ['util', 'process', 'buffer', 'events', 'simple-peer'],
+    },
+    define: {
+        global: 'window',
+        'process.env': {},
     },
 }));

@@ -1,37 +1,36 @@
 <script setup lang="ts">
 /**
  * CallApp.vue — Standalone call page (Google Meet style).
- *
- * This component runs in its own browser window/tab, completely independent
- * of the main SPA. It bootstraps its own Echo connection for signaling
- * and manages the full WebRTC lifecycle internally.
- *
- * Data is passed via sessionStorage from the parent window.
  */
-import 'webrtc-adapter';
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
-import { startEcho, stopEcho } from '@/echo';
-import { videoCallService } from '@/services/videocall.service';
+import "webrtc-adapter";
+import {
+    ref,
+    computed,
+    onMounted,
+    onBeforeUnmount,
+    watch,
+    nextTick,
+} from "vue";
+import Peer from "simple-peer";
+import { startEcho, stopEcho } from "@/echo";
+import { videoCallService } from "@/services/videocall.service";
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface CallData {
-  callId: string;
-  chatId: string;
-  callType: 'audio' | 'video';
-  direction: 'outgoing' | 'incoming';
-  remoteUser: {
-    publicId: string;
-    name: string;
-    avatar: string | null;
-  };
-  // For incoming calls — the saved offer
-  pendingOffer?: RTCSessionDescriptionInit | null;
-  pendingCandidates?: RTCIceCandidateInit[];
-  // The current user's public ID (to filter own events)
-  selfPublicId: string;
+    callId: string;
+    chatId: string;
+    callType: "audio" | "video";
+    direction: "outgoing" | "incoming";
+    remoteUser: {
+        publicId: string;
+        name: string;
+        avatar: string | null;
+    };
+    pendingSignals?: any[]; // Simple-Peer signal data buffer
+    selfPublicId: string;
 }
 
 // ============================================================================
@@ -39,12 +38,16 @@ interface CallData {
 // ============================================================================
 
 const callData = ref<CallData | null>(null);
-const callState = ref<'initializing' | 'ringing' | 'connecting' | 'connected' | 'ended' | 'error'>('initializing');
+const callState = ref<
+    "initializing" | "ringing" | "connecting" | "connected" | "ended" | "error"
+>("initializing");
+const hasJoined = ref(false); // Join Screen flag
 const error = ref<string | null>(null);
 const isMuted = ref(false);
 const isCameraOff = ref(false);
-const videoFallback = ref(false); // true if camera was unavailable
+const videoFallback = ref(false);
 const callDuration = ref(0);
+const avatarLoadFailed = ref(false); // Handle broken avatars
 
 const localStream = ref<MediaStream | null>(null);
 const remoteStream = ref<MediaStream | null>(null);
@@ -53,8 +56,7 @@ const localVideoRef = ref<HTMLVideoElement | null>(null);
 const remoteVideoRef = ref<HTMLVideoElement | null>(null);
 const remoteAudioRef = ref<HTMLAudioElement | null>(null);
 
-let peerConnection: RTCPeerConnection | null = null;
-let pendingIceCandidates: RTCIceCandidateInit[] = [];
+let peer: Peer.Instance | null = null;
 let durationTimer: ReturnType<typeof setInterval> | null = null;
 let echoChannel: any = null;
 let broadcastChannel: BroadcastChannel | null = null;
@@ -65,942 +67,960 @@ let ringtoneTimeout: ReturnType<typeof setTimeout> | null = null;
 // Computed
 // ============================================================================
 
-const isVideoCall = computed(() => callData.value?.callType === 'video' && !videoFallback.value);
+const isVideoCall = computed(
+    () => callData.value?.callType === "video" && !videoFallback.value,
+);
 
 const stateLabel = computed(() => {
-  switch (callState.value) {
-    case 'initializing': return 'Starting call...';
-    case 'ringing': return 'Ringing...';
-    case 'connecting': return 'Connecting...';
-    case 'connected': return formattedDuration.value;
-    case 'ended': return 'Call ended';
-    case 'error': return error.value || 'Error';
-    default: return '';
-  }
+    switch (callState.value) {
+        case "initializing":
+            return "Preparing...";
+        case "ringing":
+            return "Ringing...";
+        case "connecting":
+            return "Connecting...";
+        case "connected":
+            return formattedDuration.value;
+        case "ended":
+            return "Call ended";
+        case "error":
+            return error.value || "Error";
+        default:
+            return "";
+    }
 });
 
 const formattedDuration = computed(() => {
-  const mins = Math.floor(callDuration.value / 60);
-  const secs = callDuration.value % 60;
-  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    const mins = Math.floor(callDuration.value / 60);
+    const secs = callDuration.value % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 });
 
 const remoteInitials = computed(() => {
-  const name = callData.value?.remoteUser.name || '?';
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
+    const name = callData.value?.remoteUser.name || "?";
+    return name
+        .split(" ")
+        .map((w) => w[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
 });
 
 // ============================================================================
-// SDP Sanitizer
-// ============================================================================
-
-function sanitizeSdp(sdp: string | undefined): string {
-  if (!sdp) return '';
-  const result = sdp.replace(/a=ssrc:[^\r\n]*(\r?\n|$)/g, '');
-  if (result !== sdp) {
-    const removed = (sdp.match(/^a=ssrc:/gm) || []).length;
-    console.log(`[Call] SDP sanitize: removed ${removed} a=ssrc lines`);
-  }
-  return result;
-}
-
-// ============================================================================
-// Video element bindings
+// Watchers
 // ============================================================================
 
 watch(localStream, async (stream) => {
-  await nextTick();
-  if (localVideoRef.value && stream) {
-    localVideoRef.value.srcObject = stream;
-  }
+    console.log("[Call] localStream changed", !!stream);
+    await nextTick();
+    if (localVideoRef.value && stream) {
+        localVideoRef.value.srcObject = stream;
+    }
 });
 
 watch(remoteStream, async (stream) => {
-  await nextTick();
-  if (remoteVideoRef.value && stream) {
-    remoteVideoRef.value.srcObject = stream;
-  }
-  // Also bind to audio element for audio-only calls
-  if (remoteAudioRef.value && stream) {
-    remoteAudioRef.value.srcObject = stream;
-  }
+    console.log("[Call] remoteStream changed", !!stream);
+    await nextTick();
+    if (remoteVideoRef.value && stream) {
+        remoteVideoRef.value.srcObject = stream;
+    }
+    if (remoteAudioRef.value && stream) {
+        remoteAudioRef.value.srcObject = stream;
+        // Simple-peer doesn't always trigger play, so be explicit
+        remoteAudioRef.value.play().catch(() => {});
+    }
 });
 
 // ============================================================================
 // Media
 // ============================================================================
 
-async function acquireMedia(callType: 'audio' | 'video'): Promise<MediaStream | null> {
-  console.log('[Call] acquireMedia, type:', callType);
-  try {
-    if (callType === 'video') {
-      try {
+async function acquireMedia(): Promise<MediaStream | null> {
+    if (!callData.value) return null;
+    const type = callData.value.callType;
+    console.log("[Call] acquireMedia, type:", type);
+
+    try {
+        if (type === "video") {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+                });
+                localStream.value = stream;
+                return stream;
+            } catch (e) {
+                console.warn("[Call] Camera unavailable, fallback to audio");
+                videoFallback.value = true;
+            }
+        }
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: true,
+            video: false,
         });
-        console.log('[Call] Got video+audio stream');
         localStream.value = stream;
         return stream;
-      } catch (videoErr: any) {
-        console.warn('[Call] Camera unavailable, falling back to audio-only:', videoErr.name);
-        videoFallback.value = true;
-        // Fall through to audio-only below
-      }
+    } catch (err: any) {
+        console.error("[Call] Media acquisition failed:", err);
+        error.value = "Microphone access denied.";
+        callState.value = "error";
+        return null;
     }
-
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    console.log('[Call] Got audio-only stream');
-    localStream.value = stream;
-    return stream;
-  } catch (err: any) {
-    console.error('[Call] Failed to acquire media:', err.name, err.message);
-    error.value = err.name === 'NotAllowedError'
-      ? 'Microphone permission denied. Please allow access.'
-      : 'Could not access microphone.';
-    callState.value = 'error';
-    return null;
-  }
 }
 
 // ============================================================================
-// Peer Connection
+// SDP Munging (Fix for Chrome/Firefox compatibility)
 // ============================================================================
 
-async function createPeerConnection(): Promise<RTCPeerConnection> {
-  const { chatId, callId } = callData.value!;
-  console.log('[Call] createPeerConnection for:', callId);
+function mungeSdp(sdp: string): string {
+    if (!sdp) return sdp;
+    // We MUST use \r\n because many SDP parsers are strict about it.
+    return sdp.split(/\r?\n/).map(line => {
+        const clean = line.trim();
+        if (!clean) return "";
+        
+        // Fix for Chrome: rejects huge max-message-size
+        if (clean.startsWith('a=max-message-size:')) {
+            return 'a=max-message-size:65536';
+        }
 
-  let iceServers: RTCIceServer[] = [
-    { urls: 'stun:stun.cloudflare.com:3478' },
-    { urls: 'stun:stun.l.google.com:19302' },
-  ];
+        // Fix for Chrome/Firefox: rejects sctp-port:0
+        if (clean === 'a=sctp-port:0') {
+            return 'a=sctp-port:5000';
+        }
 
-  try {
-    const creds = await videoCallService.getTurnCredentials(chatId);
-    iceServers = creds.ice_servers;
-    console.log('[Call] Got ICE servers:', iceServers.length);
-  } catch (err) {
-    console.warn('[Call] Using fallback STUN-only:', err);
-  }
+        return clean;
+    }).filter(l => l.length > 0).join('\r\n') + '\r\n';
+}
 
-  const pc = new RTCPeerConnection({ iceServers });
-  console.log('[Call] RTCPeerConnection created');
+// ============================================================================
+// WebRTC (SimplePeer)
+// ============================================================================
 
-  // Add local tracks
-  if (localStream.value) {
-    localStream.value.getTracks().forEach((track) => {
-      pc.addTrack(track, localStream.value!);
+async function joinCall() {
+    console.log("[Call] User clicked JOIN");
+    hasJoined.value = true;
+
+    const stream = await acquireMedia();
+    if (!stream) return;
+
+    const data = callData.value!;
+    const isInitiator = data.direction === "outgoing";
+
+    console.log("[Call] Initializing SimplePeer, initiator:", isInitiator);
+
+    let iceServers = [
+        { urls: "stun:stun.cloudflare.com:3478" },
+        { urls: "stun:stun.l.google.com:19302" },
+    ];
+
+    try {
+        const creds = await videoCallService.getTurnCredentials(data.chatId);
+        iceServers = creds.ice_servers;
+        console.log("[Call] ICE servers loaded");
+    } catch (err) {
+        console.warn("[Call] Using default STUN servers");
+    }
+
+    peer = new Peer({
+        initiator: isInitiator,
+        stream: stream,
+        trickle: false, // Disable trickle ICE for better stability (single signal)
+        config: { iceServers },
+        dataChannels: true, // Re-enable for BUNDLE stability
+        sdpTransform: (sdp: string) => {
+            console.log("[Call] --- TRANSFORMING OUTGOING SDP ---");
+            const munged = mungeSdp(sdp);
+            console.log("[Call] Munged outgoing SDP length:", munged.length);
+            return munged;
+        }
     });
-    console.log('[Call] Added', localStream.value.getTracks().length, 'tracks');
-  }
 
-  // Remote tracks
-  pc.ontrack = (event) => {
-    console.log('[Call] Remote track:', event.track.kind);
-    if (event.streams[0]) {
-      remoteStream.value = event.streams[0];
-    }
-  };
+    peer.on("signal", (signal: any) => {
+        console.log("[Call] ☁️ Local signal produced, type:", signal.type || "candidate");
+        videoCallService.sendSignal(data.chatId, data.callId, "signal", signal);
+    });
 
-  // ICE candidates → send via signaling
-  pc.onicecandidate = (event) => {
-    if (event.candidate) {
-      videoCallService.sendSignal(chatId, callId, 'ice-candidate', {
-        candidate: event.candidate.candidate,
-        sdpMid: event.candidate.sdpMid,
-        sdpMLineIndex: event.candidate.sdpMLineIndex,
-      }).catch(() => {});
-    }
-  };
+    peer.on("stream", (remote: MediaStream) => {
+        console.log("[Call] 📡 Remote stream received");
+        remoteStream.value = remote;
+    });
 
-  // Connection state
-  pc.onconnectionstatechange = () => {
-    console.log('[Call] Connection state:', pc.connectionState);
-    switch (pc.connectionState) {
-      case 'connected':
-        console.log('[Call] ✅ CONNECTED');
-        callState.value = 'connected';
+    peer.on("connect", () => {
+        console.log("[Call] ✅✅✅ PEER CONNECTED ✅✅✅");
+        callState.value = "connected";
         stopRingtone();
         startDurationTimer();
-        postToParent({ type: 'state', state: 'connected' });
-        break;
-      case 'disconnected':
-      case 'failed':
-        console.error('[Call] Connection', pc.connectionState);
-        handleCallFailed();
-        break;
-    }
-  };
-
-  pc.oniceconnectionstatechange = () => {
-    console.log('[Call] ICE state:', pc.iceConnectionState);
-  };
-
-  peerConnection = pc;
-  return pc;
-}
-
-// ============================================================================
-// Outgoing Call Flow
-// ============================================================================
-
-async function startOutgoingCall() {
-  const data = callData.value!;
-  console.log('[Call] Starting outgoing call to', data.remoteUser.name);
-
-  callState.value = 'ringing';
-  playRingtone('outgoing');
-
-  // Ring timeout
-  ringtoneTimeout = setTimeout(() => {
-    if (callState.value === 'ringing') {
-      console.log('[Call] Ring timeout (45s)');
-      endCall('timeout');
-    }
-  }, 45000);
-
-  try {
-    const pc = await createPeerConnection();
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    console.log('[Call] Offer created, sending...');
-
-    await videoCallService.sendSignal(data.chatId, data.callId, 'offer', {
-      type: offer.type,
-      sdp: offer.sdp,
+        postToParent({ type: "state", state: "connected" });
     });
-    console.log('[Call] Offer sent');
-  } catch (err) {
-    console.error('[Call] Failed to start outgoing call:', err);
-    error.value = 'Failed to start call';
-    callState.value = 'error';
-  }
-}
 
-// ============================================================================
-// Incoming Call Flow
-// ============================================================================
-
-async function startIncomingCall() {
-  const data = callData.value!;
-  console.log('[Call] Starting incoming call from', data.remoteUser.name);
-
-  callState.value = 'connecting';
-
-  try {
-    const pc = await createPeerConnection();
-
-    // Apply the saved offer
-    if (data.pendingOffer) {
-      const sanitized = sanitizeSdp(data.pendingOffer.sdp);
-      await pc.setRemoteDescription({ type: data.pendingOffer.type!, sdp: sanitized });
-      console.log('[Call] Remote description (offer) set');
-
-      // Flush saved ICE candidates
-      if (data.pendingCandidates?.length) {
-        console.log('[Call] Flushing', data.pendingCandidates.length, 'saved ICE candidates');
-        for (const c of data.pendingCandidates) {
-          await pc.addIceCandidate(new RTCIceCandidate(c));
+    peer.on("error", (err: any) => {
+        console.error("[Call] ❌ PEER ERROR:", err.name, err.message);
+        console.error("[Call] Error stack:", err.stack);
+        if (err.name === 'OperationError') {
+             console.error("[Call] This usually means an invalid SDP line was encountered.");
+             // Log the current local/remote descriptions if available
+             if (peer?._pc) {
+                 console.log("[Call] LOCAL DESCRIPTION:", peer._pc.localDescription?.sdp);
+                 console.log("[Call] REMOTE DESCRIPTION:", peer._pc.remoteDescription?.sdp);
+             }
         }
-      }
+        handleCallFailed();
+    });
 
-      // Also flush any that arrived via Echo during setup
-      if (pendingIceCandidates.length) {
-        console.log('[Call] Flushing', pendingIceCandidates.length, 'echo ICE candidates');
-        for (const c of pendingIceCandidates) {
-          await pc.addIceCandidate(new RTCIceCandidate(c));
-        }
-        pendingIceCandidates = [];
-      }
+    peer.on("close", () => {
+        console.log("[Call] Peer closed");
+        if (callState.value !== "ended") endCall("hangup");
+    });
 
-      // Create and send answer
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      console.log('[Call] Answer created, sending...');
-
-      await videoCallService.sendSignal(data.chatId, data.callId, 'answer', {
-        type: answer.type,
-        sdp: answer.sdp,
-      });
-      console.log('[Call] ✅ Answer sent');
+    // Start outgoing ringing if initiator
+    if (isInitiator) {
+        callState.value = "ringing";
+        playRingtone("outgoing");
+        // Timeout
+        ringtoneTimeout = setTimeout(() => {
+            if (callState.value === "ringing") endCall("timeout");
+        }, 45000);
     } else {
-      console.warn('[Call] No pending offer! Waiting for offer via Echo...');
-      callState.value = 'connecting';
+        callState.value = "connecting";
+        // If we have initial signals, apply them
+        if (data.pendingSignals && data.pendingSignals.length > 0) {
+            console.log(`[Call] Applying ${data.pendingSignals.length} initial pending signals`);
+            data.pendingSignals.forEach(s => {
+                if (s.sdp) s.sdp = mungeSdp(s.sdp);
+                peer?.signal(s);
+            });
+        }
     }
-  } catch (err) {
-    console.error('[Call] Failed to start incoming call:', err);
-    error.value = 'Failed to connect call';
-    callState.value = 'error';
-  }
 }
 
 // ============================================================================
-// Signal Handling (from Echo)
+// Signal Handling (Echo)
 // ============================================================================
 
 async function handleSignal(event: any) {
-  if (event.sender_public_id === callData.value?.selfPublicId) return;
-  if (event.call_id !== callData.value?.callId) return;
+    if (event.sender_public_id === callData.value?.selfPublicId) return;
+    if (event.call_id !== callData.value?.callId) return;
 
-  const { signal_type, signal_data } = event;
-  console.log('[Call] Signal:', signal_type);
+    const signal = event.signal_data;
+    console.log("[Call] 📥 Received Signal:", signal.type || "candidate");
 
-  try {
-    switch (signal_type) {
-      case 'offer':
-        if (peerConnection) {
-          const sanitized = sanitizeSdp(signal_data.sdp);
-          await peerConnection.setRemoteDescription({ type: signal_data.type, sdp: sanitized });
-          const answer = await peerConnection.createAnswer();
-          await peerConnection.setLocalDescription(answer);
-          await videoCallService.sendSignal(
-            callData.value!.chatId, callData.value!.callId,
-            'answer', { type: answer.type, sdp: answer.sdp },
-          );
-        }
-        break;
-
-      case 'answer':
-        if (peerConnection) {
-          const sanitized = sanitizeSdp(signal_data.sdp);
-          await peerConnection.setRemoteDescription({ type: signal_data.type, sdp: sanitized });
-          console.log('[Call] ✅ Answer applied');
-
-          // Flush pending ICE candidates
-          if (pendingIceCandidates.length) {
-            for (const c of pendingIceCandidates) {
-              await peerConnection.addIceCandidate(new RTCIceCandidate(c));
-            }
-            pendingIceCandidates = [];
-          }
-          callState.value = 'connecting';
-        }
-        break;
-
-      case 'ice-candidate':
-        if (peerConnection?.remoteDescription) {
-          await peerConnection.addIceCandidate(new RTCIceCandidate(signal_data));
-        } else {
-          pendingIceCandidates.push(signal_data);
-        }
-        break;
+    if (peer) {
+        if (signal.sdp) signal.sdp = mungeSdp(signal.sdp);
+        peer.signal(signal);
+    } else {
+        console.warn("[Call] Signal received but peer not initialized (User hasn't clicked join)");
+        // If user hasn't joined yet, we can't apply signals.
+        // For incoming calls, the offer is usually passed via sessionStorage,
+        // but late candidates might arrive here. Simple-peer handles this
+        // if we initialize it early, but we wait for user gesture.
     }
-  } catch (err) {
-    console.error('[Call] Signal error:', signal_type, err);
-  }
 }
 
 function handleCallEndedEvent(event: any) {
-  if (event.ender_public_id === callData.value?.selfPublicId) return;
-  if (event.call_id !== callData.value?.callId) return;
-  console.log('[Call] Remote party ended call:', event.reason);
-  callState.value = 'ended';
-  postToParent({ type: 'state', state: 'ended', reason: event.reason });
-  closeAfterDelay();
+    if (event.ender_public_id === callData.value?.selfPublicId) return;
+    if (event.call_id !== callData.value?.callId) return;
+    console.log("[Call] Remote party ended call");
+    callState.value = "ended";
+    postToParent({ type: "state", state: "ended", reason: event.reason });
+    cleanup();
 }
-
-// ============================================================================
-// Echo Setup
-// ============================================================================
 
 function setupEcho() {
-  const echo = startEcho();
-  if (!echo || !callData.value) {
-    console.error('[Call] Failed to start Echo');
-    return;
-  }
+    const echo = startEcho();
+    if (!echo || !callData.value) return;
 
-  const channelName = `dm.${callData.value.chatId}`;
-  console.log('[Call] Subscribing to Echo channel:', channelName);
-
-  echoChannel = echo.private(channelName);
-  echoChannel
-    .listen('.CallSignal', (event: any) => handleSignal(event))
-    .listen('.CallEnded', (event: any) => handleCallEndedEvent(event));
+    const channelName = `dm.${callData.value.chatId}`;
+    echoChannel = echo.private(channelName);
+    echoChannel
+        .listen(".CallSignal", (event: any) => handleSignal(event))
+        .listen(".CallEnded", (event: any) => handleCallEndedEvent(event));
 }
 
 // ============================================================================
-// BroadcastChannel (sync with parent)
+// Communication & Controls
 // ============================================================================
 
 function setupBroadcastChannel() {
-  broadcastChannel = new BroadcastChannel('worksphere-call');
-  broadcastChannel.onmessage = (event) => {
-    if (event.data?.type === 'end-call') {
-      endCall('hangup');
-    }
-  };
+    broadcastChannel = new BroadcastChannel("worksphere-call");
+    broadcastChannel.onmessage = (e) => {
+        if (e.data?.type === "end-call") endCall("hangup");
+    };
 }
 
 function postToParent(msg: Record<string, any>) {
-  broadcastChannel?.postMessage({ ...msg, callId: callData.value?.callId });
+    broadcastChannel?.postMessage({ ...msg, callId: callData.value?.callId });
 }
 
-// ============================================================================
-// Call Controls
-// ============================================================================
-
 function toggleMute() {
-  isMuted.value = !isMuted.value;
-  localStream.value?.getAudioTracks().forEach((t) => {
-    t.enabled = !isMuted.value;
-  });
+    isMuted.value = !isMuted.value;
+    localStream.value?.getAudioTracks().forEach((t) => (t.enabled = !isMuted.value));
 }
 
 function toggleCamera() {
-  isCameraOff.value = !isCameraOff.value;
-  localStream.value?.getVideoTracks().forEach((t) => {
-    t.enabled = !isCameraOff.value;
-  });
+    isCameraOff.value = !isCameraOff.value;
+    localStream.value?.getVideoTracks().forEach((t) => (t.enabled = !isCameraOff.value));
 }
 
-async function endCall(reason: 'hangup' | 'timeout' | 'failed' = 'hangup') {
-  console.log('[Call] endCall:', reason);
-  if (callData.value && callState.value !== 'ended') {
-    videoCallService.endCall(callData.value.chatId, callData.value.callId, reason).catch(() => {});
-  }
-  callState.value = 'ended';
-  postToParent({ type: 'state', state: 'ended', reason });
-  cleanup();
-  closeAfterDelay();
+async function endCall(reason: any = "hangup") {
+    console.log("[Call] endCall:", reason);
+    if (callData.value && callState.value !== "ended") {
+        videoCallService
+            .endCall(callData.value.chatId, callData.value.callId, reason)
+            .catch(() => {});
+    }
+    callState.value = "ended";
+    postToParent({ type: "state", state: "ended", reason });
+    cleanup();
 }
 
 function handleCallFailed() {
-  if (callData.value) {
-    videoCallService.endCall(callData.value.chatId, callData.value.callId, 'failed').catch(() => {});
-  }
-  callState.value = 'ended';
-  error.value = 'Connection lost';
-  postToParent({ type: 'state', state: 'ended', reason: 'failed' });
-  closeAfterDelay();
+    if (callData.value) {
+        videoCallService
+            .endCall(callData.value.chatId, callData.value.callId, "failed")
+            .catch(() => {});
+    }
+    error.value = "Connection failed";
+    callState.value = "ended";
+    cleanup();
 }
 
 // ============================================================================
 // Ringtone
 // ============================================================================
 
-function playRingtone(type: 'incoming' | 'outgoing') {
-  try {
-    ringtoneAudio = new Audio(type === 'incoming' ? '/static/sounds/inbound-call.mp3' : '/static/sounds/outbound-call.mp3');
-    ringtoneAudio.loop = true;
-    ringtoneAudio.volume = 0.5;
-    ringtoneAudio.play().catch(() => {});
-  } catch { /* noop */ }
+function playRingtone(type: "incoming" | "outgoing") {
+    try {
+        ringtoneAudio = new Audio(
+            type === "incoming"
+                ? "/static/sounds/inbound-call.mp3"
+                : "/static/sounds/outbound-call.mp3",
+        );
+        ringtoneAudio.loop = true;
+        ringtoneAudio.volume = 0.5;
+        ringtoneAudio.play().catch(() => {});
+    } catch {}
 }
 
 function stopRingtone() {
-  if (ringtoneAudio) {
-    ringtoneAudio.pause();
-    ringtoneAudio.currentTime = 0;
-    ringtoneAudio = null;
-  }
-  if (ringtoneTimeout) {
-    clearTimeout(ringtoneTimeout);
-    ringtoneTimeout = null;
-  }
+    if (ringtoneAudio) {
+        ringtoneAudio.pause();
+        ringtoneAudio = null;
+    }
+    if (ringtoneTimeout) {
+        clearTimeout(ringtoneTimeout);
+        ringtoneTimeout = null;
+    }
 }
-
-// ============================================================================
-// Duration Timer
-// ============================================================================
 
 function startDurationTimer() {
-  callDuration.value = 0;
-  durationTimer = setInterval(() => callDuration.value++, 1000);
+    callDuration.value = 0;
+    durationTimer = setInterval(() => callDuration.value++, 1000);
 }
 
 // ============================================================================
-// Cleanup & Close
+// Lifecycle
 // ============================================================================
 
 function cleanup() {
-  stopRingtone();
-
-  if (localStream.value) {
-    localStream.value.getTracks().forEach((t) => t.stop());
-    localStream.value = null;
-  }
-
-  if (peerConnection) {
-    peerConnection.close();
-    peerConnection = null;
-  }
-
-  if (durationTimer) {
-    clearInterval(durationTimer);
-    durationTimer = null;
-  }
-
-  pendingIceCandidates = [];
+    console.log("[Call] cleanup");
+    stopRingtone();
+    if (localStream.value) {
+        localStream.value.getTracks().forEach((t) => t.stop());
+        localStream.value = null;
+    }
+    if (peer) {
+        peer.destroy();
+        peer = null;
+    }
+    if (durationTimer) {
+        clearInterval(durationTimer);
+        durationTimer = null;
+    }
 }
-
-function closeAfterDelay() {
-  setTimeout(() => {
-    window.close();
-  }, 2000);
-}
-
-// ============================================================================
-// Initialization
-// ============================================================================
 
 onMounted(async () => {
-  console.log('[Call] Mounted, reading sessionStorage...');
+    console.log("[Call] Mounted");
+    const raw = sessionStorage.getItem("callData");
+    if (!raw) {
+        error.value = "Invalid session.";
+        callState.value = "error";
+        return;
+    }
 
-  // Read call data from sessionStorage
-  const raw = sessionStorage.getItem('callData');
-  if (!raw) {
-    error.value = 'No call data found. This window may have been opened incorrectly.';
-    callState.value = 'error';
-    return;
-  }
+    try {
+        callData.value = JSON.parse(raw);
+        sessionStorage.removeItem("callData");
+    } catch {
+        error.value = "Data parse error.";
+        callState.value = "error";
+        return;
+    }
 
-  try {
-    callData.value = JSON.parse(raw);
-    sessionStorage.removeItem('callData');
-  } catch {
-    error.value = 'Invalid call data.';
-    callState.value = 'error';
-    return;
-  }
+    const data = callData.value!;
+    document.title = `Call — ${data.remoteUser.name}`;
+    setupBroadcastChannel();
+    setupEcho();
 
-  const data = callData.value!;
-  console.log('[Call] Call data:', { callId: data.callId, direction: data.direction, type: data.callType, remote: data.remoteUser.name });
-
-  // Set window title
-  document.title = `Call — ${data.remoteUser.name}`;
-
-  // Setup communication channels
-  setupBroadcastChannel();
-  setupEcho();
-
-  // Acquire media
-  const stream = await acquireMedia(data.callType);
-  if (!stream) return;
-
-  // Start the appropriate flow
-  if (data.direction === 'outgoing') {
-    await startOutgoingCall();
-  } else {
-    await startIncomingCall();
-  }
+    if (data.direction === "incoming") {
+        playRingtone("incoming");
+    }
 });
 
 onBeforeUnmount(() => {
-  cleanup();
-  if (echoChannel) {
-    echoChannel.stopListening('.CallSignal');
-    echoChannel.stopListening('.CallEnded');
-  }
-  stopEcho();
-  broadcastChannel?.close();
+    cleanup();
+    stopEcho();
+    broadcastChannel?.close();
 });
 
-// Handle window close
-window.addEventListener('beforeunload', () => {
-  if (callState.value !== 'ended') {
-    endCall('hangup');
-  }
+window.addEventListener("beforeunload", () => {
+    if (callState.value !== "ended") endCall("hangup");
 });
 </script>
 
 <template>
-  <div class="call-container">
-    <!-- Background gradient -->
-    <div class="call-bg" />
+    <div class="call-container">
+        <!-- Background gradient -->
+        <div class="call-bg" />
 
-    <!-- Error State -->
-    <div v-if="callState === 'error'" class="call-center-content">
-      <div class="error-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <line x1="15" y1="9" x2="9" y2="15" />
-          <line x1="9" y1="9" x2="15" y2="15" />
-        </svg>
-      </div>
-      <p class="error-text">{{ error }}</p>
-      <button class="btn-close-window" @click="window.close()">Close Window</button>
-    </div>
-
-    <!-- Call Ended State -->
-    <div v-else-if="callState === 'ended'" class="call-center-content">
-      <div class="ended-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" />
-          <line x1="23" y1="1" x2="1" y2="23" />
-        </svg>
-      </div>
-      <p class="ended-text">Call ended</p>
-      <p class="ended-sub">{{ error || 'Closing window...' }}</p>
-    </div>
-
-    <!-- Active Call State -->
-    <template v-else>
-      <!-- Remote Video (full screen) -->
-      <video
-        v-if="remoteStream && isVideoCall"
-        ref="remoteVideoRef"
-        autoplay
-        playsinline
-        class="remote-video"
-      />
-
-      <!-- Audio-only: avatar display -->
-      <div v-else class="call-center-content">
-        <div class="avatar-container">
-          <img
-            v-if="callData?.remoteUser.avatar"
-            :src="callData.remoteUser.avatar"
-            :alt="callData?.remoteUser.name"
-            class="avatar-img"
-          />
-          <div v-else class="avatar-fallback">
-            {{ remoteInitials }}
-          </div>
-          <!-- Pulsing ring while connecting -->
-          <div v-if="callState !== 'connected'" class="avatar-pulse" />
+        <!-- Error State -->
+        <div v-if="callState === 'error'" class="call-center-content">
+            <div class="error-icon">
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="48"
+                    height="48"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="15" y1="9" x2="9" y2="15" />
+                    <line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
+            </div>
+            <p class="error-text">{{ error }}</p>
+            <button class="btn-close-window" @click="window.close()">
+                Close Window
+            </button>
         </div>
-        <p class="remote-name">{{ callData?.remoteUser.name }}</p>
-        <p class="state-label">{{ stateLabel }}</p>
-      </div>
 
-      <!-- Hidden audio element for audio-only calls -->
-      <audio ref="remoteAudioRef" autoplay />
-
-      <!-- Local Video PiP -->
-      <div
-        v-if="localStream && isVideoCall && !isCameraOff"
-        class="local-video-pip"
-      >
-        <video
-          ref="localVideoRef"
-          autoplay
-          muted
-          playsinline
-          class="local-video"
-        />
-      </div>
-
-      <!-- Top bar (video calls) -->
-      <div v-if="isVideoCall && remoteStream" class="top-bar">
-        <div class="top-bar-info">
-          <span class="status-dot" :class="callState === 'connected' ? 'dot-green' : 'dot-amber'" />
-          <span class="remote-name-small">{{ callData?.remoteUser.name }}</span>
+        <!-- Call Ended State -->
+        <div v-else-if="callState === 'ended'" class="call-center-content">
+            <div class="ended-icon">
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="48"
+                    height="48"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <path
+                        d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"
+                    />
+                    <line x1="23" y1="1" x2="1" y2="23" />
+                </svg>
+            </div>
+            <p class="ended-text">Call ended</p>
+            <p class="ended-sub">{{ error || "You can now close this window." }}</p>
         </div>
-        <span class="duration-label">{{ stateLabel }}</span>
-      </div>
 
-      <!-- Controls bar -->
-      <div class="controls-bar">
-        <!-- Mute -->
-        <button
-          class="ctrl-btn"
-          :class="{ active: isMuted }"
-          :title="isMuted ? 'Unmute' : 'Mute'"
-          @click="toggleMute"
-        >
-          <!-- Mic / MicOff -->
-          <svg v-if="!isMuted" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            <line x1="12" y1="19" x2="12" y2="22" />
-          </svg>
-          <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="2" y1="2" x2="22" y2="22" />
-            <path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2" />
-            <path d="M5 10v2a7 7 0 0 0 12 5.29" />
-            <path d="M15 9.34V5a3 3 0 0 0-5.68-1.33" />
-            <path d="M9 9v3a3 3 0 0 0 5.12 2.12" />
-            <line x1="12" y1="19" x2="12" y2="22" />
-          </svg>
-        </button>
+        <!-- Join Screen (Before Peer initialized) -->
+        <div v-else-if="!hasJoined" class="join-screen call-center-content">
+            <div class="join-preview">
+                <div class="avatar-container">
+                    <img
+                        v-if="callData?.remoteUser.avatar && !avatarLoadFailed"
+                        :src="callData.remoteUser.avatar"
+                        :alt="callData?.remoteUser.name"
+                        class="avatar-img"
+                        @error="avatarLoadFailed = true"
+                    />
+                    <div v-else class="avatar-fallback">
+                        {{ remoteInitials }}
+                    </div>
+                </div>
+                <h1 class="join-title">Ready to join?</h1>
+                <p class="join-subtitle">
+                    {{ callData?.remoteUser.name }} is on the line.
+                </p>
+            </div>
 
-        <!-- Camera (video calls only) -->
-        <button
-          v-if="callData?.callType === 'video' && !videoFallback"
-          class="ctrl-btn"
-          :class="{ active: isCameraOff }"
-          :title="isCameraOff ? 'Turn Camera On' : 'Turn Camera Off'"
-          @click="toggleCamera"
-        >
-          <svg v-if="!isCameraOff" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5" />
-            <rect x="2" y="6" width="14" height="12" rx="2" />
-          </svg>
-          <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10.66 6H14a2 2 0 0 1 2 2v2.5l5.248-3.062A.5.5 0 0 1 22 7.87v8.196" />
-            <path d="M16 16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2" />
-            <line x1="2" y1="2" x2="22" y2="22" />
-          </svg>
-        </button>
+            <div class="join-actions">
+                <button class="btn-join" @click="joinCall">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" />
+                    </svg>
+                    Join now
+                </button>
+                <button class="btn-decline-join" @click="endCall('hangup')">Decline</button>
+            </div>
+        </div>
 
-        <!-- End Call -->
-        <button
-          class="ctrl-btn end-call"
-          title="End Call"
-          @click="endCall('hangup')"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" />
-            <line x1="23" y1="1" x2="1" y2="23" />
-          </svg>
-        </button>
-      </div>
-    </template>
-  </div>
+        <!-- Active Call State -->
+        <template v-else>
+            <!-- Remote Video (full screen) -->
+            <video
+                v-if="remoteStream && isVideoCall"
+                ref="remoteVideoRef"
+                autoplay
+                playsinline
+                class="remote-video"
+            />
+
+            <!-- Audio-only or Missing Remote Video: avatar display -->
+            <div v-else class="call-center-content">
+                <div class="avatar-container big">
+                    <img
+                        v-if="callData?.remoteUser.avatar && !avatarLoadFailed"
+                        :src="callData.remoteUser.avatar"
+                        :alt="callData?.remoteUser.name"
+                        class="avatar-img"
+                        @error="avatarLoadFailed = true"
+                    />
+                    <div v-else class="avatar-fallback">
+                        {{ remoteInitials }}
+                    </div>
+                    <!-- Pulsing ring while connecting -->
+                    <div
+                        v-if="callState !== 'connected'"
+                        class="avatar-pulse"
+                    />
+                </div>
+                <p class="remote-name">{{ callData?.remoteUser.name }}</p>
+                <p class="state-label">{{ stateLabel }}</p>
+            </div>
+
+            <!-- Hidden audio element for audio-only calls -->
+            <audio ref="remoteAudioRef" autoplay />
+
+            <!-- Local Video PiP -->
+            <div
+                v-if="localStream && isVideoCall && !isCameraOff"
+                class="local-video-pip"
+            >
+                <video
+                    ref="localVideoRef"
+                    autoplay
+                    muted
+                    playsinline
+                    class="local-video"
+                />
+            </div>
+
+            <!-- Top bar (video calls) -->
+            <div v-if="isVideoCall && remoteStream" class="top-bar">
+                <div class="participant-info">
+                    <span class="participant-name">{{ callData?.remoteUser.name }}</span>
+                    <span class="call-duration">{{ formattedDuration }}</span>
+                </div>
+            </div>
+
+            <!-- Bottom Controls -->
+            <div class="controls-container">
+                <div class="controls-inner">
+                    <!-- Toggle Mic -->
+                    <button
+                        class="control-btn"
+                        :class="{ 'is-active': isMuted }"
+                        @click="toggleMute"
+                        :title="isMuted ? 'Unmute' : 'Mute'"
+                    >
+                        <svg
+                            v-if="!isMuted"
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                            <line x1="12" y1="19" x2="12" y2="22" />
+                        </svg>
+                        <svg
+                            v-else
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <line x1="2" y1="2" x2="22" y2="22" />
+                            <path d="M18.89 13.23A7.12 7.12 0 0 1 5 12v-2" />
+                            <path d="M9 5a3 3 0 0 1 5.12-2.12" />
+                            <path d="M11.5 11.5a3 3 0 0 1-2.5-2.5" />
+                            <line x1="12" y1="19" x2="12" y2="22" />
+                        </svg>
+                    </button>
+
+                    <!-- Toggle Camera -->
+                    <button
+                        class="control-btn"
+                        :class="{ 'is-active': isCameraOff }"
+                        @click="toggleCamera"
+                        :title="isCameraOff ? 'Turn Camera On' : 'Turn Camera Off'"
+                    >
+                        <svg
+                            v-if="!isCameraOff"
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path d="m22 8-6 4 6 4V8Z" />
+                            <rect x="2" y="6" width="12" height="12" rx="2" ry="2" />
+                        </svg>
+                        <svg
+                            v-else
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <line x1="2" y1="2" x2="22" y2="22" />
+                            <path d="m22 8-6 4 6 4V8Z" />
+                            <path d="M14 8V6a2 2 0 0 0-2-2H4.26" />
+                            <path d="M2.28 2.28 2 2.28A2 2 0 0 0 2 4v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" />
+                        </svg>
+                    </button>
+
+                    <!-- Hangup -->
+                    <button
+                        class="control-btn hangup"
+                        @click="endCall('hangup')"
+                        title="End Call"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <path
+                                d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"
+                            />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </template>
+    </div>
 </template>
 
 <style scoped>
 .call-container {
-  position: relative;
-  width: 100dvw;
-  height: 100dvh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+    position: relative;
+    width: 100dvw;
+    height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
 .call-bg {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at 50% 0%, rgba(59, 130, 246, 0.08) 0%, transparent 60%),
-    radial-gradient(ellipse at 80% 100%, rgba(124, 58, 237, 0.06) 0%, transparent 50%),
-    #0a0a0f;
-  z-index: 0;
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(
+            ellipse at 50% 0%,
+            rgba(59, 130, 246, 0.08) 0%,
+            transparent 60%
+        ),
+        radial-gradient(
+            ellipse at 80% 100%,
+            rgba(124, 58, 237, 0.06) 0%,
+            transparent 50%
+        ),
+        #0a0a0f;
+    z-index: 0;
 }
 
 /* ── Center content (avatar / error / ended) ── */
 .call-center-content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
 }
 
 .avatar-container {
-  position: relative;
-  width: 120px;
-  height: 120px;
+    position: relative;
+    width: 120px;
+    height: 120px;
 }
 
 .avatar-img {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid rgba(255, 255, 255, 0.15);
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid rgba(255, 255, 255, 0.15);
 }
 
 .avatar-fallback {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40px;
-  font-weight: 600;
-  color: white;
-  border: 3px solid rgba(255, 255, 255, 0.15);
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    font-weight: 600;
+    color: white;
+    border: 3px solid rgba(255, 255, 255, 0.15);
 }
 
 .avatar-pulse {
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 2px solid rgba(59, 130, 246, 0.4);
-  animation: pulse-ring 2s ease-out infinite;
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid rgba(59, 130, 246, 0.4);
+    animation: pulse-ring 2s ease-out infinite;
 }
 
 @keyframes pulse-ring {
-  0% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(1.3); opacity: 0; }
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1.3);
+        opacity: 0;
+    }
 }
 
 .remote-name {
-  font-size: 24px;
-  font-weight: 600;
-  color: white;
-  margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+    color: white;
+    margin: 0;
 }
 
 .state-label {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
-  margin: 0;
-  animation: fade-pulse 2s ease-in-out infinite;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.5);
+    margin: 0;
+    animation: fade-pulse 2s ease-in-out infinite;
 }
 
 @keyframes fade-pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
+    0%,
+    100% {
+        opacity: 0.5;
+    }
+    50% {
+        opacity: 1;
+    }
 }
 
 /* ── Remote Video ── */
 .remote-video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  z-index: 0;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
 }
 
 /* ── Local Video PiP ── */
 .local-video-pip {
-  position: absolute;
-  bottom: 100px;
-  right: 24px;
-  width: 200px;
-  aspect-ratio: 16/9;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 2px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  z-index: 10;
+    position: absolute;
+    bottom: 100px;
+    right: 24px;
+    width: 200px;
+    aspect-ratio: 16/9;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    z-index: 10;
 }
 
 .local-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scaleX(-1);
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
 }
 
 /* ── Top bar ── */
 .top-bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 24px;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent);
-  z-index: 10;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent);
+    z-index: 10;
 }
 
 .top-bar-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
 }
 
-.dot-green { background: #22c55e; box-shadow: 0 0 8px rgba(34, 197, 94, 0.5); }
-.dot-amber { background: #f59e0b; box-shadow: 0 0 8px rgba(245, 158, 11, 0.5); }
+.dot-green {
+    background: #22c55e;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+}
+.dot-amber {
+    background: #f59e0b;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
 
 .remote-name-small {
-  font-size: 14px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
 }
 
 .duration-label {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.6);
-  font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
+    font-variant-numeric: tabular-nums;
 }
 
 /* ── Controls bar ── */
 .controls-bar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 24px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
-  z-index: 10;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 24px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+    z-index: 10;
 }
 
 .ctrl-btn {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.12);
-  color: white;
-  transition: all 0.15s ease;
-  backdrop-filter: blur(8px);
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.12);
+    color: white;
+    transition: all 0.15s ease;
+    backdrop-filter: blur(8px);
 }
 
 .ctrl-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  transform: scale(1.05);
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
 }
 
 .ctrl-btn.active {
-  background: #ef4444;
-  color: white;
+    background: #ef4444;
+    color: white;
 }
 
 .ctrl-btn.end-call {
-  background: #dc2626;
-  width: 60px;
-  height: 60px;
+    background: #dc2626;
+    width: 60px;
+    height: 60px;
 }
 
 .ctrl-btn.end-call:hover {
-  background: #b91c1c;
+    background: #b91c1c;
 }
 
 /* ── Error & Ended states ── */
-.error-icon, .ended-icon {
-  color: rgba(255, 255, 255, 0.4);
-  margin-bottom: 8px;
+.error-icon,
+.ended-icon {
+    color: rgba(255, 255, 255, 0.4);
+    margin-bottom: 8px;
 }
 
-.error-text, .ended-text {
-  font-size: 18px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.8);
-  margin: 0;
+.error-text,
+.ended-text {
+    font-size: 18px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0;
 }
 
 .ended-sub {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.4);
-  margin: 0;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.4);
+    margin: 0;
 }
 
 .btn-close-window {
-  margin-top: 12px;
-  padding: 8px 20px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.08);
-  color: white;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s;
+    margin-top: 12px;
+    padding: 8px 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
 }
 
 .btn-close-window:hover {
-  background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.15);
 }
 </style>
