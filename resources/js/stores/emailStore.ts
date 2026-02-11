@@ -9,6 +9,7 @@ import {
     AlertOctagonIcon,
     StarIcon,
     FolderIcon,
+    ClockIcon,
 } from "lucide-vue-next";
 import { emailService } from "@/services/email.service";
 import { startEcho } from "@/echo";
@@ -49,6 +50,13 @@ const defaultFolders: EmailFolder[] = [
         count: 0,
     },
     { id: "archive", name: "Archive", icon: ArchiveIcon, type: "system" },
+    {
+        id: "scheduled",
+        name: "Scheduled",
+        icon: ClockIcon,
+        type: "system",
+        count: 0,
+    },
     { id: "spam", name: "Spam", icon: AlertOctagonIcon, type: "system" },
     { id: "trash", name: "Trash", icon: TrashIcon, type: "system" },
 ];
@@ -98,6 +106,10 @@ export const useEmailStore = defineStore("email", () => {
         null
     );
     const selectedEmailIds = ref<Set<string>>(new Set());
+    const isSidebarCollapsed = useStorage<boolean>(
+        "worksphere_email_sidebar_collapsed",
+        false
+    );
 
     // Filters
     const searchQuery = ref("");
@@ -831,6 +843,10 @@ export const useEmailStore = defineStore("email", () => {
         }
     }
 
+    function toggleSidebar() {
+        isSidebarCollapsed.value = !isSidebarCollapsed.value;
+    }
+
     return {
         // State
         emails,
@@ -850,6 +866,7 @@ export const useEmailStore = defineStore("email", () => {
         newEmailCount,
         totalEmails,
         accountStatus,
+        isSidebarCollapsed, // Added isSidebarCollapsed
 
         // Getters
         selectedAccount,
@@ -891,6 +908,7 @@ export const useEmailStore = defineStore("email", () => {
         applyFilters,
         loadNewEmails,
         fetchAccountFolders,
+        toggleSidebar,
 
         // Sort Actions
         sortField,

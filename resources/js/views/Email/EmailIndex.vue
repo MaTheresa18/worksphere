@@ -14,12 +14,13 @@
         <!-- 1. Left Sidebar (Folders) -->
         <!-- Mobile: Fixed overlay | Desktop: Static width column -->
         <aside
-            class="shrink-0 flex flex-col h-full min-h-0 bg-(--surface-secondary) border-r border-(--border-default) transition-transform duration-300 z-30"
-            :class="[
-                isMobileSidebarOpen
-                    ? 'fixed inset-y-0 left-0 shadow-xl'
-                    : 'hidden -translate-x-full md:translate-x-0 md:flex md:static',
-            ]"
+            class="shrink-0 flex flex-col h-full min-h-0 bg-(--surface-secondary) border-r border-(--border-default) transition-all duration-500 z-30 overflow-hidden"
+            :class="{
+                'fixed inset-y-0 left-0 shadow-xl w-64': isMobileSidebarOpen,
+                'hidden md:flex md:static': !isMobileSidebarOpen,
+                'w-64': !isMobileSidebarOpen && !isCollapsed,
+                'w-20': !isMobileSidebarOpen && isCollapsed
+            }"
         >
             <EmailSidebar @compose="handleCompose" />
         </aside>
@@ -71,7 +72,7 @@ import { useEmailStore, type Email } from "@/stores/emailStore";
 import { storeToRefs } from "pinia";
 
 const store = useEmailStore();
-const { emails, selectedEmailId, loading } = storeToRefs(store);
+const { emails, selectedEmailId, loading, isSidebarCollapsed: isCollapsed } = storeToRefs(store);
 
 const selectedEmail = computed(() => {
     return emails.value.find((e) => e.id === selectedEmailId.value) || null;

@@ -79,6 +79,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
 Route::get('/media/{media}/{conversion?}', [\App\Http\Controllers\Api\MediaController::class, 'show'])
     ->name('media.show');
 
+// Standalone Call Page (must be before SPA catch-all)
+Route::get('/call/{callId}', function () {
+    return view('call');
+})->middleware(['auth:sanctum'])->name('call.page');
+
 Route::get('/{any?}', function () {
     return view('app');
 })->where('any', '.*');

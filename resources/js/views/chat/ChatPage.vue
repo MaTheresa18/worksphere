@@ -391,8 +391,7 @@ const handleDeclineInvite = (id: any) => declineInvite(Number(id));
         @jump="jumpToMessage"
     />
 
-    <!-- Video/Audio Call -->
-    <VideoCallModal />
+    <!-- Video/Audio Call (opens in standalone popup) -->
     <IncomingCallOverlay />
   </div>
 </template>

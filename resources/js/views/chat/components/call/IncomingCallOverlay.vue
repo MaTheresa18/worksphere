@@ -10,8 +10,8 @@ const { acceptCall, declineCall } = useVideoCall();
 const avatar = useAvatar();
 
 const remoteAvatarData = computed(() => {
-  if (!store.currentCall) return { url: '', initials: '?' };
-  return avatar.resolveInitials(store.currentCall.remoteUser.name);
+  if (!store.currentCall) return { initials: '?' };
+  return { initials: avatar.getInitials(store.currentCall.remoteUser.name) };
 });
 
 const callTypeLabel = computed(() => {

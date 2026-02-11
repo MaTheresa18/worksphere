@@ -1,229 +1,324 @@
 <template>
-    <div class="flex flex-col h-full w-[230px]" v-bind="$attrs">
-        <!-- Accounts Selector (Dropdown) & Sync -->
-        <div
-            class="px-3 py-3 border-b border-(--border-default) flex items-center gap-2"
-        >
-            <Dropdown
-                :items="accountItems"
-                align="start"
-                class="flex-1 min-w-0"
+    <div
+        class="flex flex-col h-full bg-(--surface-primary)/80 backdrop-blur-xl transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] border-r border-(--border-default)/50 relative group/sidebar shadow-2xl"
+        v-bind="$attrs"
+    >
+        <!-- Top Section: Account & Identity -->
+        <div class="p-4 mb-2">
+            <div
+                class="relative flex items-center transition-all duration-300"
+                :class="store.isSidebarCollapsed ? 'justify-center' : 'gap-3'"
             >
-                <template #trigger>
-                    <button
-                        class="flex items-center w-full px-2.5 py-2 text-sm font-medium text-left bg-(--surface-elevated) border border-(--border-default) rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-(--interactive-primary) hover:bg-(--surface-tertiary) transition-all hover:border-(--interactive-primary)/30"
-                    >
-                        <div
-                            class="w-6 h-6 rounded-full mr-2 ring-1 ring-white/20 flex items-center justify-center text-[10px] font-bold text-white shrink-0 relative"
-                            :style="{
-                                background: selectedAccount
-                                    ? '#6366f1'
-                                    : '#9ca3af',
-                            }"
+                <Dropdown :items="accountItems" align="start" class="shrink-0">
+                    <template #trigger>
+                        <button
+                            class="relative group/avatar flex items-center justify-center transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+                            :title="selectedAccount?.email"
                         >
-                            {{
-                                selectedAccount
-                                    ? selectedAccount.email
-                                          .charAt(0)
-                                          .toUpperCase()
-                                    : "?"
-                            }}
-                            <!-- Sync Indicator Badge -->
                             <div
-                                v-if="isBackgroundSyncing"
-                                class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-(--surface-elevated) animate-pulse"
-                            ></div>
-                        </div>
-                        <span
-                            class="flex-1 truncate text-(--text-primary) leading-tight"
-                            >{{ selectedAccount?.email || "No account" }}</span
-                        >
-                        <ChevronDownIcon
-                            class="w-3.5 h-3.5 text-(--text-muted) shrink-0 ml-1.5"
-                        />
-                    </button>
-                </template>
-            </Dropdown>
+                                class="w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-bold text-white shadow-lg overflow-hidden relative ring-2 ring-indigo-500/20 group-hover/avatar:ring-indigo-500/40 transition-all font-sans"
+                                :style="{
+                                    background:
+                                        'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+                                }"
+                            >
+                                <span class="relative z-10">{{
+                                    selectedAccount
+                                        ? selectedAccount.email
+                                              .charAt(0)
+                                              .toUpperCase()
+                                        : "?"
+                                }}</span>
+                                <div
+                                    class="absolute inset-0 bg-white/10 opacity-0 group-hover/avatar:opacity-100 transition-opacity"
+                                ></div>
+                            </div>
+
+                            <!-- Status Indicator -->
+                            <div
+                                class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-(--surface-primary) flex items-center justify-center"
+                                :class="
+                                    isBackgroundSyncing
+                                        ? 'bg-blue-500'
+                                        : 'bg-emerald-500'
+                                "
+                            >
+                                <div
+                                    v-if="isBackgroundSyncing"
+                                    class="w-1.5 h-1.5 bg-white rounded-full animate-ping"
+                                ></div>
+                            </div>
+                        </button>
+                    </template>
+                </Dropdown>
+
+                <div
+                    v-show="!store.isSidebarCollapsed"
+                    class="flex flex-col min-w-0 pr-2"
+                >
+                    <span
+                        class="text-sm font-semibold text-(--text-primary) truncate"
+                        >{{ selectedAccount?.name || "My Account" }}</span
+                    >
+                    <span
+                        class="text-[10px] text-(--text-muted) truncate opacity-70"
+                        >{{ selectedAccount?.email }}</span
+                    >
+                </div>
+            </div>
         </div>
 
-        <!-- Compose Button & Sync -->
-        <div class="px-4 py-4 flex items-center gap-2.5">
+        <!-- Action Section: New Email -->
+        <div class="px-3 mb-6">
             <button
                 @click="$emit('compose')"
                 :disabled="!selectedAccount"
-                class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold rounded-xl text-white bg-linear-to-r from-(--interactive-primary) to-indigo-600 hover:from-(--interactive-primary-hover) hover:to-indigo-700 shadow-lg shadow-(--interactive-primary)/20 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer select-none disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100 disabled:shadow-none"
+                class="group/compose w-full relative flex items-center justify-center gap-3 p-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/25 transition-all active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
+                :title="store.isSidebarCollapsed ? 'New Email' : ''"
             >
-                <PencilIcon class="w-4 h-4 text-white/90" />
-                <span>New Email</span>
-            </button>
-
-            <button
-                @click="handleSync"
-                :disabled="isSyncing || isBackgroundSyncing || !selectedAccount"
-                class="flex items-center justify-center w-10 h-10 shrink-0 rounded-xl bg-(--surface-elevated) border border-(--border-default) text-(--text-secondary) hover:text-(--interactive-primary) hover:border-(--interactive-primary)/40 hover:bg-(--surface-tertiary) transition-all disabled:opacity-50 disabled:cursor-not-allowed group relative shadow-sm"
-                :title="isBackgroundSyncing ? 'Syncing...' : 'Sync Account'"
-            >
-                <RotateCwIcon
-                    class="w-4 h-4 group-hover:rotate-180 transition-transform duration-700 ease-in-out"
-                    :class="{
-                        'animate-spin': isSyncing || isBackgroundSyncing,
-                    }"
+                <PencilIcon
+                    class="w-5 h-5 shrink-0 transition-transform group-hover/compose:rotate-12"
                 />
+                <span
+                    v-if="!store.isSidebarCollapsed"
+                    class="text-sm font-bold tracking-tight"
+                    >New Email</span
+                >
+
+                <!-- Shine effect -->
+                <div
+                    class="absolute inset-0 w-1/2 h-full bg-linear-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/compose:translate-x-[200%] transition-transform duration-1000"
+                ></div>
             </button>
         </div>
 
-        <!-- Navigation -->
-        <nav class="flex-1 overflow-y-auto min-h-0 px-3 space-y-1">
-            <!-- System Folders -->
-            <a
-                v-for="folder in systemFolders"
-                :key="folder.id"
-                href="#"
-                @click.prevent="handleFolderClick(folder.id)"
-                :class="[
-                    selectedFolderId === folder.id
-                        ? 'bg-(--interactive-primary)/10 text-(--interactive-primary)'
-                        : 'text-(--text-secondary) hover:bg-(--surface-tertiary)',
-                    'group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all relative overflow-hidden',
-                ]"
-            >
-                <!-- Selection Indicator -->
-                <div
-                    v-if="selectedFolderId === folder.id"
-                    class="absolute left-0 top-1.5 bottom-1.5 w-1 bg-(--interactive-primary) rounded-r-full"
-                ></div>
+        <!-- Scrollable Navigation Area -->
+        <nav
+            class="flex-1 overflow-y-auto overflow-x-hidden px-3 space-y-6 pb-20"
+        >
+            <!-- Mailbox Section -->
+            <div class="space-y-1">
+                <div v-if="!store.isSidebarCollapsed" class="px-2 mb-2">
+                    <span
+                        class="text-[10px] font-bold text-(--text-muted) uppercase tracking-[0.15em] opacity-50"
+                        >Mailbox</span
+                    >
+                </div>
 
-                <component
-                    :is="folder.icon"
+                <a
+                    v-for="folder in systemFolders"
+                    :key="folder.id"
+                    href="#"
+                    @click.prevent="handleFolderClick(folder.id)"
+                    :title="store.isSidebarCollapsed ? folder.name : ''"
+                    class="group flex items-center h-10 px-2.5 rounded-xl transition-all relative overflow-hidden active:scale-95"
                     :class="[
                         selectedFolderId === folder.id
-                            ? 'text-(--interactive-primary)'
-                            : 'text-(--text-muted) group-hover:text-(--text-secondary)',
-                        'mr-3 shrink-0 h-4.5 w-4.5 transition-colors',
-                    ]"
-                />
-                <span class="flex-1 truncate">{{ folder.name }}</span>
-                <span
-                    v-if="folder.count"
-                    :class="[
-                        selectedFolderId === folder.id
-                            ? 'bg-(--interactive-primary) text-white'
-                            : 'bg-(--surface-tertiary) text-(--text-secondary)',
-                        'ml-auto py-0.5 px-2 rounded-full text-[10px] font-bold transition-colors shadow-sm',
+                            ? 'bg-indigo-500/10 text-indigo-600'
+                            : 'text-(--text-secondary) hover:bg-black/5',
+                        store.isSidebarCollapsed ? 'justify-center' : '',
                     ]"
                 >
-                    {{ folder.count }}
-                </span>
-            </a>
-
-            <!-- Custom Folders -->
-            <template v-if="customFolders.length > 0">
-                <div class="pt-2 space-y-1">
-                    <a
-                        v-for="folder in customFolders"
-                        :key="folder.id"
-                        href="#"
-                        @click.prevent="handleFolderClick(folder.id)"
-                        :class="[
-                            selectedFolderId === folder.id
-                                ? 'bg-(--interactive-primary)/10 text-(--interactive-primary)'
-                                : 'text-(--text-secondary) hover:bg-(--surface-tertiary)',
-                            'group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all relative overflow-hidden',
-                        ]"
-                    >
-                        <div
-                            v-if="selectedFolderId === folder.id"
-                            class="absolute left-0 top-1.5 bottom-1.5 w-1 bg-(--interactive-primary) rounded-r-full"
-                        ></div>
-
-                        <component
-                            :is="folder.icon"
-                            class="mr-3 shrink-0 h-4.5 w-4.5 text-(--text-muted)"
-                        />
-                        <span class="flex-1 truncate">{{ folder.name }}</span>
-                    </a>
-                </div>
-            </template>
-
-            <!-- Provider Folders (Subscribed Labels) -->
-            <template v-if="subscribedRemoteFolders.length > 0">
-                <div class="pt-6 space-y-1">
+                    <!-- Active Indicator Pill -->
                     <div
-                        class="px-3 pb-2 text-[10px] font-bold text-(--text-muted) uppercase tracking-widest flex items-center gap-2"
-                    >
-                        <div class="h-px bg-(--border-default) flex-1"></div>
-                        <span>Provider Folders</span>
-                        <div class="h-px bg-(--border-default) flex-1"></div>
-                    </div>
-                    <a
-                        v-for="folder in subscribedRemoteFolders"
-                        :key="folder.id"
-                        href="#"
-                        @click.prevent="handleFolderClick(folder.id)"
+                        v-if="selectedFolderId === folder.id"
+                        class="absolute left-0 w-1.5 h-6 bg-indigo-500 rounded-r-full shadow-[0_0_12px_rgba(99,102,241,0.5)]"
+                    ></div>
+
+                    <component
+                        :is="folder.icon"
+                        class="w-5 h-5 shrink-0 transition-all group-hover:scale-110"
                         :class="[
                             selectedFolderId === folder.id
-                                ? 'bg-(--interactive-primary)/8 text-(--interactive-primary)'
-                                : 'text-(--text-secondary) hover:bg-(--surface-tertiary)',
-                            'group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all relative overflow-hidden',
+                                ? 'text-indigo-600'
+                                : 'text-(--text-muted) group-hover:text-indigo-500',
+                            store.isSidebarCollapsed ? '' : 'mr-3',
                         ]"
+                    />
+
+                    <span
+                        v-if="!store.isSidebarCollapsed"
+                        class="flex-1 text-sm font-medium truncate"
+                        >{{ folder.name }}</span
                     >
-                        <div
-                            v-if="selectedFolderId === folder.id"
-                            class="absolute left-0 top-1.5 bottom-1.5 w-1 bg-(--interactive-primary) rounded-r-full"
-                        ></div>
 
-                        <FolderIcon
-                            class="mr-3 shrink-0 h-4 w-4 text-(--text-muted) group-hover:text-(--text-secondary) transition-colors"
-                        />
-                        <span class="truncate capitalize leading-relaxed">{{ folder.name.toLowerCase() }}</span>
-                    </a>
-                </div>
-            </template>
+                    <span
+                        v-if="folder.count && !store.isSidebarCollapsed"
+                        class="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-lg"
+                        :class="
+                            selectedFolderId === folder.id
+                                ? 'bg-indigo-500 text-white'
+                                : 'bg-black/5 text-(--text-muted)'
+                        "
+                    >
+                        {{ folder.count }}
+                    </span>
 
-            <!-- New Folder Button -->
-            <button
-                @click="showCreateFolderModal = true"
-                class="w-full flex items-center gap-2 px-3 py-2 text-sm text-(--text-muted) hover:text-(--text-primary) hover:bg-(--surface-tertiary) rounded-lg transition-colors border-t border-(--border-default) mt-2 pt-2"
+                    <!-- Notification dot for collapsed state -->
+                    <div
+                        v-if="folder.count && store.isSidebarCollapsed"
+                        class="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full border-2 border-(--surface-primary)"
+                    ></div>
+                </a>
+            </div>
+
+            <!-- Folders Section -->
+            <div
+                v-if="
+                    customFolders.length > 0 ||
+                    subscribedRemoteFolders.length > 0
+                "
+                class="space-y-1"
             >
-                <PlusIcon class="w-4 h-4" />
-                New Folder
-            </button>
-
-            <!-- Labels Section -->
-            <div class="mt-8">
-                <div class="flex items-center justify-between px-3 mb-2 gap-2">
-                    <div class="h-px bg-(--border-default) flex-1"></div>
-                    <h3
-                        class="text-[10px] font-bold text-(--text-muted) uppercase tracking-widest whitespace-nowrap"
+                <div
+                    v-if="!store.isSidebarCollapsed"
+                    class="px-2 mb-2 flex items-center justify-between"
+                >
+                    <span
+                        class="text-[10px] font-bold text-(--text-muted) uppercase tracking-[0.15em] opacity-50"
+                        >Custom</span
                     >
-                        Labels
-                    </h3>
-                    <div class="h-px bg-(--border-default) flex-1"></div>
                     <button
-                        @click="showCreateLabelModal = true"
-                        class="p-1 rounded-md hover:bg-(--surface-tertiary) text-(--text-muted) hover:text-(--text-primary) transition-all active:scale-95"
-                        title="Create label"
+                        @click="showCreateFolderModal = true"
+                        class="p-1 hover:bg-black/5 rounded-md text-(--text-muted) hover:text-indigo-600 transition-colors"
                     >
-                        <PlusIcon class="w-3.5 h-3.5" />
+                        <PlusIcon class="w-3 h-3" />
                     </button>
                 </div>
-                <div class="space-y-0.5" role="group">
+
+                <div class="space-y-1">
+                    <a
+                        v-for="folder in [
+                            ...customFolders,
+                            ...subscribedRemoteFolders,
+                        ]"
+                        :key="folder.id"
+                        href="#"
+                        @click.prevent="handleFolderClick(folder.id)"
+                        :title="store.isSidebarCollapsed ? folder.name : ''"
+                        class="group flex items-center h-10 px-2.5 rounded-xl text-(--text-secondary) hover:bg-black/5 transition-all overflow-hidden"
+                        :class="[
+                            selectedFolderId === folder.id
+                                ? 'bg-indigo-500/10 text-indigo-600'
+                                : '',
+                            store.isSidebarCollapsed ? 'justify-center' : '',
+                        ]"
+                    >
+                        <FolderIcon
+                            class="w-5 h-5 shrink-0 transition-transform group-hover:scale-110"
+                            :class="[
+                                store.isSidebarCollapsed ? '' : 'mr-3',
+                                selectedFolderId === folder.id
+                                    ? 'text-indigo-600'
+                                    : 'text-(--text-muted)',
+                            ]"
+                        />
+                        <span
+                            v-if="!store.isSidebarCollapsed"
+                            class="flex-1 text-sm font-medium truncate capitalize leading-relaxed"
+                        >
+                            {{ folder.name.toLowerCase() }}
+                        </span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Labels Section -->
+            <div class="space-y-3">
+                <div
+                    v-if="!store.isSidebarCollapsed"
+                    class="px-2 mb-1 flex items-center justify-between"
+                >
+                    <span
+                        class="text-[10px] font-bold text-(--text-muted) uppercase tracking-[0.15em] opacity-50"
+                        >Labels</span
+                    >
+                    <button
+                        @click="showCreateLabelModal = true"
+                        class="p-1 hover:bg-black/5 rounded-md text-(--text-muted) hover:text-indigo-600 transition-colors"
+                    >
+                        <PlusIcon class="w-3 h-3" />
+                    </button>
+                </div>
+
+                <div class="space-y-1 transition-all duration-300">
                     <a
                         v-for="label in labels"
                         :key="label.id"
                         href="#"
                         @click.prevent="handleLabelClick(label.id)"
-                        class="group flex items-center px-3 py-1.5 text-sm font-medium text-(--text-secondary) rounded-lg hover:text-(--text-primary) hover:bg-(--surface-tertiary) transition-all"
+                        :title="store.isSidebarCollapsed ? label.name : ''"
+                        class="group flex items-center h-9 px-3 rounded-xl hover:bg-black/5 transition-all text-sm font-medium text-(--text-secondary)"
+                        :class="
+                            store.isSidebarCollapsed
+                                ? 'justify-center px-0'
+                                : ''
+                        "
                     >
+                        <div
+                            class="w-2.5 h-2.5 rounded-full ring-2 ring-white shadow-sm shrink-0"
+                            :class="[
+                                label.color,
+                                store.isSidebarCollapsed ? '' : 'mr-4',
+                            ]"
+                        ></div>
                         <span
-                            class="w-2.5 h-2.5 rounded-full mr-3 ring-1 ring-black/5"
-                            :class="label.color"
-                        ></span>
-                        <span class="truncate">{{ label.name }}</span>
+                            v-if="!store.isSidebarCollapsed"
+                            class="truncate opacity-80 group-hover:opacity-100"
+                            >{{ label.name }}</span
+                        >
                     </a>
                 </div>
             </div>
         </nav>
+
+        <!-- Flat Minimalist Footer -->
+        <div class="px-4 py-4 mt-auto">
+            <div
+                class="flex items-center gap-4"
+                :class="
+                    store.isSidebarCollapsed
+                        ? 'flex-col justify-center'
+                        : 'flex-row justify-end'
+                "
+            >
+                <button
+                    @click="handleSync"
+                    :disabled="
+                        isSyncing || isBackgroundSyncing || !selectedAccount
+                    "
+                    class="flex items-center justify-center w-7 h-7 rounded-lg text-(--text-muted) hover:text-indigo-600 border border-(--border-default)/30 hover:border-indigo-500/50 transition-all disabled:opacity-30 group shrink-0 relative active:scale-95"
+                    :title="isBackgroundSyncing ? 'Syncing...' : 'Sync Account'"
+                >
+                    <RotateCwIcon
+                        class="w-3.5 h-3.5 transition-transform duration-700 shrink-0"
+                        :class="{
+                            'animate-spin': isSyncing || isBackgroundSyncing,
+                            'group-hover:rotate-180': !isSyncing,
+                        }"
+                    />
+                </button>
+
+                <button
+                    @click="store.toggleSidebar"
+                    class="w-7 h-7 flex items-center justify-center rounded-lg text-(--text-muted) hover:text-indigo-600 border border-(--border-default)/30 hover:border-indigo-500/50 transition-all group shrink-0 active:scale-95"
+                    :title="
+                        store.isSidebarCollapsed
+                            ? 'Expand Sidebar'
+                            : 'Collapse Sidebar'
+                    "
+                >
+                    <ChevronLeftIcon
+                        v-if="!store.isSidebarCollapsed"
+                        class="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform shrink-0"
+                    />
+                    <ChevronRightIcon
+                        v-else
+                        class="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform shrink-0"
+                    />
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Create Folder Modal -->
@@ -244,7 +339,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import {
-    ChevronDownIcon,
+    ChevronLeftIcon,
+    ChevronRightIcon,
     PencilIcon,
     UserIcon,
     PlusIcon,
@@ -281,6 +377,7 @@ const {
     accounts,
     selectedAccount,
     accountStatus,
+    isSidebarCollapsed,
 } = storeToRefs(store);
 
 const isBackgroundSyncing = computed(() => {

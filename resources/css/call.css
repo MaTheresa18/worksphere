@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Standalone Call Page — Dark theme
+   ============================================================ */
+
+body {
+    margin: 0;
+    padding: 0;
+    background: #0a0a0f;
+    color: #fff;
+    font-family:
+        "Inter",
+        system-ui,
+        -apple-system,
+        sans-serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+#call-app {
+    width: 100dvw;
+    height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}

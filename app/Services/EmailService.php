@@ -93,19 +93,25 @@ class EmailService implements EmailServiceContract
             + count($data['cc'] ?? [])
             + count($data['bcc'] ?? []);
 
+        $isScheduled = ! empty($data['scheduled_at']) && \Illuminate\Support\Carbon::parse($data['scheduled_at'])->isFuture();
+        $targetFolder = $isScheduled ? EmailFolderType::Scheduled->value : EmailFolderType::Sent->value;
+
         if ($draft) {
             $email = $this->updateDraft($draft, $data);
             $email->update([
-                'folder' => EmailFolderType::Sent->value,
-                'is_draft' => false,
-                'sent_at' => now(),
+                'folder' => $targetFolder,
+                'is_draft' => $isScheduled,
+                'sent_at' => $isScheduled ? null : now(),
                 'email_account_id' => $account->id,
                 'from_email' => $account->email,
                 'from_name' => $account->name ?? $user->name,
             ]);
         } else {
             // Create email record first to handle media persistence
-            $email = $this->createEmailRecord($user, $account, $data, isSent: true);
+            $email = $this->createEmailRecord($user, $account, $data, isDraft: $isScheduled, isSent: ! $isScheduled);
+            if ($isScheduled) {
+                $email->update(['folder' => $targetFolder]);
+            }
         }
 
         if ($recipientCount > config('email.batch_threshold', 10)) {
@@ -115,8 +121,10 @@ class EmailService implements EmailServiceContract
             return $email;
         }
 
-        // Dispatch send job
-        SendEmailJob::dispatch($email->id, $account->id);
+        // Dispatch send job only if not scheduled for the future
+        if (! $email->scheduled_at || $email->scheduled_at->isPast()) {
+            SendEmailJob::dispatch($email->id, $account->id);
+        }
 
         return $email;
     }
@@ -295,16 +303,32 @@ class EmailService implements EmailServiceContract
         $counts = [];
 
         foreach (EmailFolderType::cases() as $folder) {
-            $counts[$folder->value] = Email::forUser($user->id)
-                ->inFolder($folder->value)
-                ->notDraft()
-                ->count();
+            $query = Email::forUser($user->id);
+
+            if ($folder === EmailFolderType::Scheduled) {
+                // Scheduled is virtual: drafts with a future schedule
+                $query->where('is_draft', true)
+                    ->whereNotNull('scheduled_at')
+                    ->where('scheduled_at', '>', now());
+            } else {
+                $query->inFolder($folder->value)->notDraft();
+            }
+
+            $counts[$folder->value] = $query->count();
         }
 
-        // Add unread counts
+        // Add special counts
         $counts['unread'] = $this->getUnreadCount($user);
         $counts['starred'] = Email::forUser($user->id)->starred()->notDraft()->count();
-        $counts['drafts'] = Email::forUser($user->id)->where('is_draft', true)->count();
+
+        // Regular drafts (not scheduled for future)
+        $counts['drafts'] = Email::forUser($user->id)
+            ->where('is_draft', true)
+            ->where(function ($q) {
+                $q->whereNull('scheduled_at')
+                    ->orWhere('scheduled_at', '<=', now());
+            })
+            ->count();
 
         return $counts;
     }

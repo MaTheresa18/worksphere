@@ -16,7 +16,6 @@ import RoleChangeNotificationModal from "@/components/RoleChangeNotificationModa
 import WelcomeModal from "@/components/WelcomeModal.vue";
 import LegalUpdateModal from "@/components/LegalUpdateModal.vue";
 import MiniChatLauncher from "@/components/minichat/MiniChatLauncher.vue";
-import VideoCallModal from "@/views/chat/components/call/VideoCallModal.vue";
 import IncomingCallOverlay from "@/views/chat/components/call/IncomingCallOverlay.vue";
 import { useVideoCall } from "@/composables/useVideoCall";
 import { appConfig } from "@/config/app";
@@ -252,8 +251,7 @@ function handleRoleChangeLogout() {
         <WelcomeModal />
         <LegalUpdateModal />
 
-        <!-- Video/Audio Call UI (global — always in DOM) -->
-        <VideoCallModal />
+        <!-- Incoming Call Overlay (call UI opens in standalone popup) -->
         <IncomingCallOverlay />
     </div>
 </template>

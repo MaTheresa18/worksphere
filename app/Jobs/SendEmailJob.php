@@ -77,6 +77,7 @@ class SendEmailJob implements ShouldQueue
             $email->update([
                 'sent_at' => now(),
                 'is_draft' => false,
+                'folder' => \App\Enums\EmailFolderType::Sent->value,
             ]);
 
             // Mark account as used

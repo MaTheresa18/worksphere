@@ -18,8 +18,8 @@ const position = ref({ x: window.innerWidth - 380, y: 80 });
 const dragOffset = ref({ x: 0, y: 0 });
 
 const remoteAvatarData = computed(() => {
-  if (!store.currentCall) return { url: '', initials: '?' };
-  return avatar.resolveInitials(store.currentCall.remoteUser.name);
+  if (!store.currentCall) return { initials: '?' };
+  return { initials: avatar.getInitials(store.currentCall.remoteUser.name) };
 });
 
 // Only show for active calls that are NOT incoming ringing (that's handled by IncomingCallOverlay)

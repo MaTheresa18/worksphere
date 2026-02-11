@@ -8,7 +8,12 @@ import os from 'node:os';
 export default defineConfig(({ mode, command }) => ({
     plugins: [
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.ts'],
+            input: [
+                'resources/css/app.css',
+                'resources/js/app.ts',
+                'resources/css/call.css',
+                'resources/js/call.ts',
+            ],
             refresh: true,
         }),
         vue({

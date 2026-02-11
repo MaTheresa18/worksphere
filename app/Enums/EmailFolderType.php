@@ -10,6 +10,7 @@ enum EmailFolderType: string
     case Trash = 'trash';
     case Spam = 'spam';
     case Archive = 'archive';
+    case Scheduled = 'scheduled';
 
     /**
      * Get priority for sync ordering.
@@ -23,7 +24,8 @@ enum EmailFolderType: string
             self::Drafts => 3,
             self::Trash => 4,
             self::Archive => 5,
-            self::Spam => 6,
+            self::Scheduled => 6,
+            self::Spam => 7,
         };
     }
 
@@ -39,6 +41,7 @@ enum EmailFolderType: string
             self::Trash => 'Trash',
             self::Spam => 'Spam',
             self::Archive => 'Archive',
+            self::Scheduled => 'Scheduled',
         };
     }
 
@@ -54,6 +57,7 @@ enum EmailFolderType: string
             self::Trash => '[Gmail]/Trash',
             self::Spam => '[Gmail]/Spam',
             self::Archive => '[Gmail]/All Mail',
+            self::Scheduled => 'Scheduled', // Local only, no IMAP mapping
         };
     }
 

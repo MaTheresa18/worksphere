@@ -61,12 +61,13 @@ class InvoiceManagementTest extends TestCase
         // Create admin user
         $this->admin = User::factory()->create();
         $this->admin->assignRole('invoice_admin');
-        $this->team->addMember($this->admin, 'owner');
+        $this->team->addMember($this->admin, 'team_lead');
+        $this->team->update(['owner_id' => $this->admin->id]);
 
         // Create member user
         $this->member = User::factory()->create();
         $this->member->assignRole('invoice_viewer');
-        $this->team->addMember($this->member, 'member');
+        $this->team->addMember($this->member, 'subject_matter_expert');
 
         // Create client
         $this->client = Client::factory()->create();

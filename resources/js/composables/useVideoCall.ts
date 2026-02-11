@@ -1,131 +1,114 @@
-import { ref } from 'vue';
+/**
+ * useVideoCall — Parent-side composable for the popup call architecture.
+ *
+ * This composable NO LONGER manages WebRTC directly. Instead it:
+ * 1. Receives incoming call events (from Echo via CustomEvent)
+ * 2. Opens the standalone call page in a popup window
+ * 3. Passes call data via sessionStorage
+ * 4. Listens to BroadcastChannel for state updates from the popup
+ *
+ * All WebRTC logic lives in CallApp.vue (the popup).
+ */
+import { ref, onBeforeUnmount } from 'vue';
 import { useVideoCallStore, type CallType } from '@/stores/videocall';
 import { videoCallService } from '@/services/videocall.service';
 import { useAuthStore } from '@/stores/auth';
 import { toast } from 'vue-sonner';
 
-/**
- * Core WebRTC composable encapsulating the full lifecycle of a peer-to-peer call.
- * 
- * This is a SINGLETON — all components share the same WebRTC connection and state.
- * The module-level variables ensure only one peer connection exists at a time.
- */
-
-let peerConnection: RTCPeerConnection | null = null;
+// Singleton state
+let initialized = false;
+let callPopup: Window | null = null;
+let broadcastChannel: BroadcastChannel | null = null;
 let ringtoneAudio: HTMLAudioElement | null = null;
 let ringtoneTimeout: ReturnType<typeof setTimeout> | null = null;
+
+// Pending offer + ICE candidates for incoming calls (received before user accepts)
+const pendingOffer = ref<RTCSessionDescriptionInit | null>(null);
 const pendingCandidates = ref<RTCIceCandidateInit[]>([]);
-let initialized = false;
 
 export function useVideoCall() {
   const store = useVideoCallStore();
   const authStore = useAuthStore();
 
   // ============================================================================
-  // Media
+  // Popup Window Management
   // ============================================================================
 
-  async function acquireMedia(callType: CallType): Promise<MediaStream | null> {
-    try {
-      const constraints: MediaStreamConstraints = {
-        audio: true,
-        video: callType === 'video' ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false,
-      };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      store.setLocalStream(stream);
-      return stream;
-    } catch (err: any) {
-      console.error('[VideoCall] Failed to acquire media:', err);
-      const msg =
-        err.name === 'NotAllowedError'
-          ? 'Camera/microphone permission denied. Please allow access in your browser settings.'
-          : 'Could not access camera or microphone.';
-      store.setError(msg);
-      toast.error('Media Access Failed', { description: msg });
-      return null;
-    }
-  }
+  function openCallPopup(callId: string) {
+    const width = 480;
+    const height = 640;
+    const left = window.screenX + window.outerWidth - width - 24;
+    const top = window.screenY + 80;
 
-  function stopMedia() {
-    if (store.localStream) {
-      store.localStream.getTracks().forEach((t) => t.stop());
-      store.setLocalStream(null);
-    }
-  }
+    callPopup = window.open(
+      `/call/${callId}`,
+      `worksphere-call-${callId}`,
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no`,
+    );
 
-  // ============================================================================
-  // Peer Connection
-  // ============================================================================
-
-  async function createPeerConnection(chatId: string, callId: string): Promise<RTCPeerConnection> {
-    // Fetch ICE servers (STUN + optional TURN)
-    let iceServers: RTCIceServer[] = [{ urls: 'stun:stun.cloudflare.com:3478' }];
-
-    try {
-      const creds = await videoCallService.getTurnCredentials(chatId);
-      iceServers = creds.ice_servers;
-    } catch (err) {
-      console.warn('[VideoCall] Using fallback STUN-only config:', err);
-    }
-
-    const pc = new RTCPeerConnection({ iceServers });
-
-    // Add local tracks to the connection
-    if (store.localStream) {
-      store.localStream.getTracks().forEach((track) => {
-        pc.addTrack(track, store.localStream!);
+    if (!callPopup) {
+      toast.error('Popup Blocked', {
+        description: 'Please allow popups for this site to make calls.',
       });
+      cleanup();
+      return;
     }
 
-    // Handle incoming remote tracks
-    pc.ontrack = (event) => {
-      console.log('[VideoCall] Remote track received:', event.track.kind);
-      if (event.streams[0]) {
-        store.setRemoteStream(event.streams[0]);
+    // Monitor popup close
+    const checkInterval = setInterval(() => {
+      if (callPopup?.closed) {
+        clearInterval(checkInterval);
+        handlePopupClosed();
       }
-    };
+    }, 1000);
+  }
 
-    // Trickle ICE candidates to the remote peer
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        videoCallService.sendSignal(chatId, callId, 'ice-candidate', {
-          candidate: event.candidate.candidate,
-          sdpMid: event.candidate.sdpMid,
-          sdpMLineIndex: event.candidate.sdpMLineIndex,
-        }).catch((err) => console.warn('[VideoCall] Failed to send ICE candidate:', err));
-      }
-    };
-
-    // Connection state tracking
-    pc.onconnectionstatechange = () => {
-      console.log('[VideoCall] Connection state:', pc.connectionState);
-      switch (pc.connectionState) {
-        case 'connected':
-          store.setState('connected');
-          stopRingtone();
-          break;
-        case 'disconnected':
-        case 'failed':
-          handleCallFailed(chatId, callId);
-          break;
-        case 'closed':
-          break;
-      }
-    };
-
-    pc.oniceconnectionstatechange = () => {
-      console.log('[VideoCall] ICE state:', pc.iceConnectionState);
-    };
-
-    peerConnection = pc;
-    return pc;
+  function handlePopupClosed() {
+    console.log('[VideoCall] Popup was closed');
+    callPopup = null;
+    cleanup();
   }
 
   // ============================================================================
-  // Outgoing Call Flow
+  // BroadcastChannel (receive state from popup)
+  // ============================================================================
+
+  function ensureBroadcastChannel() {
+    if (broadcastChannel) return;
+    broadcastChannel = new BroadcastChannel('worksphere-call');
+    broadcastChannel.onmessage = (event) => {
+      const msg = event.data;
+      if (!msg) return;
+
+      console.log('[VideoCall] BroadcastChannel message:', msg);
+
+      switch (msg.type) {
+        case 'state':
+          if (msg.state === 'connected') {
+            store.setState('connected');
+            stopRingtone();
+          } else if (msg.state === 'ended') {
+            if (msg.reason === 'declined') {
+              toast.info(`${store.currentCall?.remoteUser.name || 'User'} declined the call`);
+            } else if (msg.reason === 'timeout') {
+              toast.info('Call was not answered');
+            } else {
+              toast.info('Call ended');
+            }
+            cleanup();
+          }
+          break;
+      }
+    };
+  }
+
+  // ============================================================================
+  // Outgoing Call
   // ============================================================================
 
   async function startCall(chatId: string, callType: CallType, remoteUser: { publicId: string; name: string; avatar: string | null }) {
+    console.log('[VideoCall] startCall:', { chatId, callType, remoteUser: remoteUser.name });
+
     if (store.isCallActive) {
       toast.warning('You are already in a call');
       return;
@@ -133,16 +116,10 @@ export function useVideoCall() {
 
     store.setState('initiating');
 
-    // Acquire media first
-    const stream = await acquireMedia(callType);
-    if (!stream) {
-      store.reset();
-      return;
-    }
-
     try {
       // Tell server to notify the other user
       const { call_id } = await videoCallService.initiateCall(chatId, callType);
+      console.log('[VideoCall] Call initiated, callId:', call_id);
 
       store.setCall({
         callId: call_id,
@@ -156,25 +133,27 @@ export function useVideoCall() {
       store.setState('ringing');
       playRingtone('outgoing');
 
-      // Set a 45-second ring timeout
+      // Ring timeout
       ringtoneTimeout = setTimeout(() => {
         if (store.callState === 'ringing') {
           endCall('timeout');
         }
       }, 45000);
 
-      // Create peer connection and generate offer
-      const pc = await createPeerConnection(chatId, call_id);
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+      // Store call data for the popup to read
+      sessionStorage.setItem('callData', JSON.stringify({
+        callId: call_id,
+        chatId,
+        callType,
+        direction: 'outgoing',
+        remoteUser,
+        selfPublicId: authStore.user?.public_id,
+      }));
 
-      // Send offer via signaling
-      await videoCallService.sendSignal(chatId, call_id, 'offer', {
-        type: offer.type,
-        sdp: offer.sdp,
-      });
+      ensureBroadcastChannel();
+      openCallPopup(call_id);
 
-    } catch (err: any) {
+    } catch (err) {
       console.error('[VideoCall] Failed to start call:', err);
       toast.error('Failed to start call');
       cleanup();
@@ -182,7 +161,7 @@ export function useVideoCall() {
   }
 
   // ============================================================================
-  // Incoming Call Flow
+  // Incoming Call Handling
   // ============================================================================
 
   function handleIncomingCall(data: {
@@ -193,6 +172,8 @@ export function useVideoCall() {
     caller_avatar: string | null;
     chat_id: string;
   }) {
+    console.log('[VideoCall] handleIncomingCall:', data);
+
     // Ignore our own events
     if (data.caller_public_id === authStore.user?.public_id) return;
 
@@ -226,33 +207,63 @@ export function useVideoCall() {
     }, 45000);
   }
 
+  function handleSignal(data: {
+    call_id: string;
+    signal_type: 'offer' | 'answer' | 'ice-candidate';
+    signal_data: any;
+    sender_public_id: string;
+  }) {
+    // Ignore our own signals
+    if (data.sender_public_id === authStore.user?.public_id) return;
+    if (!store.currentCall || store.currentCall.callId !== data.call_id) return;
+
+    // If the popup is open, it handles signals via its own Echo subscription.
+    // But we still need to buffer offer + ICE candidates that arrive BEFORE
+    // the user clicks Accept (i.e., before the popup opens).
+    if (callPopup && !callPopup.closed) return; // popup handles it
+
+    const { signal_type, signal_data } = data;
+
+    switch (signal_type) {
+      case 'offer':
+        console.log('[VideoCall] Saving pending offer (user has not accepted yet)');
+        pendingOffer.value = signal_data;
+        break;
+      case 'ice-candidate':
+        console.log('[VideoCall] Queuing ICE candidate (popup not open yet)');
+        pendingCandidates.value.push(signal_data);
+        break;
+      case 'answer':
+        // Rare: answer arrives before popup — ignore (popup will handle renegotiation)
+        break;
+    }
+  }
+
   async function acceptCall() {
     if (!store.currentCall) return;
-
-    const { chatId, callId, callType } = store.currentCall;
+    const { callId, chatId, callType, remoteUser } = store.currentCall;
 
     stopRingtone();
     store.setState('connecting');
 
-    const stream = await acquireMedia(callType);
-    if (!stream) {
-      endCall('failed');
-      return;
-    }
+    // Store call data for the popup, INCLUDING the pending offer and candidates
+    sessionStorage.setItem('callData', JSON.stringify({
+      callId,
+      chatId,
+      callType,
+      direction: 'incoming',
+      remoteUser,
+      pendingOffer: pendingOffer.value,
+      pendingCandidates: pendingCandidates.value,
+      selfPublicId: authStore.user?.public_id,
+    }));
 
-    try {
-      await createPeerConnection(chatId, callId);
+    // Clear pending data
+    pendingOffer.value = null;
+    pendingCandidates.value = [];
 
-      // Flush pending ICE candidates that arrived before PC was created
-      for (const candidate of pendingCandidates.value) {
-        await peerConnection!.addIceCandidate(new RTCIceCandidate(candidate));
-      }
-      pendingCandidates.value = [];
-
-    } catch (err) {
-      console.error('[VideoCall] Failed to accept call:', err);
-      endCall('failed');
-    }
+    ensureBroadcastChannel();
+    openCallPopup(callId);
   }
 
   function declineCall() {
@@ -261,61 +272,12 @@ export function useVideoCall() {
     cleanup();
   }
 
-  // ============================================================================
-  // Signal Handling (from broadcast events)
-  // ============================================================================
-
-  async function handleSignal(data: {
-    call_id: string;
-    signal_type: 'offer' | 'answer' | 'ice-candidate';
-    signal_data: any;
-    sender_public_id: string;
-  }) {
-    // Ignore our own signals
-    if (data.sender_public_id === authStore.user?.public_id) return;
-
-    // Only process signals for the current call
-    if (!store.currentCall || store.currentCall.callId !== data.call_id) return;
-
-    const { signal_type, signal_data } = data;
-
-    switch (signal_type) {
-      case 'offer':
-        if (peerConnection) {
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(signal_data));
-          const answer = await peerConnection.createAnswer();
-          await peerConnection.setLocalDescription(answer);
-
-          await videoCallService.sendSignal(
-            store.currentCall.chatId,
-            store.currentCall.callId,
-            'answer',
-            { type: answer.type, sdp: answer.sdp },
-          );
-        }
-        break;
-
-      case 'answer':
-        if (peerConnection) {
-          await peerConnection.setRemoteDescription(new RTCSessionDescription(signal_data));
-          store.setState('connecting');
-        }
-        break;
-
-      case 'ice-candidate':
-        if (peerConnection && peerConnection.remoteDescription) {
-          await peerConnection.addIceCandidate(new RTCIceCandidate(signal_data));
-        } else {
-          // Queue candidates until remote description is set
-          pendingCandidates.value.push(signal_data);
-        }
-        break;
-    }
-  }
-
   function handleCallEnded(data: { call_id: string; ender_public_id: string; reason: string }) {
     if (data.ender_public_id === authStore.user?.public_id) return;
     if (!store.currentCall || store.currentCall.callId !== data.call_id) return;
+
+    // If popup is open, it handles this via its own Echo subscription
+    if (callPopup && !callPopup.closed) return;
 
     switch (data.reason) {
       case 'declined':
@@ -324,30 +286,24 @@ export function useVideoCall() {
       case 'timeout':
         toast.info('Call was not answered');
         break;
-      case 'hangup':
-        toast.info('Call ended');
-        break;
       default:
         toast.info('Call ended');
     }
-
     cleanup();
   }
 
   // ============================================================================
-  // Call Control
+  // Call Controls (from parent side)
   // ============================================================================
 
   async function endCall(reason: 'hangup' | 'declined' | 'timeout' | 'failed' = 'hangup') {
     if (store.currentCall) {
       videoCallService.endCall(store.currentCall.chatId, store.currentCall.callId, reason).catch(() => {});
     }
-    cleanup();
-  }
 
-  function handleCallFailed(chatId: string, callId: string) {
-    toast.error('Call connection lost');
-    videoCallService.endCall(chatId, callId, 'failed').catch(() => {});
+    // Tell popup to close
+    broadcastChannel?.postMessage({ type: 'end-call' });
+
     cleanup();
   }
 
@@ -361,9 +317,7 @@ export function useVideoCall() {
       ringtoneAudio.loop = true;
       ringtoneAudio.volume = 0.5;
       ringtoneAudio.play().catch(() => {});
-    } catch (e) {
-      // Audio not available
-    }
+    } catch { /* noop */ }
   }
 
   function stopRingtone() {
@@ -384,49 +338,42 @@ export function useVideoCall() {
 
   function cleanup() {
     stopRingtone();
-    stopMedia();
-
-    if (peerConnection) {
-      peerConnection.close();
-      peerConnection = null;
-    }
-
+    pendingOffer.value = null;
     pendingCandidates.value = [];
+    callPopup = null;
     store.reset();
   }
 
   // ============================================================================
-  // Global Event Listener Setup (call once from AppLayout)
+  // Global Event Listener Setup (called once from AppLayout)
   // ============================================================================
 
   function setupGlobalListeners() {
     if (initialized) return;
     initialized = true;
+    console.log('[VideoCall] Global listeners initialized (popup architecture)');
 
-    function onIncomingCall(e: Event) {
+    window.addEventListener('videocall:incoming', (e: Event) => {
       handleIncomingCall((e as CustomEvent).detail);
-    }
-    function onCallSignal(e: Event) {
+    });
+    window.addEventListener('videocall:signal', (e: Event) => {
       handleSignal((e as CustomEvent).detail);
-    }
-    function onCallEnded(e: Event) {
+    });
+    window.addEventListener('videocall:ended', (e: Event) => {
       handleCallEnded((e as CustomEvent).detail);
-    }
+    });
 
-    window.addEventListener('videocall:incoming', onIncomingCall);
-    window.addEventListener('videocall:signal', onCallSignal);
-    window.addEventListener('videocall:ended', onCallEnded);
+    ensureBroadcastChannel();
   }
 
   return {
-    // Actions
     startCall,
     acceptCall,
     declineCall,
     endCall,
     handleIncomingCall,
     handleSignal,
-    handleCallEnded,
+    handleCallEnded: handleCallEnded,
     cleanup,
     setupGlobalListeners,
   };
