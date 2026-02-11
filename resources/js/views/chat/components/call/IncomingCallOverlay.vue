@@ -11,7 +11,13 @@ const avatar = useAvatar();
 
 const remoteAvatarData = computed(() => {
   if (!store.currentCall) return { initials: '?' };
-  return { initials: avatar.getInitials(store.currentCall.remoteUser.name) };
+  const caller = store.currentCall.participants.values().next().value;
+  return { initials: avatar.getInitials(caller?.name || '?') };
+});
+
+const caller = computed(() => {
+    if (!store.currentCall) return null;
+    return store.currentCall.participants.values().next().value;
 });
 
 const callTypeLabel = computed(() => {
@@ -41,9 +47,9 @@ const callTypeLabel = computed(() => {
           <div class="flex items-center gap-3 mb-4">
             <div class="relative">
               <Avatar
-                v-if="store.currentCall?.remoteUser.avatar"
-                :src="store.currentCall.remoteUser.avatar"
-                :alt="store.currentCall?.remoteUser.name || ''"
+                v-if="caller?.avatar"
+                :src="caller.avatar"
+                :alt="caller.name || ''"
                 :fallback="remoteAvatarData.initials"
                 size="lg"
                 class="rounded-full ring-2 ring-green-400/50"
@@ -59,7 +65,7 @@ const callTypeLabel = computed(() => {
             </div>
             <div class="min-w-0">
               <p class="text-sm font-semibold text-(--text-primary) truncate">
-                {{ store.currentCall?.remoteUser.name }}
+                {{ caller?.name }}
               </p>
               <p class="text-xs text-(--text-secondary)">
                 Incoming {{ callTypeLabel }}

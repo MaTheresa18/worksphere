@@ -4,15 +4,18 @@ import { ref, computed } from 'vue';
 export type CallState = 'idle' | 'initiating' | 'ringing' | 'connecting' | 'connected' | 'ended';
 export type CallType = 'video' | 'audio';
 
+export interface Participant {
+  publicId: string;
+  name: string;
+  avatar: string | null;
+  isSelf?: boolean;
+}
+
 export interface CallInfo {
   callId: string;
   chatId: string;
   callType: CallType;
-  remoteUser: {
-    publicId: string;
-    name: string;
-    avatar: string | null;
-  };
+  participants: Map<string, Participant>;
   isOutgoing: boolean;
   startedAt: number | null;
 }
@@ -24,11 +27,18 @@ export const useVideoCallStore = defineStore('videoCall', () => {
   const callState = ref<CallState>('idle');
   const currentCall = ref<CallInfo | null>(null);
   const localStream = ref<MediaStream | null>(null);
-  const remoteStream = ref<MediaStream | null>(null);
+  
+  // Maps publicId -> Stream
+  const remoteStreams = ref<Map<string, MediaStream>>(new Map());
+  
   const isMuted = ref(false);
   const isCameraOff = ref(false);
   const callDuration = ref(0);
   const error = ref<string | null>(null);
+  const activeCallId = ref<string | null>(null); // For "Call in progress" indicator in chat
+
+  // Track active calls in other chats: Map<chatId, { callId: string, callType: CallType }>
+  const activeCalls = ref<Map<string, { callId: string, callType: CallType }>>(new Map());
 
   let durationTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -49,24 +59,52 @@ export const useVideoCallStore = defineStore('videoCall', () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   });
 
+  const participantCount = computed(() => currentCall.value?.participants.size || 0);
+
   // ============================================================================
   // Actions
   // ============================================================================
 
+  function registerActiveCall(chatId: string, callId: string, callType: CallType = 'video') {
+      activeCalls.value.set(chatId, { callId, callType });
+  }
+
+  function unregisterActiveCall(chatId: string) {
+      activeCalls.value.delete(chatId);
+  }
+
+
   function setCall(info: CallInfo) {
     currentCall.value = info;
+    activeCallId.value = info.callId;
+  }
+
+  function addParticipant(p: Participant) {
+    if (currentCall.value) {
+        currentCall.value.participants.set(p.publicId, p);
+    }
+  }
+
+  function removeParticipant(publicId: string) {
+    if (currentCall.value) {
+        currentCall.value.participants.delete(publicId);
+    }
+    remoteStreams.value.delete(publicId);
   }
 
   function setState(state: CallState) {
     callState.value = state;
 
     if (state === 'connected') {
-      currentCall.value!.startedAt = Date.now();
+      if (currentCall.value && !currentCall.value.startedAt) {
+          currentCall.value.startedAt = Date.now();
+      }
       startDurationTimer();
     }
 
     if (state === 'ended' || state === 'idle') {
       stopDurationTimer();
+      activeCallId.value = null;
     }
   }
 
@@ -74,8 +112,8 @@ export const useVideoCallStore = defineStore('videoCall', () => {
     localStream.value = stream;
   }
 
-  function setRemoteStream(stream: MediaStream | null) {
-    remoteStream.value = stream;
+  function addRemoteStream(publicId: string, stream: MediaStream) {
+    remoteStreams.value.set(publicId, stream);
   }
 
   function toggleMute() {
@@ -101,6 +139,8 @@ export const useVideoCallStore = defineStore('videoCall', () => {
   }
 
   function startDurationTimer() {
+    // Only start if not running
+    if (durationTimer) return;
     callDuration.value = 0;
     durationTimer = setInterval(() => {
       callDuration.value++;
@@ -123,11 +163,12 @@ export const useVideoCallStore = defineStore('videoCall', () => {
     callState.value = 'idle';
     currentCall.value = null;
     localStream.value = null;
-    remoteStream.value = null;
+    remoteStreams.value.clear(); 
     isMuted.value = false;
     isCameraOff.value = false;
     callDuration.value = 0;
     error.value = null;
+    activeCallId.value = null;
     stopDurationTimer();
   }
 
@@ -136,25 +177,32 @@ export const useVideoCallStore = defineStore('videoCall', () => {
     callState,
     currentCall,
     localStream,
-    remoteStream,
+    remoteStreams,
     isMuted,
     isCameraOff,
     callDuration,
     error,
+    activeCallId,
+    activeCalls,
     // Getters
     isCallActive,
     isRinging,
     isConnected,
     isIncoming,
     formattedDuration,
+    participantCount,
     // Actions
     setCall,
+    addParticipant,
+    removeParticipant,
     setState,
     setLocalStream,
-    setRemoteStream,
+    addRemoteStream,
     toggleMute,
     toggleCamera,
     setError,
     reset,
+    registerActiveCall,
+    unregisterActiveCall,
   };
 });

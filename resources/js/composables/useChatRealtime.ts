@@ -70,6 +70,14 @@ export function useChatRealtime() {
     .listen('.CallEnded', (event: any) => {
       console.log(`[ChatRealtime] 📴 RECEIVED .CallEnded on ${channelName}`, event);
       window.dispatchEvent(new CustomEvent('videocall:ended', { detail: event }));
+    })
+    .listen('.CallParticipantJoined', (event: any) => {
+      console.log(`[ChatRealtime] 👤 RECEIVED .CallParticipantJoined on ${channelName}`, event);
+      window.dispatchEvent(new CustomEvent('videocall:joined', { detail: event }));
+    })
+    .listen('.CallParticipantLeft', (event: any) => {
+      console.log(`[ChatRealtime] 🚪 RECEIVED .CallParticipantLeft on ${channelName}`, event);
+      window.dispatchEvent(new CustomEvent('videocall:left', { detail: event }));
     });
 
     // Log subscription success/failure

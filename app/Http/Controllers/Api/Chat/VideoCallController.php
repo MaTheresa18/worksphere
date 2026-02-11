@@ -93,21 +93,77 @@ class VideoCallController extends Controller
             'call_type' => 'required|in:video,audio',
         ]);
 
-        // Only allow DM calls for now
-        if ($chat->type !== 'dm') {
-            return response()->json([
-                'message' => 'Group calls are not yet supported.',
-            ], 422);
-        }
-
         $user = Auth::user();
         $callId = (string) Str::ulid();
+
+        // Store call metadata
+        $this->storeCallMetadata($chat->public_id, $callId, [
+            'type' => $request->input('call_type'),
+            'initiator_id' => $user->public_id,
+            'started_at' => now()->timestamp,
+        ]);
+
+        // Register initiator as the first participant
+        $this->addParticipant($chat->public_id, $callId, $user);
 
         event(new CallInitiated($chat, $user, $callId, $request->input('call_type')));
 
         return response()->json([
             'call_id' => $callId,
             'chat_id' => $chat->public_id,
+        ]);
+    }
+
+    /**
+     * Join an existing call.
+     */
+    public function join(Request $request, Chat $chat): JsonResponse
+    {
+        $chat = $this->findChatOrFail($chat);
+
+        $request->validate([
+            'call_id' => 'required|string|max:64',
+        ]);
+
+        $user = Auth::user();
+        $callId = $request->input('call_id');
+
+        // Add to cache
+        $this->addParticipant($chat->public_id, $callId, $user);
+
+        // Broadcast join event so existing peers can connect
+        event(new \App\Events\Chat\CallParticipantJoined(
+            $chat->public_id,
+            $chat->type ?? 'dm',
+            $callId,
+            $user->public_id,
+            $user->name,
+            $user->avatar_thumb_url
+        ));
+
+        // Return current participants so the joiner can connect to them
+        $participants = $this->getParticipantsList($chat->public_id, $callId);
+        $metadata = $this->getCallMetadata($chat->public_id, $callId);
+
+        return response()->json([
+            'status' => 'ok',
+            'participants' => $participants,
+            'type' => $metadata['type'] ?? 'video', // Default to video if missing
+        ]);
+    }
+
+    /**
+     * Get list of current participants.
+     */
+    public function participants(Request $request, Chat $chat, string $callId): JsonResponse
+    {
+        $chat = $this->findChatOrFail($chat);
+        $participants = $this->getParticipantsList($chat->public_id, $callId);
+        $metadata = $this->getCallMetadata($chat->public_id, $callId);
+
+        return response()->json([
+            'participants' => $participants,
+            'type' => $metadata['type'] ?? 'video',
         ]);
     }
 
@@ -122,6 +178,7 @@ class VideoCallController extends Controller
             'call_id' => 'required|string|max:64',
             'signal_type' => 'required|in:offer,answer,ice-candidate,signal',
             'signal_data' => 'required|array',
+            'target_public_id' => 'nullable|string',
         ]);
 
         $user = Auth::user();
@@ -132,13 +189,14 @@ class VideoCallController extends Controller
             $request->input('call_id'),
             $request->input('signal_type'),
             $request->input('signal_data'),
+            $request->input('target_public_id')
         ));
 
         return response()->json(['status' => 'ok']);
     }
 
     /**
-     * End an active call.
+     * End an active call or leave it.
      */
     public function end(Request $request, Chat $chat): JsonResponse
     {
@@ -150,10 +208,91 @@ class VideoCallController extends Controller
         ]);
 
         $user = Auth::user();
+        $callId = $request->input('call_id');
         $reason = $request->input('reason', 'hangup');
 
-        event(new CallEnded($chat, $user->public_id, $request->input('call_id'), $reason));
+        // Remove from cache
+        $this->removeParticipant($chat->public_id, $callId, $user->public_id);
+
+        // Notify others that this user left
+        event(new \App\Events\Chat\CallParticipantLeft(
+            $chat->public_id,
+            $chat->type ?? 'dm',
+            $callId,
+            $user->public_id,
+            $reason
+        ));
+
+        // If no participants left, the call is technically over, 
+        // but we assume the frontend handles the "last person leaving" logic via the events.
+        // We could explicitly check `count($participants) === 0` here if we wanted to trigger a CallEnded event.
+        // For backwards compatibility, if it's a DM and someone hangs up, we can still send CallEnded.
+        if ($chat->type === 'dm') {
+             event(new CallEnded($chat, $user->public_id, $callId, $reason));
+        }
 
         return response()->json(['status' => 'ok']);
+    }
+
+    // =========================================================================
+    // Cache Helpers (Redis/File)
+    // =========================================================================
+
+    private function getCacheKey(string $chatId, string $callId): string
+    {
+        return "call:participants:{$chatId}:{$callId}";
+    }
+
+    private function addParticipant(string $chatId, string $callId, $user): void
+    {
+        $key = $this->getCacheKey($chatId, $callId);
+        $participant = [
+            'public_id' => $user->public_id,
+            'name' => $user->name,
+            'avatar' => $user->avatar_thumb_url,
+            'joined_at' => now()->timestamp,
+        ];
+        
+        // Use a simple array in cache for now. Ideally this would be a Redis Set.
+        $participants = \Illuminate\Support\Facades\Cache::get($key, []);
+        
+        // Remove existing if present (update)
+        $participants = array_filter($participants, fn($p) => $p['public_id'] !== $user->public_id);
+        $participants[] = $participant;
+
+        // Expire after 2 hours to clean up stale calls
+        \Illuminate\Support\Facades\Cache::put($key, $participants, 7200);
+    }
+
+    private function removeParticipant(string $chatId, string $callId, string $userPublicId): void
+    {
+        $key = $this->getCacheKey($chatId, $callId);
+        $participants = \Illuminate\Support\Facades\Cache::get($key, []);
+        
+        $participants = array_filter($participants, fn($p) => $p['public_id'] !== $userPublicId);
+        
+        if (empty($participants)) {
+            \Illuminate\Support\Facades\Cache::forget($key);
+        } else {
+            \Illuminate\Support\Facades\Cache::put($key, $participants, 7200);
+        }
+    }
+
+    private function getParticipantsList(string $chatId, string $callId): array
+    {
+        $key = $this->getCacheKey($chatId, $callId);
+        return array_values(\Illuminate\Support\Facades\Cache::get($key, []));
+    }
+
+    private function storeCallMetadata(string $chatId, string $callId, array $metadata): void
+    {
+        $key = "call:meta:{$chatId}:{$callId}";
+        \Illuminate\Support\Facades\Cache::put($key, $metadata, 7200);
+    }
+
+    private function getCallMetadata(string $chatId, string $callId): array
+    {
+        $key = "call:meta:{$chatId}:{$callId}";
+        return \Illuminate\Support\Facades\Cache::get($key, []);
     }
 }

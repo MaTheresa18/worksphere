@@ -12,6 +12,8 @@ import { animate, stagger } from "animejs";
 import { ref, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { Icon, Avatar } from "@/components/ui";
 import { useAvatar } from "@/composables/useAvatar";
+import { useVideoCallStore } from "@/stores/videocall";
+import { useVideoCall } from "@/composables/useVideoCall";
 
 interface Props {
     chat: Chat;
@@ -33,8 +35,29 @@ const emit = defineEmits<{
 
 const authStore = useAuthStore();
 const themeStore = useThemeStore();
+const videoCallStore = useVideoCallStore();
+const { joinActiveCall } = useVideoCall();
+
 const { presenceUsers } = usePresence({ manageLifecycle: false });
 const avatar = useAvatar();
+
+const activeCall = computed(() => {
+    return videoCallStore.activeCalls.get(props.chat.public_id);
+});
+
+const isInCurrentCall = computed(() => {
+    return videoCallStore.currentCall?.chatId === props.chat.public_id;
+});
+
+function joinCall() {
+    if (activeCall.value) {
+        joinActiveCall(
+            props.chat.public_id,
+            activeCall.value.callId,
+            activeCall.value.callType
+        );
+    }
+}
 
 const chatAvatarData = computed(() => {
     return avatar.resolveChatAvatar(props.chat, authStore.user?.public_id);
@@ -133,14 +156,14 @@ watch(
 
 <template>
     <header
-        class="flex items-center justify-between gap-3 p-3 lg:p-4 border-b border-[var(--border-default)] bg-[var(--surface-elevated)]"
+        class="flex items-center justify-between gap-3 p-3 lg:p-4 border-b border-(--border-default) bg-(--surface-elevated)"
     >
         <!-- Left: Avatar & Name -->
         <div class="flex items-center gap-3 min-w-0">
             <!-- Mobile menu button -->
             <button
                 v-if="isMobile"
-                class="shrink-0 p-2 -ml-2 rounded-lg hover:bg-[var(--surface-tertiary)] text-[var(--text-primary)] lg:hidden"
+                class="shrink-0 p-2 -ml-2 rounded-lg hover:bg-(--surface-tertiary) text-(--text-primary) lg:hidden"
                 @click="emit('toggleSidebar')"
             >
                 <Icon name="Menu" size="20" />
@@ -160,25 +183,25 @@ watch(
             <!-- Name & Status -->
             <div class="min-w-0">
                 <div class="flex items-center gap-2">
-                    <h1 class="text-sm text-[var(--text-primary)] font-medium truncate">
+                    <h1 class="text-sm text-(--text-primary) font-medium truncate">
                         {{ headerTitle }}
                     </h1>
                     <span
                         v-if="chat.type === 'group'"
-                        class="shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"
+                        class="shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-(--surface-tertiary) text-(--text-secondary)"
                     >
                         GROUP
                     </span>
                 </div>
-                <div class="text-xs text-[var(--text-secondary)] truncate">
+                <div class="text-xs text-(--text-secondary) truncate">
                     <div v-if="typingIndicator" class="flex items-center gap-2">
-                        <span class="text-[var(--interactive-primary)] truncate">{{
+                        <span class="text-(--interactive-primary) truncate">{{
                             typingIndicator
                         }}</span>
                         <div class="flex space-x-0.5" ref="typingDotsRef">
-                            <div class="w-1 h-1 bg-[var(--interactive-primary)] rounded-full"></div>
-                            <div class="w-1 h-1 bg-[var(--interactive-primary)] rounded-full"></div>
-                            <div class="w-1 h-1 bg-[var(--interactive-primary)] rounded-full"></div>
+                            <div class="w-1 h-1 bg-(--interactive-primary) rounded-full"></div>
+                            <div class="w-1 h-1 bg-(--interactive-primary) rounded-full"></div>
+                            <div class="w-1 h-1 bg-(--interactive-primary) rounded-full"></div>
                         </div>
                     </div>
                     <template v-else>
@@ -202,7 +225,7 @@ watch(
                             }}
                             <span
                                 v-if="onlineParticipantCount > 0"
-                                class="text-[var(--text-tertiary)]"
+                                class="text-(--text-tertiary)"
                             >
                                 •
                                 <span class="text-green-500 font-medium"
@@ -234,11 +257,31 @@ watch(
                     <Icon name="Video" size="18" />
                 </button>
             </template>
+            <!-- Group Call Join Button -->
+            <template v-else-if="chat.type === 'group' && activeCall && !isInCurrentCall">
+                <button
+                    class="px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium text-xs flex items-center gap-2 animate-pulse"
+                    title="Join Active Call"
+                    @click="joinCall"
+                >
+                    <Icon name="Video" size="14" />
+                    <span>Join Call</span>
+                </button>
+            </template>
+            <template v-else-if="chat.type === 'group'">
+                 <button
+                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) text-(--text-primary) transition-colors"
+                    title="Start Video Call"
+                    @click="emit('startVideoCall')"
+                >
+                    <Icon name="Video" size="18" />
+                </button>
+            </template>
 
             <!-- Theme Switcher -->
             <div class="relative">
                 <button
-                    class="p-2 rounded-lg hover:bg-[var(--surface-tertiary)] text-[var(--text-primary)]"
+                    class="p-2 rounded-lg hover:bg-(--surface-tertiary) text-(--text-primary)"
                     title="Change Theme"
                     @click="showThemeMenu = !showThemeMenu"
                 >
@@ -248,13 +291,13 @@ watch(
                 <!-- Theme Menu -->
                 <div 
                     v-if="showThemeMenu"
-                    class="absolute right-0 top-full mt-2 w-48 bg-[var(--surface-elevated)] border border-[var(--border-default)] rounded-xl shadow-lg z-50 overflow-hidden py-1"
+                    class="absolute right-0 top-full mt-2 w-48 bg-(--surface-elevated) border border-(--border-default) rounded-xl shadow-lg z-50 overflow-hidden py-1"
                 >
                     <button 
                         v-for="theme in themes" 
                         :key="theme.id"
-                        class="w-full px-4 py-2 text-left text-sm hover:bg-[var(--surface-tertiary)] flex items-center gap-2"
-                        :class="{'text-[var(--interactive-primary)] font-medium': themeStore.chatTheme === theme.id}"
+                        class="w-full px-4 py-2 text-left text-sm hover:bg-(--surface-tertiary) flex items-center gap-2"
+                        :class="{'text-(--interactive-primary) font-medium': themeStore.chatTheme === theme.id}"
                         @click="setTheme(theme.id)"
                     >
                         <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: theme.color }"></div>
@@ -279,7 +322,7 @@ watch(
                 <span
                     class="w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full"
                     :class="{
-                        'bg-green-500 shadow-[0_0_6px_theme(colors.green.500)]':
+                        'bg-green-500 shadow-[0_0_6px_var(--color-green-500)]':
                             connectionState === 'connected',
                         'bg-yellow-500 animate-pulse':
                             connectionState === 'connecting',
@@ -299,7 +342,7 @@ watch(
 
             <!-- Search (placeholder) -->
             <button
-                class="p-2 rounded-lg hover:bg-[var(--surface-tertiary)] text-[var(--text-primary)]"
+                class="p-2 rounded-lg hover:bg-(--surface-tertiary) text-(--text-primary)"
                 title="Search messages"
                 @click="emit('toggleSearch')"
             >
@@ -308,7 +351,7 @@ watch(
 
             <!-- Info Drawer Toggle -->
             <button
-                class="p-2 rounded-lg hover:bg-[var(--surface-tertiary)] text-[var(--text-primary)]"
+                class="p-2 rounded-lg hover:bg-(--surface-tertiary) text-(--text-primary)"
                 title="Chat details"
                 @click="emit('toggleDrawer')"
             >

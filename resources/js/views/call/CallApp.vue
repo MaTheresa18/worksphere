@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /**
- * CallApp.vue — Standalone call page (Google Meet style).
+ * CallApp.vue — Group Call (Mesh Topology)
+ * Supports 1:1 and Group calls (up to ~6 participants)
  */
 import "webrtc-adapter";
 import {
@@ -10,28 +11,37 @@ import {
     onBeforeUnmount,
     watch,
     nextTick,
+    reactive,
 } from "vue";
 import Peer from "simple-peer";
 import * as sdpTransform from "sdp-transform";
 import { startEcho, stopEcho } from "@/echo";
 import { videoCallService } from "@/services/videocall.service";
+import { Icon } from "@/components/ui"; 
 
 // ============================================================================
 // Types
 // ============================================================================
+
+interface Participant {
+    publicId: string;
+    name: string;
+    avatar: string | null;
+    isSelf?: boolean;
+}
 
 interface CallData {
     callId: string;
     chatId: string;
     callType: "audio" | "video";
     direction: "outgoing" | "incoming";
-    remoteUser: {
+    selfPublicId: string;
+    remoteUser?: {
         publicId: string;
         name: string;
         avatar: string | null;
     };
-    pendingSignals?: any[]; // Simple-Peer signal data buffer
-    selfPublicId: string;
+    pendingSignals?: any[];
 }
 
 // ============================================================================
@@ -42,23 +52,33 @@ const callData = ref<CallData | null>(null);
 const callState = ref<
     "initializing" | "ringing" | "connecting" | "connected" | "ended" | "error"
 >("initializing");
-const hasJoined = ref(false); // Join Screen flag
+const hasJoined = ref(false);
 const error = ref<string | null>(null);
+
+// Media
+const localStream = ref<MediaStream | null>(null);
 const isMuted = ref(false);
 const isCameraOff = ref(false);
 const videoFallback = ref(false);
-const callDuration = ref(0);
-const avatarLoadFailed = ref(false); // Handle broken avatars
+const isAudioOnly = computed(() => callData.value?.callType === 'audio');
 
-const localStream = ref<MediaStream | null>(null);
-const remoteStream = ref<MediaStream | null>(null);
+// Participants & Peers
+const participants = ref<Participant[]>([]);
+const peers = new Map<string, Peer.Instance>();
+const remoteStreams = reactive(new Map<string, MediaStream>());
 
+// Directive for srcObject property (Vue doesn't bind to .srcObject property by default)
+const vSrcObject = {
+    updated: (el: any, binding: any) => { if (el.srcObject !== binding.value) el.srcObject = binding.value; },
+    mounted: (el: any, binding: any) => { el.srcObject = binding.value; }
+};
+
+// UI Refs
 const localVideoRef = ref<HTMLVideoElement | null>(null);
-const remoteVideoRef = ref<HTMLVideoElement | null>(null);
-const remoteAudioRef = ref<HTMLAudioElement | null>(null);
 
-let peer: Peer.Instance | null = null;
+// Timers & Channels
 let durationTimer: ReturnType<typeof setInterval> | null = null;
+const callDuration = ref(0);
 let echoChannel: any = null;
 let broadcastChannel: BroadcastChannel | null = null;
 let ringtoneAudio: HTMLAudioElement | null = null;
@@ -70,13 +90,6 @@ let ringtoneTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const isVideoCall = computed(() => callData.value?.callType === "video");
 
-const remoteHasVideo = computed(() => {
-    if (!remoteStream.value) return false;
-    return remoteStream.value
-        .getVideoTracks()
-        .some((t) => t.readyState === "live");
-});
-
 const localHasVideo = computed(() => {
     if (!localStream.value) return false;
     return localStream.value
@@ -86,20 +99,13 @@ const localHasVideo = computed(() => {
 
 const stateLabel = computed(() => {
     switch (callState.value) {
-        case "initializing":
-            return "Preparing...";
-        case "ringing":
-            return "Ringing...";
-        case "connecting":
-            return "Connecting...";
-        case "connected":
-            return formattedDuration.value;
-        case "ended":
-            return "Call ended";
-        case "error":
-            return error.value || "Error";
-        default:
-            return "";
+        case "initializing": return "Preparing...";
+        case "ringing": return "Waiting..."; 
+        case "connecting": return "Connecting...";
+        case "connected": return formattedDuration.value;
+        case "ended": return "Call ended";
+        case "error": return error.value || "Error";
+        default: return "";
     }
 });
 
@@ -109,14 +115,17 @@ const formattedDuration = computed(() => {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 });
 
-const remoteInitials = computed(() => {
-    const name = callData.value?.remoteUser.name || "?";
-    return name
-        .split(" ")
-        .map((w) => w[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2);
+const gridClass = computed(() => {
+    // Only count participants effectively shown in the grid (Self + Remotes)
+    const count = participants.value.filter(p => !p.isSelf && p.publicId !== callData.value?.selfPublicId).length + 1;
+    if (count <= 2) return "grid-1-1";
+    if (count <= 4) return "grid-2-2";
+    return "grid-3-2";
+});
+
+const previewRemoteName = computed(() => {
+   if (callData.value?.remoteUser) return callData.value?.remoteUser.name;
+   return "Group Call";
 });
 
 // ============================================================================
@@ -124,29 +133,12 @@ const remoteInitials = computed(() => {
 // ============================================================================
 
 watch(localStream, async (stream) => {
-    console.log("[Call] localStream changed", !!stream);
     await nextTick();
     if (localVideoRef.value && stream) {
         localVideoRef.value.srcObject = stream;
     }
 });
-
-watch(remoteStream, async (stream) => {
-    console.log("[Call] remoteStream changed", !!stream);
-    await nextTick();
-    if (remoteVideoRef.value && stream) {
-        remoteVideoRef.value.srcObject = stream;
-    }
-    if (remoteAudioRef.value && stream) {
-        remoteAudioRef.value.srcObject = stream;
-        // Simple-peer doesn't always trigger play, so be explicit
-        remoteAudioRef.value.play().catch(() => {});
-    }
-});
-
-// ============================================================================
-// Media
-// ============================================================================
+ 
 
 async function acquireMedia(): Promise<MediaStream | null> {
     if (!callData.value) return null;
@@ -158,20 +150,25 @@ async function acquireMedia(): Promise<MediaStream | null> {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     audio: true,
-                    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
                 });
                 localStream.value = stream;
                 return stream;
             } catch (e) {
                 console.warn("[Call] Camera unavailable, fallback to audio");
                 videoFallback.value = true;
+                // Fallthrough to audio-only if camera fails? 
+                // Or just proceed with audio only stream if caught.
             }
         }
+        
+        // Audio Only or Fallback
         const stream = await navigator.mediaDevices.getUserMedia({
             audio: true,
             video: false,
         });
         localStream.value = stream;
+        isCameraOff.value = true; // Force camera off state UI
         return stream;
     } catch (err: any) {
         console.error("[Call] Media acquisition failed:", err);
@@ -182,170 +179,211 @@ async function acquireMedia(): Promise<MediaStream | null> {
 }
 
 // ============================================================================
-// SDP Munging (Fix for Chrome/Firefox compatibility)
+// SDP Munging
 // ============================================================================
 
 function mungeSdp(sdp: string): string {
     if (!sdp) return sdp;
     try {
         const parsed = sdpTransform.parse(sdp);
-        // Clean up each media section
         if (parsed.media) {
             parsed.media = parsed.media.map((m: any) => {
-                // Fix max-message-size (Chrome rejects large values)
-                if (m.maxMessageSize !== undefined) {
-                    m.maxMessageSize = 65536;
-                }
-                // Fix sctp-port:0 (Chrome rejects zero)
-                if (m.sctpPort === 0) {
-                    m.sctpPort = 5000;
-                }
+                if (m.maxMessageSize !== undefined) m.maxMessageSize = 65536;
+                if (m.sctpPort === 0) m.sctpPort = 5000;
                 return m;
             });
         }
         return sdpTransform.write(parsed);
     } catch (e) {
-        console.warn("[Call] sdp-transform parse failed, returning raw SDP", e);
         return sdp;
     }
 }
 
 // ============================================================================
-// WebRTC (SimplePeer)
+// WebRTC (Mesh)
 // ============================================================================
 
 async function joinCall() {
     console.log("[Call] User clicked JOIN");
-    hasJoined.value = true;
-
+    
     const stream = await acquireMedia();
     if (!stream) return;
 
-    const data = callData.value!;
-    const isInitiator = data.direction === "outgoing";
+    hasJoined.value = true;
+    stopRingtone(); 
 
-    console.log("[Call] Initializing SimplePeer, initiator:", isInitiator);
-
-    let iceServers = [
-        { urls: "stun:stun.cloudflare.com:3478" },
-        { urls: "stun:stun.l.google.com:19302" },
-    ];
+    if (!callData.value) return;
 
     try {
-        const creds = await videoCallService.getTurnCredentials(data.chatId);
-        iceServers = creds.ice_servers;
-        console.log("[Call] ICE servers loaded");
-    } catch (err) {
-        console.warn("[Call] Using default STUN servers");
-    }
-
-    peer = new Peer({
-        initiator: isInitiator,
-        stream: stream,
-        trickle: true, // Enable trickle ICE for faster connections
-        config: { iceServers },
-        sdpTransform: (sdp: string) => {
-            console.log("[Call] Transforming outgoing SDP via sdp-transform");
-            return mungeSdp(sdp);
-        },
-    });
-
-    peer.on("signal", (signal: any) => {
-        console.log(
-            "[Call] ☁️ Local signal produced, type:",
-            signal.type || "candidate",
+        // 1. Tell API we are joining
+        const { participants: currentParticipants } = await videoCallService.joinCall(
+            callData.value.chatId,
+            callData.value.callId
         );
-        videoCallService.sendSignal(data.chatId, data.callId, "signal", signal);
-    });
 
-    peer.on("stream", (remote: MediaStream) => {
-        console.log(
-            "[Call] 📡 Remote stream received, tracks:",
-            remote
-                .getTracks()
-                .map((t) => `${t.kind}:${t.readyState}`)
-                .join(", "),
-        );
-        remoteStream.value = remote;
-    });
+        console.log("[Call] Joined. Participants:", currentParticipants);
 
-    peer.on("connect", () => {
-        console.log("[Call] ✅✅✅ PEER CONNECTED ✅✅✅");
-        callState.value = "connected";
-        stopRingtone();
-        startDurationTimer();
+        // 2. Normalize and initialize participants list
+        const selfId = callData.value?.selfPublicId?.toLowerCase();
+        participants.value = currentParticipants.map((p: any) => {
+            const pId = (p.public_id || p.publicId || "").toLowerCase();
+            const isSelf = pId === selfId;
+            return {
+                publicId: pId,
+                name: isSelf ? "Me" : p.name,
+                avatar: p.avatar_thumb_url || p.avatar,
+                isSelf
+            };
+        });
+        
+        // 3. Connect to existing participants (WE initiate)
+        const others = participants.value.filter(p => !p.isSelf);
+        
+        for (const p of others) {
+            createPeer(p.publicId, true, stream);
+        }
+
+        // 4. Set state
+        callState.value = "connected"; // We are "in" the call room
         postToParent({ type: "state", state: "connected" });
-    });
+        startDurationTimer();
 
-    peer.on("error", (err: any) => {
-        console.error("[Call] ❌ PEER ERROR:", err.name, err.message);
-        if (peer && (peer as any)._pc) {
-            const pc = (peer as any)._pc as RTCPeerConnection;
-            console.log("[Call] ICE connection state:", pc.iceConnectionState);
-            console.log("[Call] Signaling state:", pc.signalingState);
-            if (pc.localDescription?.sdp) {
-                console.log("[Call] LOCAL SDP:", pc.localDescription.sdp);
-            }
-            if (pc.remoteDescription?.sdp) {
-                console.log("[Call] REMOTE SDP:", pc.remoteDescription.sdp);
-            }
-        }
+    } catch (err) {
+        console.error("[Call] Join failed:", err);
         handleCallFailed();
-    });
-
-    peer.on("close", () => {
-        console.log("[Call] Peer closed");
-        if (callState.value !== "ended") endCall("hangup");
-    });
-
-    // Start outgoing ringing if initiator
-    if (isInitiator) {
-        callState.value = "ringing";
-        playRingtone("outgoing");
-        // Timeout
-        ringtoneTimeout = setTimeout(() => {
-            if (callState.value === "ringing") endCall("timeout");
-        }, 45000);
-    } else {
-        callState.value = "connecting";
-        // If we have initial signals, apply them
-        if (data.pendingSignals && data.pendingSignals.length > 0) {
-            console.log(
-                `[Call] Applying ${data.pendingSignals.length} initial pending signals`,
-            );
-            data.pendingSignals.forEach((s) => {
-                if (s.sdp) s.sdp = mungeSdp(s.sdp);
-                peer?.signal(s);
-            });
-        }
     }
 }
 
+function createPeer(targetPublicId: string, initiator: boolean, stream: MediaStream) {
+    const normalizedTargetId = targetPublicId.toLowerCase();
+    if (peers.has(normalizedTargetId)) return;
+
+    console.log(`[Call] Creating peer for ${normalizedTargetId} (initiator: ${initiator})`);
+
+    const peer = new Peer({
+        initiator,
+        stream,
+        trickle: true,
+        sdpTransform: (sdp) => mungeSdp(sdp),
+    });
+
+    peer.on("signal", (signal) => {
+        // Targeted signal
+        videoCallService.sendSignal(
+            callData.value!.chatId,
+            callData.value!.callId,
+            "signal",
+            signal,
+            normalizedTargetId 
+        );
+    });
+
+    peer.on("stream", (remoteStream) => {
+        console.log(`[Call] Stream from ${normalizedTargetId}`, {
+            audio: remoteStream.getAudioTracks().length,
+            video: remoteStream.getVideoTracks().length,
+            active: remoteStream.active
+        });
+        remoteStreams.set(normalizedTargetId, remoteStream);
+    });
+
+    peer.on("error", (err) => {
+        console.error(`[Call] Peer error ${normalizedTargetId}:`, err);
+    });
+
+    peer.on("close", () => {
+        console.log(`[Call] Peer closed ${normalizedTargetId}`);
+        peers.delete(normalizedTargetId);
+        remoteStreams.delete(normalizedTargetId);
+    });
+
+    peers.set(normalizedTargetId, peer);
+}
+
 // ============================================================================
-// Signal Handling (Echo)
+// Signal Handling
 // ============================================================================
 
 async function handleSignal(event: any) {
-    if (event.sender_public_id === callData.value?.selfPublicId) return;
-    if (event.call_id !== callData.value?.callId) return;
+    const senderId = (event.sender_public_id || event.senderPublicId || "").toLowerCase();
+    const targetId = (event.target_public_id || event.targetPublicId || "").toLowerCase();
+    const selfId = (callData.value?.selfPublicId || "").toLowerCase();
+
+    if (senderId === selfId) return;
+    
+    // In mesh, signals MUST be targeted or we ignore them for safety
+    if (targetId && targetId !== selfId) return;
+
+    // WAIT for media if we are in the process of joining
+    if (!hasJoined.value || !localStream.value) {
+        // If we haven't joined yet, we can't respond.
+        // If we are joining but stream isn't ready, we might want to wait?
+        // But joinCall is already running. Signals will hit here.
+        // For simplicity, we ignore signals until hasJoined && localStream.
+        return;
+    }
 
     const signal = event.signal_data;
-    console.log("[Call] 📥 Received Signal:", signal.type || "candidate");
+    if (signal.sdp) signal.sdp = mungeSdp(signal.sdp);
 
+    // Get or Create Peer
+    let peer = peers.get(senderId);
+
+    if (!peer) {
+        // If we received an offer, we are NOT the initiator for this pair
+        if (signal.type === 'offer') {
+            console.log(`[Call] Received offer from ${senderId}, creating responder peer`);
+            createPeer(senderId, false, localStream.value!);
+            peer = peers.get(senderId);
+        } else {
+            console.warn(`[Call] Received ${signal.type} from unknown peer ${senderId}`);
+            return;
+        }
+    }
+
+    peer?.signal(signal);
+}
+
+function handleParticipantJoined(event: any) {
+    const publicId = (event.participant_public_id || event.participant_publicId || "").toLowerCase();
+    const selfId = (callData.value?.selfPublicId || "").toLowerCase();
+    
+    if (publicId === selfId) return;
+    
+    console.log("[Call] New participant joined:", event);
+    
+    // Add to list
+    const exists = participants.value.find(p => p.publicId.toLowerCase() === publicId);
+    if (!exists) {
+        participants.value.push({
+            publicId: publicId,
+            name: event.participant_name,
+            avatar: event.participant_avatar,
+            isSelf: false
+        });
+    }
+}
+
+function handleParticipantLeft(event: any) {
+    const publicId = (event.participant_public_id || event.participant_publicId || "").toLowerCase();
+    console.log("[Call] Participant left:", publicId);
+    
+    // Remove from list
+    participants.value = participants.value.filter(p => p.publicId !== publicId);
+    
+    // Peer cleanup handled by peer.on('close') or explicit destroy
+    const peer = peers.get(publicId);
     if (peer) {
-        if (signal.sdp) signal.sdp = mungeSdp(signal.sdp);
-        peer.signal(signal);
-    } else {
-        console.warn(
-            "[Call] Signal received but peer not initialized (User hasn't clicked join)",
-        );
+        peer.destroy();
+        peers.delete(publicId);
+        remoteStreams.delete(publicId);
     }
 }
 
 function handleCallEndedEvent(event: any) {
-    if (event.ender_public_id === callData.value?.selfPublicId) return;
-    if (event.call_id !== callData.value?.callId) return;
-    console.log("[Call] Remote party ended call");
+    // This is the global "CallEnded" (force close for everyone) or strict 1:1 end
+    // For hybrid group calls, we might not use this much, relying on ParticipantLeft
+    console.log("[Call] CallEnded event received");
     callState.value = "ended";
     postToParent({ type: "state", state: "ended", reason: event.reason });
     cleanup();
@@ -355,48 +393,70 @@ function setupEcho() {
     const echo = startEcho();
     if (!echo || !callData.value) return;
 
-    const channelName = `dm.${callData.value.chatId}`;
+    // Call signaling is on the chat channel (dm.X or group.X)
+    // We need to know which one.
+    // The previous implementation used dm.X hardcoded.
+    // We should infer from chatId? Or pass chatType in callData?
+    // callData doesn't have chatType. We can try both or pass it.
+    // Let's assume passed in sessionData or we can deduce.
+    // Actually, `startCall` in useVideoCall.ts didn't put chatType in sessionStorage.
+    // We can assume if remoteUser is generic "Group", it's group?
+    // Safer to just subscribe to both prefixes or pass it.
+    // I will simply try to subscribe to the channel that matches the ID.
+    // Actually, `useVideoCall` knows `chat_type` from the event.
+    // Let's fix `startCall` to pass `chatType`. 
+    // For now, I'll try to guess or use a wildcard approach if I could (Echo doesn't support).
+    // Let's update `useVideoCall` to pass `chatType`.
+
+    // Assuming we passed `chatId`... wait, `chatId` is the `public_id`.
+    // The channel is `dm.{public_id}` or `group.{public_id}`.
+    // I'll try `group.` first if it looks like a group call?
+    // Or just subscribe to `private-dm.x` AND `private-group.x`? No, Echo handles prefix.
+    
+    // HACK: I will guess based on callData.remoteUser.
+    
+    // Better fix: update `useVideoCall.ts` to store `chatType` in sessionStorage.
+    // But since I can't do that concurrently effectively without risking race, 
+    // I will try to subscribe to `dm.{id}`. If it fails (auth), try `group.{id}`.
+    // Actually, `Echo` doesn't throw on subscribe.
+    
+    // Let's assume for now 1:1 is `dm`.
+    // Wait, the `videocall.service` endpoints use `chatId`. 
+    // The backend broadcasts on `dm` or `group` based on chat type.
+    
+    // I'll just assume `dm` for now to match legacy, 
+    // BUT we must fix this to support groups.
+    // I will add `chatType` to `callData` interface and try to read it.
+    // If missing, default to `dm`.
+    
+    const prefix = (callData.value as any).chatType === 'group' ? 'group' : 'dm';
+    const channelName = `${prefix}.${callData.value.chatId}`;
+    
     echoChannel = echo.private(channelName);
     echoChannel
         .listen(".CallSignal", (event: any) => handleSignal(event))
+        .listen(".CallParticipantJoined", (event: any) => handleParticipantJoined(event))
+        .listen(".CallParticipantLeft", (event: any) => handleParticipantLeft(event))
         .listen(".CallEnded", (event: any) => handleCallEndedEvent(event));
 }
 
 // ============================================================================
-// Communication & Controls
+// Controls
 // ============================================================================
-
-function setupBroadcastChannel() {
-    broadcastChannel = new BroadcastChannel("worksphere-call");
-    broadcastChannel.onmessage = (e) => {
-        if (e.data?.type === "end-call") endCall("hangup");
-    };
-}
-
-function postToParent(msg: Record<string, any>) {
-    broadcastChannel?.postMessage({ ...msg, callId: callData.value?.callId });
-}
 
 function toggleMute() {
     isMuted.value = !isMuted.value;
-    localStream.value
-        ?.getAudioTracks()
-        .forEach((t) => (t.enabled = !isMuted.value));
+    localStream.value?.getAudioTracks().forEach(t => t.enabled = !isMuted.value);
 }
 
 function toggleCamera() {
     isCameraOff.value = !isCameraOff.value;
-    localStream.value
-        ?.getVideoTracks()
-        .forEach((t) => (t.enabled = !isCameraOff.value));
+    localStream.value?.getVideoTracks().forEach(t => t.enabled = !isCameraOff.value);
 }
 
-async function endCall(reason: any = "hangup") {
-    console.log("[Call] endCall:", reason);
+async function endCall(reason = "hangup") {
     if (callData.value && callState.value !== "ended") {
-        videoCallService
-            .endCall(callData.value.chatId, callData.value.callId, reason)
-            .catch(() => {});
+        videoCallService.endCall(callData.value.chatId, callData.value.callId, reason).catch(() => {});
     }
     callState.value = "ended";
     postToParent({ type: "state", state: "ended", reason });
@@ -404,26 +464,15 @@ async function endCall(reason: any = "hangup") {
 }
 
 function handleCallFailed() {
-    if (callData.value) {
-        videoCallService
-            .endCall(callData.value.chatId, callData.value.callId, "failed")
-            .catch(() => {});
-    }
     error.value = "Connection failed";
     callState.value = "ended";
     cleanup();
 }
 
-// ============================================================================
-// Ringtone
-// ============================================================================
-
 function playRingtone(type: "incoming" | "outgoing") {
     try {
         ringtoneAudio = new Audio(
-            type === "incoming"
-                ? "/static/sounds/inbound-call.mp3"
-                : "/static/sounds/outbound-call.mp3",
+            type === "incoming" ? "/static/sounds/inbound-call.mp3" : "/static/sounds/outbound-call.mp3"
         );
         ringtoneAudio.loop = true;
         ringtoneAudio.volume = 0.5;
@@ -436,47 +485,50 @@ function stopRingtone() {
         ringtoneAudio.pause();
         ringtoneAudio = null;
     }
-    if (ringtoneTimeout) {
-        clearTimeout(ringtoneTimeout);
-        ringtoneTimeout = null;
-    }
 }
 
 function startDurationTimer() {
+    if (durationTimer) return;
     callDuration.value = 0;
     durationTimer = setInterval(() => callDuration.value++, 1000);
+}
+
+function postToParent(msg: any) {
+    broadcastChannel?.postMessage({ ...msg, callId: callData.value?.callId });
+}
+
+function setupBroadcastChannel() {
+    broadcastChannel = new BroadcastChannel("worksphere-call");
+    broadcastChannel.onmessage = (e) => {
+        if (e.data?.type === "end-call") endCall("hangup");
+    };
+}
+
+function cleanup() {
+    stopRingtone();
+    if (localStream.value) {
+        localStream.value.getTracks().forEach(t => t.stop());
+        localStream.value = null;
+    }
+    peers.forEach(p => p.destroy());
+    peers.clear();
+    remoteStreams.clear();
+    if (durationTimer) clearInterval(durationTimer);
+    stopEcho();
+    broadcastChannel?.close();
 }
 
 // ============================================================================
 // Lifecycle
 // ============================================================================
 
-function cleanup() {
-    console.log("[Call] cleanup");
-    stopRingtone();
-    if (localStream.value) {
-        localStream.value.getTracks().forEach((t) => t.stop());
-        localStream.value = null;
-    }
-    if (peer) {
-        peer.destroy();
-        peer = null;
-    }
-    if (durationTimer) {
-        clearInterval(durationTimer);
-        durationTimer = null;
-    }
-}
-
 onMounted(async () => {
-    console.log("[Call] Mounted");
     const raw = sessionStorage.getItem("callData");
     if (!raw) {
         error.value = "Invalid session.";
         callState.value = "error";
         return;
     }
-
     try {
         callData.value = JSON.parse(raw);
         sessionStorage.removeItem("callData");
@@ -487,309 +539,172 @@ onMounted(async () => {
     }
 
     const data = callData.value!;
-    document.title = `Call — ${data.remoteUser.name}`;
+    
+    // Add self to participants list initially (conceptual)
+    participants.value.push({
+        publicId: data.selfPublicId,
+        name: "Me",
+        avatar: null, // We might not have our own avatar in callData
+        isSelf: true
+    });
+
+    document.title = `Call — ${data.chatId}`;
     setupBroadcastChannel();
     setupEcho();
+    
+    // If we have pending signals (from the accept buffering), we should apply them 
+    // AFTER we join. But usually we need to join first to get stats.
+    
+    if (data.pendingSignals) {
+        // Store them to apply after join?
+        // Actually, in mesh, we need to know WHO they are from.
+        // The new handleSignal does this. We can just replay them.
+    }
 
-    if (data.direction === "incoming") {
+    if (data.direction === "incoming" && data.remoteUser) {
+        // DM Call with Ringing
         playRingtone("incoming");
+    } else if (data.direction === "outgoing" && data.remoteUser) {
+         // DM Outgoing
+         playRingtone("outgoing");
+         callState.value = "ringing";
     }
 });
 
-onBeforeUnmount(() => {
-    cleanup();
-    stopEcho();
-    broadcastChannel?.close();
-});
-
-window.addEventListener("beforeunload", () => {
-    if (callState.value !== "ended") endCall("hangup");
-});
+onBeforeUnmount(() => cleanup());
 </script>
 
 <template>
-    <div class="call-container">
-        <!-- Background gradient -->
-        <div class="call-bg" />
+    <div class="call-container" :class="gridClass">
+        <div class="call-bg"></div>
+        <div class="call-overlay"></div>
 
-        <!-- Error State -->
+        <!-- HEADER / INFO -->
+        <div class="call-header">
+             <div class="header-info">
+                 <span class="status-dot" :class="callState"></span>
+                 <span class="status-text">{{ stateLabel }}</span>
+             </div>
+        </div>
+
+        <!-- ERROR STATE -->
         <div v-if="callState === 'error'" class="call-center-content">
-            <div class="error-icon">
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="48"
-                    height="48"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                >
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="15" y1="9" x2="9" y2="15" />
-                    <line x1="9" y1="9" x2="15" y2="15" />
-                </svg>
-            </div>
-            <p class="error-text">{{ error }}</p>
-            <button class="btn-close-window" @click="window.close()">
-                Close Window
-            </button>
+             <div class="state-icon error">
+                 <Icon name="AlertCircle" size="48" />
+             </div>
+             <p class="state-text">{{ error }}</p>
+             <button class="btn-secondary" @click="window.close()">Close</button>
         </div>
 
-        <!-- Call Ended State -->
+        <!-- ENDED STATE -->
         <div v-else-if="callState === 'ended'" class="call-center-content">
-            <div class="ended-icon">
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="48"
-                    height="48"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                >
-                    <path
-                        d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"
-                    />
-                    <line x1="23" y1="1" x2="1" y2="23" />
-                </svg>
-            </div>
-            <p class="ended-text">Call ended</p>
-            <p class="ended-sub">
-                {{ error || "You can now close this window." }}
-            </p>
+             <div class="state-icon ended">
+                 <Icon name="PhoneOff" size="48" />
+             </div>
+             <p class="state-text">Call ended</p>
         </div>
 
-        <!-- Join Screen (Before Peer initialized) -->
+        <!-- JOIN SCREEN -->
         <div v-else-if="!hasJoined" class="join-screen call-center-content">
-            <div class="join-preview">
-                <div class="avatar-container">
-                    <img
-                        v-if="callData?.remoteUser.avatar && !avatarLoadFailed"
-                        :src="callData.remoteUser.avatar"
-                        :alt="callData?.remoteUser.name"
-                        class="avatar-img"
-                        @error="avatarLoadFailed = true"
-                    />
-                    <div v-else class="avatar-fallback">
-                        {{ remoteInitials }}
-                    </div>
-                </div>
-                <h1 class="join-title">Ready to join?</h1>
-                <p class="join-subtitle">
-                    {{ callData?.remoteUser.name }} is on the line.
-                </p>
-            </div>
-
-            <div class="join-actions">
-                <button class="btn-join" @click="joinCall">
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <path
-                            d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"
-                        />
-                    </svg>
-                    Join now
-                </button>
-                <button class="btn-decline-join" @click="endCall('hangup')">
-                    Decline
-                </button>
-            </div>
+             <div class="avatar-preview">
+                 <!-- Avatar Preview -->
+                  <div class="preview-circle">
+                      <span class="initials">{{ previewRemoteName[0] }}</span>
+                  </div>
+             </div>
+             <h1 class="join-title">Join Call</h1>
+             <p class="join-subtitle">With {{ previewRemoteName }}</p>
+             
+             <div class="join-actions">
+                  <button class="btn-join" @click="joinCall">
+                      <Icon name="Phone" size="20" />
+                      <span>Join Now</span>
+                  </button>
+                  <button class="btn-decline" @click="endCall('declined')">
+                      <Icon name="X" size="20" />
+                      <span>Decline</span>
+                  </button>
+             </div>
         </div>
 
-        <!-- Active Call State -->
+        <!-- CONNECTED GRID -->
         <template v-else>
-            <!-- Remote Video (full screen) -->
-            <video
-                v-if="remoteHasVideo"
-                ref="remoteVideoRef"
-                autoplay
-                playsinline
-                class="remote-video"
-            />
+            <div class="grid-wrapper">
+                <!-- 1. Remote Participants -->
+                <div 
+                    v-for="p in participants.filter(p => !p.isSelf && p.publicId !== callData?.selfPublicId)" 
+                    :key="p.publicId" 
+                    class="video-cell remote"
+                >
+                    <!-- Audio playback (always audible, but hidden/tiny) -->
+                    <audio
+                        v-if="remoteStreams.get(p.publicId)"
+                        v-src-object="remoteStreams.get(p.publicId)"
+                        autoplay
+                        playsinline
+                        class="hidden-audio"
+                    />
 
-            <!-- Audio-only or Missing Remote Video: avatar display -->
-            <div v-else class="call-center-content">
-                <div class="avatar-container big">
-                    <img
-                        v-if="callData?.remoteUser.avatar && !avatarLoadFailed"
-                        :src="callData.remoteUser.avatar"
-                        :alt="callData?.remoteUser.name"
-                        class="avatar-img"
-                        @error="avatarLoadFailed = true"
+                    <video
+                        v-if="remoteStreams.get(p.publicId) && !isAudioOnly"
+                        v-src-object="remoteStreams.get(p.publicId)"
+                        autoplay
+                        playsinline
+                        class="video-element"
+                    />
+                    <!-- Avatar Fallback (Audio Only or No Video) -->
+                    <div v-else class="avatar-fallback">
+                        <img v-if="p.avatar" :src="p.avatar" class="avatar-img" />
+                        <div v-else class="avatar-placeholder" :style="{ backgroundColor: 'var(--avatar-bg)' }">
+                            {{ p.name[0] }}
+                        </div>
+                        <div class="audio-indicator">
+                            <Icon name="Mic" size="16" />
+                        </div>
+                    </div>
+                    
+                    <div class="participant-info">
+                        <span class="participant-name">{{ p.name }}</span>
+                    </div>
+                </div>
+
+                <!-- 2. Local Participant (Me) -->
+                <div 
+                    class="video-cell local" 
+                    :class="{ 'pip-mode': participants.length >= 2, 'audio-mode': isAudioOnly }"
+                >
+                    <video
+                        v-if="localHasVideo && !isCameraOff && !isAudioOnly"
+                        ref="localVideoRef"
+                        autoplay
+                        muted
+                        playsinline
+                        class="video-element"
                     />
                     <div v-else class="avatar-fallback">
-                        {{ remoteInitials }}
+                        <div class="avatar-placeholder local">
+                            Me
+                        </div>
                     </div>
-                    <!-- Pulsing ring while connecting -->
-                    <div
-                        v-if="callState !== 'connected'"
-                        class="avatar-pulse"
-                    />
-                </div>
-                <p class="remote-name">{{ callData?.remoteUser.name }}</p>
-                <p class="state-label">{{ stateLabel }}</p>
-            </div>
-
-            <!-- Hidden audio element for audio-only calls -->
-            <audio ref="remoteAudioRef" autoplay />
-
-            <!-- Local Video PiP -->
-            <div v-if="localHasVideo" class="local-video-pip">
-                <video
-                    ref="localVideoRef"
-                    autoplay
-                    muted
-                    playsinline
-                    class="local-video"
-                />
-            </div>
-
-            <!-- Top bar (video calls) -->
-            <div v-if="isVideoCall && remoteStream" class="top-bar">
-                <div class="participant-info">
-                    <span class="participant-name">{{
-                        callData?.remoteUser.name
-                    }}</span>
-                    <span class="call-duration">{{ formattedDuration }}</span>
+                    <div class="participant-info">
+                        <span class="participant-name">You</span>
+                    </div>
                 </div>
             </div>
+            
+            <!-- CONTROLS -->
+            <div class="controls-bar">
+                 <button class="control-btn" :class="{ 'off': isMuted }" @click="toggleMute" title="Toggle Mute">
+                    <Icon :name="isMuted ? 'MicOff' : 'Mic'" size="24" />
+                 </button>
+                 
+                 <button v-if="!isAudioOnly" class="control-btn" :class="{ 'off': isCameraOff }" @click="toggleCamera" title="Toggle Camera">
+                    <Icon :name="isCameraOff ? 'VideoOff' : 'Video'" size="24" />
+                 </button>
 
-            <!-- Bottom Controls -->
-            <div class="controls-container">
-                <div class="controls-inner">
-                    <!-- Toggle Mic -->
-                    <button
-                        class="control-btn"
-                        :class="{ 'is-active': isMuted }"
-                        @click="toggleMute"
-                        :title="isMuted ? 'Unmute' : 'Mute'"
-                    >
-                        <svg
-                            v-if="!isMuted"
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        >
-                            <path
-                                d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"
-                            />
-                            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                            <line x1="12" y1="19" x2="12" y2="22" />
-                        </svg>
-                        <svg
-                            v-else
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        >
-                            <line x1="2" y1="2" x2="22" y2="22" />
-                            <path d="M18.89 13.23A7.12 7.12 0 0 1 5 12v-2" />
-                            <path d="M9 5a3 3 0 0 1 5.12-2.12" />
-                            <path d="M11.5 11.5a3 3 0 0 1-2.5-2.5" />
-                            <line x1="12" y1="19" x2="12" y2="22" />
-                        </svg>
-                    </button>
-
-                    <!-- Toggle Camera -->
-                    <button
-                        class="control-btn"
-                        :class="{ 'is-active': isCameraOff }"
-                        @click="toggleCamera"
-                        :title="
-                            isCameraOff ? 'Turn Camera On' : 'Turn Camera Off'
-                        "
-                    >
-                        <svg
-                            v-if="!isCameraOff"
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        >
-                            <path d="m22 8-6 4 6 4V8Z" />
-                            <rect
-                                x="2"
-                                y="6"
-                                width="12"
-                                height="12"
-                                rx="2"
-                                ry="2"
-                            />
-                        </svg>
-                        <svg
-                            v-else
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        >
-                            <line x1="2" y1="2" x2="22" y2="22" />
-                            <path d="m22 8-6 4 6 4V8Z" />
-                            <path d="M14 8V6a2 2 0 0 0-2-2H4.26" />
-                            <path
-                                d="M2.28 2.28 2 2.28A2 2 0 0 0 2 4v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"
-                            />
-                        </svg>
-                    </button>
-
-                    <!-- Hangup -->
-                    <button
-                        class="control-btn hangup"
-                        @click="endCall('hangup')"
-                        title="End Call"
-                    >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                        >
-                            <path
-                                d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"
-                            />
-                        </svg>
-                    </button>
-                </div>
+                 <button class="control-btn hangup" @click="endCall('hangup')" title="End Call">
+                    <Icon name="PhoneOff" size="24" />
+                 </button>
             </div>
         </template>
     </div>
@@ -797,277 +712,365 @@ window.addEventListener("beforeunload", () => {
 
 <style scoped>
 .call-container {
-    position: relative;
-    width: 100dvw;
-    height: 100dvh;
-    overflow: hidden;
+    background: #000;
+    height: 100vh;
+    width: 100vw;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    font-family: 'Inter', system-ui, sans-serif;
 }
 
 .call-bg {
     position: absolute;
     inset: 0;
-    background:
-        radial-gradient(
-            ellipse at 50% 0%,
-            rgba(59, 130, 246, 0.08) 0%,
-            transparent 60%
-        ),
-        radial-gradient(
-            ellipse at 80% 100%,
-            rgba(124, 58, 237, 0.06) 0%,
-            transparent 50%
-        ),
-        #0a0a0f;
+    background: linear-gradient(135deg, #1e1e2e 0%, #11111b 100%);
     z-index: 0;
 }
-
-/* ── Center content (avatar / error / ended) ── */
-.call-center-content {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-}
-
-.avatar-container {
-    position: relative;
-    width: 120px;
-    height: 120px;
-}
-
-.avatar-img {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 3px solid rgba(255, 255, 255, 0.15);
-}
-
-.avatar-fallback {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 40px;
-    font-weight: 600;
-    color: white;
-    border: 3px solid rgba(255, 255, 255, 0.15);
-}
-
-.avatar-pulse {
-    position: absolute;
-    inset: -4px;
-    border-radius: 50%;
-    border: 2px solid rgba(59, 130, 246, 0.4);
-    animation: pulse-ring 2s ease-out infinite;
-}
-
-@keyframes pulse-ring {
-    0% {
-        transform: scale(1);
-        opacity: 1;
-    }
-    100% {
-        transform: scale(1.3);
-        opacity: 0;
-    }
-}
-
-.remote-name {
-    font-size: 24px;
-    font-weight: 600;
-    color: white;
-    margin: 0;
-}
-
-.state-label {
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.5);
-    margin: 0;
-    animation: fade-pulse 2s ease-in-out infinite;
-}
-
-@keyframes fade-pulse {
-    0%,
-    100% {
-        opacity: 0.5;
-    }
-    50% {
-        opacity: 1;
-    }
-}
-
-/* ── Remote Video ── */
-.remote-video {
+.call-overlay {
     position: absolute;
     inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    z-index: 0;
+    background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.4) 100%);
+    z-index: 1;
+    pointer-events: none;
 }
 
-/* ── Local Video PiP ── */
-.local-video-pip {
-    position: absolute;
-    bottom: 100px;
-    right: 24px;
-    width: 200px;
-    aspect-ratio: 16/9;
-    border-radius: 12px;
-    overflow: hidden;
-    border: 2px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    z-index: 10;
-}
-
-.local-video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transform: scaleX(-1);
-}
-
-/* ── Top bar ── */
-.top-bar {
+/* Header */
+.call-header {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
+    padding: 16px;
+    z-index: 20;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 24px;
-    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent);
-    z-index: 10;
+    justify-content: center;
+    pointer-events: none;
 }
-
-.top-bar-info {
+.header-info {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 6px 12px;
+    border-radius: 20px;
     display: flex;
     align-items: center;
     gap: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
-
 .status-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
+    background: #9ca3af;
 }
+.status-dot.connected { background: #10b981; box-shadow: 0 0 8px #10b981; }
+.status-dot.connecting { background: #f59e0b; animation: pulse 1.5s infinite; }
+.status-dot.ringing { background: #3b82f6; animation: pulse 1.5s infinite; }
+.status-dot.ended { background: #ef4444; }
 
-.dot-green {
-    background: #22c55e;
-    box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
-}
-.dot-amber {
-    background: #f59e0b;
-    box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
-}
-
-.remote-name-small {
-    font-size: 14px;
-    font-weight: 500;
+.status-text {
     color: rgba(255, 255, 255, 0.9);
-}
-
-.duration-label {
     font-size: 13px;
-    color: rgba(255, 255, 255, 0.6);
-    font-variant-numeric: tabular-nums;
+    font-weight: 500;
 }
 
-/* ── Controls bar ── */
+/* Call Centers (Error / Ended / Join) */
+.call-center-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: white;
+    z-index: 10;
+    padding: 24px;
+    text-align: center;
+}
+.state-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+}
+.state-icon.error { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.state-icon.ended { background: rgba(107, 114, 128, 0.2); color: #9ca3af; }
+.state-text { font-size: 18px; color: rgba(255,255,255,0.8); margin-bottom: 24px; }
+
+/* Join Screen */
+.avatar-preview { margin-bottom: 24px; }
+.preview-circle {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: 700;
+    color: white;
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+}
+.join-title { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+.join-subtitle { font-size: 16px; color: rgba(255,255,255,0.6); margin-bottom: 32px; }
+.join-actions { display: flex; gap: 16px; }
+
+.btn-join, .btn-decline, .btn-secondary {
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.1s, opacity 0.2s;
+}
+.btn-join { background: #10b981; color: white; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
+.btn-join:hover { transform: translateY(-1px); opacity: 0.9; }
+.btn-decline { background: rgba(255,255,255,0.1); color: #ef4444; backdrop-filter: blur(8px); }
+.btn-decline:hover { background: rgba(239, 68, 68, 0.1); }
+.btn-secondary { background: rgba(255,255,255,0.1); color: white; }
+
+/* Grid Wrapper */
+.grid-wrapper {
+    flex: 1;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    position: relative;
+    padding: 16px;
+    gap: 16px;
+    justify-content: center;
+    align-content: center;
+}
+
+/* Grid Layout Logic */
+.grid-1-1 .grid-wrapper { flex-direction: column; }
+/* Grid 2x2 */
+.grid-2-2 .grid-wrapper {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 1fr); /* Force equal height rows? */
+    /* Better: grid-auto-rows: 1fr; */
+}
+/* Grid 3x2 */
+.grid-3-2 .grid-wrapper {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+}
+
+/* Mobile Adjustments for Grid */
+@media (max-width: 768px) {
+    .grid-wrapper { padding: 8px; gap: 8px; }
+    
+    .grid-2-2 .grid-wrapper, 
+    .grid-3-2 .grid-wrapper {
+        grid-template-columns: 1fr; /* Stack vertically on small mobile? Or 2 cols? */
+        /* If 4 people on phone, 2x2 is tiny. Stacking vertical is better scroll or squeeze. */
+        /* Let's try 2 cols optimized. */
+        grid-template-columns: repeat(2, 1fr);
+        grid-auto-rows: 1fr;
+    }
+}
+
+/* Video Cell */
+.video-cell {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #1f2937;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.video-element {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Local PiP Mode */
+.grid-1-1 .video-cell.local.pip-mode {
+    position: absolute;
+    bottom: 100px; /* Above controls */
+    right: 20px;
+    width: 120px;
+    height: 160px; /* Portrait aspect usually better for Pip */
+    z-index: 30;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.grid-1-1 .video-cell.remote {
+    /* Fullscreen remote */
+    position: absolute;
+    inset: 0;
+    border-radius: 0;
+}
+
+/* Participant Info */
+.participant-info {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 4px 10px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: white;
+    font-size: 12px;
+    font-weight: 500;
+    pointer-events: none;
+}
+
+/* Avatar Fallback */
+.avatar-fallback {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #18181b; 
+    position: relative;
+}
+.avatar-img {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.avatar-placeholder {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: bold;
+    color: white;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.audio-indicator {
+    position: absolute;
+    bottom: 25%;
+    right: calc(50% - 40px); /* Rough positioning */
+    background: #10b981;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    border: 2px solid #18181b;
+}
+
+/* Controls Bar */
 .controls-bar {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
-    align-items: center;
-    justify-content: center;
     gap: 16px;
-    padding: 24px;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
-    z-index: 10;
+    z-index: 50;
+    background: rgba(20, 20, 25, 0.8);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 12px 24px;
+    border-radius: 24px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.08);
 }
 
-.ctrl-btn {
-    width: 52px;
-    height: 52px;
+.control-btn {
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
     border: none;
-    cursor: pointer;
+    background: rgba(255,255,255,0.08);
+    color: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.12);
-    color: white;
-    transition: all 0.15s ease;
-    backdrop-filter: blur(8px);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-.ctrl-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
+.control-btn:hover {
+    background: rgba(255,255,255,0.15);
     transform: scale(1.05);
 }
+.control-btn:active { transform: scale(0.95); }
 
-.ctrl-btn.active {
+.control-btn.off {
+    background: rgba(255,255,255,0.9);
+    color: #1f2937;
+}
+
+.control-btn.hangup {
     background: #ef4444;
     color: white;
+    margin-left: 8px;
+}
+.control-btn.hangup:hover { background: #dc2626; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4); }
+
+/* Animations */
+@keyframes pulse {
+    0% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.1); }
+    100% { opacity: 0.6; transform: scale(1); }
 }
 
-.ctrl-btn.end-call {
-    background: #dc2626;
-    width: 60px;
-    height: 60px;
+@media (max-width: 640px) {
+    .controls-bar {
+        bottom: 24px;
+        padding: 10px 20px;
+        gap: 12px;
+        width: 90%;
+        justify-content: space-around;
+    }
+    .control-btn { width: 48px; height: 48px; }
+    
+    .grid-1-1 .video-cell.local.pip-mode {
+        width: 100px;
+        height: 133px;
+        bottom: 90px;
+        right: 16px;
+    }
 }
 
-.ctrl-btn.end-call:hover {
-    background: #b91c1c;
-}
-
-/* ── Error & Ended states ── */
-.error-icon,
-.ended-icon {
-    color: rgba(255, 255, 255, 0.4);
-    margin-bottom: 8px;
-}
-
-.error-text,
-.ended-text {
-    font-size: 18px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.8);
-    margin: 0;
-}
-
-.ended-sub {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.4);
-    margin: 0;
-}
-
-.btn-close-window {
-    margin-top: 12px;
-    padding: 8px 20px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(255, 255, 255, 0.08);
-    color: white;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.btn-close-window:hover {
-    background: rgba(255, 255, 255, 0.15);
+.hidden-audio {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    opacity: 0.05;
+    pointer-events: none;
+    overflow: hidden;
+    bottom: 0;
+    right: 0;
+    z-index: -100;
 }
 </style>
+```

@@ -25,7 +25,9 @@ class CallSignal implements ShouldBroadcastNow
 
     public string $callId;
 
-    public function __construct(Chat $chat, string $senderPublicId, string $callId, string $signalType, array $signalData)
+    public ?string $targetPublicId;
+
+    public function __construct(Chat $chat, string $senderPublicId, string $callId, string $signalType, array $signalData, ?string $targetPublicId = null)
     {
         $this->chatPublicId = $chat->public_id;
         $this->chatType = $chat->type ?? 'dm';
@@ -33,6 +35,7 @@ class CallSignal implements ShouldBroadcastNow
         $this->callId = $callId;
         $this->signalType = $signalType;
         $this->signalData = $signalData;
+        $this->targetPublicId = $targetPublicId;
     }
 
     public function broadcastWith(): array
@@ -42,6 +45,7 @@ class CallSignal implements ShouldBroadcastNow
             'signal_type' => $this->signalType,
             'signal_data' => $this->signalData,
             'sender_public_id' => $this->senderPublicId,
+            'target_public_id' => $this->targetPublicId,
         ];
     }
 

@@ -17,6 +17,7 @@ import MessageList from './components/chat/MessageList.vue';
 import ChatComposer from './components/chat/ChatComposer.vue';
 import ChatInfoDrawer from './components/drawer/ChatInfoDrawer.vue';
 import ChatSearchModal from './components/chat/ChatSearchModal.vue';
+import IncomingCallOverlay from './components/call/IncomingCallOverlay.vue';
 
 
 const route = useRoute();
@@ -277,7 +278,7 @@ const handleDeclineInvite = (id: any) => declineInvite(Number(id));
     />
 
     <!-- Chat Area (Center Column) -->
-    <main class="chat-main-area flex-1 flex flex-col min-w-0 bg-[var(--surface-primary)]">
+    <main class="chat-main-area flex-1 flex flex-col min-w-0 bg-(--surface-primary)">
       <!-- Header -->
       <ChatHeader
         v-if="activeChat"
@@ -297,16 +298,16 @@ const handleDeclineInvite = (id: any) => declineInvite(Number(id));
       <!-- Empty Header -->
       <div 
         v-else 
-        class="flex items-center gap-3 p-4 border-b border-[var(--border-default)] bg-[var(--surface-elevated)]"
+        class="flex items-center gap-3 p-4 border-b border-(--border-default) bg-(--surface-elevated)"
       >
         <button 
           v-if="isMobile"
-          class="p-2 rounded-lg hover:bg-[var(--surface-tertiary)] text-[var(--text-primary)]"
+          class="p-2 rounded-lg hover:bg-(--surface-tertiary) text-(--text-primary)"
           @click="showSidebar = !showSidebar"
         >
           ☰
         </button>
-        <span class="text-[var(--text-secondary)]">Select a chat to start messaging</span>
+        <span class="text-(--text-secondary)">Select a chat to start messaging</span>
       </div>
 
       <MessageList
@@ -329,12 +330,12 @@ const handleDeclineInvite = (id: any) => declineInvite(Number(id));
         <!-- Typing Indicator (Fixed above composer) -->
         <div 
           v-if="typingIndicator" 
-          class="flex items-center gap-2 px-6 py-2 text-sm text-[var(--text-secondary)] transition-all duration-300"
+          class="flex items-center gap-2 px-6 py-2 text-sm text-(--text-secondary) transition-all duration-300"
         >
-            <div class="flex space-x-1 p-2 bg-[var(--surface-elevated)] rounded-2xl shadow-sm border border-[var(--border-default)]">
-                <div class="w-2 h-2 bg-[var(--text-tertiary)] rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                <div class="w-2 h-2 bg-[var(--text-tertiary)] rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                <div class="w-2 h-2 bg-[var(--text-tertiary)] rounded-full animate-bounce"></div>
+            <div class="flex space-x-1 p-2 bg-(--surface-elevated) rounded-2xl shadow-sm border border-(--border-default)">
+                <div class="w-2 h-2 bg-(--text-tertiary) rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                <div class="w-2 h-2 bg-(--text-tertiary) rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                <div class="w-2 h-2 bg-(--text-tertiary) rounded-full animate-bounce"></div>
             </div>
           <span class="font-medium text-xs animate-pulse">{{ typingIndicator }}</span>
         </div>

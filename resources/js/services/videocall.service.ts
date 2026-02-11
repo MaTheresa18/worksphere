@@ -20,6 +20,24 @@ export class VideoCallService extends BaseService {
   }
 
   /**
+   * Join an existing call.
+   */
+  async joinCall(chatId: string, callId: string): Promise<{ status: string; participants: any[] }> {
+    const response = await this.api.post(`/api/chat/${chatId}/call/join`, {
+      call_id: callId,
+    });
+    return response.data;
+  }
+
+  /**
+   * Get current participants in a call.
+   */
+  async getParticipants(chatId: string, callId: string): Promise<{ participants: any[] }> {
+    const response = await this.api.get(`/api/chat/${chatId}/call/${callId}/participants`);
+    return response.data;
+  }
+
+  /**
    * Send a WebRTC signal (offer/answer/ice-candidate).
    */
   async sendSignal(
@@ -27,11 +45,13 @@ export class VideoCallService extends BaseService {
     callId: string,
     signalType: 'offer' | 'answer' | 'ice-candidate' | 'signal',
     signalData: Record<string, unknown>,
+    targetPublicId?: string,
   ): Promise<void> {
     await this.api.post(`/api/chat/${chatId}/call/signal`, {
       call_id: callId,
       signal_type: signalType,
       signal_data: signalData,
+      target_public_id: targetPublicId,
     });
   }
 

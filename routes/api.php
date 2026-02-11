@@ -907,6 +907,8 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce', 'demo'])->grou
         // Video/Audio Call Signaling
         Route::get('/{chat}/call/turn-credentials', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'turnCredentials']);
         Route::post('/{chat}/call/initiate', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'initiate']);
+        Route::post('/{chat}/call/join', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'join']);
+        Route::get('/{chat}/call/{callId}/participants', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'participants']);
         Route::post('/{chat}/call/signal', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'signal']);
         Route::post('/{chat}/call/end', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'end']);
     });
