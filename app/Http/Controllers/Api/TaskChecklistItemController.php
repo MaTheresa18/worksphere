@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\TaskChecklistItemStatus;
 use App\Enums\TaskStatus;
+use App\Enums\AuditAction;
+use App\Enums\AuditCategory;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreTaskChecklistItemRequest;
 use App\Http\Requests\UpdateTaskChecklistItemRequest;
@@ -12,6 +14,7 @@ use App\Models\Task;
 use App\Models\TaskChecklistItem;
 use App\Models\Team;
 use App\Services\PermissionService;
+use App\Services\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -19,7 +22,8 @@ use Illuminate\Support\Facades\Log;
 class TaskChecklistItemController extends Controller
 {
     public function __construct(
-        protected PermissionService $permissionService
+        protected PermissionService $permissionService,
+        protected AuditService $auditService
     ) {}
 
     /**
@@ -71,8 +75,8 @@ class TaskChecklistItemController extends Controller
         $this->ensureProjectBelongsToTeam($team, $project);
         $this->ensureTaskBelongsToProject($project, $task);
 
-        if ($task->status->isTerminal()) {
-            abort(403, 'Checklist cannot be modified when task is completed or archived.');
+        if ($task->status->isLocked()) {
+            abort(403, "Checklist cannot be modified when task is in '{$task->status->label()}' status.");
         }
 
         // Read-only logic: If in QA, only QA review can modify structure
@@ -95,6 +99,10 @@ class TaskChecklistItemController extends Controller
         // Structure modification requires manage_checklist
         if (! $this->permissionService->hasTeamPermission($user, $team, 'tasks.manage_checklist')) {
             abort(403, 'You do not have permission to add items to this checklist.');
+        }
+
+        if ($task->status->isLocked()) {
+            abort(403, 'Checklist cannot be modified in the current task status.');
         }
 
         $validated = $request->validated();
@@ -156,8 +164,8 @@ class TaskChecklistItemController extends Controller
     {
         $user = $request->user();
 
-        if ($task->status->isTerminal()) {
-            abort(403, 'Checklist cannot be modified when task is completed or archived.');
+        if ($task->status->isLocked()) {
+            abort(403, "Checklist cannot be modified when task is in '{$task->status->label()}' status.");
         }
 
         // Read-only logic: If in QA, only QA review can modify
@@ -206,29 +214,45 @@ class TaskChecklistItemController extends Controller
 
         $validated = $request->validated();
 
-        // Sanitize text if present
-        if (isset($validated['text'])) {
-            // Sanitize text if present - disabled
-            // $validated['text'] = \Mews\Purifier\Facades\Purifier::clean($validated['text']);
-        }
-
-        // Track completion
+        // Worker Lock / Logic
         if (isset($validated['status'])) {
-            $newStatus = $validated['status'];
-            if ($newStatus === TaskChecklistItemStatus::Done || $newStatus === 'done') {
-                $validated['completed_by'] = $request->user()->id;
-                $validated['completed_at'] = now();
-            } elseif ($checklistItem->status === TaskChecklistItemStatus::Done) {
-                // Changing from done to another status
-                $validated['completed_by'] = null;
-                $validated['completed_at'] = null;
+            $newStatusValue = $validated['status'];
+            $newStatus = $newStatusValue instanceof TaskChecklistItemStatus ? $newStatusValue : TaskChecklistItemStatus::from($newStatusValue);
+            $oldStatus = $checklistItem->status;
+
+            // Enforce worker lock: if item is InProgress or OnHold, only the worker who started it (or Admin/Lead) can change status
+            if ($checklistItem->last_worked_on_by && $checklistItem->last_worked_on_by !== $user->id) {
+                if (! $this->permissionService->hasTeamPermission($user, $team, 'tasks.update')) {
+                    abort(403, 'This item is currently being worked on by someone else.');
+                }
             }
+
+            // Handle Transitions
+            if ($oldStatus === TaskChecklistItemStatus::Todo && $newStatus === TaskChecklistItemStatus::InProgress) {
+                $checklistItem->start($user);
+            } elseif ($oldStatus === TaskChecklistItemStatus::InProgress && $newStatus === TaskChecklistItemStatus::OnHold) {
+                $checklistItem->putOnHold();
+            } elseif ($oldStatus === TaskChecklistItemStatus::OnHold && $newStatus === TaskChecklistItemStatus::InProgress) {
+                $checklistItem->resume();
+            } elseif ($newStatus === TaskChecklistItemStatus::Done) {
+                $checklistItem->markAsDone($user);
+            } elseif ($oldStatus === TaskChecklistItemStatus::Done && ($newStatus === TaskChecklistItemStatus::InProgress || $newStatus === TaskChecklistItemStatus::Todo)) {
+                $checklistItem->reopen();
+            } else {
+                // Fallback for other status changes (e.g. from OnHold to Todo if allowed)
+                $checklistItem->update(['status' => $newStatus]);
+            }
+
+            // Remove status from validated so we don't update it twice with generic logic
+            unset($validated['status']);
         }
 
-        $checklistItem->update($validated);
+        if (! empty($validated)) {
+            $checklistItem->update($validated);
+        }
 
         return response()->json([
-            'data' => $checklistItem->fresh(['completedBy:id,name']),
+            'data' => $checklistItem->fresh(['completedBy:id,name', 'lastWorkedOnBy:id,name']),
             'message' => 'Checklist item updated.',
             'meta' => [
                 'can_submit_for_review' => $task->fresh()->canSubmitForReview(),
@@ -243,8 +267,8 @@ class TaskChecklistItemController extends Controller
     {
         $user = request()->user();
 
-        if ($task->status->isTerminal()) {
-            abort(403, 'Checklist cannot be modified when task is completed or archived.');
+        if ($task->status->isLocked()) {
+            abort(403, "Checklist cannot be modified when task is in '{$task->status->label()}' status.");
         }
 
         // Read-only logic
@@ -271,6 +295,10 @@ class TaskChecklistItemController extends Controller
         // Ensure item belongs to task
         if ($checklistItem->task_id !== $task->id) {
             abort(404);
+        }
+
+        if ($task->status->isLocked()) {
+            abort(403, 'Checklist items cannot be deleted in the current task status.');
         }
 
         $checklistItem->delete();
@@ -315,6 +343,21 @@ class TaskChecklistItemController extends Controller
                 ->where('public_id', $itemData['public_id'])
                 ->update(['position' => $itemData['position']]);
         }
+
+        // Log the reordering action
+        $this->auditService->log(
+            AuditAction::Updated,
+            AuditCategory::TaskManagement,
+            $task,
+            $user,
+            null,
+            null,
+            [
+                'action_type' => 'checklist_reordered',
+                'task_title' => $task->title,
+            ],
+            'Reordered checklist items'
+        );
 
         return response()->json([
             'message' => 'Checklist items reordered.',

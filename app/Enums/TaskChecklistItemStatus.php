@@ -6,6 +6,7 @@ enum TaskChecklistItemStatus: string
 {
     case Todo = 'todo';
     case InProgress = 'in_progress';
+    case OnHold = 'on_hold';
     case Done = 'done';
 
     /**
@@ -16,6 +17,7 @@ enum TaskChecklistItemStatus: string
         return match ($this) {
             self::Todo => 'To Do',
             self::InProgress => 'In Progress',
+            self::OnHold => 'On Hold',
             self::Done => 'Done',
         };
     }

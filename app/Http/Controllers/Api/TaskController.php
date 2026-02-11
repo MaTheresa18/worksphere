@@ -386,8 +386,12 @@ class TaskController extends Controller
             abort(403, 'You do not have permission to update this task.');
         }
 
-        // Read-only logic: If in QA, only those with tasks.qa_review (Admin/Lead/QA) can edit.
-        // Unless it was rejected (workflow handles that transitions).
+        // Read-only logic: Terminal/External statuses are locked.
+        if ($task->status->isLocked()) {
+            abort(403, "Task is in '{$task->status->label()}' status and is read-only.");
+        }
+
+        // Review logic: If in review, only those with tasks.qa_review (Admin/Lead/QA) can edit.
         $isInReview = in_array($task->status, [TaskStatus::Submitted, TaskStatus::InQa, TaskStatus::PmReview]);
         $hasQaPermission = $this->permissionService->hasTeamPermission($user, $team, 'tasks.qa_review');
 
@@ -417,6 +421,12 @@ class TaskController extends Controller
         // Handle status change through workflow if provided
         if (isset($validated['status']) && $validated['status'] !== $task->status->value) {
             $newStatus = TaskStatus::from($validated['status']);
+
+            // SECURITY: If sending to client, MUST have tasks.send_to_client permission
+            if ($newStatus === TaskStatus::SentToClient) {
+                $this->authorizeTeamPermission($team, 'tasks.send_to_client');
+            }
+
             if ($task->canTransitionTo($newStatus)) {
                 $task->transitionTo($newStatus, $user);
             } else {
@@ -485,6 +495,11 @@ class TaskController extends Controller
         $this->authorizeTeamPermission($team, 'tasks.delete');
         $this->ensureProjectBelongsToTeam($team, $project);
         $this->ensureTaskBelongsToProject($project, $task);
+
+        // Status lock
+        if ($task->status->isLocked()) {
+            abort(403, "Tasks in '{$task->status->label()}' status cannot be deleted.");
+        }
 
         $taskTitle = $task->title;
         $task->delete();
@@ -630,6 +645,11 @@ class TaskController extends Controller
      */
     public function toggleHold(Request $request, Team $team, Project $project, Task $task): JsonResponse
     {
+        // Status lock
+        if ($task->status->isLocked()) {
+            abort(403, "Task status cannot be modified at this stage.");
+        }
+
         // Check permissions based on stage (Bucket Logic)
         $canToggle = false;
 
@@ -903,6 +923,11 @@ class TaskController extends Controller
         $this->ensureProjectBelongsToTeam($team, $project);
         $this->ensureTaskBelongsToProject($project, $task);
 
+        // Status lock
+        if ($task->status === TaskStatus::SentToClient) {
+            abort(403, "Task cannot be archived while awaiting client feedback.");
+        }
+
         if (! $this->workflowService->archiveTask($task, $request->user())) {
             return response()->json([
                 'message' => 'Cannot archive this task. Invalid status transition.',
@@ -1011,8 +1036,20 @@ class TaskController extends Controller
         $this->ensureProjectBelongsToTeam($team, $project);
         $this->ensureTaskBelongsToProject($project, $task);
 
+        $checklistIds = $task->checklistItems()->pluck('id')->toArray();
+
         $logs = \App\Models\AuditLog::query()
-            ->forModel($task)
+            ->where(function ($q) use ($task, $checklistIds) {
+                // Main task logs
+                $q->where(function ($sq) use ($task) {
+                    $sq->forModel($task);
+                })
+                // Related checklist item logs
+                ->orWhere(function ($sq) use ($checklistIds) {
+                    $sq->where('auditable_type', \App\Models\TaskChecklistItem::class)
+                       ->whereIn('auditable_id', $checklistIds);
+                });
+            })
             ->with(['user'])
             ->latest()
             ->get();

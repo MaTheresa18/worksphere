@@ -53,7 +53,7 @@ class UpdateTaskChecklistItemRequest extends FormRequest
     {
         return [
             'text.max' => 'The checklist item text must not exceed 500 characters.',
-            'status.Illuminate\Validation\Rules\Enum' => 'The status must be one of: todo, in_progress, done.',
+            'status.Illuminate\Validation\Rules\Enum' => 'The status must be one of: todo, in_progress, on_hold, done.',
         ];
     }
 }

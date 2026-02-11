@@ -100,6 +100,18 @@ enum TaskStatus: string
     }
 
     /**
+     * Check if this status represents a locked state (read-only).
+     */
+    public function isLocked(): bool
+    {
+        return in_array($this, [
+            self::SentToClient,
+            self::Completed,
+            self::Archived,
+        ]);
+    }
+
+    /**
      * Check if this is an active/working status.
      */
     public function isActive(): bool

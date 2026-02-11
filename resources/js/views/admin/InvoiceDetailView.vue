@@ -42,6 +42,7 @@ const invoice = ref<any>(null);
 
 const invoiceId = computed(() => route.params.id as string);
 const currentTeamId = computed(() => authStore.currentTeam?.public_id);
+const showPaymentModal = ref(false);
 
 const formatCurrency = (amount: number, currency: string = "USD") => {
     return new Intl.NumberFormat("en-US", {
@@ -304,7 +305,7 @@ onMounted(() => {
                         Send
                     </Button>
                     <Button
-                        v-else-if="invoice.can_record_payment"
+                        v-if="invoice.can_record_payment"
                         @click="recordPayment"
                         :loading="isProcessing"
                     >

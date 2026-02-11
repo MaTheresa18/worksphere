@@ -152,14 +152,50 @@ class AuditLog extends Model
         $modelName = $this->auditable_type ? class_basename($this->auditable_type) : 'record';
 
         if ($this->action === AuditAction::Created) {
+            if ($this->auditable_type === TaskChecklistItem::class) {
+                $text = $this->new_values['text'] ?? 'item';
+
+                return "Added checklist item \"{$text}\"";
+            }
+
             return "Created {$modelName}";
         }
 
         if ($this->action === AuditAction::Deleted) {
+            if ($this->auditable_type === TaskChecklistItem::class) {
+                $text = $this->old_values['text'] ?? 'item';
+                $statusValue = $this->old_values['status'] ?? null;
+                $statusLabel = '';
+                if ($statusValue) {
+                    $status = \App\Enums\TaskChecklistItemStatus::tryFrom($statusValue);
+                    $statusLabel = $status ? $status->label() : $statusValue;
+                }
+
+                $description = "Removed checklist item \"{$text}\"";
+                if ($statusLabel) {
+                    $description .= " while it was {$statusLabel}";
+                }
+
+                return $description;
+            }
+
             return "Deleted {$modelName}";
         }
 
         if ($this->action === AuditAction::Updated && $this->new_values) {
+            if ($this->auditable_type === TaskChecklistItem::class) {
+                $itemText = $this->metadata['item_text'] ?? $this->auditable?->text ?? $this->new_values['text'] ?? $this->old_values['text'] ?? 'item';
+
+                if (isset($this->new_values['status'])) {
+                    $status = \App\Enums\TaskChecklistItemStatus::tryFrom($this->new_values['status']);
+                    $label = $status ? $status->label() : $this->new_values['status'];
+
+                    return "Marked checklist item \"{$itemText}\" as {$label}";
+                }
+
+                return "Updated checklist item \"{$itemText}\"";
+            }
+
             $changes = [];
             foreach ($this->new_values as $key => $value) {
                 // Skip internal or non-human useful fields

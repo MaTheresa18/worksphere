@@ -571,16 +571,13 @@ const addChecklistItem = async () => {
 };
 
 const updateChecklistItemStatus = async (item: any, newStatus: string) => {
-    if (!isAssignee.value) {
-        toast.error("Only the assignee can change item status");
-        return;
-    }
     try {
         await axios.put(
             `/api/teams/${currentTeamId.value}/projects/${projectId.value}/tasks/${taskId.value}/checklist/${item.public_id}`,
             { status: newStatus },
         );
         await fetchChecklistItems();
+        await fetchActivityLogs(); // Refresh activity tab too
     } catch (err: any) {
         toast.error(err.response?.data?.message || "Failed to update item");
     }
@@ -689,12 +686,14 @@ const executeDeleteTask = async () => {
 const getItemStatusIcon = (status: string) => {
     if (status === "done") return CheckSquare;
     if (status === "in_progress") return Play;
+    if (status === "on_hold") return Pause;
     return Square;
 };
 
 const getNextStatus = (status: string) => {
     if (status === "todo") return "in_progress";
     if (status === "in_progress") return "done";
+    if (status === "done") return "todo"; // Reopen to Todo
     return "todo";
 };
 
@@ -1242,15 +1241,17 @@ watch(
                                                         ),
                                                     )
                                                 "
-                                                :disabled="!canCompleteItems"
+                                                :disabled="!canCompleteItems || item.status === 'on_hold'"
                                                 class="shrink-0"
                                                 :class="
-                                                    canCompleteItems
+                                                    canCompleteItems && item.status !== 'on_hold'
                                                         ? 'cursor-pointer hover:scale-110 transition-transform'
                                                         : 'cursor-not-allowed opacity-50'
                                                 "
                                                 :title="
-                                                    canCompleteItems
+                                                    item.status === 'on_hold'
+                                                        ? 'Resume the item before marking as done'
+                                                        : canCompleteItems
                                                         ? 'Click to change status'
                                                         : 'You do not have permission to change status or the task is locked'
                                                 "
@@ -1269,10 +1270,33 @@ watch(
                                                         'text-blue-500':
                                                             item.status ===
                                                             'in_progress',
-                                                        'text-[var(--text-muted)]':
+                                                        'text-orange-500':
+                                                            item.status ===
+                                                            'on_hold',
+                                                        'text-(--text-muted)':
                                                             item.status ===
                                                             'todo',
                                                     }"
+                                                />
+                                            </button>
+
+                                            <!-- Separate Hold/Resume Button -->
+                                            <button
+                                                v-if="item.status === 'in_progress' || item.status === 'on_hold'"
+                                                @click="
+                                                    updateChecklistItemStatus(
+                                                        item,
+                                                        item.status === 'in_progress' ? 'on_hold' : 'in_progress'
+                                                    )
+                                                "
+                                                :disabled="!canCompleteItems"
+                                                class="shrink-0 p-1 rounded-md hover:bg-(--surface-tertiary) transition-colors"
+                                                :title="item.status === 'in_progress' ? 'Put on Hold' : 'Resume Work'"
+                                            >
+                                                <component
+                                                    :is="item.status === 'in_progress' ? Pause : Play"
+                                                    class="w-4 h-4"
+                                                    :class="item.status === 'in_progress' ? 'text-orange-500' : 'text-blue-500'"
                                                 />
                                             </button>
 
@@ -1293,6 +1317,8 @@ watch(
                                                 :variant="
                                                     item.status === 'done'
                                                         ? 'success'
+                                                        : item.status === 'on_hold'
+                                                        ? 'warning'
                                                         : 'secondary'
                                                 "
                                                 size="sm"
@@ -1301,6 +1327,8 @@ watch(
                                                 {{
                                                     item.status === "done"
                                                         ? "Done"
+                                                        : item.status === "on_hold"
+                                                        ? "On Hold"
                                                         : "In Progress"
                                                 }}
                                             </Badge>

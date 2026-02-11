@@ -5,7 +5,8 @@ import api from '@/lib/api';
 
 const router = useRouter();
 import { debounce } from 'lodash';
-import { SearchInput, SelectFilter, StatsCard, Avatar } from '@/components/ui';
+import { SearchInput, SelectFilter, StatsCard, Avatar, Modal, Input, Button } from '@/components/ui';
+import { useNavigationStore } from '@/stores/navigation';
 import {
     Trash2,
     Plus,
@@ -24,6 +25,7 @@ import { useAuthStore } from '@/stores/auth';
 
 // State
 const authStore = useAuthStore();
+const navStore = useNavigationStore();
 const teams = ref([]);
 const stats = ref({
     total: 0,
@@ -173,6 +175,7 @@ const createTeam = async () => {
         fetchTeams(1);
         fetchStats();
         authStore.fetchUser(); // Refresh user to update teams list
+        navStore.fetchNavigation(); // Refresh sidebar
     } catch (error) {
         if (error.response && error.response.data.errors) {
             errors.value = error.response.data.errors;
@@ -200,6 +203,7 @@ const updateTeam = async () => {
         fetchTeams(pagination.value.current_page);
         fetchStats();
         authStore.fetchUser(); // Refresh user to update team details
+        navStore.fetchNavigation(); // Refresh sidebar
     } catch (error) {
         if (error.response && error.response.data.errors) {
             errors.value = error.response.data.errors;
@@ -214,6 +218,7 @@ const deleteTeam = async (team) => {
         fetchTeams(pagination.value.current_page);
         fetchStats();
         authStore.fetchUser(); // Refresh user to remove deleted team
+        navStore.fetchNavigation(); // Refresh sidebar
     } catch (error) {
         console.error(error);
     }
@@ -244,35 +249,35 @@ onMounted(() => {
         <!-- Header Section -->
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 animate-fade-in-down">
             <div>
-                <h1 class="text-3xl font-bold text-[var(--text-primary)] tracking-tight">Teams</h1>
-                <p class="text-[var(--text-secondary)] mt-1 text-lg">Manage your organization's teams and members.</p>
+                <h1 class="text-3xl font-bold text-(--text-primary) tracking-tight">Teams</h1>
+                <p class="text-(--text-secondary) mt-1 text-lg">Manage your organization's teams and members.</p>
             </div>
             
             <div class="flex items-center gap-4">
                  <!-- View Toggles -->
-                <div class="flex items-center bg-[var(--surface-primary)]/80 backdrop-blur-sm rounded-xl p-1.5 border border-[var(--border-default)] shadow-sm">
+                <div class="flex items-center bg-(--surface-primary)/80 backdrop-blur-sm rounded-xl p-1.5 border border-(--border-default) shadow-sm">
                     <button 
                         @click="viewMode = 'list'" 
-                        :class="{'bg-[var(--surface-elevated)] text-[var(--text-primary)] shadow-sm': viewMode === 'list', 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]': viewMode !== 'list'}" 
+                        :class="{'bg-(--surface-elevated) text-(--text-primary) shadow-sm': viewMode === 'list', 'text-(--text-secondary) hover:text-(--text-primary)': viewMode !== 'list'}" 
                         class="p-2 rounded-lg transition-all duration-200"
                     >
                         <List class="w-4 h-4" />
                     </button>
                     <button 
                         @click="viewMode = 'grid'" 
-                        :class="{'bg-[var(--surface-elevated)] text-[var(--text-primary)] shadow-sm': viewMode === 'grid', 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]': viewMode !== 'grid'}" 
+                        :class="{'bg-(--surface-elevated) text-(--text-primary) shadow-sm': viewMode === 'grid', 'text-(--text-secondary) hover:text-(--text-primary)': viewMode !== 'grid'}" 
                         class="p-2 rounded-lg transition-all duration-200"
                     >
                         <LayoutGrid class="w-4 h-4" />
                     </button>
                 </div>
 
-                <div class="h-8 w-px bg-[var(--border-default)]"></div>
+                <div class="h-8 w-px bg-(--border-default)"></div>
 
                 <button 
                     v-if="selectedTeams.length > 0" 
                     @click="deleteSelected"
-                    class="btn btn-secondary btn-sm text-[var(--color-error)] border border-[var(--color-error)]/20 hover:bg-red-500/10 backdrop-blur-sm shadow-sm hover:shadow transition-all"
+                    class="btn btn-secondary btn-sm text-error border border-error/20 hover:bg-red-500/10 backdrop-blur-sm shadow-sm hover:shadow transition-all"
                 >
                     <Trash2 class="w-4 h-4" />
                     Delete Selected ({{ selectedTeams.length }})
@@ -800,104 +805,90 @@ onMounted(() => {
         </div>
 
         <!-- Create Modal -->
-        <div v-if="showCreateModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-all duration-300">
-            <div class="modal-content w-full max-w-lg bg-[var(--surface-elevated)] rounded-2xl shadow-2xl border border-[var(--border-default)] transform transition-all animate-scale-in">
-                <div class="px-6 py-5 border-b border-[var(--border-default)] flex items-center justify-between bg-[var(--surface-secondary)]/30 rounded-t-2xl">
-                    <div>
-                        <h3 class="text-xl font-bold text-[var(--text-primary)]">Create New Team</h3>
-                        <p class="text-xs text-[var(--text-secondary)] mt-0.5">Add a new team to your organization</p>
-                    </div>
-                    <button @click="showCreateModal = false" class="text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] p-2 rounded-full transition-colors">
-                        <X class="w-5 h-5" />
-                    </button>
+        <Modal
+            v-model:open="showCreateModal"
+            title="Create New Team"
+            description="Add a new team to your organization"
+            size="lg"
+        >
+            <div class="space-y-5">
+                <div class="space-y-1.5">
+                    <label class="text-sm font-semibold text-[var(--text-secondary)]">Team Name</label>
+                    <Input v-model="formData.name" placeholder="e.g. Engineering" :error="errors.name ? errors.name[0] : ''" />
                 </div>
-                <div class="p-6 space-y-5">
-                    <div class="space-y-1.5">
-                        <label class="text-sm font-semibold text-[var(--text-secondary)]">Team Name</label>
-                        <input v-model="formData.name" type="text" class="input w-full focus:ring-2 focus:ring-purple-500/20" placeholder="e.g. Engineering">
-                        <p v-if="errors.name" class="text-xs text-[var(--color-error)] mt-1 font-medium">{{ errors.name[0] }}</p>
-                    </div>
-                    <div class="space-y-1.5">
-                        <label class="text-sm font-semibold text-[var(--text-secondary)]">Description</label>
-                        <textarea v-model="formData.description" rows="3" class="input w-full focus:ring-2 focus:ring-purple-500/20" placeholder="What is this team responsible for?"></textarea>
-                         <p v-if="errors.description" class="text-xs text-[var(--color-error)] mt-1 font-medium">{{ errors.description[0] }}</p>
-                    </div>
-                    <div class="grid grid-cols-2 gap-5">
-                        <div v-if="authStore.hasRole('administrator')" class="space-y-1.5">
-                            <label class="text-sm font-semibold text-[var(--text-secondary)]">Owner</label>
-                            <select v-model="formData.owner_id" class="input w-full focus:ring-2 focus:ring-purple-500/20">
-                                <option value="" disabled>Select Owner</option>
-                                <option v-for="user in users" :key="user.id" :value="user.id">
-                                    {{ user.name }}
-                                </option>
-                            </select>
-                            <p v-if="errors.owner_id" class="text-xs text-[var(--color-error)] mt-1 font-medium">{{ errors.owner_id[0] }}</p>
-                        </div>
-                        <div :class="authStore.hasRole('administrator') ? 'space-y-1.5' : 'col-span-2 space-y-1.5'">
-                            <label class="text-sm font-semibold text-[var(--text-secondary)]">Status</label>
-                            <select v-model="formData.status" class="input w-full focus:ring-2 focus:ring-purple-500/20">
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
-                        </div>
-                    </div>
+                <div class="space-y-1.5">
+                    <label class="text-sm font-semibold text-[var(--text-secondary)]">Description</label>
+                    <textarea v-model="formData.description" rows="3" class="input w-full focus:ring-2 focus:ring-purple-500/20" placeholder="What is this team responsible for?"></textarea>
+                     <p v-if="errors.description" class="text-xs text-[var(--color-error)] mt-1 font-medium">{{ errors.description[0] }}</p>
                 </div>
-                <div class="px-6 py-5 bg-[var(--surface-secondary)]/50 rounded-b-2xl flex justify-end gap-3 border-t border-[var(--border-default)]">
-                    <button @click="showCreateModal = false" class="btn btn-ghost hover:bg-[var(--surface-tertiary)] text-[var(--text-secondary)] font-medium">Cancel</button>
-                    <button @click="createTeam" class="btn btn-primary shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30">Create Team</button>
+                <div class="grid grid-cols-2 gap-5">
+                    <div v-if="authStore.hasRole('administrator')" class="space-y-1.5">
+                        <label class="text-sm font-semibold text-[var(--text-secondary)]">Owner</label>
+                        <select v-model="formData.owner_id" class="input w-full focus:ring-2 focus:ring-purple-500/20">
+                            <option value="" disabled>Select Owner</option>
+                            <option v-for="user in users" :key="user.id" :value="user.id">
+                                {{ user.name }}
+                            </option>
+                        </select>
+                        <p v-if="errors.owner_id" class="text-xs text-[var(--color-error)] mt-1 font-medium">{{ errors.owner_id[0] }}</p>
+                    </div>
+                    <div :class="authStore.hasRole('administrator') ? 'space-y-1.5' : 'col-span-2 space-y-1.5'">
+                        <label class="text-sm font-semibold text-[var(--text-secondary)]">Status</label>
+                        <select v-model="formData.status" class="input w-full focus:ring-2 focus:ring-purple-500/20">
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
                 </div>
             </div>
-        </div>
+            <template #footer>
+                <Button variant="ghost" @click="showCreateModal = false">Cancel</Button>
+                <Button @click="createTeam" variant="primary" class="shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30">Create Team</Button>
+            </template>
+        </Modal>
 
-        <!-- Edit Modal (Reusing similar styling) -->
-        <div v-if="showEditModal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-all duration-300">
-             <div class="modal-content w-full max-w-lg bg-[var(--surface-elevated)] rounded-2xl shadow-2xl border border-[var(--border-default)] transform transition-all animate-scale-in">
-                <div class="px-6 py-5 border-b border-[var(--border-default)] flex items-center justify-between bg-[var(--surface-secondary)]/30 rounded-t-2xl">
-                     <div>
-                        <h3 class="text-xl font-bold text-[var(--text-primary)]">Edit Team</h3>
-                        <p class="text-xs text-[var(--text-secondary)] mt-0.5">Update team details and settings</p>
-                    </div>
-                    <button @click="showEditModal = false" class="text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] p-2 rounded-full transition-colors">
-                        <X class="w-5 h-5" />
-                    </button>
+        <!-- Edit Modal -->
+        <Modal
+            v-model:open="showEditModal"
+            title="Edit Team"
+            description="Update team details and settings"
+            size="lg"
+        >
+            <div class="space-y-5">
+                <div class="space-y-1.5">
+                    <label class="text-sm font-semibold text-[var(--text-secondary)]">Team Name</label>
+                    <Input v-model="formData.name" :error="errors.name ? errors.name[0] : ''" />
                 </div>
-                <div class="p-6 space-y-5">
+                 <div class="space-y-1.5">
+                    <label class="text-sm font-semibold text-[var(--text-secondary)]">Description</label>
+                    <textarea v-model="formData.description" rows="3" class="input w-full focus:ring-2 focus:ring-purple-500/20"></textarea>
+                     <p v-if="errors.description" class="text-xs text-[var(--color-error)] mt-1 font-medium">{{ errors.description[0] }}</p>
+                </div>
+                <div class="grid grid-cols-2 gap-5">
+                    <div v-if="authStore.hasRole('administrator')" class="space-y-1.5">
+                        <label class="text-sm font-semibold text-[var(--text-secondary)]">Owner</label>
+                        <select v-model="formData.owner_id" class="input w-full focus:ring-2 focus:ring-purple-500/20">
+                            <option value="" disabled>Select Owner</option>
+                            <option v-for="user in users" :key="user.id" :value="user.id">
+                                {{ user.name }}
+                            </option>
+                        </select>
+                        <p v-if="errors.owner_id" class="text-xs text-[var(--color-error)] mt-1 font-medium">{{ errors.owner_id[0] }}</p>
+                    </div>
                     <div class="space-y-1.5">
-                        <label class="text-sm font-semibold text-[var(--text-secondary)]">Team Name</label>
-                        <input v-model="formData.name" type="text" class="input w-full focus:ring-2 focus:ring-purple-500/20">
-                        <p v-if="errors.name" class="text-xs text-[var(--color-error)] mt-1 font-medium">{{ errors.name[0] }}</p>
+                        <label class="text-sm font-semibold text-[var(--text-secondary)]">Status</label>
+                        <select v-model="formData.status" class="input w-full focus:ring-2 focus:ring-purple-500/20">
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
                     </div>
-                     <div class="space-y-1.5">
-                        <label class="text-sm font-semibold text-[var(--text-secondary)]">Description</label>
-                        <textarea v-model="formData.description" rows="3" class="input w-full focus:ring-2 focus:ring-purple-500/20"></textarea>
-                         <p v-if="errors.description" class="text-xs text-[var(--color-error)] mt-1 font-medium">{{ errors.description[0] }}</p>
-                    </div>
-                    <div class="grid grid-cols-2 gap-5">
-                        <div v-if="authStore.hasRole('administrator')" class="space-y-1.5">
-                            <label class="text-sm font-semibold text-[var(--text-secondary)]">Owner</label>
-                            <select v-model="formData.owner_id" class="input w-full focus:ring-2 focus:ring-purple-500/20">
-                                <option value="" disabled>Select Owner</option>
-                                <option v-for="user in users" :key="user.id" :value="user.id">
-                                    {{ user.name }}
-                                </option>
-                            </select>
-                            <p v-if="errors.owner_id" class="text-xs text-[var(--color-error)] mt-1 font-medium">{{ errors.owner_id[0] }}</p>
-                        </div>
-                        <div class="space-y-1.5">
-                            <label class="text-sm font-semibold text-[var(--text-secondary)]">Status</label>
-                            <select v-model="formData.status" class="input w-full focus:ring-2 focus:ring-purple-500/20">
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="px-6 py-5 bg-[var(--surface-secondary)]/50 rounded-b-2xl flex justify-end gap-3 border-t border-[var(--border-default)]">
-                    <button @click="showEditModal = false" class="btn btn-ghost hover:bg-[var(--surface-tertiary)] text-[var(--text-secondary)] font-medium">Cancel</button>
-                    <button @click="updateTeam" class="btn btn-primary shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30">Save Changes</button>
                 </div>
             </div>
-        </div>
+            <template #footer>
+                <Button variant="ghost" @click="showEditModal = false">Cancel</Button>
+                <Button @click="updateTeam" variant="primary" class="shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30">Save Changes</Button>
+            </template>
+        </Modal>
     </div>
 </template>
 

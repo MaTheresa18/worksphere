@@ -43,7 +43,7 @@ const checkboxId = computed(
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--interactive-primary)/20',
                     'disabled:cursor-not-allowed disabled:opacity-50',
                     proxyChecked
-                        ? 'bg-(--brand-primary) border-(--brand-primary) shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]'
+                        ? 'bg-(--interactive-primary) border-(--interactive-primary) shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]'
                         : 'border-(--border-default) bg-(--surface-elevated) hover:border-(--border-strong)',
                 )
             "

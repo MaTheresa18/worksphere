@@ -42,6 +42,7 @@ return [
         \App\Models\Client::class,
         \App\Models\Project::class,
         \App\Models\Task::class,
+        \App\Models\TaskChecklistItem::class,
     ],
 
     /*

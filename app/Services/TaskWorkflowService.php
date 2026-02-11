@@ -214,6 +214,8 @@ class TaskWorkflowService
             $type = $approved ? \App\Notifications\TaskNotification::TYPE_UPDATED : \App\Notifications\TaskNotification::TYPE_REJECTED; // Use UPDATED for PM review move, REJECTED for rejection
             $message = $approved ? 'QA Approved task' : 'QA Rejected task: '.($notes ?? 'Issues found');
             $this->notifyStakeholders($task, $type, $reviewer, $message);
+
+            return true;
         });
     }
 
