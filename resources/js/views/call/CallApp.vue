@@ -12,6 +12,7 @@ import {
     nextTick,
 } from "vue";
 import Peer from "simple-peer";
+import * as sdpTransform from "sdp-transform";
 import { startEcho, stopEcho } from "@/echo";
 import { videoCallService } from "@/services/videocall.service";
 
@@ -67,9 +68,21 @@ let ringtoneTimeout: ReturnType<typeof setTimeout> | null = null;
 // Computed
 // ============================================================================
 
-const isVideoCall = computed(
-    () => callData.value?.callType === "video" && !videoFallback.value,
-);
+const isVideoCall = computed(() => callData.value?.callType === "video");
+
+const remoteHasVideo = computed(() => {
+    if (!remoteStream.value) return false;
+    return remoteStream.value
+        .getVideoTracks()
+        .some((t) => t.readyState === "live");
+});
+
+const localHasVideo = computed(() => {
+    if (!localStream.value) return false;
+    return localStream.value
+        .getVideoTracks()
+        .some((t) => t.enabled && t.readyState === "live");
+});
 
 const stateLabel = computed(() => {
     switch (callState.value) {
@@ -174,23 +187,27 @@ async function acquireMedia(): Promise<MediaStream | null> {
 
 function mungeSdp(sdp: string): string {
     if (!sdp) return sdp;
-    // We MUST use \r\n because many SDP parsers are strict about it.
-    return sdp.split(/\r?\n/).map(line => {
-        const clean = line.trim();
-        if (!clean) return "";
-        
-        // Fix for Chrome: rejects huge max-message-size
-        if (clean.startsWith('a=max-message-size:')) {
-            return 'a=max-message-size:65536';
+    try {
+        const parsed = sdpTransform.parse(sdp);
+        // Clean up each media section
+        if (parsed.media) {
+            parsed.media = parsed.media.map((m: any) => {
+                // Fix max-message-size (Chrome rejects large values)
+                if (m.maxMessageSize !== undefined) {
+                    m.maxMessageSize = 65536;
+                }
+                // Fix sctp-port:0 (Chrome rejects zero)
+                if (m.sctpPort === 0) {
+                    m.sctpPort = 5000;
+                }
+                return m;
+            });
         }
-
-        // Fix for Chrome/Firefox: rejects sctp-port:0
-        if (clean === 'a=sctp-port:0') {
-            return 'a=sctp-port:5000';
-        }
-
-        return clean;
-    }).filter(l => l.length > 0).join('\r\n') + '\r\n';
+        return sdpTransform.write(parsed);
+    } catch (e) {
+        console.warn("[Call] sdp-transform parse failed, returning raw SDP", e);
+        return sdp;
+    }
 }
 
 // ============================================================================
@@ -225,24 +242,30 @@ async function joinCall() {
     peer = new Peer({
         initiator: isInitiator,
         stream: stream,
-        trickle: false, // Disable trickle ICE for better stability (single signal)
+        trickle: true, // Enable trickle ICE for faster connections
         config: { iceServers },
-        dataChannels: true, // Re-enable for BUNDLE stability
         sdpTransform: (sdp: string) => {
-            console.log("[Call] --- TRANSFORMING OUTGOING SDP ---");
-            const munged = mungeSdp(sdp);
-            console.log("[Call] Munged outgoing SDP length:", munged.length);
-            return munged;
-        }
+            console.log("[Call] Transforming outgoing SDP via sdp-transform");
+            return mungeSdp(sdp);
+        },
     });
 
     peer.on("signal", (signal: any) => {
-        console.log("[Call] ☁️ Local signal produced, type:", signal.type || "candidate");
+        console.log(
+            "[Call] ☁️ Local signal produced, type:",
+            signal.type || "candidate",
+        );
         videoCallService.sendSignal(data.chatId, data.callId, "signal", signal);
     });
 
     peer.on("stream", (remote: MediaStream) => {
-        console.log("[Call] 📡 Remote stream received");
+        console.log(
+            "[Call] 📡 Remote stream received, tracks:",
+            remote
+                .getTracks()
+                .map((t) => `${t.kind}:${t.readyState}`)
+                .join(", "),
+        );
         remoteStream.value = remote;
     });
 
@@ -256,14 +279,16 @@ async function joinCall() {
 
     peer.on("error", (err: any) => {
         console.error("[Call] ❌ PEER ERROR:", err.name, err.message);
-        console.error("[Call] Error stack:", err.stack);
-        if (err.name === 'OperationError') {
-             console.error("[Call] This usually means an invalid SDP line was encountered.");
-             // Log the current local/remote descriptions if available
-             if (peer?._pc) {
-                 console.log("[Call] LOCAL DESCRIPTION:", peer._pc.localDescription?.sdp);
-                 console.log("[Call] REMOTE DESCRIPTION:", peer._pc.remoteDescription?.sdp);
-             }
+        if (peer && (peer as any)._pc) {
+            const pc = (peer as any)._pc as RTCPeerConnection;
+            console.log("[Call] ICE connection state:", pc.iceConnectionState);
+            console.log("[Call] Signaling state:", pc.signalingState);
+            if (pc.localDescription?.sdp) {
+                console.log("[Call] LOCAL SDP:", pc.localDescription.sdp);
+            }
+            if (pc.remoteDescription?.sdp) {
+                console.log("[Call] REMOTE SDP:", pc.remoteDescription.sdp);
+            }
         }
         handleCallFailed();
     });
@@ -285,8 +310,10 @@ async function joinCall() {
         callState.value = "connecting";
         // If we have initial signals, apply them
         if (data.pendingSignals && data.pendingSignals.length > 0) {
-            console.log(`[Call] Applying ${data.pendingSignals.length} initial pending signals`);
-            data.pendingSignals.forEach(s => {
+            console.log(
+                `[Call] Applying ${data.pendingSignals.length} initial pending signals`,
+            );
+            data.pendingSignals.forEach((s) => {
                 if (s.sdp) s.sdp = mungeSdp(s.sdp);
                 peer?.signal(s);
             });
@@ -309,11 +336,9 @@ async function handleSignal(event: any) {
         if (signal.sdp) signal.sdp = mungeSdp(signal.sdp);
         peer.signal(signal);
     } else {
-        console.warn("[Call] Signal received but peer not initialized (User hasn't clicked join)");
-        // If user hasn't joined yet, we can't apply signals.
-        // For incoming calls, the offer is usually passed via sessionStorage,
-        // but late candidates might arrive here. Simple-peer handles this
-        // if we initialize it early, but we wait for user gesture.
+        console.warn(
+            "[Call] Signal received but peer not initialized (User hasn't clicked join)",
+        );
     }
 }
 
@@ -354,12 +379,16 @@ function postToParent(msg: Record<string, any>) {
 
 function toggleMute() {
     isMuted.value = !isMuted.value;
-    localStream.value?.getAudioTracks().forEach((t) => (t.enabled = !isMuted.value));
+    localStream.value
+        ?.getAudioTracks()
+        .forEach((t) => (t.enabled = !isMuted.value));
 }
 
 function toggleCamera() {
     isCameraOff.value = !isCameraOff.value;
-    localStream.value?.getVideoTracks().forEach((t) => (t.enabled = !isCameraOff.value));
+    localStream.value
+        ?.getVideoTracks()
+        .forEach((t) => (t.enabled = !isCameraOff.value));
 }
 
 async function endCall(reason: any = "hangup") {
@@ -529,7 +558,9 @@ window.addEventListener("beforeunload", () => {
                 </svg>
             </div>
             <p class="ended-text">Call ended</p>
-            <p class="ended-sub">{{ error || "You can now close this window." }}</p>
+            <p class="ended-sub">
+                {{ error || "You can now close this window." }}
+            </p>
         </div>
 
         <!-- Join Screen (Before Peer initialized) -->
@@ -566,11 +597,15 @@ window.addEventListener("beforeunload", () => {
                         stroke-linecap="round"
                         stroke-linejoin="round"
                     >
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" />
+                        <path
+                            d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"
+                        />
                     </svg>
                     Join now
                 </button>
-                <button class="btn-decline-join" @click="endCall('hangup')">Decline</button>
+                <button class="btn-decline-join" @click="endCall('hangup')">
+                    Decline
+                </button>
             </div>
         </div>
 
@@ -578,7 +613,7 @@ window.addEventListener("beforeunload", () => {
         <template v-else>
             <!-- Remote Video (full screen) -->
             <video
-                v-if="remoteStream && isVideoCall"
+                v-if="remoteHasVideo"
                 ref="remoteVideoRef"
                 autoplay
                 playsinline
@@ -612,10 +647,7 @@ window.addEventListener("beforeunload", () => {
             <audio ref="remoteAudioRef" autoplay />
 
             <!-- Local Video PiP -->
-            <div
-                v-if="localStream && isVideoCall && !isCameraOff"
-                class="local-video-pip"
-            >
+            <div v-if="localHasVideo" class="local-video-pip">
                 <video
                     ref="localVideoRef"
                     autoplay
@@ -628,7 +660,9 @@ window.addEventListener("beforeunload", () => {
             <!-- Top bar (video calls) -->
             <div v-if="isVideoCall && remoteStream" class="top-bar">
                 <div class="participant-info">
-                    <span class="participant-name">{{ callData?.remoteUser.name }}</span>
+                    <span class="participant-name">{{
+                        callData?.remoteUser.name
+                    }}</span>
                     <span class="call-duration">{{ formattedDuration }}</span>
                 </div>
             </div>
@@ -655,7 +689,9 @@ window.addEventListener("beforeunload", () => {
                             stroke-linecap="round"
                             stroke-linejoin="round"
                         >
-                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                            <path
+                                d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"
+                            />
                             <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                             <line x1="12" y1="19" x2="12" y2="22" />
                         </svg>
@@ -684,7 +720,9 @@ window.addEventListener("beforeunload", () => {
                         class="control-btn"
                         :class="{ 'is-active': isCameraOff }"
                         @click="toggleCamera"
-                        :title="isCameraOff ? 'Turn Camera On' : 'Turn Camera Off'"
+                        :title="
+                            isCameraOff ? 'Turn Camera On' : 'Turn Camera Off'
+                        "
                     >
                         <svg
                             v-if="!isCameraOff"
@@ -699,7 +737,14 @@ window.addEventListener("beforeunload", () => {
                             stroke-linejoin="round"
                         >
                             <path d="m22 8-6 4 6 4V8Z" />
-                            <rect x="2" y="6" width="12" height="12" rx="2" ry="2" />
+                            <rect
+                                x="2"
+                                y="6"
+                                width="12"
+                                height="12"
+                                rx="2"
+                                ry="2"
+                            />
                         </svg>
                         <svg
                             v-else
@@ -716,7 +761,9 @@ window.addEventListener("beforeunload", () => {
                             <line x1="2" y1="2" x2="22" y2="22" />
                             <path d="m22 8-6 4 6 4V8Z" />
                             <path d="M14 8V6a2 2 0 0 0-2-2H4.26" />
-                            <path d="M2.28 2.28 2 2.28A2 2 0 0 0 2 4v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" />
+                            <path
+                                d="M2.28 2.28 2 2.28A2 2 0 0 0 2 4v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"
+                            />
                         </svg>
                     </button>
 
