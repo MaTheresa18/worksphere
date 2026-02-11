@@ -10,7 +10,9 @@ import {
     SelectFilter,
     Avatar,
     Dropdown,
+    Modal,
 } from "@/components/ui";
+import RecordPaymentModal from "@/components/invoices/RecordPaymentModal.vue";
 import {
     FileText,
     Search,
@@ -71,6 +73,9 @@ const filters = ref({
 });
 
 const viewMode = ref<"list" | "grid">("list");
+
+const isPaymentModalOpen = ref(false);
+const selectedInvoice = ref<any>(null);
 // selectedInvoices removed
 
 // Initialize with store's current team, but allow local override via filter if needed
@@ -259,18 +264,13 @@ const sendInvoice = async (invoice: any) => {
     }
 };
 
-const recordPayment = async (invoice: any) => {
-    if (!activeTeamId.value) return;
+const recordPayment = (invoice: any) => {
+    selectedInvoice.value = invoice;
+    isPaymentModalOpen.value = true;
+};
 
-    try {
-        await axios.post(
-            `/api/teams/${activeTeamId.value}/invoices/${invoice.public_id}/record-payment`,
-        );
-        toast.success("Payment recorded successfully");
-        refreshData();
-    } catch (err: any) {
-        toast.error(err.response?.data?.message || "Failed to record payment");
-    }
+const onPaymentSuccess = () => {
+    refreshData();
 };
 
 const cancelInvoice = async (invoice: any) => {
@@ -927,4 +927,13 @@ onMounted(() => {
             </div>
         </template>
     </div>
+
+    <!-- Record Payment Modal -->
+    <RecordPaymentModal
+        v-if="selectedInvoice"
+        v-model:open="isPaymentModalOpen"
+        :invoice="selectedInvoice"
+        :team-id="activeTeamId"
+        @success="onPaymentSuccess"
+    />
 </template>

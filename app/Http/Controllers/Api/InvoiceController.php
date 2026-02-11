@@ -264,6 +264,7 @@ class InvoiceController extends Controller
             'date' => ['required', 'date'],
             'note' => ['nullable', 'string', 'max:1000'],
             'proof' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'], // Max 10MB
+            'send_receipt' => ['nullable', 'boolean'],
         ]);
 
         try {
@@ -272,7 +273,8 @@ class InvoiceController extends Controller
                 recordedBy: $request->user(),
                 date: $validated['date'],
                 note: $validated['note'] ?? null,
-                proof: $request->file('proof')
+                proof: $request->file('proof'),
+                sendReceipt: (bool) ($validated['send_receipt'] ?? false)
             );
 
             return response()->json(new InvoiceResource($updatedInvoice));

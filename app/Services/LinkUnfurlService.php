@@ -7,17 +7,13 @@ use App\Enums\AuditCategory;
 use App\Models\BlockedUrl;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use shweshi\OpenGraph\OpenGraph;
 
 class LinkUnfurlService
 {
-    protected OpenGraph $openGraph;
-
     public function __construct(
-        protected AuditService $auditService
-    ) {
-        $this->openGraph = new OpenGraph;
-    }
+        protected AuditService $auditService,
+        protected SecureOpenGraph $openGraph
+    ) {}
 
     /**
      * Fetch OpenGraph data for a URL.
@@ -207,7 +203,7 @@ class LinkUnfurlService
     protected function performFetch(string $url): array
     {
         try {
-            $data = $this->openGraph->fetch($url, true); // true = verify SSL
+            $data = $this->openGraph->fetch($url);
 
             // Normalize data
             $result = [
@@ -215,7 +211,6 @@ class LinkUnfurlService
                 'description' => $data['description'] ?? null,
                 'image' => $data['image'] ?? null,
                 'url' => $data['url'] ?? $url,
-                'type' => $data['type'] ?? null,
                 'site_name' => $data['site_name'] ?? null,
             ];
 
@@ -223,7 +218,7 @@ class LinkUnfurlService
             $this->auditService->log(
                 action: AuditAction::LinkUnfurled,
                 category: AuditCategory::Communication,
-                newValues: ['result' => $result], // Show result in Changes section
+                newValues: ['result' => $result],
                 context: [
                     'url' => $url,
                     'title' => $result['title'],

@@ -100,6 +100,14 @@ class SecurityDashboardController extends Controller
             'expires_at' => 'nullable|date|after:now',
         ]);
 
+        // Prevent blocking server's own IP or 127.0.0.1
+        $serverIp = $_SERVER['SERVER_ADDR'] ?? null;
+        if ($validated['ip_address'] === '127.0.0.1' || ($serverIp && $validated['ip_address'] === $serverIp)) {
+            return response()->json([
+                'message' => 'Cannot block the server\'s own IP address or the loopback address.',
+            ], 422);
+        }
+
         $blockedIp = BlockedIp::create([
             'ip_address' => $validated['ip_address'],
             'reason' => $validated['reason'] ?? null,

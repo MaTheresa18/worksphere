@@ -138,6 +138,16 @@ const routes: RouteRecordRaw[] = [
         },
     },
     {
+        path: "/dialer",
+        name: "dialer",
+        component: () => import("@/views/dialer/DialerApp.vue"),
+        meta: {
+            title: "WorkSphere Phone",
+            requiresAuth: true,
+            layout: "none",
+        },
+    },
+    {
         path: "/auth",
         component: AuthLayout,
         meta: { requiresGuest: true },
@@ -1313,6 +1323,23 @@ router.beforeEach(
         next();
     },
 );
+
+/**
+ * Handle SPA Chunk Loading Errors
+ * This occurs when a new deployment has replaced asset chunks on the server.
+ * Forcing a hard reload fixes the "Failed to fetch dynamically imported module" error.
+ */
+router.onError((error, to) => {
+    const isDynamicImportError =
+        error.message.includes("Failed to fetch dynamically imported module") ||
+        error.message.includes("Importing a module script failed") ||
+        error.message.includes("Strict MIME type checking is enforced");
+
+    if (isDynamicImportError) {
+        console.warn("[Router] Dynamic import failed, forcing hard reload:", to.fullPath);
+        window.location.href = to.fullPath;
+    }
+});
 
 import { analyticsService } from "@/services/analytics.service";
 

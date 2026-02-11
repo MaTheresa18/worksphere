@@ -48,7 +48,9 @@ import {
     Plus,
     BookOpen,
     Calendar,
+    Phone,
 } from "lucide-vue-next";
+// DialerModal removed in favor of popup window
 
 const route = useRoute();
 const router = useRouter();
@@ -151,6 +153,19 @@ function handleItemClick(item: NavigationItem): void {
     } else if (item.route) {
         navigate(item.route);
     }
+}
+
+function openDialerPopup() {
+    const width = 340;
+    const height = 540;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+
+    window.open(
+        "/dialer",
+        "WorkSphereDialer",
+        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=no,status=no,location=no,toolbar=no,menubar=no`
+    );
 }
 
 onMounted(() => {
@@ -622,18 +637,36 @@ onMounted(() => {
             </div>
         </nav>
 
-        <!-- Sidebar Toggle -->
-        <button
-            class="hidden lg:flex absolute -right-3 bottom-[0.5em] -translate-y-1/2 z-50 h-8 w-8 items-center justify-center rounded-full border border-[var(--border-muted)] bg-[var(--surface-primary)] text-[var(--text-secondary)] shadow-md hover:text-[var(--text-primary)] hover:border-[var(--border-default)] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--interactive-primary)] cursor-pointer"
-            @click="navStore.toggleSidebar"
-        >
-            <ChevronRight
-                v-if="navStore.isSidebarCollapsed"
-                class="h-3 w-3"
-                stroke-width="2"
-            />
-            <ChevronLeft v-else class="h-3 w-3" stroke-width="2" />
-        </button>
+        <!-- Dialer Quick Action (Demo) -->
+        <div class="px-3 mb-2">
+            <Tooltip
+                content="Phone Dialer (Demo)"
+                side="right"
+                :delay-duration="200"
+                :side-offset="10"
+                content-class="font-medium bg-[var(--text-primary)] text-[var(--text-inverse)] border-none shadow-md px-3 py-1.5 text-xs rounded-lg"
+            >
+                <button 
+                    @click="openDialerPopup"
+                    :class="cn(
+                        'group flex items-center rounded-lg transition-all duration-300 border cursor-pointer',
+                        'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/30 hover:bg-emerald-500/10',
+                        'text-emerald-600 dark:text-emerald-400',
+                        !showExpanded ? 'justify-center p-2 w-[2.5rem] h-[2.5rem] mx-auto' : 'w-full px-3 py-2 gap-3'
+                    )"
+                >
+                    <Phone class="h-[1.2rem] w-[1.2rem] shrink-0" stroke-width="2.5" />
+                    <span 
+                        :class="cn(
+                            'text-[13px] font-semibold truncate transition-all duration-300',
+                            !showExpanded ? 'max-w-0 opacity-0' : 'max-w-[200px] opacity-100'
+                        )"
+                    >
+                        Dialer <span class="text-[10px] opacity-70 ml-1">DEMO</span>
+                    </span>
+                </button>
+            </Tooltip>
+        </div>
 
         <!-- User Section -->
         <div class="p-3 mt-auto">

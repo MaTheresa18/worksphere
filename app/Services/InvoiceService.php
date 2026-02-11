@@ -216,8 +216,14 @@ class InvoiceService
     /**
      * Record a payment for the invoice.
      */
-    public function recordPayment(Invoice $invoice, User $recordedBy, string $date, ?string $note = null, ?\Illuminate\Http\UploadedFile $proof = null): Invoice
-    {
+    public function recordPayment(
+        Invoice $invoice,
+        User $recordedBy,
+        string $date,
+        ?string $note = null,
+        ?\Illuminate\Http\UploadedFile $proof = null,
+        bool $sendReceipt = false
+    ): Invoice {
         if (! $invoice->status->canRecordPayment()) {
             throw new \Exception('Cannot record payment for this invoice.');
         }
@@ -236,6 +242,10 @@ class InvoiceService
             'paid_at' => $date,
         ]);
 
+        if ($sendReceipt) {
+            $this->sendReceipt($invoice, $date, $note);
+        }
+
         $this->auditService->log(
             action: AuditAction::Updated,
             category: AuditCategory::InvoiceManagement,
@@ -247,10 +257,35 @@ class InvoiceService
                 'note' => $note,
                 'has_proof' => (bool) $proofMedia,
                 'recorded_by' => $recordedBy->id,
+                'receipt_sent' => $sendReceipt,
             ]
         );
 
         return $invoice;
+    }
+
+    /**
+     * Generate and send receipt to client.
+     */
+    protected function sendReceipt(Invoice $invoice, string $date, ?string $note = null): bool
+    {
+        $invoice->load(['client', 'team', 'items']);
+
+        // Generate Receipt PDF
+        $pdf = Pdf::loadView('pdf.payment-receipt-pdf', [
+            'invoice' => $invoice,
+            'paymentDate' => $date,
+            'note' => $note,
+        ]);
+
+        $pdfPath = "receipts/{$invoice->public_id}-receipt.pdf";
+        Storage::disk('local')->put($pdfPath, $pdf->output());
+
+        // Send Receipt Email
+        \Illuminate\Support\Facades\Mail::to($invoice->client->email)
+            ->send(new \App\Mail\PaymentReceiptMail($invoice, $pdfPath, $date));
+
+        return true;
     }
 
     /**

@@ -10,7 +10,9 @@ import {
     Avatar,
     Modal,
     Input,
+    Checkbox,
 } from "@/components/ui";
+import RecordPaymentModal from "@/components/invoices/RecordPaymentModal.vue";
 import {
     ArrowLeft,
     Download,
@@ -130,55 +132,12 @@ const sendInvoice = async () => {
     }
 };
 
-const showPaymentModal = ref(false);
-const paymentForm = reactive({
-    date: new Date().toISOString().split("T")[0],
-    note: "",
-    proof: null as File | null,
-});
-
-const handleFileChange = (event: Event) => {
-    const target = event.target as HTMLInputElement;
-    if (target.files && target.files[0]) {
-        paymentForm.proof = target.files[0];
-    }
+const handlePaymentSuccess = () => {
+    fetchInvoice();
 };
 
 const recordPayment = () => {
     showPaymentModal.value = true;
-};
-
-const submitPayment = async () => {
-    if (!currentTeamId.value || !invoice.value) return;
-
-    try {
-        isProcessing.value = true;
-        const formData = new FormData();
-        formData.append("date", paymentForm.date);
-        if (paymentForm.note) formData.append("note", paymentForm.note);
-        if (paymentForm.proof) formData.append("proof", paymentForm.proof);
-
-        await axios.post(
-            `/api/teams/${currentTeamId.value}/invoices/${invoice.value.public_id}/record-payment`,
-            formData,
-            {
-                headers: {
-                    "Content-Type": "multipart/form-data",
-                },
-            },
-        );
-        toast.success("Payment recorded successfully");
-        showPaymentModal.value = false;
-        // Reset form
-        paymentForm.note = "";
-        paymentForm.proof = null;
-        paymentForm.date = new Date().toISOString().split("T")[0];
-        fetchInvoice();
-    } catch (err: any) {
-        toast.error(err.response?.data?.message || "Failed to record payment");
-    } finally {
-        isProcessing.value = false;
-    }
 };
 
 const cancelInvoice = async () => {
@@ -304,527 +263,489 @@ onMounted(() => {
 
 <template>
     <div>
-    <div class="p-6 space-y-6">
-        <!-- Header -->
-        <div
-            class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
-        >
-            <div class="flex items-center gap-4">
-                <Button variant="ghost" size="sm" @click="goBack">
-                    <ArrowLeft class="w-4 h-4" />
-                </Button>
-                <div>
-                    <div class="flex items-center gap-3">
-                        <h1
-                            class="text-2xl font-bold text-[var(--text-primary)]"
-                        >
-                            {{ invoice?.invoice_number || "Loading..." }}
-                        </h1>
-                        <Badge
-                            v-if="invoice"
-                            :variant="getStatusVariant(invoice.status)"
-                            size="md"
-                        >
-                            {{ invoice.status_label }}
-                        </Badge>
+        <div class="p-6 space-y-6">
+            <!-- Header -->
+            <div
+                class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+            >
+                <div class="flex items-center gap-4">
+                    <Button variant="ghost" size="sm" @click="goBack">
+                        <ArrowLeft class="w-4 h-4" />
+                    </Button>
+                    <div>
+                        <div class="flex items-center gap-3">
+                            <h1
+                                class="text-2xl font-bold text-[var(--text-primary)]"
+                            >
+                                {{ invoice?.invoice_number || "Loading..." }}
+                            </h1>
+                            <Badge
+                                v-if="invoice"
+                                :variant="getStatusVariant(invoice.status)"
+                                size="md"
+                            >
+                                {{ invoice.status_label }}
+                            </Badge>
+                        </div>
+                        <p class="text-[var(--text-secondary)]">
+                            {{ invoice?.project?.name || "Invoice Details" }}
+                        </p>
                     </div>
-                    <p class="text-[var(--text-secondary)]">
-                        {{ invoice?.project?.name || "Invoice Details" }}
-                    </p>
+                </div>
+
+                <div v-if="invoice" class="flex items-center gap-2">
+                    <!-- Primary Actions -->
+                    <Button
+                        v-if="invoice.can_send"
+                        @click="sendInvoice"
+                        :loading="isProcessing"
+                    >
+                        <Send class="w-4 h-4 mr-2" />
+                        Send
+                    </Button>
+                    <Button
+                        v-else-if="invoice.can_record_payment"
+                        @click="recordPayment"
+                        :loading="isProcessing"
+                    >
+                        <DollarSign class="w-4 h-4 mr-2" />
+                        Record Payment
+                    </Button>
+
+                    <!-- More Actions -->
+                    <Button
+                        variant="outline"
+                        @click="downloadPdf"
+                        :loading="isProcessing"
+                        title="Download PDF"
+                    >
+                        <Download class="w-4 h-4" />
+                    </Button>
+
+                    <Button
+                        variant="outline"
+                        @click="printInvoice"
+                        title="Print Invoice"
+                    >
+                        <Printer class="w-4 h-4" />
+                    </Button>
+
+                    <Dropdown :items="getActions()" align="end">
+                        <template #trigger>
+                            <Button variant="outline" :loading="isProcessing">
+                                <MoreHorizontal class="w-4 h-4" />
+                            </Button>
+                        </template>
+                    </Dropdown>
                 </div>
             </div>
 
-            <div v-if="invoice" class="flex items-center gap-2">
-                <!-- Primary Actions -->
-                <Button
-                    v-if="invoice.can_send"
-                    @click="sendInvoice"
-                    :loading="isProcessing"
-                >
-                    <Send class="w-4 h-4 mr-2" />
-                    Send
-                </Button>
-                <Button
-                    v-else-if="invoice.can_record_payment"
-                    @click="recordPayment"
-                    :loading="isProcessing"
-                >
-                    <DollarSign class="w-4 h-4 mr-2" />
-                    Record Payment
-                </Button>
+            <!-- Loading State -->
+            <PageLoader v-if="isLoading" />
 
-                <!-- More Actions -->
-                <Button
-                    variant="outline"
-                    @click="downloadPdf"
-                    :loading="isProcessing"
-                    title="Download PDF"
-                >
-                    <Download class="w-4 h-4" />
-                </Button>
-
-                <Button
-                    variant="outline"
-                    @click="printInvoice"
-                    title="Print Invoice"
-                >
-                    <Printer class="w-4 h-4" />
-                </Button>
-
-                <Dropdown :items="getActions()" align="end">
-                    <template #trigger>
-                        <Button variant="outline" :loading="isProcessing">
-                            <MoreHorizontal class="w-4 h-4" />
-                        </Button>
-                    </template>
-                </Dropdown>
-            </div>
-        </div>
-
-        <!-- Loading State -->
-        <PageLoader v-if="isLoading" />
-
-        <!-- Detail Content -->
-        <template v-else-if="invoice">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- Main Invoice -->
-                <div class="lg:col-span-2 space-y-6">
-                    <!-- Invoice Header Card -->
-                    <Card padding="lg">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            <!-- From -->
-                            <div>
-                                <p
-                                    class="text-xs font-semibold uppercase text-[var(--text-muted)] mb-2"
-                                >
-                                    From
-                                </p>
-                                <div class="flex items-center gap-3">
-                                    <Avatar
-                                        :name="invoice.team?.name"
-                                        :src="invoice.team?.logo_url"
-                                        size="md"
-                                    />
-                                    <div>
-                                        <p
-                                            class="font-semibold text-[var(--text-primary)]"
-                                        >
-                                            {{ invoice.team?.name }}
-                                        </p>
-                                        <p
-                                            class="text-sm text-[var(--text-secondary)]"
-                                        >
-                                            {{ invoice.owner?.name }}
-                                        </p>
+            <!-- Detail Content -->
+            <template v-else-if="invoice">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Main Invoice -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <!-- Invoice Header Card -->
+                        <Card padding="lg">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <!-- From -->
+                                <div>
+                                    <p
+                                        class="text-xs font-semibold uppercase text-[var(--text-muted)] mb-2"
+                                    >
+                                        From
+                                    </p>
+                                    <div class="flex items-center gap-3">
+                                        <Avatar
+                                            :name="invoice.team?.name"
+                                            :src="invoice.team?.logo_url"
+                                            size="md"
+                                        />
+                                        <div>
+                                            <p
+                                                class="font-semibold text-[var(--text-primary)]"
+                                            >
+                                                {{ invoice.team?.name }}
+                                            </p>
+                                            <p
+                                                class="text-sm text-[var(--text-secondary)]"
+                                            >
+                                                {{ invoice.owner?.name }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- To -->
+                                <div>
+                                    <p
+                                        class="text-xs font-semibold uppercase text-[var(--text-muted)] mb-2"
+                                    >
+                                        Bill To
+                                    </p>
+                                    <div class="flex items-center gap-3">
+                                        <Avatar
+                                            :name="invoice.client?.name"
+                                            :src="invoice.client?.avatar_url"
+                                            size="md"
+                                        />
+                                        <div>
+                                            <p
+                                                class="font-semibold text-[var(--text-primary)]"
+                                            >
+                                                {{ invoice.client?.name }}
+                                            </p>
+                                            <p
+                                                v-if="invoice.client?.email"
+                                                class="text-sm text-[var(--text-secondary)]"
+                                            >
+                                                {{ invoice.client.email }}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <!-- To -->
-                            <div>
-                                <p
-                                    class="text-xs font-semibold uppercase text-[var(--text-muted)] mb-2"
-                                >
-                                    Bill To
-                                </p>
-                                <div class="flex items-center gap-3">
-                                    <Avatar
-                                        :name="invoice.client?.name"
-                                        :src="invoice.client?.avatar_url"
-                                        size="md"
-                                    />
-                                    <div>
-                                        <p
-                                            class="font-semibold text-[var(--text-primary)]"
-                                        >
-                                            {{ invoice.client?.name }}
-                                        </p>
-                                        <p
-                                            v-if="invoice.client?.email"
-                                            class="text-sm text-[var(--text-secondary)]"
-                                        >
-                                            {{ invoice.client.email }}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </Card>
+                        </Card>
 
-                    <!-- Line Items -->
-                    <Card padding="none" class="overflow-hidden">
-                        <div
-                            class="p-4 border-b border-[var(--border-default)] flex justify-between items-center"
-                        >
-                            <h2
-                                class="font-semibold text-[var(--text-primary)]"
-                            >
-                                Line Items
-                            </h2>
-                            <Button
-                                v-if="invoice.can_edit"
-                                variant="ghost"
-                                size="sm"
-                                @click="editInvoice"
-                            >
-                                <Pencil class="w-4 h-4 mr-2" />
-                                Edit Items
-                            </Button>
-                        </div>
-
-                        <!-- Table Header -->
-                        <div
-                            class="hidden sm:grid grid-cols-12 gap-4 p-4 bg-[var(--surface-secondary)] text-xs font-semibold uppercase text-[var(--text-muted)]"
-                        >
-                            <div class="col-span-6">Description</div>
-                            <div class="col-span-2 text-right">Quantity</div>
-                            <div class="col-span-2 text-right">Unit Price</div>
-                            <div class="col-span-2 text-right">Total</div>
-                        </div>
-
-                        <!-- Items -->
-                        <div class="divide-y divide-[var(--border-default)]">
+                        <!-- Line Items -->
+                        <Card padding="none" class="overflow-hidden">
                             <div
-                                v-for="item in invoice.items"
-                                :key="item.id"
-                                class="p-4"
+                                class="p-4 border-b border-[var(--border-default)] flex justify-between items-center"
+                            >
+                                <h2
+                                    class="font-semibold text-[var(--text-primary)]"
+                                >
+                                    Line Items
+                                </h2>
+                                <Button
+                                    v-if="invoice.can_edit"
+                                    variant="ghost"
+                                    size="sm"
+                                    @click="editInvoice"
+                                >
+                                    <Pencil class="w-4 h-4 mr-2" />
+                                    Edit Items
+                                </Button>
+                            </div>
+
+                            <!-- Table Header -->
+                            <div
+                                class="hidden sm:grid grid-cols-12 gap-4 p-4 bg-[var(--surface-secondary)] text-xs font-semibold uppercase text-[var(--text-muted)]"
+                            >
+                                <div class="col-span-6">Description</div>
+                                <div class="col-span-2 text-right">
+                                    Quantity
+                                </div>
+                                <div class="col-span-2 text-right">
+                                    Unit Price
+                                </div>
+                                <div class="col-span-2 text-right">Total</div>
+                            </div>
+
+                            <!-- Items -->
+                            <div
+                                class="divide-y divide-[var(--border-default)]"
                             >
                                 <div
-                                    class="sm:grid grid-cols-12 gap-4 space-y-2 sm:space-y-0"
+                                    v-for="item in invoice.items"
+                                    :key="item.id"
+                                    class="p-4"
                                 >
-                                    <div class="col-span-6">
-                                        <p
-                                            class="font-medium text-[var(--text-primary)]"
+                                    <div
+                                        class="sm:grid grid-cols-12 gap-4 space-y-2 sm:space-y-0"
+                                    >
+                                        <div class="col-span-6">
+                                            <p
+                                                class="font-medium text-[var(--text-primary)]"
+                                            >
+                                                {{ item.description }}
+                                            </p>
+                                        </div>
+                                        <div
+                                            class="col-span-2 text-right text-[var(--text-secondary)]"
                                         >
-                                            {{ item.description }}
-                                        </p>
-                                    </div>
-                                    <div
-                                        class="col-span-2 text-right text-[var(--text-secondary)]"
-                                    >
-                                        <span
-                                            class="sm:hidden text-[var(--text-muted)]"
-                                            >Qty:
-                                        </span>
-                                        {{ item.quantity }}
-                                    </div>
-                                    <div
-                                        class="col-span-2 text-right text-[var(--text-secondary)]"
-                                    >
-                                        <span
-                                            class="sm:hidden text-[var(--text-muted)]"
-                                            >Unit:
-                                        </span>
-                                        {{
-                                            formatCurrency(
-                                                item.unit_price,
-                                                invoice.currency,
-                                            )
-                                        }}
-                                    </div>
-                                    <div
-                                        class="col-span-2 text-right font-medium text-[var(--text-primary)]"
-                                    >
-                                        {{
-                                            formatCurrency(
-                                                item.total,
-                                                invoice.currency,
-                                            )
-                                        }}
+                                            <span
+                                                class="sm:hidden text-[var(--text-muted)]"
+                                                >Qty:
+                                            </span>
+                                            {{ item.quantity }}
+                                        </div>
+                                        <div
+                                            class="col-span-2 text-right text-[var(--text-secondary)]"
+                                        >
+                                            <span
+                                                class="sm:hidden text-[var(--text-muted)]"
+                                                >Unit:
+                                            </span>
+                                            {{
+                                                formatCurrency(
+                                                    item.unit_price,
+                                                    invoice.currency,
+                                                )
+                                            }}
+                                        </div>
+                                        <div
+                                            class="col-span-2 text-right font-medium text-[var(--text-primary)]"
+                                        >
+                                            {{
+                                                formatCurrency(
+                                                    item.total,
+                                                    invoice.currency,
+                                                )
+                                            }}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- Totals -->
-                        <div
-                            class="border-t border-[var(--border-default)] p-4 bg-[var(--surface-secondary)]"
-                        >
-                            <div class="max-w-xs ml-auto space-y-2">
-                                <div
-                                    class="flex justify-between text-[var(--text-secondary)]"
-                                >
-                                    <span>Subtotal</span>
-                                    <span>{{
-                                        formatCurrency(
-                                            invoice.subtotal,
-                                            invoice.currency,
-                                        )
-                                    }}</span>
-                                </div>
-                                <div
-                                    v-if="invoice.tax_rate > 0"
-                                    class="flex justify-between text-[var(--text-secondary)]"
-                                >
-                                    <span>Tax ({{ invoice.tax_rate }}%)</span>
-                                    <span>{{
-                                        formatCurrency(
-                                            invoice.tax_amount,
-                                            invoice.currency,
-                                        )
-                                    }}</span>
-                                </div>
-                                <div
-                                    v-if="invoice.discount_amount > 0"
-                                    class="flex justify-between text-[var(--text-secondary)]"
-                                >
-                                    <span>Discount</span>
-                                    <span
-                                        >-{{
+                            <!-- Totals -->
+                            <div
+                                class="border-t border-[var(--border-default)] p-4 bg-[var(--surface-secondary)]"
+                            >
+                                <div class="max-w-xs ml-auto space-y-2">
+                                    <div
+                                        class="flex justify-between text-[var(--text-secondary)]"
+                                    >
+                                        <span>Subtotal</span>
+                                        <span>{{
                                             formatCurrency(
-                                                invoice.discount_amount,
+                                                invoice.subtotal,
                                                 invoice.currency,
                                             )
-                                        }}</span
+                                        }}</span>
+                                    </div>
+                                    <div
+                                        v-if="invoice.tax_rate > 0"
+                                        class="flex justify-between text-[var(--text-secondary)]"
                                     >
+                                        <span
+                                            >Tax ({{ invoice.tax_rate }}%)</span
+                                        >
+                                        <span>{{
+                                            formatCurrency(
+                                                invoice.tax_amount,
+                                                invoice.currency,
+                                            )
+                                        }}</span>
+                                    </div>
+                                    <div
+                                        v-if="invoice.discount_amount > 0"
+                                        class="flex justify-between text-[var(--text-secondary)]"
+                                    >
+                                        <span>Discount</span>
+                                        <span
+                                            >-{{
+                                                formatCurrency(
+                                                    invoice.discount_amount,
+                                                    invoice.currency,
+                                                )
+                                            }}</span
+                                        >
+                                    </div>
+                                    <div
+                                        class="flex justify-between pt-2 border-t border-[var(--border-default)] font-bold text-lg text-[var(--text-primary)]"
+                                    >
+                                        <span>Total</span>
+                                        <span>{{
+                                            formatCurrency(
+                                                invoice.total,
+                                                invoice.currency,
+                                            )
+                                        }}</span>
+                                    </div>
                                 </div>
-                                <div
-                                    class="flex justify-between pt-2 border-t border-[var(--border-default)] font-bold text-lg text-[var(--text-primary)]"
+                            </div>
+                        </Card>
+
+                        <!-- Notes & Terms -->
+                        <div
+                            v-if="invoice.notes || invoice.terms"
+                            class="grid grid-cols-1 md:grid-cols-2 gap-6"
+                        >
+                            <Card v-if="invoice.notes" padding="lg">
+                                <h3
+                                    class="font-semibold text-[var(--text-primary)] mb-2"
                                 >
-                                    <span>Total</span>
-                                    <span>{{
+                                    Notes
+                                </h3>
+                                <p
+                                    class="text-sm text-[var(--text-secondary)] whitespace-pre-wrap"
+                                >
+                                    {{ invoice.notes }}
+                                </p>
+                            </Card>
+                            <Card v-if="invoice.terms" padding="lg">
+                                <h3
+                                    class="font-semibold text-[var(--text-primary)] mb-2"
+                                >
+                                    Terms & Conditions
+                                </h3>
+                                <p
+                                    class="text-sm text-[var(--text-secondary)] whitespace-pre-wrap"
+                                >
+                                    {{ invoice.terms }}
+                                </p>
+                            </Card>
+                        </div>
+                    </div>
+
+                    <!-- Sidebar -->
+                    <div class="space-y-6">
+                        <!-- Invoice Info -->
+                        <Card padding="lg">
+                            <h3
+                                class="font-semibold text-[var(--text-primary)] mb-4"
+                            >
+                                Invoice Details
+                            </h3>
+                            <dl class="space-y-4">
+                                <div>
+                                    <dt
+                                        class="text-xs font-semibold uppercase text-[var(--text-muted)]"
+                                    >
+                                        Invoice Number
+                                    </dt>
+                                    <dd
+                                        class="text-[var(--text-primary)] flex items-center gap-2"
+                                    >
+                                        {{ invoice.invoice_number }}
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            class="h-6 w-6 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                                            @click="
+                                                copyToClipboard(
+                                                    invoice.invoice_number,
+                                                )
+                                            "
+                                            title="Copy Invoice Number"
+                                        >
+                                            <Copy class="w-3 h-3" />
+                                        </Button>
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt
+                                        class="text-xs font-semibold uppercase text-[var(--text-muted)]"
+                                    >
+                                        Issue Date
+                                    </dt>
+                                    <dd class="text-[var(--text-primary)]">
+                                        {{
+                                            formatShortDate(invoice.issue_date)
+                                        }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt
+                                        class="text-xs font-semibold uppercase text-[var(--text-muted)]"
+                                    >
+                                        Due Date
+                                    </dt>
+                                    <dd
+                                        class="text-[var(--text-primary)]"
+                                        :class="{
+                                            'text-[var(--color-error)]':
+                                                invoice.is_overdue,
+                                        }"
+                                    >
+                                        {{ formatShortDate(invoice.due_date) }}
+                                        <span
+                                            v-if="invoice.is_overdue"
+                                            class="text-xs ml-1"
+                                            >(Overdue)</span
+                                        >
+                                    </dd>
+                                </div>
+                                <div v-if="invoice.paid_at">
+                                    <dt
+                                        class="text-xs font-semibold uppercase text-[var(--text-muted)]"
+                                    >
+                                        Paid Date
+                                    </dt>
+                                    <dd class="text-[var(--color-success)]">
+                                        {{ formatShortDate(invoice.paid_at) }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt
+                                        class="text-xs font-semibold uppercase text-[var(--text-muted)]"
+                                    >
+                                        Currency
+                                    </dt>
+                                    <dd class="text-[var(--text-primary)]">
+                                        {{ invoice.currency }}
+                                    </dd>
+                                </div>
+                                <div v-if="invoice.public_view_url">
+                                    <dt
+                                        class="text-xs font-semibold uppercase text-[var(--text-muted)]"
+                                    >
+                                        Client Link
+                                    </dt>
+                                    <dd class="text-sm truncate">
+                                        <a
+                                            :href="invoice.public_view_url"
+                                            target="_blank"
+                                            class="text-[var(--interactive-primary)] hover:underline"
+                                        >
+                                            View as Client
+                                        </a>
+                                    </dd>
+                                </div>
+                            </dl>
+                        </Card>
+
+                        <!-- Amount Due Card -->
+                        <Card
+                            padding="lg"
+                            :class="
+                                invoice.status === 'paid'
+                                    ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800'
+                                    : 'bg-[var(--surface-secondary)]'
+                            "
+                        >
+                            <div class="text-center">
+                                <p
+                                    class="text-sm font-semibold uppercase text-[var(--text-muted)] mb-2"
+                                >
+                                    {{
+                                        invoice.status === "paid"
+                                            ? "Amount Paid"
+                                            : "Amount Due"
+                                    }}
+                                </p>
+                                <p
+                                    class="text-3xl font-bold"
+                                    :class="
+                                        invoice.status === 'paid'
+                                            ? 'text-[var(--color-success)]'
+                                            : 'text-[var(--text-primary)]'
+                                    "
+                                >
+                                    {{
                                         formatCurrency(
                                             invoice.total,
                                             invoice.currency,
                                         )
-                                    }}</span>
-                                </div>
+                                    }}
+                                </p>
                             </div>
-                        </div>
-                    </Card>
-
-                    <!-- Notes & Terms -->
-                    <div
-                        v-if="invoice.notes || invoice.terms"
-                        class="grid grid-cols-1 md:grid-cols-2 gap-6"
-                    >
-                        <Card v-if="invoice.notes" padding="lg">
-                            <h3
-                                class="font-semibold text-[var(--text-primary)] mb-2"
-                            >
-                                Notes
-                            </h3>
-                            <p
-                                class="text-sm text-[var(--text-secondary)] whitespace-pre-wrap"
-                            >
-                                {{ invoice.notes }}
-                            </p>
-                        </Card>
-                        <Card v-if="invoice.terms" padding="lg">
-                            <h3
-                                class="font-semibold text-[var(--text-primary)] mb-2"
-                            >
-                                Terms & Conditions
-                            </h3>
-                            <p
-                                class="text-sm text-[var(--text-secondary)] whitespace-pre-wrap"
-                            >
-                                {{ invoice.terms }}
-                            </p>
                         </Card>
                     </div>
                 </div>
-
-                <!-- Sidebar -->
-                <div class="space-y-6">
-                    <!-- Invoice Info -->
-                    <Card padding="lg">
-                        <h3
-                            class="font-semibold text-[var(--text-primary)] mb-4"
-                        >
-                            Invoice Details
-                        </h3>
-                        <dl class="space-y-4">
-                            <div>
-                                <dt
-                                    class="text-xs font-semibold uppercase text-[var(--text-muted)]"
-                                >
-                                    Invoice Number
-                                </dt>
-                                <dd class="text-[var(--text-primary)] flex items-center gap-2">
-                                    {{ invoice.invoice_number }}
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        class="h-6 w-6 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                                        @click="copyToClipboard(invoice.invoice_number)"
-                                        title="Copy Invoice Number"
-                                    >
-                                        <Copy class="w-3 h-3" />
-                                    </Button>
-                                </dd>
-                            </div>
-                            <div>
-                                <dt
-                                    class="text-xs font-semibold uppercase text-[var(--text-muted)]"
-                                >
-                                    Issue Date
-                                </dt>
-                                <dd class="text-[var(--text-primary)]">
-                                    {{ formatShortDate(invoice.issue_date) }}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt
-                                    class="text-xs font-semibold uppercase text-[var(--text-muted)]"
-                                >
-                                    Due Date
-                                </dt>
-                                <dd
-                                    class="text-[var(--text-primary)]"
-                                    :class="{
-                                        'text-[var(--color-error)]':
-                                            invoice.is_overdue,
-                                    }"
-                                >
-                                    {{ formatShortDate(invoice.due_date) }}
-                                    <span
-                                        v-if="invoice.is_overdue"
-                                        class="text-xs ml-1"
-                                        >(Overdue)</span
-                                    >
-                                </dd>
-                            </div>
-                            <div v-if="invoice.paid_at">
-                                <dt
-                                    class="text-xs font-semibold uppercase text-[var(--text-muted)]"
-                                >
-                                    Paid Date
-                                </dt>
-                                <dd class="text-[var(--color-success)]">
-                                    {{ formatShortDate(invoice.paid_at) }}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt
-                                    class="text-xs font-semibold uppercase text-[var(--text-muted)]"
-                                >
-                                    Currency
-                                </dt>
-                                <dd class="text-[var(--text-primary)]">
-                                    {{ invoice.currency }}
-                                </dd>
-                            </div>
-                            <div v-if="invoice.public_view_url">
-                                <dt
-                                    class="text-xs font-semibold uppercase text-[var(--text-muted)]"
-                                >
-                                    Client Link
-                                </dt>
-                                <dd class="text-sm truncate">
-                                    <a
-                                        :href="invoice.public_view_url"
-                                        target="_blank"
-                                        class="text-[var(--interactive-primary)] hover:underline"
-                                    >
-                                        View as Client
-                                    </a>
-                                </dd>
-                            </div>
-                        </dl>
-                    </Card>
-
-                    <!-- Amount Due Card -->
-                    <Card
-                        padding="lg"
-                        :class="
-                            invoice.status === 'paid'
-                                ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800'
-                                : 'bg-[var(--surface-secondary)]'
-                        "
-                    >
-                        <div class="text-center">
-                            <p
-                                class="text-sm font-semibold uppercase text-[var(--text-muted)] mb-2"
-                            >
-                                {{
-                                    invoice.status === "paid"
-                                        ? "Amount Paid"
-                                        : "Amount Due"
-                                }}
-                            </p>
-                            <p
-                                class="text-3xl font-bold"
-                                :class="
-                                    invoice.status === 'paid'
-                                        ? 'text-[var(--color-success)]'
-                                        : 'text-[var(--text-primary)]'
-                                "
-                            >
-                                {{
-                                    formatCurrency(
-                                        invoice.total,
-                                        invoice.currency,
-                                    )
-                                }}
-                            </p>
-                        </div>
-                    </Card>
-                </div>
-            </div>
-        </template>
-    </div>
-
-    <!-- Record Payment Modal -->
-    <Modal
-        :open="showPaymentModal"
-        @update:open="showPaymentModal = $event"
-        title="Record Payment"
-        description="Record a manual payment for this invoice."
-    >
-        <div class="space-y-4">
-            <div>
-                <label
-                    class="block text-sm font-medium text-[var(--text-secondary)] mb-1"
-                >
-                    Payment Date
-                </label>
-                <Input v-model="paymentForm.date" type="date" />
-            </div>
-
-            <div>
-                <label
-                    class="block text-sm font-medium text-[var(--text-secondary)] mb-1"
-                >
-                    Proof of Payment (Optional)
-                </label>
-                <input
-                    type="file"
-                    class="block w-full text-sm text-[var(--text-secondary)] file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[var(--primary-light)] file:text-[var(--primary)] hover:file:bg-[var(--primary-light)]/80"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    @change="handleFileChange"
-                />
-                <p class="text-xs text-[var(--text-muted)] mt-1">
-                    Accepted: PDF, JPG, PNG (Max 10MB)
-                </p>
-            </div>
-
-            <div>
-                <label
-                    class="block text-sm font-medium text-[var(--text-secondary)] mb-1"
-                >
-                    Note (Optional)
-                </label>
-                <textarea
-                    v-model="paymentForm.note"
-                    rows="3"
-                    class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder="Enter payment details (e.g., Check #1234)"
-                ></textarea>
-            </div>
+            </template>
         </div>
 
-        <template #footer>
-            <Button
-                variant="ghost"
-                @click="showPaymentModal = false"
-                :disabled="isProcessing"
-            >
-                Cancel
-            </Button>
-            <Button @click="submitPayment" :loading="isProcessing">
-                Record Payment
-            </Button>
-        </template>
-    </Modal>
+        <!-- Record Payment Modal -->
+        <RecordPaymentModal
+            v-if="invoice"
+            v-model:open="showPaymentModal"
+            :invoice="invoice"
+            :team-id="currentTeamId"
+            @success="handlePaymentSuccess"
+        />
     </div>
 </template>
