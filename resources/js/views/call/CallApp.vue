@@ -67,6 +67,7 @@ const participants = ref<Participant[]>([]);
 const peers = new Map<string, Peer.Instance>();
 const remoteStreams = reactive(new Map<string, MediaStream>());
 const iceServers = ref<RTCIceServer[]>([]);
+const processedSignals = new Set<string>(); // To prevent duplicate signal processing
 
 // Directive for srcObject property (Vue doesn't bind to .srcObject property by default)
 const vSrcObject = {
@@ -171,8 +172,8 @@ async function acquireMedia(): Promise<MediaStream | null> {
         localStream.value = stream;
         isCameraOff.value = true; // Force camera off state UI
         return stream;
-    } catch (err: any) {
-        console.error("[Call] Media acquisition failed:", err);
+    } catch (e: any) {
+        console.error("[Call] Media acquisition failed:", e);
         error.value = "Microphone access denied.";
         callState.value = "error";
         return null;
@@ -263,8 +264,18 @@ async function joinCall() {
 
         // 4. Set state
         callState.value = "connected"; // We are "in" the call room
+        hasJoined.value = true;
         postToParent({ type: "state", state: "connected" });
         startDurationTimer();
+        stopRingtone();
+
+        // 5. Replay pending signals (from buffering in useVideoCall)
+        if (callData.value.pendingSignals && callData.value.pendingSignals.length > 0) {
+            console.log(`[Call] Replaying ${callData.value.pendingSignals.length} pending signals`);
+            for (const sig of callData.value.pendingSignals) {
+                handleSignal(sig);
+            }
+        }
 
     } catch (err) {
         console.error("[Call] Join failed:", err);
@@ -349,32 +360,62 @@ async function handleSignal(event: any) {
 
     // WAIT for media if we are in the process of joining
     if (!hasJoined.value || !localStream.value) {
-        // If we haven't joined yet, we can't respond.
-        // If we are joining but stream isn't ready, we might want to wait?
-        // But joinCall is already running. Signals will hit here.
-        // For simplicity, we ignore signals until hasJoined && localStream.
+        console.log(`[Call] Buffering signal from ${senderId} - joining or media not ready`);
         return;
     }
 
     const signal = event.signal_data;
+    
+    // Deduplication check (simple fingerprint)
+    const signalId = JSON.stringify(signal).substring(0, 100) + senderId;
+    if (processedSignals.has(signalId)) return;
+    processedSignals.add(signalId);
+    if (processedSignals.size > 100) processedSignals.delete(processedSignals.keys().next().value!);
+
     if (signal.sdp) signal.sdp = mungeSdp(signal.sdp);
 
     // Get or Create Peer
     let peer = peers.get(senderId);
 
     if (!peer) {
-        // If we received an offer, we are NOT the initiator for this pair
+        // Deterministic initiation: prevent both sides from offering at once
+        // If we see an offer, we respond. 
+        // If we see an answer but don't have a peer, something is wrong or we joined late.
         if (signal.type === 'offer') {
             console.log(`[Call] Received offer from ${senderId}, creating responder peer`);
             createPeer(senderId, false, localStream.value!);
             peer = peers.get(senderId);
+        } else if (signal.type === 'ice-candidate') {
+            console.warn(`[Call] Received candidate from unknown peer ${senderId}, ignoring`);
+            return;
         } else {
             console.warn(`[Call] Received ${signal.type} from unknown peer ${senderId}`);
             return;
         }
     }
 
-    peer?.signal(signal);
+    // Handle Glare: if we receive an offer while we are in 'have-local-offer' state
+    // @ts-ignore
+    const pc = peer._pc as RTCPeerConnection;
+    if (signal.type === 'offer' && pc && pc.signalingState !== 'stable') {
+        const isPolite = selfId < senderId;
+        if (!isPolite) {
+            console.log(`[Call] Glare detected with ${senderId}. We are impolite, ignoring their offer.`);
+            return;
+        }
+        console.log(`[Call] Glare detected with ${senderId}. We are polite, rollback and accept their offer.`);
+        try {
+            await pc.setLocalDescription({ type: 'rollback' } as any);
+        } catch (e) {
+            console.warn("[Call] Rollback failed", e);
+        }
+    }
+
+    try {
+        peer?.signal(signal);
+    } catch (e) {
+        console.error(`[Call] Error signaling peer ${senderId}:`, e);
+    }
 }
 
 function handleParticipantJoined(event: any) {
