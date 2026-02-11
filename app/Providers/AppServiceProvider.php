@@ -165,5 +165,10 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('email-send-account', function ($job) {
             return Limit::perMinute(10)->by($job->accountId);
         });
+
+        // Rate limiter for WebRTC signaling (high burst capacity)
+        RateLimiter::for('signaling', function (Request $request) {
+            return Limit::perMinute(1000)->by($request->user()?->id ?: $request->ip());
+        });
     }
 }

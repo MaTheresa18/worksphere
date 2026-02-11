@@ -67,6 +67,8 @@
 *Full-featured instant messaging and high-quality voice/video calls.*
 - **Messaging**: Groups, file sharing, and typing indicators.
 - **Video Calls**: 1:1 and Group video/audio calls with peer-to-peer WebRTC.
+- **Hybrid SFU**: Scalable calls using Cloudflare Calls for groups > 6 participants.
+- **Screen Sharing**: High-resolution screen sharing support for both 1:1 and group calls.
 - **Global Notifications**: Receive call alerts anywhere in the application.
 
 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -168,14 +170,22 @@ REVERB_PORT=8080
 REVERB_SCHEME=http
 ```
 
-**WebRTC STUN/TURN (Cloudflare):**
 Required for reliable video calls across different networks.
-1. Go to **Cloudflare Dashboard** → **Calls**.
+1. Go to **Cloudflare Dashboard** -> **Calls**.
 2. Create a new **TURN App**.
 3. Copy the **Key ID** and **API Token** to your `.env`:
 ```ini
 TURN_KEY_ID="your-key-id"
 TURN_KEY_API_TOKEN="your-api-token"
+```
+
+**Cloudflare SFU (Large Group Calls):**
+Required for calls with more than 6 participants and advanced track management.
+1. In the same **Cloudflare Calls** dashboard, create a new **App**.
+2. Copy the **App ID** and **App Secret** to your `.env`:
+```ini
+CLOUDFLARE_APP_ID_SFU="your-app-id"
+CLOUDFLARE_APP_SECRET_SFU="your-app-secret"
 ```
 
 ### 5. Initialize System

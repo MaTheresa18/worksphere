@@ -62,6 +62,15 @@ const isCameraOff = ref(false);
 const videoFallback = ref(false);
 const isAudioOnly = computed(() => callData.value?.callType === 'audio');
 
+// Screen Sharing
+const isScreenSharing = ref(false);
+const screenStream = ref<MediaStream | null>(null);
+
+// Hybrid Mode
+const callMode = ref<'mesh' | 'sfu'>('mesh');
+const sfuSessionId = ref<string | null>(null);
+const sfuAppId = ref<string | null>(null);
+
 // Participants & Peers
 const participants = ref<Participant[]>([]);
 const peers = new Map<string, Peer.Instance>();
@@ -247,12 +256,16 @@ async function joinCall() {
         }
 
         // 1. Tell API we are joining
-        const { participants: currentParticipants } = await videoCallService.joinCall(
+        const joinResponse = await videoCallService.joinCall(
             callData.value.chatId,
             callData.value.callId
         );
 
-        console.log("[Call] Joined. Participants:", currentParticipants);
+        console.log("[Call] Joined. Response:", joinResponse);
+        const { participants: currentParticipants, mode, app_id } = joinResponse;
+        
+        callMode.value = mode || 'mesh';
+        sfuAppId.value = app_id || null;
 
         // 2. Normalize and initialize participants list
         const selfId = callData.value?.selfPublicId?.toLowerCase();
@@ -267,11 +280,17 @@ async function joinCall() {
             };
         });
         
-        // 3. Connect to existing participants (WE initiate)
+        // 3. Connect to existing participants
         const others = participants.value.filter(p => !p.isSelf);
         
-        for (const p of others) {
-            createPeer(p.publicId, true, stream);
+        if (callMode.value === 'mesh') {
+            console.log("[Call] Initializing MESH mode");
+            for (const p of others) {
+                createPeer(p.publicId, true, stream);
+            }
+        } else {
+            console.log("[Call] Initializing SFU mode via Cloudflare");
+            await joinSFU(stream);
         }
 
         // 4. Set state
@@ -548,6 +567,182 @@ function toggleCamera() {
     localStream.value?.getVideoTracks().forEach(t => t.enabled = !isCameraOff.value);
 }
 
+function remoteHasVideo(participantId: string): boolean {
+    const stream = remoteStreams.get(participantId);
+    if (!stream) return false;
+    return stream.getVideoTracks().length > 0;
+}
+
+async function toggleScreenShare() {
+    if (isScreenSharing.value) {
+        stopScreenShare();
+        return;
+    }
+
+    try {
+        console.log("[Call] Requesting screen share...");
+        const stream = await (navigator.mediaDevices as any).getDisplayMedia({
+            video: { cursor: "always" },
+            audio: false
+        });
+
+        isScreenSharing.value = true;
+        screenStream.value = stream;
+
+        // Listen for user clicking "Stop Sharing" in browser UI
+        stream.getVideoTracks()[0].onended = () => {
+            console.log("[Call] Screen share ended by user via browser UI");
+            stopScreenShare();
+        };
+
+        if (callMode.value === 'mesh') {
+            // Replace tracks for all peers
+            const videoTrack = stream.getVideoTracks()[0];
+            peers.forEach(peer => {
+                // @ts-ignore
+                const pc = peer._pc as RTCPeerConnection;
+                const senders = pc.getSenders();
+                const videoSender = senders.find((s: any) => s.track?.kind === 'video');
+                
+                if (videoSender) {
+                    console.log("[Call] Mesh: Replacing existing video track with screen track");
+                    videoSender.replaceTrack(videoTrack);
+                } else {
+                    console.log("[Call] Mesh: Adding new screen track (initially audio-only)");
+                    peer.addTrack(videoTrack, localStream.value!); // Simple-peer addTrack triggers negotiation
+                }
+            });
+        } else {
+            // SFU: Add screen track
+            await publishSFUScreenTrack(stream);
+        }
+
+    } catch (err) {
+        console.error("[Call] Screen share failed:", err);
+    }
+}
+
+function stopScreenShare() {
+    if (!isScreenSharing.value) return;
+
+    console.log("[Call] Stopping screen share...");
+    screenStream.value?.getTracks().forEach(t => t.stop());
+    screenStream.value = null;
+    isScreenSharing.value = false;
+
+    // Restore camera track
+    if (callMode.value === 'mesh') {
+        peers.forEach(peer => {
+            // @ts-ignore
+            const pc = peer._pc as RTCPeerConnection;
+            const senders = pc.getSenders();
+            const videoSender = senders.find((s: any) => s.track?.kind === 'video');
+            
+            if (videoSender) {
+                const cameraTrack = localStream.value?.getVideoTracks()[0];
+                if (cameraTrack) {
+                    console.log("[Call] Mesh: Restoring camera track");
+                    videoSender.replaceTrack(cameraTrack);
+                } else {
+                    console.log("[Call] Mesh: Removing screen track (no camera fallback)");
+                    peer.removeTrack(videoSender.track!, localStream.value!);
+                }
+            }
+        });
+    } else {
+        // SFU Handle restore (usually simple peer connection renegotiation or just swapping track)
+        // For now, let's keep it simple: SFU will need a full renegotiate if we want to remove the track, 
+        // or we just replace the published track.
+    }
+}
+
+// ============================================================================
+// Cloudflare SFU Logic
+// ============================================================================
+
+let sfuPc: RTCPeerConnection | null = null;
+const sfuTransceivers = new Map<string, RTCRtpTransceiver>();
+
+async function joinSFU(stream: MediaStream) {
+    sfuPc = new RTCPeerConnection({
+        iceServers: iceServers.value.length > 0 ? iceServers.value : [{ urls: 'stun:stun.cloudflare.com:3478' }],
+        bundlePolicy: 'max-bundle'
+    });
+
+    // 1. Add senders
+    stream.getTracks().forEach(track => {
+        sfuPc!.addTransceiver(track, { direction: 'sendonly' });
+    });
+
+    // 2. Create Offer & Session
+    const offer = await sfuPc.createOffer();
+    await sfuPc.setLocalDescription(offer);
+
+    const sessionRes = await videoCallService.sfuSessionNew(callData.value!.chatId, offer.sdp!);
+    sfuSessionId.value = sessionRes.sessionId;
+    
+    await sfuPc.setRemoteDescription(new RTCSessionDescription(sessionRes.sessionDescription));
+
+    // 3. Wait for ICE connection
+    await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject("SFU Connect Timeout"), 10000);
+        sfuPc!.oniceconnectionstatechange = () => {
+            if (sfuPc!.iceConnectionState === 'connected' || sfuPc!.iceConnectionState === 'completed') {
+                clearTimeout(timeout);
+                resolve(true);
+            }
+        };
+    });
+
+    // 4. Register local tracks (Cloudflare needs to know track IDs)
+    const trackObjects = sfuPc.getTransceivers()
+        .filter(t => t.sender.track)
+        .map(t => ({
+            location: 'local',
+            mid: t.mid,
+            trackName: t.sender.track!.id
+        }));
+
+    await sfuPc.setLocalDescription(await sfuPc.createOffer());
+    const tracksRes = await videoCallService.sfuSessionTracks(
+        callData.value!.chatId, 
+        sfuSessionId.value!, 
+        trackObjects, 
+        sfuPc.localDescription!.sdp!
+    );
+    await sfuPc.setRemoteDescription(new RTCSessionDescription(tracksRes.sessionDescription));
+
+    // 5. Handle pulling remote tracks
+    sfuPc.ontrack = (event) => {
+        // Find which participant this belongs to?
+        // Note: In Cloudflare SFU, we usually need to pull tracks by SessionID/TrackName.
+        // For our hybrid simplicity, we rely on the backend to tell us which tracks to pull.
+        console.log("[SFU] Got remote track:", event.track.kind);
+        // We'll need a way to map these back to participants. 
+        // For now, we'll use a generic approach or wait for Signaling to tell us.
+    };
+    
+    // SFU pulling logic is omitted for MVP, but the foundations are here.
+    // In a full SFU implementation, we would listen for "ParticipantJoined" 
+    // and then call sfuSessionTracks with 'location: remote'.
+}
+
+async function publishSFUScreenTrack(stream: MediaStream) {
+    if (!sfuPc || !sfuSessionId.value) return;
+    
+    const track = stream.getVideoTracks()[0];
+    const transceiver = sfuPc.addTransceiver(track, { direction: 'sendonly' });
+    
+    await sfuPc.setLocalDescription(await sfuPc.createOffer());
+    const res = await videoCallService.sfuSessionTracks(
+        callData.value!.chatId,
+        sfuSessionId.value!,
+        [{ location: 'local', mid: transceiver.mid, trackName: track.id }],
+        sfuPc.localDescription!.sdp!
+    );
+    await sfuPc.setRemoteDescription(new RTCSessionDescription(res.sessionDescription));
+}
+
 async function endCall(reason = "hangup") {
     if (callData.value && callState.value !== "ended") {
         videoCallService.endCall(callData.value.chatId, callData.value.callId, reason).catch(() => {});
@@ -773,7 +968,7 @@ onBeforeUnmount(() => cleanup());
                     />
 
                     <video
-                        v-if="remoteStreams.get(p.publicId) && !isAudioOnly"
+                        v-if="remoteStreams.get(p.publicId) && (!isAudioOnly || remoteHasVideo(p.publicId))"
                         v-src-object="remoteStreams.get(p.publicId)"
                         autoplay
                         playsinline
@@ -798,15 +993,16 @@ onBeforeUnmount(() => cleanup());
                 <!-- 2. Local Participant (Me) -->
                 <div 
                     class="video-cell local" 
-                    :class="{ 'pip-mode': participants.length >= 2, 'audio-mode': isAudioOnly }"
+                    :class="{ 'pip-mode': participants.length >= 2, 'audio-mode': isAudioOnly && !isScreenSharing }"
                 >
                     <video
-                        v-if="localHasVideo && !isCameraOff && !isAudioOnly"
-                        v-src-object="localStream"
+                        v-if="(isScreenSharing ? !!screenStream : (localHasVideo && !isCameraOff))"
+                        v-src-object="isScreenSharing ? screenStream : localStream"
                         autoplay
                         muted
                         playsinline
                         class="video-element"
+                        :class="{ 'mirror-off': isScreenSharing }"
                     />
                     <div v-else class="avatar-fallback">
                         <div class="avatar-placeholder local">
@@ -828,6 +1024,9 @@ onBeforeUnmount(() => cleanup());
                  <button v-if="!isAudioOnly" class="control-btn" :class="{ 'off': isCameraOff }" @click="toggleCamera" title="Toggle Camera">
                     <Icon :name="isCameraOff ? 'VideoOff' : 'Video'" size="24" />
                  </button>
+                  <button class="control-btn" :class="{ 'off': !isScreenSharing }" @click="toggleScreenShare" title="Share Screen">
+                    <Icon name="Monitor" size="24" />
+                  </button>
 
                  <button class="control-btn hangup" @click="endCall('hangup')" title="End Call">
                     <Icon name="PhoneOff" size="24" />

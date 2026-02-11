@@ -43,7 +43,11 @@ class SecurityHeaders
         $response->headers->remove('X-Powered-By');
 
         // Permissions Policy (formerly Feature Policy)
-        $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(self), camera=(self)');
+        // geolocation=(): Disabled (empty list)
+        // microphone=(self): Allowed for this origin
+        // camera=(self): Allowed for this origin
+        // display-capture=(self): Allowed for this origin (Required for Screen Sharing)
+        $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(self), camera=(self), display-capture=(self)');
 
         // Content Security Policy (skip for Horizon and Pulse which use inline scripts/Livewire)
         if (! $request->is('horizon*', 'pulse*')) {
@@ -59,7 +63,7 @@ class SecurityHeaders
 
         // Allow unsafe-eval in local development for Vue DevTools / Vite HMR
         $scriptSrc = "'self' 'nonce-{$nonce}'";
-        $connectSrc = "'self'";
+        $connectSrc = "'self' https://rtc.live.cloudflare.com"; // Cloudflare Calls Origin
         $styleSrc = "'self' 'unsafe-inline' https://fonts.bunny.net https://fonts.googleapis.com https://*.indeed.com";
 
         // Vite Dev Server Handling

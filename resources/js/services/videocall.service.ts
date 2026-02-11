@@ -22,9 +22,41 @@ export class VideoCallService extends BaseService {
   /**
    * Join an existing call.
    */
-  async joinCall(chatId: string, callId: string): Promise<{ status: string; participants: any[] }> {
+  async joinCall(chatId: string, callId: string): Promise<{ status: string; participants: any[]; mode: 'mesh' | 'sfu'; app_id?: string }> {
     const response = await this.api.post(`/api/chat/${chatId}/call/join`, {
       call_id: callId,
+    });
+    return response.data;
+  }
+
+  /**
+   * SFU Proxy: Create New Session
+   */
+  async sfuSessionNew(chatId: string, offer: string): Promise<any> {
+    const response = await this.api.post(`/api/chat/${chatId}/call/sfu/sessions/new`, {
+      sessionDescription: { type: 'offer', sdp: offer }
+    });
+    return response.data;
+  }
+
+  /**
+   * SFU Proxy: Add Tracks
+   */
+  async sfuSessionTracks(chatId: string, sessionId: string, tracks: any[], offer?: string): Promise<any> {
+    const body: any = { tracks };
+    if (offer) {
+      body.sessionDescription = { type: 'offer', sdp: offer };
+    }
+    const response = await this.api.post(`/api/chat/${chatId}/call/sfu/sessions/${sessionId}/tracks/new`, body);
+    return response.data;
+  }
+
+  /**
+   * SFU Proxy: Renegotiate (Answer)
+   */
+  async sfuSessionRenegotiate(chatId: string, sessionId: string, answer: string): Promise<any> {
+    const response = await this.api.put(`/api/chat/${chatId}/call/sfu/sessions/${sessionId}/renegotiate`, {
+      sessionDescription: { type: 'answer', sdp: answer }
     });
     return response.data;
   }

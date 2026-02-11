@@ -145,11 +145,65 @@ class VideoCallController extends Controller
         $participants = $this->getParticipantsList($chat->public_id, $callId);
         $metadata = $this->getCallMetadata($chat->public_id, $callId);
 
+        // HYBRID LOGIC: If total participants > 6, suggest SFU mode
+        $mode = count($participants) >= 6 ? 'sfu' : 'mesh';
+
         return response()->json([
             'status' => 'ok',
             'participants' => $participants,
-            'type' => $metadata['type'] ?? 'video', // Default to video if missing
+            'type' => $metadata['type'] ?? 'video',
+            'mode' => $mode,
+            'app_id' => config('services.cloudflare.app_id'), // Share public AppID if SFU
         ]);
+    }
+
+    /**
+     * SFU PROXY: New Session
+     */
+    public function sfuSessionNew(Request $request, Chat $chat): JsonResponse
+    {
+        $this->findChatOrFail($chat);
+        $appId = config('services.cloudflare.app_id');
+        $secret = config('services.cloudflare.app_secret');
+
+        if (!$appId || !$secret) {
+            return response()->json(['error' => 'SFU not configured'], 503);
+        }
+
+        $response = Http::withToken($secret)
+            ->post("https://rtc.live.cloudflare.com/v1/apps/{$appId}/sessions/new", $request->all());
+
+        return response()->json($response->json(), $response->status());
+    }
+
+    /**
+     * SFU PROXY: New Tracks
+     */
+    public function sfuSessionTracks(Request $request, Chat $chat, string $sessionId): JsonResponse
+    {
+        $this->findChatOrFail($chat);
+        $appId = config('services.cloudflare.app_id');
+        $secret = config('services.cloudflare.app_secret');
+
+        $response = Http::withToken($secret)
+            ->post("https://rtc.live.cloudflare.com/v1/apps/{$appId}/sessions/{$sessionId}/tracks/new", $request->all());
+
+        return response()->json($response->json(), $response->status());
+    }
+
+    /**
+     * SFU PROXY: Renegotiate
+     */
+    public function sfuSessionRenegotiate(Request $request, Chat $chat, string $sessionId): JsonResponse
+    {
+        $this->findChatOrFail($chat);
+        $appId = config('services.cloudflare.app_id');
+        $secret = config('services.cloudflare.app_secret');
+
+        $response = Http::withToken($secret)
+            ->put("https://rtc.live.cloudflare.com/v1/apps/{$appId}/sessions/{$sessionId}/renegotiate", $request->all());
+
+        return response()->json($response->json(), $response->status());
     }
 
     /**

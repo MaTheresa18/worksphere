@@ -909,8 +909,13 @@ Route::middleware(['auth:sanctum', 'throttle:api', '2fa.enforce', 'demo'])->grou
         Route::post('/{chat}/call/initiate', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'initiate']);
         Route::post('/{chat}/call/join', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'join']);
         Route::get('/{chat}/call/{callId}/participants', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'participants']);
-        Route::post('/{chat}/call/signal', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'signal']);
+        Route::post('/{chat}/call/signal', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'signal'])->middleware('throttle:signaling');
         Route::post('/{chat}/call/end', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'end']);
+
+        // SFU Proxy Routes
+        Route::post('/{chat}/call/sfu/sessions/new', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'sfuSessionNew']);
+        Route::post('/{chat}/call/sfu/sessions/{sessionId}/tracks/new', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'sfuSessionTracks']);
+        Route::put('/{chat}/call/sfu/sessions/{sessionId}/renegotiate', [\App\Http\Controllers\Api\Chat\VideoCallController::class, 'sfuSessionRenegotiate']);
     });
 
     // Personal Notes

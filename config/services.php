@@ -105,6 +105,8 @@ return [
     'cloudflare' => [
         'turn_key_id' => env('TURN_KEY_ID'),
         'turn_api_token' => env('TURN_KEY_API_TOKEN'),
+        'app_id' => env('CLOUDFLARE_APP_ID_SFU'),
+        'app_secret' => env('CLOUDFLARE_APP_SECRET_SFU'),
     ],
 
 ];
