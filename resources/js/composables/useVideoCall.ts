@@ -357,7 +357,7 @@ export function useVideoCall() {
 
   function playRingtone(type: 'incoming' | 'outgoing') {
     try {
-      ringtoneAudio = new Audio(type === 'incoming' ? '/static/sounds/ringtone.mp3' : '/static/sounds/ringback.mp3');
+      ringtoneAudio = new Audio(type === 'incoming' ? '/static/sounds/inbound-call.mp3' : '/static/sounds/outbound-call.mp3');
       ringtoneAudio.loop = true;
       ringtoneAudio.volume = 0.5;
       ringtoneAudio.play().catch(() => {});
